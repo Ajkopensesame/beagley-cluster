@@ -26,17 +26,52 @@ QtObject {
     readonly property color danger:    isNight ? "#FF3B3B" : "#C62828"
 
     function speedColor(speedKph) {
-        const s = Math.round(speedKph);
-        if (s <= 50)  return pearlLow;
-        if (s <= 115) return pearlHigh;
-        return danger;
+        const s = Math.max(0, Number(speedKph) || 0);
+
+        // Smooth transitions:
+        // 0..115: pearlLow -> pearlHigh
+        // 115..130: pearlHigh -> danger
+        const t1 = clamp(s / 115.0, 0, 1);
+        const t2 = clamp((s - 115.0) / 15.0, 0, 1);
+
+        function lerp(a, b, t) { return a + (b - a) * t; }
+        function mix(c1, c2, t) {
+            return Qt.rgba(
+                lerp(c1.r, c2.r, t),
+                lerp(c1.g, c2.g, t),
+                lerp(c1.b, c2.b, t),
+                lerp(c1.a, c2.a, t)
+            );
+        }
+
+        const base = mix(pearlLow, pearlHigh, t1);
+        return mix(base, danger, t2);
     }
 
-    function rpmColor(rpm, redlineStart) {
-        const v = Math.round(rpm);
-        const red = (redlineStart !== undefined) ? redlineStart : 5000;
-        if (v < red) return pearlHigh;
-        return danger;
+    // NOTE: third arg maxRpm is optional; TachGauge should pass it for best results.
+    function rpmColor(rpm, redlineStart, maxRpm) {
+        const r = Math.max(0, Number(rpm) || 0);
+        const red = (redlineStart !== undefined) ? Number(redlineStart) : 5000;
+        const max = (maxRpm !== undefined) ? Number(maxRpm) : 6500;
+
+        // Smooth transitions:
+        // 0..redline: pearlLow -> pearlHigh
+        // redline..max: pearlHigh -> danger
+        const t1 = clamp(r / Math.max(1, red), 0, 1);
+        const t2 = clamp((r - red) / Math.max(1, (max - red)), 0, 1);
+
+        function lerp(a, b, t) { return a + (b - a) * t; }
+        function mix(c1, c2, t) {
+            return Qt.rgba(
+                lerp(c1.r, c2.r, t),
+                lerp(c1.g, c2.g, t),
+                lerp(c1.b, c2.b, t),
+                lerp(c1.a, c2.a, t)
+            );
+        }
+
+        const base = mix(pearlLow, pearlHigh, t1);
+        return mix(base, danger, t2);
     }
 
     function tickAlpha(isMajor) {

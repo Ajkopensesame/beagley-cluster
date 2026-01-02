@@ -2,3 +2,8 @@
 build/
 *.user
 *.user.*
+
+# Local backups
+*.bak
+*.bak2
+*.save

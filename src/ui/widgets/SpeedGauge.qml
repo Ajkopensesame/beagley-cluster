@@ -20,6 +20,10 @@ Item {
     property real response: 10.0
     property real maxStepPerFrame: 10.0
 
+    // Depth controls (rim line around gauge)
+    property real rimDepth: 1.0      // 0.0..2.0 (try 1.2 to 1.6)
+    property bool overSpeed: speedInt >= 116
+
     readonly property real startAngleDeg: 225
     readonly property real sweepAngleDeg: 210
 
@@ -27,6 +31,21 @@ Item {
 
     readonly property real progress: clamp(displaySpeed / maxSpeed, 0, 1)
     readonly property int speedInt: Math.round(displaySpeed)
+
+    
+    // ===== Depth effect (more depth as speed rises) =====
+    // Global depth intensity multiplier
+    property real depthK: 1.0
+
+    property real depthTargetSpeed: 120
+
+    readonly property real depthProgress: clamp(displaySpeed / depthTargetSpeed, 0, 1)
+    readonly property real depth: depthProgress * depthK
+
+    // Make the face recess more obvious
+    readonly property real faceScale: 1.0 - 0.08 * depth
+    readonly property real faceYOffset: 12 * depth
+
 
     function fallbackSpeedColor(s) {
         const v = Math.round(s);
@@ -65,8 +84,21 @@ Item {
 
             ticksCanvas.requestPaint();
             arcCanvas.requestPaint();
+            rimCanvas.requestPaint();
         }
     }
+    // ===== Gauge face (scaled/sunk for depth) =====
+    Item {
+        id: face
+        z: 30
+        anchors.fill: parent
+        transformOrigin: Item.Center
+
+        scale: root.faceScale
+        y: root.faceYOffset
+
+
+
     // Tick marks
     Canvas {
         id: ticksCanvas
@@ -140,27 +172,142 @@ Item {
         }
     }
 
+    // ===== "Depth line" around the gauge (rim highlight + shadow) =====
+    Canvas {
+        id: rimCanvas
+        visible: false
+        anchors.fill: parent
+        opacity: 1.0
+
+        onPaint: {
+            const ctx = getContext("2d");
+            ctx.clearRect(0, 0, width, height);
+
+            const d = Math.max(0.0, Math.min(2.0, root.rimDepth));
+            const cx = width / 2;
+            const cy = height / 2;
+
+            // Place this just outside your ticks/arc so it reads like a bezel line.
+            const rOuter = width * 0.465;
+            const rimW = 6 + 8 * d;
+
+            const aHi = 0.16 + 0.24 * d;   // highlight strength
+            const aSh = 0.18 + 0.32 * d;   // shadow strength
+
+            ctx.save();
+            ctx.globalCompositeOperation = "source-over";
+
+            // Soft highlight arc (top-left quadrant-ish)
+            ctx.beginPath();
+            ctx.arc(cx, cy, rOuter - rimW * 0.35, (-140 * Math.PI)/180, (20 * Math.PI)/180);
+            ctx.strokeStyle = "rgba(255,255,255," + aHi + ")";
+            ctx.lineWidth = rimW;
+            ctx.lineCap = "round";
+            ctx.stroke();
+
+            // Shadow arc (bottom-right quadrant-ish)
+            ctx.beginPath();
+            ctx.arc(cx, cy, rOuter - rimW * 0.35, (40 * Math.PI)/180, (220 * Math.PI)/180);
+            ctx.strokeStyle = "rgba(0,0,0," + aSh + ")";
+            ctx.lineWidth = rimW;
+            ctx.lineCap = "round";
+            ctx.stroke();
+
+            // Inner rim separator (plane separation)
+            ctx.beginPath();
+            ctx.arc(cx, cy, width * 0.33, 0, Math.PI * 2);
+            ctx.strokeStyle = "rgba(0,0,0," + (0.10 + 0.20 * d) + ")";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            ctx.restore();
+        }
+    }
+
     // Centre number
     Text {
+        id: speedText
+        z: 50
         anchors.centerIn: parent
         text: root.speedInt
         font.pixelSize: 120
-    font.family: "Menlo"
+        font.family: "Menlo"
         font.letterSpacing: 1
         color: root.gaugeColor
-        opacity: 1.0
+        opacity:  1.0
 
         SequentialAnimation on opacity {
-            running: root.speedInt >= 116
+            id: flashAnim
+            running: root.overSpeed
             loops: Animation.Infinite
             NumberAnimation { to: 0.15; duration: 90 }
             NumberAnimation { to: 1.0; duration: 90 }
         }
 
-        onTextChanged: {
-            if (root.speedInt < 116) opacity = 1.0;
+    }
+    }
+
+    // Ensure we snap back after overspeed stops
+    onOverSpeedChanged: {
+        if (!overSpeed) speedText.opacity = 1.0;
+    }
+    // ===== Inner shadow / glass vignette (depth) =====
+    Canvas {
+        id: innerShadow
+        visible: true
+        z: 10
+        anchors.fill: parent
+        opacity: 0.70
+        // repaint when the value changes
+        Connections {
+            target: root
+            function onProgressChanged() { innerShadow.requestPaint(); }
+        }
+        onPaint: {
+            const ctx = getContext("2d");
+            ctx.clearRect(0, 0, width, height);
+
+            const cx = width / 2;
+            const cy = height / 2;
+
+            // Shadow ring sits just inside the tick radius
+            const rOuter = width * 0.46;
+            const rInner = width * 0.08;   // pulls the vignette closer to centre
+
+            // Depth-controlled alpha
+            const a = 0.14 + 0.55 * root.depth;  // deeper, more noticeable   // 0.10..0.45
+            const a2 = 0.04 + 0.18 * root.depth;  // subtle highlight
+
+            // Inner shadow (dark vignette)
+            let g = ctx.createRadialGradient(cx, cy, rInner, cx, cy, rOuter);
+            g.addColorStop(0.00, "rgba(0,0,0,0.00)");
+            g.addColorStop(0.55, "rgba(0,0,0,0.00)");
+            g.addColorStop(0.78, "rgba(0,0,0," + a + ")");
+            g.addColorStop(1.00, "rgba(0,0,0," + (a * 1.25) + ")");
+
+            ctx.fillStyle = g;
+            ctx.beginPath();
+            ctx.arc(cx, cy, rOuter, 0, Math.PI * 2);
+            ctx.arc(cx, cy, rInner, 0, Math.PI * 2, true);
+            ctx.closePath();
+            ctx.fill("evenodd");
+
+            // A very soft inner highlight ring for "glass"
+            let h = ctx.createRadialGradient(cx, cy, rInner, cx, cy, rOuter);
+            h.addColorStop(0.00, "rgba(255,255,255,0.00)");
+            h.addColorStop(0.65, "rgba(255,255,255,0.00)");
+            h.addColorStop(0.90, "rgba(255,255,255," + a2 + ")");
+            h.addColorStop(1.00, "rgba(255,255,255,0.00)");
+
+            ctx.fillStyle = h;
+            ctx.beginPath();
+            ctx.arc(cx, cy, rOuter, 0, Math.PI * 2);
+            ctx.arc(cx, cy, rInner, 0, Math.PI * 2, true);
+            ctx.closePath();
+            ctx.fill("evenodd");
         }
     }
+
 
     // Repaint if the theme flips day/night
     Connections {
@@ -168,6 +315,7 @@ Item {
         function onIsNightChanged() {
             ticksCanvas.requestPaint();
             arcCanvas.requestPaint();
+            rimCanvas.requestPaint();
         }
     }
 }
