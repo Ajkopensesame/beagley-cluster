@@ -197,34 +197,6 @@ Item {
         }
     }
 
-    // Centre number + label
-    Item {
-        anchors.centerIn: parent
-        width: parent.width
-        height: parent.height
-
-        Text {
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.verticalCenter: parent.verticalCenter
-            anchors.verticalCenterOffset: -6
-            text: root.rpmInt
-            font.pixelSize: 86
-            font.family: "Menlo"
-            font.letterSpacing: 1
-            color: root.gaugeColor
-        }
-
-        Text {
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.top: parent.verticalCenter
-            anchors.topMargin: 62
-            text: "RPM"
-            font.pixelSize: 26
-            font.family: "Menlo"
-            color: (theme && theme.text) ? theme.text : "white"
-            opacity: (theme && theme.isNight !== undefined) ? (theme.isNight ? 0.70 : 0.85) : 0.75
-        }
-    }
     // ===== Inner shadow / glass vignette (depth) =====
     Canvas {
         id: innerShadow
