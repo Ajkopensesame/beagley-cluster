@@ -15,7 +15,9 @@ Item {
     property real displayRpm: 0
 
     // Limits
-    property int maxRpm: 6500
+    property int maxScale: 8
+
+    property int maxRpm: maxScale * 1000
     property int redlineStart: 5000
 
     // Smoothing
@@ -113,7 +115,27 @@ Item {
                 ctx.moveTo(cx + Math.cos(a) * rInner, cy + Math.sin(a) * rInner);
                 ctx.lineTo(cx + Math.cos(a) * rOuter, cy + Math.sin(a) * rOuter);
                 ctx.stroke();
-            }
+            
+
+                // Major tick labels: 1..maxScale
+                if (major && v > 0) {
+                    const label = Math.round(v / 1000);
+                    if (label <= root.maxScale) {
+                        const rLabel = rInnerMajor - 20;
+                        const lx = cx + Math.cos(a) * rLabel;
+                        const ly = cy + Math.sin(a) * rLabel;
+
+                        ctx.save();
+                        ctx.globalAlpha = (theme && theme.isNight !== undefined) ? (theme.isNight ? 0.85 : 0.75) : 0.80;
+                        ctx.fillStyle = (theme && theme.text) ? theme.text : "white";
+                        ctx.font = "600 18px Menlo";
+                        ctx.textAlign = "center";
+                        ctx.textBaseline = "middle";
+                        ctx.fillText(String(label), lx, ly);
+                        ctx.restore();
+                    }
+                }
+}
         }
     }
 
