@@ -1,0 +1,6 @@
+<RCC>
+  <qresource prefix="/">
+    <file>ui/Main.qml</file>
+    <file>ui/widgets/SpeedGauge.qml</file>
+  </qresource>
+</RCC>
