@@ -7,3 +7,8 @@ build/
 *.bak
 *.bak2
 *.save
+
+# build outputs
+/build/
+*.user
+.DS_Store
