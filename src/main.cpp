@@ -4,8 +4,7 @@
 int main(int argc, char *argv[])
 {
     QGuiApplication app(argc, argv);
-
-    QQmlApplicationEngine engine;
+QQmlApplicationEngine engine;
 
     // Load QML module entry point
     engine.loadFromModule("BeagleY", "Main");

@@ -1,0 +1,52 @@
+qt_add_qml_module(beagley_cluster
+    URI BeagleY
+    VERSION 1.0
+
+    QML_FILES
+        src/ui/Main.qml
+
+        # Widgets
+        src/ui/widgets/SpeedGauge.qml
+        src/ui/widgets/SpeedoPearl.qml
+        src/ui/widgets/TachGauge.qml
+        src/ui/widgets/MatrixRain.qml
+
+        # Mock data (temporary)
+        src/ui/mock/MockVehicleState.qml
+
+    RESOURCES
+        src/assets/fonts/Oxanium-Regular.ttf
+        src/assets/fonts/Oxanium-SemiBold.ttf
+)cmake_minimum_required(VERSION 3.21)
+project(beagley_cluster LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+find_package(Qt6 REQUIRED COMPONENTS Quick)
+
+qt_standard_project_setup()
+
+qt_policy(SET QTP0001 NEW)
+qt_policy(SET QTP0004 NEW)
+
+qt_add_executable(beagley_cluster
+    src/main.cpp
+)
+
+qt_add_qml_module(beagley_cluster
+    URI BeagleY
+    VERSION 1.0
+
+    QML_FILES
+        src/ui/Main.qml
+        src/ui/widgets/SpeedGauge.qml
+        src/ui/widgets/TachGauge.qml
+        src/ui/widgets/MatrixRain.qml
+
+    RESOURCES
+        src/assets/fonts/Oxanium-Regular.ttf
+        src/assets/fonts/Oxanium-SemiBold.ttf
+)
+
+target_link_libraries(beagley_cluster PRIVATE Qt6::Quick)

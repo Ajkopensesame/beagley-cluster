@@ -6,38 +6,70 @@ Item {
     width: 420
     height: 420
 
+    // Pass the theme object in from Main.qml
+    property var theme
+
+    // ===== Public API (raw input) =====
     property real speed: 0
     property real maxSpeed: 180
+
+    // ===== Smoothed value (what we render) =====
+    property real displaySpeed: 0
+
+    // Tuning (OEM feel)
+    property real response: 10.0
+    property real maxStepPerFrame: 10.0
 
     readonly property real startAngleDeg: 225
     readonly property real sweepAngleDeg: 210
 
     function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
-    readonly property real progress: clamp(speed / maxSpeed, 0, 1)
-    readonly property int speedInt: Math.round(speed)
 
-    readonly property color currentColor: gaugeColor
+    readonly property real progress: clamp(displaySpeed / maxSpeed, 0, 1)
+    readonly property int speedInt: Math.round(displaySpeed)
 
-    readonly property color gaugeColor: {
-        const s = speedInt;
-        if (s <= 50)  return "#C7B7FF";
-        if (s <= 115) return "#5E35B1";
+    function fallbackSpeedColor(s) {
+        const v = Math.round(s);
+        if (v <= 50)  return "#C7B7FF";
+        if (v <= 115) return "#5E35B1";
         return "#FF3B3B";
     }
 
-    // ===== Load fonts =====
-    FontLoader {
-        id: oxaniumRegular
-        source: "qrc:/qt/qml/BeagleY/src/assets/fonts/Oxanium-Regular.ttf"
+    readonly property color gaugeColor: (theme && theme.speedColor)
+        ? theme.speedColor(displaySpeed)
+        : fallbackSpeedColor(displaySpeed)
+
+    function tickAlpha(major) {
+        if (theme && theme.tickAlpha) return theme.tickAlpha(major);
+        return major ? 0.55 : 0.32;
     }
 
-    FontLoader {
-        id: oxaniumBold
-        source: "qrc:/qt/qml/BeagleY/src/assets/fonts/Oxanium-SemiBold.ttf"
-    }
+    // Smooth speed -> displaySpeed
+    Timer {
+        id: smoothTimer
+        interval: 16
+        running: true
+        repeat: true
+        onTriggered: {
+            const dt = interval / 1000.0;
+            const target = clamp(root.speed, 0, root.maxSpeed);
+            const diff = target - root.displaySpeed;
 
-    // ===== Tick marks =====
+            let step = diff * (1 - Math.exp(-root.response * dt));
+
+            const cap = root.maxStepPerFrame;
+            if (step > cap) step = cap;
+            if (step < -cap) step = -cap;
+
+            root.displaySpeed += step;
+
+            ticksCanvas.requestPaint();
+            arcCanvas.requestPaint();
+        }
+    }
+    // Tick marks
     Canvas {
+        id: ticksCanvas
         anchors.fill: parent
 
         onPaint: {
@@ -60,10 +92,8 @@ Item {
 
                 ctx.beginPath();
                 ctx.strokeStyle = Qt.rgba(
-                    root.gaugeColor.r,
-                    root.gaugeColor.g,
-                    root.gaugeColor.b,
-                    major ? 0.5 : 0.3
+                    root.gaugeColor.r, root.gaugeColor.g, root.gaugeColor.b,
+                    tickAlpha(major)
                 );
                 ctx.lineWidth = major ? 4 : 2.5;
                 ctx.lineCap = "round";
@@ -77,7 +107,7 @@ Item {
         }
     }
 
-    // ===== Tapered arc =====
+    // Tapered arc
     Canvas {
         id: arcCanvas
         anchors.fill: parent
@@ -108,20 +138,14 @@ Item {
                 ctx.stroke();
             }
         }
-
-        Connections {
-            target: root
-            function onProgressChanged() { arcCanvas.requestPaint(); }
-            function onGaugeColorChanged() { arcCanvas.requestPaint(); }
-        }
     }
 
-    // ===== Centre number =====
+    // Centre number
     Text {
         anchors.centerIn: parent
         text: root.speedInt
-        font.family: oxaniumBold.name
         font.pixelSize: 120
+    font.family: "Menlo"
         font.letterSpacing: 1
         color: root.gaugeColor
         opacity: 1.0
@@ -138,7 +162,12 @@ Item {
         }
     }
 
-    Behavior on speed {
-        NumberAnimation { duration: 150 }
+    // Repaint if the theme flips day/night
+    Connections {
+        target: theme
+        function onIsNightChanged() {
+            ticksCanvas.requestPaint();
+            arcCanvas.requestPaint();
+        }
     }
 }

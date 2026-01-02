@@ -2,165 +2,178 @@ import QtQuick 2.15
 
 Item {
     id: root
+    width: 420
+    height: 420
 
-    // ===== Public API =====
+    // Pass the theme object in from Main.qml
+    property var theme
+
+    // Public API
     property real rpm: 0
 
-    // Tuning / limits
+    // Smoothed RPM
+    property real displayRpm: 0
+
+    // Limits
     property int maxRpm: 6500
-    property int greenMax: 2500
-    property int amberMax: 5000
+    property int redlineStart: 5000
 
-    // Visual sizing helper
-    readonly property real sizePx: Math.min(width, height)
+    // Smoothing
+    property real response: 12.0
+    property real maxStepPerFrame: 350.0
 
-    // Fonts (use your existing qrc root aliases)
-    FontLoader { id: oxReg;  source: "qrc:/Oxanium-Regular.ttf" }
-    FontLoader { id: oxSemi; source: "qrc:/Oxanium-SemiBold.ttf" }
-
-    // Zone color based on your thresholds:
-    // 0–2500 green, 2501–5000 amber, 5000+ red
-    function zoneColor(v) {
-        if (v <= greenMax) return "#4CAF50";     // green
-        if (v <= amberMax) return "#FFC107";     // amber
-        return "#FF1744";                        // red
-    }
+    readonly property real startAngleDeg: 225
+    readonly property real sweepAngleDeg: 210
 
     function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
-    Canvas {
-        id: canvas
-        anchors.fill: parent
-        antialiasing: true
+    readonly property real progress: clamp(displayRpm / maxRpm, 0, 1)
+    readonly property int rpmInt: Math.round(displayRpm)
 
-        onPaint: {
-            var ctx = getContext("2d");
-            ctx.reset && ctx.reset(); // Qt 6 Canvas supports reset in some builds; safe no-op otherwise
+    function fallbackRpmColor(v) {
+        return (v >= redlineStart) ? "#FF3B3B" : "#5E35B1";
+    }
 
-            var w = width, h = height;
-            ctx.clearRect(0, 0, w, h);
+    readonly property color gaugeColor: (theme && theme.rpmColor)
+        ? theme.rpmColor(displayRpm, redlineStart)
+        : fallbackRpmColor(displayRpm)
 
-            // Guard against weird sizing
-            if (w <= 2 || h <= 2) return;
+    function tickAlpha(major) {
+        if (theme && theme.tickAlpha) return theme.tickAlpha(major);
+        return major ? 0.55 : 0.32;
+    }
+    // Smooth rpm -> displayRpm
+    Timer {
+        id: smoothTimer
+        interval: 16
+        running: true
+        repeat: true
+        onTriggered: {
+            const dt = interval / 1000.0;
+            const target = clamp(root.rpm, 0, root.maxRpm);
+            const diff = target - root.displayRpm;
 
-            // Geometry
-            var cx = w * 0.5;
-            var cy = h * 0.52;                    // slight vertical bias like automotive clusters
-            var r  = Math.min(w, h) * 0.40;       // radius
-            var thickness = Math.max(10, r * 0.16);
+            let step = diff * (1 - Math.exp(-root.response * dt));
 
-            // Sweep angles (classic cluster arc)
-            // Start ~225°, end ~-45° (i.e., 270° sweep)
-            var start = Math.PI * 1.25;           // 225°
-            var end   = Math.PI * -0.25;          // -45°
-            var sweep = end - start;
+            const cap = root.maxStepPerFrame;
+            if (step > cap) step = cap;
+            if (step < -cap) step = -cap;
 
-            // Normalize value
-            var v = root.clamp(root.rpm, 0, root.maxRpm);
-            var t = (root.maxRpm > 0) ? (v / root.maxRpm) : 0;
-            t = root.clamp(t, 0, 1);
+            root.displayRpm += step;
 
-            // Colors
-            var bgArc = "rgba(255,255,255,0.12)";
-            var valArc = root.zoneColor(v);
-
-            // Background arc
-            ctx.save();
-            ctx.lineCap = "round";
-            ctx.lineWidth = thickness;
-            ctx.strokeStyle = bgArc;
-            ctx.beginPath();
-            ctx.arc(cx, cy, r, start, end, false);
-            ctx.stroke();
-            ctx.restore();
-
-            // Value arc
-            var valEnd = start + (sweep * t);
-            ctx.save();
-            ctx.lineCap = "round";
-            ctx.lineWidth = thickness;
-            ctx.strokeStyle = valArc;
-            ctx.beginPath();
-            ctx.arc(cx, cy, r, start, valEnd, false);
-            ctx.stroke();
-            ctx.restore();
-
-            // Optional subtle inner ring (matches “premium” look)
-            ctx.save();
-            ctx.lineWidth = Math.max(2, thickness * 0.18);
-            ctx.strokeStyle = "rgba(255,255,255,0.10)";
-            ctx.beginPath();
-            ctx.arc(cx, cy, r - thickness * 0.70, start, end, false);
-            ctx.stroke();
-            ctx.restore();
-
-            // Ticks (sparse, clean)
-            // Major every 1000 RPM, minor every 500 RPM
-            function drawTick(angle, len, alpha) {
-                var x1 = cx + Math.cos(angle) * (r - thickness * 0.10);
-                var y1 = cy + Math.sin(angle) * (r - thickness * 0.10);
-                var x2 = cx + Math.cos(angle) * (r - thickness * 0.10 - len);
-                var y2 = cy + Math.sin(angle) * (r - thickness * 0.10 - len);
-                ctx.strokeStyle = "rgba(255,255,255," + alpha + ")";
-                ctx.beginPath();
-                ctx.moveTo(x1, y1);
-                ctx.lineTo(x2, y2);
-                ctx.stroke();
-            }
-
-            ctx.save();
-            ctx.lineWidth = Math.max(2, thickness * 0.12);
-            var majors = Math.floor(root.maxRpm / 1000);
-            for (var i = 0; i <= majors; i++) {
-                var rpmMajor = i * 1000;
-                var tt = rpmMajor / root.maxRpm;
-                var a = start + sweep * tt;
-
-                // Major tick
-                drawTick(a, thickness * 0.55, 0.55);
-
-                // Minor tick between majors (500)
-                if (i < majors) {
-                    var rpmMinor = rpmMajor + 500;
-                    var ttm = rpmMinor / root.maxRpm;
-                    var am = start + sweep * ttm;
-                    drawTick(am, thickness * 0.32, 0.30);
-                }
-            }
-            ctx.restore();
-
-            // Numbers: big RPM value
-            ctx.save();
-            var rpmText = Math.round(v).toString();
-            ctx.fillStyle = valArc;
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-            ctx.font = Math.round(root.sizePx * 0.16) + "px " + (oxSemi.name || "sans-serif");
-            ctx.fillText(rpmText, cx, cy + r * 0.10);
-            ctx.restore();
-
-            // Label: RPM
-            ctx.save();
-            ctx.fillStyle = "rgba(255,255,255,0.70)";
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-            ctx.font = Math.round(root.sizePx * 0.06) + "px " + (oxReg.name || "sans-serif");
-            ctx.fillText("RPM", cx, cy + r * 0.28);
-            ctx.restore();
-
-            // Title: TACH
-            ctx.save();
-            ctx.fillStyle = "rgba(255,255,255,0.55)";
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-            ctx.font = Math.round(root.sizePx * 0.055) + "px " + (oxReg.name || "sans-serif");
-            ctx.fillText("TACH", cx, cy - r * 0.55);
-            ctx.restore();
+            ticksCanvas.requestPaint();
+            arcCanvas.requestPaint();
         }
     }
 
-    // Repaint smoothly when rpm changes or size changes
-    onRpmChanged: canvas.requestPaint()
-    onWidthChanged: canvas.requestPaint()
-    onHeightChanged: canvas.requestPaint()
+    // Tick marks (tach style)
+    Canvas {
+        id: ticksCanvas
+        anchors.fill: parent
+
+        onPaint: {
+            const ctx = getContext("2d");
+            ctx.clearRect(0, 0, width, height);
+
+            const cx = width / 2;
+            const cy = height / 2;
+            const rOuter = width * 0.42;
+            const rInnerMinor = rOuter - 9;
+            const rInnerMajor = rOuter - 18;
+
+            const startRad = (root.startAngleDeg - 90) * Math.PI / 180;
+            const sweepRad = root.sweepAngleDeg * Math.PI / 180;
+
+            for (let v = 0; v <= root.maxRpm; v += 500) {
+                const t = v / root.maxRpm;
+                const a = startRad + sweepRad * t;
+                const major = (v % 1000 === 0);
+
+                ctx.beginPath();
+                ctx.strokeStyle = Qt.rgba(
+                    root.gaugeColor.r, root.gaugeColor.g, root.gaugeColor.b,
+                    tickAlpha(major)
+                );
+                ctx.lineWidth = major ? 4 : 2.5;
+                ctx.lineCap = "round";
+
+                const rInner = major ? rInnerMajor : rInnerMinor;
+
+                ctx.moveTo(cx + Math.cos(a) * rInner, cy + Math.sin(a) * rInner);
+                ctx.lineTo(cx + Math.cos(a) * rOuter, cy + Math.sin(a) * rOuter);
+                ctx.stroke();
+            }
+        }
+    }
+
+    // Tapered arc (pearl depth)
+    Canvas {
+        id: arcCanvas
+        anchors.fill: parent
+
+        onPaint: {
+            const ctx = getContext("2d");
+            ctx.clearRect(0, 0, width, height);
+
+            const cx = width / 2;
+            const cy = height / 2;
+            const r  = width * 0.40;
+
+            const startRad = (root.startAngleDeg - 90) * Math.PI / 180;
+            const endRad = startRad + (root.sweepAngleDeg * root.progress) * Math.PI / 180;
+
+            for (let i = 0; i < 60; i++) {
+                const t0 = i / 60;
+                const t1 = (i + 1) / 60;
+
+                ctx.beginPath();
+                ctx.strokeStyle = root.gaugeColor;
+                ctx.lineCap = "round";
+                ctx.lineWidth = 6 + (26 - 6) * t1;
+
+                ctx.arc(cx, cy, r,
+                        startRad + (endRad - startRad) * t0,
+                        startRad + (endRad - startRad) * t1);
+                ctx.stroke();
+            }
+        }
+    }
+
+    // Centre number + label
+    Item {
+        anchors.centerIn: parent
+        width: parent.width
+        height: parent.height
+
+        Text {
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.verticalCenterOffset: -6
+            text: root.rpmInt
+            font.pixelSize: 86
+    font.family: "Menlo"
+            font.letterSpacing: 1
+            color: root.gaugeColor
+        }
+
+        Text {
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.top: parent.verticalCenter
+            anchors.topMargin: 62
+            text: "RPM"
+            font.pixelSize: 26
+    font.family: "Menlo"
+            color: (theme && theme.text) ? theme.text : "white"
+            opacity: (theme && theme.isNight !== undefined) ? (theme.isNight ? 0.70 : 0.85) : 0.75
+        }
+    }
+
+    // Repaint if day/night flips
+    Connections {
+        target: theme
+        function onIsNightChanged() {
+            ticksCanvas.requestPaint();
+            arcCanvas.requestPaint();
+        }
+    }
 }
