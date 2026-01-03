@@ -107,10 +107,10 @@ Window {
         theme: appTheme
         rpm: vehicle.rpm
 
+        fuelPct: vehicle.fuelPct
         width: Math.min(rightPanel.width * 0.92, rightPanel.height * 0.92)
         height: width
     }
-
     // Debug overlay
     Text {
         anchors.left: parent.left

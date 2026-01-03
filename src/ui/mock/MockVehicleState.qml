@@ -7,6 +7,7 @@ Item {
     // -------- Vehicle state (mock) --------
     property real speedKph: 0
     property real rpm: 0
+    property real fuelPct: 100
 
     // -------- Simulation parameters --------
     property real targetSpeedKph: 0
@@ -51,7 +52,21 @@ Item {
             }
 
             root.speedKph = Math.max(0, Math.min(root.maxSpeedKph, root.speedKph));
+
+            // Simple RPM mapping for demo only
             root.rpm = Math.max(0, Math.min(6500, root.speedKph * 50));
+        }
+    }
+
+    // Fuel simulation: slow drain, refill when empty
+    Timer {
+        id: fuelTimer
+        interval: 250
+        running: true
+        repeat: true
+        onTriggered: {
+            root.fuelPct -= 0.08;
+            if (root.fuelPct <= 0) root.fuelPct = 100;
         }
     }
 }

@@ -11,6 +11,16 @@ Item {
     // Public API
     property real rpm: 0
 
+
+    // Fuel (0..100) for center mini-gauge
+    property real fuelPct: 100
+    property real lowFuelPct: 12
+
+    // Smoothed fuel
+    property real displayFuel: 100
+    property real fuelResponse: 10.0
+    property real fuelMaxStepPerFrame: 6.0
+
     // Smoothed RPM
     property real displayRpm: 0
 
@@ -33,6 +43,10 @@ Item {
 
     readonly property real progress: clamp(displayRpm / maxRpm, 0, 1)
     readonly property int rpmInt: Math.round(displayRpm)
+
+
+    readonly property int fuelInt: Math.round(displayFuel)
+    readonly property bool lowFuel: (displayFuel <= lowFuelPct)
 
     // ===== Depth effect (MATCH SPEEDO) =====
     property real depthK: 1.0
@@ -67,6 +81,16 @@ Item {
             step = clamp(step, -root.maxStepPerFrame, root.maxStepPerFrame);
 
             root.displayRpm += step;
+
+
+            // ---- Smooth fuel ----
+            const fuelTarget = clamp(root.fuelPct, 0, 100);
+            const fuelDiff = fuelTarget - root.displayFuel;
+
+            let fuelStep = fuelDiff * (1 - Math.exp(-root.fuelResponse * dt));
+            fuelStep = clamp(fuelStep, -root.fuelMaxStepPerFrame, root.fuelMaxStepPerFrame);
+
+            root.displayFuel += fuelStep;
 
             ticksCanvas.requestPaint();
             arcCanvas.requestPaint();
@@ -183,6 +207,35 @@ Item {
             id: rimCanvas
             visible: false
             anchors.fill: parent
+        }
+    }
+
+
+    // ===== Center Fuel (debug text) =====
+    Column {
+        anchors.centerIn: parent
+        width: parent.width * 0.32
+        z: 45
+        spacing: 2
+
+        Text {
+            text: "FUEL"
+            font.pixelSize: 14
+            font.family: "Menlo"
+            color: theme?.text ?? "white"
+            opacity: theme?.isNight ? 0.80 : 0.65
+            horizontalAlignment: Text.AlignHCenter
+            width: parent.width
+        }
+
+        Text {
+            text: root.fuelInt + "%"
+            font.pixelSize: 44
+            font.family: "Menlo"
+            font.letterSpacing: 1
+            color: root.lowFuel ? (theme?.danger ?? "#FF3B3B") : (theme?.pearlHigh ?? root.gaugeColor)
+            horizontalAlignment: Text.AlignHCenter
+            width: parent.width
         }
     }
 

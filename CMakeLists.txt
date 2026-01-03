@@ -39,6 +39,7 @@ qt_add_qml_module(beagley_cluster
 
         # Widgets
         src/ui/widgets/SpeedGauge.qml
+        src/ui/widgets/FuelGauge.qml
         src/ui/widgets/SpeedoPearl.qml
         src/ui/widgets/TachGauge.qml
         src/ui/widgets/MatrixRain.qml
