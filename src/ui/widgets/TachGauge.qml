@@ -16,7 +16,6 @@ Item {
 
     // Limits
     property int maxScale: 8
-
     property int maxRpm: maxScale * 1000
     property int redlineStart: 5000
 
@@ -24,8 +23,8 @@ Item {
     property real response: 12.0
     property real maxStepPerFrame: 350.0
 
-    // Depth controls (rim line around gauge)
-    property real rimDepth: 1.0      // 0.0..2.0
+    // Depth controls
+    property real rimDepth: 1.0
 
     readonly property real startAngleDeg: 225
     readonly property real sweepAngleDeg: 210
@@ -35,11 +34,11 @@ Item {
     readonly property real progress: clamp(displayRpm / maxRpm, 0, 1)
     readonly property int rpmInt: Math.round(displayRpm)
 
-    // ===== Depth effect (more depth as RPM rises) =====
+    // ===== Depth effect (MATCH SPEEDO) =====
     property real depthK: 1.0
     readonly property real depth: progress * depthK
-    readonly property real faceScale: 1.0 - 0.05 * depth
-    readonly property real faceYOffset: 6 * depth
+    readonly property real faceScale: 1.0 - 0.08 * depth
+    readonly property real faceYOffset: 12 * depth
 
     function fallbackRpmColor(v) {
         return (v >= redlineStart) ? "#FF3B3B" : "#5E35B1";
@@ -54,9 +53,8 @@ Item {
         return major ? 0.55 : 0.32;
     }
 
-    // Smooth rpm -> displayRpm
+    // ===== Smooth RPM =====
     Timer {
-        id: smoothTimer
         interval: 16
         running: true
         repeat: true
@@ -66,217 +64,155 @@ Item {
             const diff = target - root.displayRpm;
 
             let step = diff * (1 - Math.exp(-root.response * dt));
-
-            const cap = root.maxStepPerFrame;
-            if (step > cap) step = cap;
-            if (step < -cap) step = -cap;
+            step = clamp(step, -root.maxStepPerFrame, root.maxStepPerFrame);
 
             root.displayRpm += step;
 
             ticksCanvas.requestPaint();
             arcCanvas.requestPaint();
             rimCanvas.requestPaint();
+            innerShadow.requestPaint();
         }
     }
 
-    // Tick marks (tach style)
-    Canvas {
-        id: ticksCanvas
+    // ===== Gauge face (breathing layer) =====
+    Item {
+        id: face
         anchors.fill: parent
+        transformOrigin: Item.Center
+        scale: root.faceScale
+        y: root.faceYOffset
+        z: 20
 
-        onPaint: {
-            const ctx = getContext("2d");
-            ctx.clearRect(0, 0, width, height);
+        // ---- Ticks + numbers ----
+        Canvas {
+            id: ticksCanvas
+            anchors.fill: parent
 
-            const cx = width / 2;
-            const cy = height / 2;
-            const rOuter = width * 0.42;
-            const rInnerMinor = rOuter - 9;
-            const rInnerMajor = rOuter - 18;
+            onPaint: {
+                const ctx = getContext("2d");
+                ctx.clearRect(0, 0, width, height);
 
-            const startRad = (root.startAngleDeg - 90) * Math.PI / 180;
-            const sweepRad = root.sweepAngleDeg * Math.PI / 180;
+                const cx = width / 2;
+                const cy = height / 2;
+                const rOuter = width * 0.42;
+                const rInnerMinor = rOuter - 9;
+                const rInnerMajor = rOuter - 18;
 
-            for (let v = 0; v <= root.maxRpm; v += 500) {
-                const t = v / root.maxRpm;
-                const a = startRad + sweepRad * t;
-                const major = (v % 1000 === 0);
+                const startRad = (root.startAngleDeg - 90) * Math.PI / 180;
+                const sweepRad = root.sweepAngleDeg * Math.PI / 180;
 
-                ctx.beginPath();
-                ctx.strokeStyle = Qt.rgba(
-                    root.gaugeColor.r, root.gaugeColor.g, root.gaugeColor.b,
-                    tickAlpha(major)
-                );
-                ctx.lineWidth = major ? 4 : 2.5;
-                ctx.lineCap = "round";
+                for (let v = 0; v <= root.maxRpm; v += 500) {
+                    const t = v / root.maxRpm;
+                    const a = startRad + sweepRad * t;
+                    const major = (v % 1000 === 0);
 
-                const rInner = major ? rInnerMajor : rInnerMinor;
+                    ctx.beginPath();
+                    ctx.strokeStyle = Qt.rgba(
+                        root.gaugeColor.r,
+                        root.gaugeColor.g,
+                        root.gaugeColor.b,
+                        tickAlpha(major)
+                    );
+                    ctx.lineWidth = major ? 4 : 2.5;
+                    ctx.lineCap = "round";
 
-                ctx.moveTo(cx + Math.cos(a) * rInner, cy + Math.sin(a) * rInner);
-                ctx.lineTo(cx + Math.cos(a) * rOuter, cy + Math.sin(a) * rOuter);
-                ctx.stroke();
-            
+                    const rInner = major ? rInnerMajor : rInnerMinor;
+                    ctx.moveTo(cx + Math.cos(a) * rInner, cy + Math.sin(a) * rInner);
+                    ctx.lineTo(cx + Math.cos(a) * rOuter, cy + Math.sin(a) * rOuter);
+                    ctx.stroke();
 
-                // Major tick labels: 1..maxScale
-                if (major && v > 0) {
-                    const label = Math.round(v / 1000);
-                    if (label <= root.maxScale) {
-                        const rLabel = rInnerMajor - 20;
-                        const lx = cx + Math.cos(a) * rLabel;
-                        const ly = cy + Math.sin(a) * rLabel;
-
-                        ctx.save();
-                        ctx.globalAlpha = (theme && theme.isNight !== undefined) ? (theme.isNight ? 0.85 : 0.75) : 0.80;
-                        ctx.fillStyle = (theme && theme.text) ? theme.text : "white";
-                        ctx.font = "600 18px Menlo";
-                        ctx.textAlign = "center";
-                        ctx.textBaseline = "middle";
-                        ctx.fillText(String(label), lx, ly);
-                        ctx.restore();
+                    if (major && v > 0) {
+                        const label = Math.round(v / 1000);
+                        if (label <= root.maxScale) {
+                            const rLabel = rInnerMajor - 20;
+                            ctx.save();
+                            ctx.fillStyle = theme?.text ?? "white";
+                            ctx.globalAlpha = theme?.isNight ? 0.85 : 0.75;
+                            ctx.font = "600 18px Menlo";
+                            ctx.textAlign = "center";
+                            ctx.textBaseline = "middle";
+                            ctx.fillText(
+                                String(label),
+                                cx + Math.cos(a) * rLabel,
+                                cy + Math.sin(a) * rLabel
+                            );
+                            ctx.restore();
+                        }
                     }
                 }
-}
-        }
-    }
-
-    // Tapered arc
-    Canvas {
-        id: arcCanvas
-        anchors.fill: parent
-
-        onPaint: {
-            const ctx = getContext("2d");
-            ctx.clearRect(0, 0, width, height);
-
-            const cx = width / 2;
-            const cy = height / 2;
-            const r  = width * 0.40;
-
-            const startRad = (root.startAngleDeg - 90) * Math.PI / 180;
-            const endRad = startRad + (root.sweepAngleDeg * root.progress) * Math.PI / 180;
-
-            for (let i = 0; i < 60; i++) {
-                const t0 = i / 60;
-                const t1 = (i + 1) / 60;
-
-                ctx.beginPath();
-                ctx.strokeStyle = root.gaugeColor;
-                ctx.lineCap = "round";
-                ctx.lineWidth = 6 + (26 - 6) * t1;
-
-                ctx.arc(cx, cy, r,
-                        startRad + (endRad - startRad) * t0,
-                        startRad + (endRad - startRad) * t1);
-                ctx.stroke();
             }
         }
-    }
 
-    // ===== "Depth line" around the gauge (rim highlight + shadow) =====
-    Canvas {
-        id: rimCanvas
-        visible: false
-        anchors.fill: parent
-        opacity: 1.0
+        // ---- Arc ----
+        Canvas {
+            id: arcCanvas
+            anchors.fill: parent
 
-        onPaint: {
-            const ctx = getContext("2d");
-            ctx.clearRect(0, 0, width, height);
+            onPaint: {
+                const ctx = getContext("2d");
+                ctx.clearRect(0, 0, width, height);
 
-            const d = Math.max(0.0, Math.min(2.0, root.rimDepth));
-            const cx = width / 2;
-            const cy = height / 2;
+                const cx = width / 2;
+                const cy = height / 2;
+                const r  = width * 0.40;
 
-            const rOuter = width * 0.465;
-            const rimW = 6 + 8 * d;
+                const startRad = (root.startAngleDeg - 90) * Math.PI / 180;
+                const endRad = startRad + root.sweepAngleDeg * root.progress * Math.PI / 180;
 
-            const aHi = 0.16 + 0.24 * d;
-            const aSh = 0.18 + 0.32 * d;
+                for (let i = 0; i < 60; i++) {
+                    const t0 = i / 60;
+                    const t1 = (i + 1) / 60;
 
-            ctx.save();
+                    ctx.beginPath();
+                    ctx.strokeStyle = root.gaugeColor;
+                    ctx.lineCap = "round";
+                    ctx.lineWidth = 6 + (26 - 6) * t1;
+                    ctx.arc(
+                        cx, cy, r,
+                        startRad + (endRad - startRad) * t0,
+                        startRad + (endRad - startRad) * t1
+                    );
+                    ctx.stroke();
+                }
+            }
+        }
 
-            ctx.beginPath();
-            ctx.arc(cx, cy, rOuter - rimW * 0.35, (-140 * Math.PI)/180, (20 * Math.PI)/180);
-            ctx.strokeStyle = "rgba(255,255,255," + aHi + ")";
-            ctx.lineWidth = rimW;
-            ctx.lineCap = "round";
-            ctx.stroke();
-
-            ctx.beginPath();
-            ctx.arc(cx, cy, rOuter - rimW * 0.35, (40 * Math.PI)/180, (220 * Math.PI)/180);
-            ctx.strokeStyle = "rgba(0,0,0," + aSh + ")";
-            ctx.lineWidth = rimW;
-            ctx.lineCap = "round";
-            ctx.stroke();
-
-            ctx.beginPath();
-            ctx.arc(cx, cy, width * 0.33, 0, Math.PI * 2);
-            ctx.strokeStyle = "rgba(0,0,0," + (0.10 + 0.20 * d) + ")";
-            ctx.lineWidth = 2;
-            ctx.stroke();
-
-            ctx.restore();
+        // ---- Rim (optional) ----
+        Canvas {
+            id: rimCanvas
+            visible: false
+            anchors.fill: parent
         }
     }
 
-    // ===== Inner shadow / glass vignette (depth) =====
+    // ===== Glass / vignette (non-breathing) =====
     Canvas {
         id: innerShadow
         anchors.fill: parent
-        opacity: 0.70
-        Connections {
-            target: root
-            function onProgressChanged() { innerShadow.requestPaint(); }
-        }
+        z: 50
+        opacity: 0.7
+
         onPaint: {
             const ctx = getContext("2d");
             ctx.clearRect(0, 0, width, height);
 
             const cx = width / 2;
             const cy = height / 2;
-
             const rOuter = width * 0.46;
             const rInner = width * 0.20;
 
             const a = 0.10 + 0.35 * root.depth;
-            const a2 = 0.04 + 0.18 * root.depth;
-
-            let g = ctx.createRadialGradient(cx, cy, rInner, cx, cy, rOuter);
-            g.addColorStop(0.00, "rgba(0,0,0,0.00)");
-            g.addColorStop(0.55, "rgba(0,0,0,0.00)");
-            g.addColorStop(0.78, "rgba(0,0,0," + a + ")");
-            g.addColorStop(1.00, "rgba(0,0,0," + (a * 1.25) + ")");
+            const g = ctx.createRadialGradient(cx, cy, rInner, cx, cy, rOuter);
+            g.addColorStop(0.0, "rgba(0,0,0,0)");
+            g.addColorStop(0.8, `rgba(0,0,0,${a})`);
+            g.addColorStop(1.0, `rgba(0,0,0,${a * 1.25})`);
 
             ctx.fillStyle = g;
             ctx.beginPath();
             ctx.arc(cx, cy, rOuter, 0, Math.PI * 2);
             ctx.arc(cx, cy, rInner, 0, Math.PI * 2, true);
-            ctx.closePath();
             ctx.fill("evenodd");
-
-            let h = ctx.createRadialGradient(cx, cy, rInner, cx, cy, rOuter);
-            h.addColorStop(0.00, "rgba(255,255,255,0.00)");
-            h.addColorStop(0.65, "rgba(255,255,255,0.00)");
-            h.addColorStop(0.90, "rgba(255,255,255," + a2 + ")");
-            h.addColorStop(1.00, "rgba(255,255,255,0.00)");
-
-            ctx.fillStyle = h;
-            ctx.beginPath();
-            ctx.arc(cx, cy, rOuter, 0, Math.PI * 2);
-            ctx.arc(cx, cy, rInner, 0, Math.PI * 2, true);
-            ctx.closePath();
-            ctx.fill("evenodd");
-        }
-    }
-
-
-    // Repaint if day/night flips
-    Connections {
-        target: theme
-        function onIsNightChanged() {
-            ticksCanvas.requestPaint();
-            arcCanvas.requestPaint();
-            rimCanvas.requestPaint();
         }
     }
 }
