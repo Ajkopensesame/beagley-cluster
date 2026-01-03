@@ -11,7 +11,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # --------------------
 # Qt
 # --------------------
-find_package(Qt6 REQUIRED COMPONENTS Quick)
+find_package(Qt6 REQUIRED COMPONENTS Quick WebEngineQuick)
 
 qt_standard_project_setup()
 
@@ -23,6 +23,12 @@ qt_policy(SET QTP0004 NEW)
 # --------------------
 qt_add_executable(beagley_cluster
     src/main.cpp
+)
+
+qt_add_resources(beagley_cluster web_resources
+    PREFIX "/web"
+    FILES
+        src/ui/web/map/index.html
 )
 
 # --------------------
@@ -44,6 +50,7 @@ qt_add_qml_module(beagley_cluster
         src/ui/widgets/SpeedoPearl.qml
         src/ui/widgets/TachGauge.qml
         src/ui/widgets/MatrixRain.qml
+        src/ui/widgets/MapCenter.qml
 
         # Mock data (temporary – will be replaced by BBB later)
         src/ui/mock/MockVehicleState.qml
@@ -55,5 +62,5 @@ qt_add_qml_module(beagley_cluster
 # Link Qt
 # --------------------
 target_link_libraries(beagley_cluster
-    PRIVATE Qt6::Quick
+    PRIVATE Qt6::Quick Qt6::WebEngineQuick
 )

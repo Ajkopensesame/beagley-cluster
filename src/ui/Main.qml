@@ -101,6 +101,14 @@ Window {
         height: width
     }
 
+
+    // ===== Center (Map) =====
+    MapCenter {
+        id: map
+        anchors.fill: centerPanel
+    }
+
+
     // ===== Right (Tach) =====
     TachGauge {
         id: tach

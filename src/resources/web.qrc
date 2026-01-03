@@ -1,0 +1,5 @@
+<RCC>
+  <qresource prefix="/">
+    <file alias="web/index.html">../ui/web/map/index.html</file>
+  </qresource>
+</RCC>
