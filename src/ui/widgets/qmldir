@@ -3,3 +3,5 @@ TachGauge     1.0 TachGauge.qml
 MatrixRain    1.0 MatrixRain.qml
 SpeedoPearl   1.0 SpeedoPearl.qml
 FuelGauge    1.0 FuelGauge.qml
+
+FuelPumpIcon 1.0 FuelPumpIcon.qml

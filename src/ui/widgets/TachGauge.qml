@@ -162,9 +162,8 @@ Item {
                                 cy + Math.sin(a) * rLabel
                             );
                             ctx.restore();
-                        }
-                    }
-                }
+            }
+        }
             }
         }
 
@@ -202,44 +201,136 @@ Item {
             }
         }
 
+        // ---- Fuel arc (FILLED band, opposite tach) ----
+        Canvas {
+            id: fuelArcCanvas
+            anchors.fill: parent
+            z: 44
+
+            onWidthChanged: requestPaint()
+            onHeightChanged: requestPaint()
+
+            Connections {
+                target: root
+                function onDisplayFuelChanged() { fuelArcCanvas.requestPaint() }
+            }
+
+            onPaint: {
+                const ctx = getContext("2d");
+                ctx.clearRect(0, 0, width, height);
+
+                const cx = width / 2;
+                const cy = height / 2;
+
+                // Fuel lives on the "remaining" degrees of the circle (opposite the tach sweep)
+                const rawStartDeg = (root.startAngleDeg + root.sweepAngleDeg) % 360;
+                const rawSweepDeg = 360 - root.sweepAngleDeg;
+
+                // Symmetric angular padding so the fuel arc is smaller AND centered
+                const padDeg = 12;   // increase/decrease this to tune spacing
+                const startDeg = rawStartDeg + padDeg;
+                const sweepDeg = Math.max(0, rawSweepDeg - padDeg * 2);
+
+                const startRad = (startDeg - 90) * Math.PI / 180;
+                const sweepRad = sweepDeg * Math.PI / 180;
+
+                const fuel = clamp(root.displayFuel / 100.0, 0, 1);
+
+                const empty = 1.0 - fuel;
+
+                // Band geometry (wide at start -> taper to a point at end)
+                const rOut = width * 0.36;
+                const thickStart = 26;   // wide end (F side)
+                const thickEnd   = 3;    // point end (E side)
+                const segments   = 90;
+
+                // Theme colours: "full" = dark purple, "empty" = light purple
+                const dark  = (theme?.pearlHigh ?? root.gaugeColor);
+                const light = (theme?.pearlLow  ?? "#B79CFF");
+
+                ctx.save();
+                ctx.globalAlpha = theme?.isNight ? 0.88 : 0.72;
+
+                function drawBand(tFrom, tTo, color) {
+                    ctx.fillStyle = color;
+
+                    for (let i = 0; i < segments; i++) {
+                        const u0 = i / segments;
+                        const u1 = (i + 1) / segments;
+
+                        if (u0 >= tTo) break;
+
+                        const v0 = Math.max(u0, tFrom);
+                        const v1 = Math.min(u1, tTo);
+                        if (v1 <= v0) continue;
+
+                        const a0 = startRad + sweepRad * v0;
+                        const a1 = startRad + sweepRad * v1;
+
+                        // IMPORTANT: thickness is based on position along the FULL arc (0..1),
+                        // so the physical arc remains constant, only the colour boundary moves.
+                        const th  = thickStart + (thickEnd - thickStart) * v1;
+                        const rIn = rOut - th;
+
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, rOut, a0, a1, false);
+                        ctx.arc(cx, cy, rIn,  a1, a0, true);
+                        ctx.closePath();
+                        ctx.fill();
+                    }
+                }
+
+                // 1) Base band (always full length): EMPTY/light colour
+                drawBand(0.0, 1.0, dark);
+
+                // 2) Overlay band (changes with fuel): FULL/dark colour, anchored at the wide end (F)
+                drawBand(0.0, empty, light);
+
+                // Rounded caps (physical endpoints always rounded)
+                function capAt(t, color) {
+                    const th = thickStart + (thickEnd - thickStart) * t;
+                    const rr = rOut - th / 2;
+                    const ang = startRad + sweepRad * t;
+                    const x = cx + Math.cos(ang) * rr;
+                    const y = cy + Math.sin(ang) * rr;
+
+                    ctx.fillStyle = color;
+                    ctx.beginPath();
+                    ctx.arc(x, y, th / 2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                capAt(0.0, empty > 0.0001 ? light : dark);   // F end
+                capAt(1.0, fuel > 0.0001 ? dark : light);  // E end
+
+                // Optional: round the moving boundary so it doesn't look "cut"
+                if (empty > 0.0 && empty < 1.0) capAt(empty, light);
+
+                // F / E labels pinned to the endpoints of the FULL arc
+                const labelR = rOut + 18;
+                const angF = startRad;
+                const angE = startRad + sweepRad;
+
+                ctx.globalAlpha = theme?.isNight ? 0.90 : 0.75;
+                ctx.fillStyle = theme?.text ?? "white";
+                ctx.font = "700 16px Menlo";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+
+                ctx.fillText("F", cx + Math.cos(angF) * labelR, cy + Math.sin(angF) * labelR);
+                ctx.fillText("E", cx + Math.cos(angE) * labelR, cy + Math.sin(angE) * labelR);
+
+                ctx.restore();
+            }
+        }
+
         // ---- Rim (optional) ----
         Canvas {
             id: rimCanvas
             visible: false
             anchors.fill: parent
         }
-    }
-
-
-    // ===== Center Fuel (debug text) =====
-    Column {
-        anchors.centerIn: parent
-        width: parent.width * 0.32
-        z: 45
-        spacing: 2
-
-        Text {
-            text: "FUEL"
-            font.pixelSize: 14
-            font.family: "Menlo"
-            color: theme?.text ?? "white"
-            opacity: theme?.isNight ? 0.80 : 0.65
-            horizontalAlignment: Text.AlignHCenter
-            width: parent.width
-        }
-
-        Text {
-            text: root.fuelInt + "%"
-            font.pixelSize: 44
-            font.family: "Menlo"
-            font.letterSpacing: 1
-            color: root.lowFuel ? (theme?.danger ?? "#FF3B3B") : (theme?.pearlHigh ?? root.gaugeColor)
-            horizontalAlignment: Text.AlignHCenter
-            width: parent.width
-        }
-    }
-
-    // ===== Glass / vignette (non-breathing) =====
+    }    // ===== Glass / vignette (non-breathing) =====
     Canvas {
         id: innerShadow
         anchors.fill: parent
@@ -268,4 +359,5 @@ Item {
             ctx.fill("evenodd");
         }
     }
+}
 }
