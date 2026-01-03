@@ -12,3 +12,4 @@ build/
 /build/
 *.user
 .DS_Store
+*.bak.*
