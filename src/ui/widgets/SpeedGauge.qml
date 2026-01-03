@@ -13,8 +13,21 @@ Item {
     property real speed: 0
     property real maxSpeed: 180
 
+    // --- Coolant public API (°C) ---
+    // For now this is a static default until we wire it from VehicleState in the next step.
+    property real coolantC: 70
+
+    // Tuning for coolant mapping (°C)
+    property real coolantColdC: 40      // bottom-left "C"
+    property real coolantHotC: 110      // top-right "H"
+
     // Smoothed value
     property real displaySpeed: 0
+
+    // Smoothed coolant
+    property real displayCoolantC: 70
+    property real coolantResponse: 8.0
+    property real coolantMaxStepPerFrame: 3.5
 
     // Tuning
     property real response: 10.0
@@ -28,9 +41,16 @@ Item {
     readonly property real sweepAngleDeg: 210
 
     function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+    function lerp(a, b, t) { return a + (b - a) * t; }
 
     readonly property real progress: clamp(displaySpeed / maxSpeed, 0, 1)
     readonly property int speedInt: Math.round(displaySpeed)
+
+    // Coolant normalized 0..1 (C -> H)
+    readonly property real coolantNorm: clamp(
+        (displayCoolantC - coolantColdC) / Math.max(1e-6, (coolantHotC - coolantColdC)),
+        0, 1
+    )
 
     // Depth effect
     property real depthK: 1.0
@@ -56,6 +76,33 @@ Item {
         return major ? 0.55 : 0.32;
     }
 
+    // --- Coolant colour ramp (cold->warm->hot) ---
+    function coolantRampColor(t) {
+        // Palette (fallbacks)
+        const cold = "#C7B7FF";  // light purple
+        const warm = "#FFD54A";  // yellow
+        const hot  = "#FF3B3B";  // red
+
+        // 0..0.65: cold->warm, 0.65..1: warm->hot
+        if (t <= 0.65) {
+            const u = t / 0.65;
+            return Qt.rgba(
+                lerp(Qt.color(cold).r, Qt.color(warm).r, u),
+                lerp(Qt.color(cold).g, Qt.color(warm).g, u),
+                lerp(Qt.color(cold).b, Qt.color(warm).b, u),
+                1
+            );
+        } else {
+            const u = (t - 0.65) / 0.35;
+            return Qt.rgba(
+                lerp(Qt.color(warm).r, Qt.color(hot).r, u),
+                lerp(Qt.color(warm).g, Qt.color(hot).g, u),
+                lerp(Qt.color(warm).b, Qt.color(hot).b, u),
+                1
+            );
+        }
+    }
+
     // Smooth animation
     Timer {
         interval: 16
@@ -63,17 +110,27 @@ Item {
         repeat: true
         onTriggered: {
             const dt = interval / 1000.0;
+
+            // ---- Smooth speed ----
             const target = clamp(root.speed, 0, root.maxSpeed);
             const diff = target - root.displaySpeed;
 
             let step = diff * (1 - Math.exp(-root.response * dt));
             step = clamp(step, -root.maxStepPerFrame, root.maxStepPerFrame);
-
             root.displaySpeed += step;
+
+            // ---- Smooth coolant ----
+            const cTarget = root.coolantC;
+            const cDiff = cTarget - root.displayCoolantC;
+
+            let cStep = cDiff * (1 - Math.exp(-root.coolantResponse * dt));
+            cStep = clamp(cStep, -root.coolantMaxStepPerFrame, root.coolantMaxStepPerFrame);
+            root.displayCoolantC += cStep;
 
             ticksCanvas.requestPaint();
             labelCanvas.requestPaint();
             arcCanvas.requestPaint();
+            coolantArcCanvas.requestPaint();
         }
     }
 
@@ -164,7 +221,7 @@ Item {
             }
         }
 
-        // Arc
+        // Speed arc
         Canvas {
             id: arcCanvas
             anchors.fill: parent
@@ -192,6 +249,138 @@ Item {
                         startRad+(endRad-startRad)*t1);
                     ctx.stroke();
                 }
+            }
+        }
+
+        // ---- Coolant arc (FILLED band, opposite speed sweep) ----
+        Canvas {
+            id: coolantArcCanvas
+            anchors.fill: parent
+            z: 44
+
+            onWidthChanged: requestPaint()
+            onHeightChanged: requestPaint()
+
+            Connections {
+                target: root
+                function onDisplayCoolantCChanged() { coolantArcCanvas.requestPaint() }
+            }
+
+            onPaint: {
+                const ctx = getContext("2d");
+                ctx.clearRect(0, 0, width, height);
+
+                const cx = width / 2;
+                const cy = height / 2;
+
+                // Opposite-side arc (same concept as Tach fuel arc)
+                const rawStartDeg = (root.startAngleDeg + root.sweepAngleDeg) % 360;
+                const rawSweepDeg = 360 - root.sweepAngleDeg;
+
+                const padDeg = 12;
+                const startDeg = rawStartDeg + padDeg;
+                const sweepDeg = Math.max(0, rawSweepDeg - padDeg * 2);
+
+                // startRad ~ top-right, end ~ bottom-left
+                const startRad = (startDeg - 90) * Math.PI / 180;
+                const sweepRad = sweepDeg * Math.PI / 180;
+
+                const rOut = width * 0.36;
+                const thickStart = 26;   // wide end (H side)
+                const thickEnd   = 3;    // point end (C side)
+                const segments   = 90;
+
+                ctx.save();
+
+                const eps = 0.0;  // seam-gap disabled (caps are now opaque)
+                ctx.globalAlpha = theme?.isNight ? 0.88 : 0.72;
+
+                const baseDark = (theme?.pearlHigh ?? root.gaugeColor);
+
+                function drawBand(tFrom, tTo, colorFnOrColor) {
+                    for (let i = 0; i < segments; i++) {
+                        const u0 = i / segments;
+                        const u1 = (i + 1) / segments;
+
+                        if (u0 >= tTo) break;
+
+                        const v0 = Math.max(u0, tFrom);
+                        const v1 = Math.min(u1, tTo);
+                        if (v1 <= v0) continue;
+
+                        const th  = thickStart + (thickEnd - thickStart) * v1;
+                        const rIn = rOut - th;
+
+                        const a0 = startRad + sweepRad * v0;
+                        const a1 = startRad + sweepRad * v1;
+
+                        const col = (typeof colorFnOrColor === "function")
+                            ? colorFnOrColor(v1)
+                            : colorFnOrColor;
+
+                        ctx.fillStyle = col;
+
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, rOut, a0, a1, false);
+                        ctx.arc(cx, cy, rIn,  a1, a0, true);
+                        ctx.closePath();
+                        ctx.fill();
+                    }
+                }
+
+                // Base band (subtle pearl layer)
+                drawBand(0.0, 1.0, baseDark);
+
+                // Fill from C -> H.
+                // Arc param: 0 at H, 1 at C. Coolant norm: 0 at C, 1 at H.
+                // Therefore filled region is [1 - coolantNorm, 1.0].
+                const tStartFill = 1.0 - root.coolantNorm;
+
+                drawBand(tStartFill, 1.0, function(t) {
+                    // t=1 (C) -> cold (0), t=0 (H) -> hot (1)
+                    const rampT = 1.0 - t;
+                    return root.coolantRampColor(rampT);
+                });
+
+                // Moving boundary cap
+                function capAt(t, color) {
+                    const th = thickStart + (thickEnd - thickStart) * t;
+                    const rr = rOut - th / 2;
+                    const ang = startRad + sweepRad * t;
+                    const x = cx + Math.cos(ang) * rr;
+                    const y = cy + Math.sin(ang) * rr;
+
+                ctx.save();
+                ctx.globalAlpha = 1.0;  // opaque caps to avoid blending
+                    ctx.fillStyle = color;
+                    ctx.beginPath();
+                    ctx.arc(x, y, th/2, 0, Math.PI * 2);
+                    ctx.fill();
+                ctx.restore();
+                }
+
+                if (tStartFill > 0.0 && tStartFill < 1.0) {
+                    capAt(tStartFill, root.coolantRampColor(1.0 - tStartFill));
+                }
+
+
+                // Rounded physical endpoint caps (match Tach fuel arc style)
+                // t=0.0 is the H end (wide), t=1.0 is the C end (point)
+                // Labels pinned to endpoints
+                const labelR = rOut + 18;
+                const angH = startRad;
+                const angC = startRad + sweepRad;
+
+                ctx.globalAlpha = theme?.isNight ? 0.90 : 0.75;
+                ctx.fillStyle = theme?.text ?? "white";
+                ctx.font = "700 16px Menlo";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+
+                ctx.fillText("H", cx + Math.cos(angH) * labelR, cy + Math.sin(angH) * labelR);
+                ctx.fillText("C", cx + Math.cos(angC) * labelR, cy + Math.sin(angC) * labelR);
+
+                ctx.restore();
             }
         }
     }

@@ -9,6 +9,10 @@ Item {
     property real rpm: 0
     property real fuelPct: 100
 
+    // Coolant temp (°C) mock
+    property real coolantC: 70
+    property bool coolantHeating: true
+
     // -------- Simulation parameters --------
     property real targetSpeedKph: 0
     property real accelKphPerSec: 45
@@ -39,7 +43,7 @@ Item {
         running: true
         repeat: true
         onTriggered: {
-            const dt = simTimer.interval / 1000.0; // always valid
+            const dt = simTimer.interval / 1000.0;
             const diff = root.targetSpeedKph - root.speedKph;
 
             const rate = (diff > 0) ? root.accelKphPerSec : root.decelKphPerSec;
@@ -67,6 +71,21 @@ Item {
         onTriggered: {
             root.fuelPct -= 0.08;
             if (root.fuelPct <= 0) root.fuelPct = 100;
+        }
+    }
+
+    // Coolant simulation: warm up and cool down loop
+    Timer {
+        id: coolantTimer
+        interval: 200
+        running: true
+        repeat: true
+        onTriggered: {
+            if (root.coolantHeating) root.coolantC += 0.12;
+            else root.coolantC -= 0.10;
+
+            if (root.coolantC >= 110) root.coolantHeating = false;
+            if (root.coolantC <= 45)  root.coolantHeating = true;
         }
     }
 }

@@ -96,6 +96,7 @@ Window {
         theme: appTheme
         speed: vehicle.speedKph
 
+        coolantC: vehicle.coolantC
         width: Math.min(leftPanel.width * 0.92, leftPanel.height * 0.92)
         height: width
     }
