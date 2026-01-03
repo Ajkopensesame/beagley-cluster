@@ -300,13 +300,10 @@ Item {
                     ctx.fill();
                 }
 
-                capAt(0.0, empty > 0.0001 ? light : dark);   // F end
-                capAt(1.0, fuel > 0.0001 ? dark : light);  // E end
 
                 // Optional: round the moving boundary so it doesn't look "cut"
-                if (empty > 0.0 && empty < 1.0) capAt(empty, light);
-
-                // F / E labels pinned to the endpoints of the FULL arc
+                if (empty > 0.0 && empty < 1.0) capAt(empty, dark);
+// F / E labels pinned to the endpoints of the FULL arc
                 const labelR = rOut + 18;
                 const angF = startRad;
                 const angE = startRad + sweepRad;
