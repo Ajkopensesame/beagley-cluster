@@ -2,6 +2,20 @@ import QtQuick 2.15
 
 Item {
     id: root
+
+    // ===== Mock PRND21 gear cycling =====
+    property var _gears: ["P","R","N","D","2","1"]
+    property int _gearIdx: 0
+    property string gear: _gears[_gearIdx]
+
+    Timer {
+        id: gearTimer
+        interval: 900
+        repeat: true
+        running: true
+        onTriggered: _gearIdx = (_gearIdx + 1) % _gears.length
+    }
+    // ===================================
     visible: false   // non-visual data model
 
     // -------- Vehicle state (mock) --------
