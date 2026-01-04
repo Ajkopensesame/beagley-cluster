@@ -4,6 +4,7 @@ import QtQuick.Window 2.15
 import "./theme" as Theme
 import "mock"
 import BeagleY 1.0
+import "widgets" as W
 
 Window {
     id: root
@@ -130,4 +131,41 @@ Window {
         font.pixelSize: 16
         text: "speed: " + Math.round(vehicle.speedKph) + "  target: " + Math.round(vehicle.targetSpeedKph)
     }
+    // ===== BEGIN TURN ARROWS =====
+    // Inside = nearest the center/map. Outward = toward the outer edges.
+
+    // Left indicator: points LEFT, flows from inside (rightmost) -> outside (leftward)
+    W.TurnChevronFlow {
+        scale: 0.92
+        chevrons: 12
+        id: leftTurnFlow
+        parent: gauge
+                        anchors.top: parent.top
+                        anchors.topMargin: -28
+anchors.right: parent.right
+        anchors.rightMargin: 18
+
+        active: !!(vehicle && vehicle.left_indicator)
+        side: "left"
+        thickness: 6
+}
+
+    // Right indicator: points RIGHT, flows from inside (leftmost) -> outside (rightward)
+    W.TurnChevronFlow {
+        chevrons: 12
+        id: rightTurnFlow
+        parent: tach
+                anchors.top: parent.top
+                anchors.topMargin: -28
+        anchors.left: parent.left
+        anchors.leftMargin: 18
+
+        active: !!(vehicle && vehicle.right_indicator)
+        side: "right"
+        thickness: 6
+}
+    // ===== END TURN ARROWS =====
+
+
+
 }

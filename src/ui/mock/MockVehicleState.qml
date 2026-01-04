@@ -1,6 +1,8 @@
 import QtQuick 2.15
 
 Item {
+    property bool left_indicator: true
+    property bool right_indicator: true
     id: root
 
     // ===== Mock PRND21 gear cycling =====
@@ -104,4 +106,5 @@ Item {
             if (root.coolantC <= 45)  root.coolantHeating = true;
         }
     }
-}
+    }
+

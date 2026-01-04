@@ -39,6 +39,7 @@ qt_add_qml_module(beagley_cluster
     VERSION 1.0
 
     QML_FILES
+        src/ui/widgets/TurnChevronFlow.qml
         src/ui/theme/PurplePearlTheme.qml
         # Entry point
         src/ui/Main.qml
