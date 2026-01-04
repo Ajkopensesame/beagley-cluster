@@ -414,7 +414,75 @@ Item {
         }
     }
 
-    // Centre speed
+    // O/D indicator (Overdrive)
+    
+Item {
+        id: odBadge
+        z: 62
+
+        visible: root.vehicleState && root.vehicleState.overdrive === true
+
+        anchors.bottom: speedValueText.top
+        anchors.bottomMargin: 12
+        anchors.horizontalCenter: speedValueText.horizontalCenter
+
+        // Size tuned to match PRND vibe but still "in your face"
+        width: 170
+        height: 60
+
+        // Glass body
+        Rectangle {
+            anchors.fill: parent
+            radius: height / 2
+            color: "#140A22"              // deep purple glass
+            border.width: 2
+            border.color: "#FFC107"       // amber rim
+            opacity: 0.94
+        }
+
+        // Outer glow (soft)
+        Rectangle {
+            anchors.fill: parent
+            radius: height / 2
+            color: "transparent"
+            border.width: 14
+            border.color: "#2BFFC107"     // low-alpha amber glow
+            opacity: 1.0
+        }
+
+        // Inner highlight line (depth)
+        Rectangle {
+            x: 10
+            y: 10
+            width: parent.width - 20
+            height: parent.height - 20
+            radius: height / 2
+            color: "transparent"
+            border.width: 2
+            border.color: "#12FFFFFF"
+        }
+
+        // Text (crisp, intentional)
+        Text {
+            anchors.centerIn: parent
+            text: "O/D"
+            font.family: "Menlo"
+            font.pixelSize: 36
+            font.weight: Font.Bold
+            font.letterSpacing: 4
+            color: "#FFC107"
+        }
+
+        // Micro-pulse so it feels alive (subtle)
+        SequentialAnimation on scale {
+            running: odBadge.visible
+            loops: Animation.Infinite
+            NumberAnimation { from: 1.00; to: 1.04; duration: 420; easing.type: Easing.InOutQuad }
+            NumberAnimation { from: 1.04; to: 1.00; duration: 420; easing.type: Easing.InOutQuad }
+            PauseAnimation { duration: 260 }
+        }
+    }
+// Centre speed
     Text {
     id: speedValueText
         anchors.centerIn: parent

@@ -16,6 +16,8 @@ Item {
         onTriggered: _gearIdx = (_gearIdx + 1) % _gears.length
     }
     // ===================================
+    property bool overdrive: true
+
     visible: false   // non-visual data model
 
     // -------- Vehicle state (mock) --------
