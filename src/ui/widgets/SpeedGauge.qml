@@ -3,12 +3,41 @@ import QtQuick.Shapes 1.15
 
 Item {
     id: root
+
+    // ===== PRND21 helpers (local, safe) =====
+    function normGear(g) {
+        if (g === undefined || g === null) return "";
+        return String(g).trim().toUpperCase();
+    }
+
+    function gearColorFor(g) {
+        var t = root.theme; // may be undefined; handle safely
+        var gg = normGear(g);
+
+        // Theme fallbacks
+        var pearlLow  = t ? t.pearlLow  : "#C7B7FF";
+        var pearlHigh = t ? t.pearlHigh : "#5E35B1";
+        var danger    = t ? t.danger    : "#FF3B3B";
+        var textCol   = t ? t.text      : "white";
+
+        if (gg === "R") return danger;             // Reverse: red (and flashing via opacity)
+        if (gg === "N") return "#FFC107";          // Neutral: amber
+        if (gg === "P") return pearlLow;           // Park: light purple
+        if (gg === "D") return pearlLow;           // Drive: light purple
+        if (gg === "2") return pearlHigh;          // 2: darker purple
+        if (gg === "1") return Qt.darker(pearlHigh, 1.35); // 1: darkest purple
+
+        return textCol;
+    }
+    // =======================================
     width: 420
     height: 420
 
     // Theme from Main.qml
     property var theme
 
+
+    property var vehicleState
     // Public API
     property real speed: 0
     property real maxSpeed: 180
@@ -387,6 +416,7 @@ Item {
 
     // Centre speed
     Text {
+    id: speedValueText
         anchors.centerIn: parent
         z: 60
         text: root.speedInt
@@ -395,4 +425,35 @@ Item {
         font.letterSpacing: 1
         color: root.gaugeColor
     }
+
+
+    // Gear indicator under speed (PRND21)
+    Text {
+        id: gearText
+        z: 61
+
+        // Pull from vehicleState mock if present; default to P
+        text: (root.vehicleState && root.vehicleState.gear !== undefined) ? root.vehicleState.gear : "P"
+
+        anchors.top: speedValueText.bottom
+        anchors.topMargin: 8
+        anchors.horizontalCenter: speedValueText.horizontalCenter
+
+        font.pixelSize: 56
+        font.family: "Menlo"
+        font.weight: Font.Bold
+        font.letterSpacing: 4
+
+        color: gearColorFor(text)
+        opacity: 1.0
+
+        // Reverse attention flash (ONLY when in R)
+        SequentialAnimation on opacity {
+            running: normGear(gearText.text) === "R"
+            loops: Animation.Infinite
+            NumberAnimation { from: 1.0; to: 0.20; duration: 220 }
+            NumberAnimation { from: 0.20; to: 1.0; duration: 220 }
+        }
+    }
+
 }

@@ -94,6 +94,7 @@ Window {
         id: gauge
         anchors.centerIn: leftPanel
         theme: appTheme
+        vehicleState: vehicle
         speed: vehicle.speedKph
 
         coolantC: vehicle.coolantC
