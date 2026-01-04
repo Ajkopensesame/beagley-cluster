@@ -1,102 +1,294 @@
 <!doctype html>
 <html>
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Cluster Map</title>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Cluster Map</title>
 
-    <!-- MapLibre (CDN for v1 prototype) -->
-    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
-    <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <!-- MapLibre GL (CDN for dev). Later we can vendor locally for offline. -->
+  <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 
-    <style>
-      html, body { height: 100%; margin: 0; background: #000; overflow: hidden; }
-      #map { position: absolute; inset: 0; }
-      .hud {
-        position: absolute;
-        left: 12px; top: 12px;
-        color: #fff;
-        font: 13px/1.3 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-        background: rgba(0,0,0,0.45);
-        padding: 8px 10px;
-        border-radius: 10px;
-        user-select: none;
-        pointer-events: none;
+  <style>
+    html, body { height: 100%; margin: 0; background: #000; color: #fff; overflow: hidden; }
+    #map { position: absolute; inset: 0; }
+
+    .bar {
+      position: absolute;
+      top: 10px; left: 10px; right: 10px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      background: rgba(0,0,0,0.55);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 14px;
+      padding: 10px 12px;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      z-index: 10;
+    }
+    input {
+      flex: 1;
+      height: 38px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.18);
+      background: rgba(20,20,20,0.9);
+      color: #fff;
+      padding: 0 12px;
+      font-size: 15px;
+      outline: none;
+    }
+    button {
+      height: 38px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.18);
+      background: rgba(30,30,30,0.9);
+      color: #fff;
+      padding: 0 12px;
+      font-size: 14px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    button:active { transform: translateY(1px); }
+
+    .results {
+      position: absolute;
+      top: 62px;
+      left: 10px; right: 10px;
+      max-height: 260px;
+      overflow: auto;
+      background: rgba(0,0,0,0.70);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 14px;
+      display: none;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      z-index: 10;
+    }
+    .row {
+      padding: 10px 12px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+      cursor: pointer;
+      font-size: 14px;
+      line-height: 1.25;
+    }
+    .row:first-child { border-top: none; }
+    .row:hover { background: rgba(255,255,255,0.06); }
+
+    .status {
+      position: absolute;
+      bottom: 10px; left: 10px; right: 10px;
+      background: rgba(0,0,0,0.55);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 14px;
+      padding: 10px 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+      color: rgba(255,255,255,0.85);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      z-index: 10;
+    }
+
+    /* Hide attribution/branding for dev preview. For release, we should show attribution. */
+    .maplibregl-ctrl-bottom-left,
+    .maplibregl-ctrl-bottom-right { display: none !important; }
+  </style>
+</head>
+
+<body>
+  <div id="map"></div>
+
+  <div class="bar">
+    <input id="q" type="text" placeholder="Search address (e.g., 1 Queen St, Brisbane)" />
+    <button id="go">Search</button>
+    <button id="demo">Demo</button>
+    <button id="clr">Clear</button>
+  </div>
+
+  <div id="results" class="results"></div>
+  <div id="status" class="status">status: boot</div>
+
+  <script>
+    const statusEl = document.getElementById("status");
+    const resultsEl = document.getElementById("results");
+    const qEl = document.getElementById("q");
+
+    function setStatus(msg) {
+      statusEl.textContent = "status: " + msg;
+      console.log(msg);
+    }
+
+    // Map style: public demo style for now.
+
+    // --- QML injection support (works even before map is loaded) ---
+    window.__pendingVehicleLocation = null;
+
+    window.setVehicleLocation = function(lat, lon, label) {
+      const lt = Number(lat), ln = Number(lon);
+      if (!Number.isFinite(lt) || !Number.isFinite(ln)) {
+        setStatus("setVehicleLocation: invalid coords");
+        return "invalid";
       }
-    </style>
-  </head>
 
-  <body>
-    <div id="map"></div>
-    <div class="hud" id="hud">MapLibre loading…</div>
+      // Store until map is ready.
+      window.__pendingVehicleLocation = { lat: lt, lon: ln, label: label || "" };
 
-    <script>
-      // Simple raster style using OpenStreetMap tiles.
-      // NOTE: For production you should NOT hammer public OSM tiles from a fleet.
-      // We will replace this with offline/hosted tiles later.
-      const rasterStyle = {
-        "version": 8,
-        "sources": {
-          "osm": {
-            "type": "raster",
-            "tiles": [
-              "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-            ],
-            "tileSize": 256,
-            "attribution": "© OpenStreetMap contributors"
-          }
-        },
-        "layers": [
-          { "id": "osm", "type": "raster", "source": "osm" }
-        ]
-      };
+      // If map is ready, apply immediately.
+      if (window.__map && typeof flyTo === "function") {
+        const name = window.__pendingVehicleLocation.label || ("vehicle " + lt.toFixed(5) + "," + ln.toFixed(5));
+        flyTo(ln, lt, name);
+        setStatus("QML injected → " + name);
+        window.__pendingVehicleLocation = null;
+        // Visual reliability: re-apply shortly after load so tiles are definitely ready
+        setTimeout(() => {
+          try { flyTo(pl.lon, pl.lat, name); } catch(e) {}
+        }, 400);
+        return "applied";
+      }
 
-      // Start position: Brisbane-ish (replace later with GPS)
-      let current = { lng: 153.0251, lat: -27.4698, zoom: 12.2, bearing: 0 };
+      setStatus("queued vehicle location (waiting for map) …");
+      return "queued";
+    };
 
-      const map = new maplibregl.Map({
-        container: "map",
-        style: rasterStyle,
-        center: [current.lng, current.lat],
-        zoom: current.zoom,
-        bearing: current.bearing,
-        pitch: 0,
-        attributionControl: false
+    const map = new maplibregl.Map({
+      container: "map",
+      style: "https://demotiles.maplibre.org/style.json",
+      center: [153.0251, -27.4698], // Brisbane default
+      zoom: 11,
+      attributionControl: false
+    });
+    window.__map = map; // expose map for QML injection
+
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
+
+    let marker = null;
+
+    function flyTo(lon, lat, label) {
+      if (marker) marker.remove();
+      marker = new maplibregl.Marker({}).setLngLat([lon, lat]).addTo(map);
+
+      map.flyTo({
+        center: [lon, lat],
+        zoom: 15,
+        speed: 1.2,
+        curve: 1.2,
+        essential: true
       });
 
-      map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right");
-      map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+      if (label) setStatus("navigated: " + label);
+    }
 
-      const hud = document.getElementById("hud");
-
-      map.on("load", () => {
-        hud.textContent = "MapLibre loaded ✅";
+    function showResults(items) {
+      resultsEl.innerHTML = "";
+      if (!items || items.length === 0) {
+        resultsEl.style.display = "none";
+        return;
+      }
+      items.forEach(it => {
+        const row = document.createElement("div");
+        row.className = "row";
+        row.textContent = it.display_name;
+        row.onclick = () => {
+          resultsEl.style.display = "none";
+          flyTo(parseFloat(it.lon), parseFloat(it.lat), it.display_name);
+        };
+        resultsEl.appendChild(row);
       });
+      resultsEl.style.display = "block";
+    }
 
-      // Hook for QML later: you can call this from WebChannel or evaluateJavaScript
-      window.setVehiclePose = function(lat, lng, bearingDeg, zoom) {
-        if (typeof zoom === "number") current.zoom = zoom;
-        current.lat = lat; current.lng = lng;
-        current.bearing = (typeof bearingDeg === "number") ? bearingDeg : current.bearing;
+    async function geocode(query) {
+      const url = "https://nominatim.openstreetmap.org/search?format=json&q=" + encodeURIComponent(query) + "&limit=8";
+      setStatus("geocoding…");
+      const res = await fetch(url, { method: "GET" });
+      if (!res.ok) throw new Error("geocode http " + res.status);
+      return await res.json();
+    }
 
-        map.easeTo({
-          center: [current.lng, current.lat],
-          bearing: current.bearing,
-          duration: 250
-        });
+    async function doSearch() {
+      const query = (qEl.value || "").trim();
+      if (!query) { setStatus("enter an address"); return; }
+      try {
+        const items = await geocode(query);
+        if (!items || items.length === 0) {
+          setStatus("no results for: " + query);
+          showResults([]);
+          return;
+        }
+        setStatus("results: " + items.length + " (tap one)");
+        showResults(items);
+      } catch (e) {
+        setStatus("geocode error: " + (e && e.message ? e.message : e));
+      }
+    }
 
-        hud.textContent = `GPS: ${current.lat.toFixed(5)}, ${current.lng.toFixed(5)}  b:${Math.round(current.bearing)}°`;
-      };
+    // ✅ Production-friendly API:
+    // QML (and later BBB) will call this to update the map location.
+    window.setVehicleLocation = function(lat, lon, label) {
+      const lt = Number(lat), ln = Number(lon);
+      if (!Number.isFinite(lt) || !Number.isFinite(ln)) {
+        setStatus("setVehicleLocation: invalid coords");
+        return;
+      }
 
-      // Demo motion so you can see it moving without GPS
-      let t = 0;
-      setInterval(() => {
-        t += 0.00025;
-        const lat = current.lat + Math.sin(t) * 0.0003;
-        const lng = current.lng + Math.cos(t) * 0.0003;
-        const bearing = (current.bearing + 1.2) % 360;
-        window.setVehiclePose(lat, lng, bearing);
-      }, 250);
-    </script>
-  </body>
+      const name = label || ("vehicle " + lt.toFixed(5) + "," + ln.toFixed(5));
+
+      // Hard fly: make it *obvious* something happened (and stop any 'orbit' feel)
+      try {
+        if (window.__map) {
+          window.__map.stop();
+          window.__map.flyTo({
+            center: [ln, lt],
+            zoom: 14.5,
+            bearing: 0,
+            pitch: 0,
+            duration: 900,
+            essential: true
+          });
+        } else {
+          // fallback (shouldn't happen)
+          flyTo(ln, lt, name);
+        }
+      } catch (e) {
+        flyTo(ln, lt, name);
+      }
+
+      setStatus("QML injected → " + name);
+    };
+
+    // Demo button: simulate a "GPS update" (Noosa)
+    function demoLocation() {
+      window.setVehicleLocation(-26.3960, 153.0910, "Noosa (demo)");
+    }
+
+    document.getElementById("go").onclick = doSearch;
+    document.getElementById("demo").onclick = demoLocation;
+    document.getElementById("clr").onclick = () => { qEl.value = ""; showResults([]); setStatus("cleared"); };
+
+    qEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") doSearch();
+      if (e.key === "Escape") showResults([]);
+    });
+
+    map.on("load", () => {
+      if (!window.__pendingVehicleLocation) setStatus("map loaded");
+      // If QML injected a location before load, apply it now
+      if (window.__pendingVehicleLocation) {
+        const pl = window.__pendingVehicleLocation;
+        const name = pl.label || ("vehicle " + pl.lat.toFixed(5) + "," + pl.lon.toFixed(5));
+        flyTo(pl.lon, pl.lat, name);
+        setStatus("QML injected → " + name);
+        window.__pendingVehicleLocation = null;
+        // Visual reliability: re-apply shortly after load so tiles are definitely ready
+        setTimeout(() => {
+          try { flyTo(pl.lon, pl.lat, name); } catch(e) {}
+        }, 400);
+      }
+
+      // Waiting for QML injection (or user search / Demo button)
+    });
+  </script>
+</body>
 </html>
