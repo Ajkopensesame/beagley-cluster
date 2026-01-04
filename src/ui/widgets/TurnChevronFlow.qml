@@ -1,158 +1,168 @@
 import QtQuick 2.15
-import QtQuick.Shapes 1.15
 
 Item {
     id: root
 
-    implicitWidth: row.width
-    width: implicitWidth
-    height: 64
-
     // ===== API =====
     property bool active: false
-    property string side: "left"          // "left" or "right"
+    property string side: "left"      // "left" or "right"
     property int chevrons: 12
 
-    // ===== Sequence timing =====
-    property int sweepMs: 1000            // full sweep duration
-    property int pauseMs: 180             // all-off pause between sweeps
+    // Full sweep duration in ms (1 second is classic)
+    property int sweepMs: 1000
 
-    // ===== Geometry / style =====
+    // ===== Geometry =====
     property real gap: 2
-    property real thickness: 5.5
-    property real thicknessOuter: 9.5      // max stroke at outside chevrons
-    property real thicknessPulseBoost: 2.2 // extra stroke while active
-
-    // Tail tuning (longer tail = smaller decay)
-    property real tailDecay: 0.28        // smaller = longer tail (try 0.12–0.25)
-    property real tailFloor: 0.01        // minimum faint tail alpha (0.0–0.08)
     property real chevronWidth: 16
-    property real chevronHeight: 32
+
+    // Height nesting (more noticeable)
+    property real chevronHeight: 26
+    property real chevronHeightOuter: 48
+
+    // Stroke nesting
+    property real thickness: 6
+    property real thicknessOuter: 12
+    property real thicknessPulseBoost: 1.5
+
     property color onColor: "#00E676"
 
-    // ===== Head + tail tuning =====
-    property real pulseWidth: 1.15        // head width (in chevrons)
-    property real pulseSharpness: 1.7
-
-    property real tailLen: 6.0            // how many chevrons the tail spans
-    property real tailMax: 0.65           // tail brightness behind the head
-    property real tailFalloff: 0.7        // lower = longer/smoother tail
-
-    // Optional: scaling can read as jitter. Keep subtle, or set both to 0/1.
-    property real nestStep: 0.0           // set 0 for no nesting scale
-    property real activeScale: 1.0        // set 1.0 for no pulse scale
+    // ===== Tail / head shaping =====
+    // Smaller tailDecay => longer tail (more arc-like)
+    property real tailDecay: 0.20
+    // Smaller headDecay => softer head (more arc-like)
+    property real headDecay: 0.75
+    // Keep 0 to avoid “faint always-on” when off
+    property real tailFloor: 0.0
 
     // ===== Animated sweep position =====
-    // pos is continuous and driven by Qt animation (smooth)
     property real pos: 0.0
-    property bool inSweep: false
 
-    SequentialAnimation {
-        id: sweepAnim
+    NumberAnimation on pos {
         running: root.active
         loops: Animation.Infinite
-
-        ScriptAction { script: root.inSweep = true }
-
-        NumberAnimation {
-            target: root
-            property: "pos"
-            from: 0.0
-            to: Math.max(0.0, root.chevrons - 1)
-            duration: Math.max(1, root.sweepMs)
-            easing.type: Easing.Linear
-        }
-
-        ScriptAction { script: root.inSweep = false }
-        PauseAnimation { duration: Math.max(0, root.pauseMs) }
-
-        ScriptAction { script: root.pos = 0.0 }
+        from: 0.0
+        to: Math.max(1.0, root.chevrons * 1.0)   // wrap-friendly
+        duration: Math.max(1, root.sweepMs)
+        easing.type: Easing.Linear
     }
 
     onActiveChanged: {
-        if (!active) {
-            inSweep = false
-            pos = 0.0
-        }
+        if (!active) pos = 0.0
+        canvas.requestPaint()
     }
 
-    // Convert visual index to "inside -> outside" rank
+    // ---- helpers ----
     function outwardRank(visualIndex) {
-        if (root.side === "left") return (root.chevrons - 1 - visualIndex) // inside is rightmost
-        return visualIndex                                                 // inside is leftmost
+        if (root.side === "left") return (root.chevrons - 1 - visualIndex)
+        return visualIndex
     }
 
-    // Tail model: bright head, exponential fade behind, OFF ahead
+    function alphaFor(index) {
+        if (!root.active) return 0.0
+        var n = Math.max(1, root.chevrons)
 
-    // Tail model: bright head, exponential fade behind, OFF ahead
-    // Goal: when head is at the last chevron, the first can still be barely visible.
+        var li = root.outwardRank(index)     // 0..n-1 inside->outside
+        var head = root.pos % n
 
-    // Tail model: bright head, exponential fade behind, OFF ahead
-    // Goal: when head is at the last chevron, the first can still be barely visible.
-    function alphaFor(i) {
-        if (!root.active || !root.inSweep) return 0.0
+        // distance behind head, wrapped: 0..n
+        var delta = (head - li + n) % n
 
-        var li = root.outwardRank(i)   // logical index (0=inside)
-        var delta = root.pos - li      // >0 => behind the head, <0 => ahead
-
-        // Ahead of the head: off (keeps directionality, prevents forward glow)
-        if (delta < 0) return 0.0
-
-        // Head shaping (keeps the head crisp)
-        // delta=0 => 1, delta grows => decays smoothly
-        var headFactor = Math.exp(-Math.abs(delta) * 1.1)
-
-        // Tail behind the head, with a faint floor so the start stays barely visible
+        // A smooth “arc-like” profile:
+        // - headFactor gives a soft highlight near the head
+        // - tail gives a long fade behind it
+        var headFactor = Math.exp(-delta * root.headDecay)
         var tail = Math.max(root.tailFloor, Math.exp(-delta * root.tailDecay))
 
         var a = tail * headFactor
-        return Math.max(0.0, Math.min(1.0, a))
+        if (a < 0.0) a = 0.0
+        if (a > 1.0) a = 1.0
+        return a
     }
-    Item {
-        id: row
+
+    // Size follows content (prevents clipping)
+    implicitWidth: rowWidth
+    width: implicitWidth
+    property real rowWidth: root.chevrons * root.chevronWidth + (root.chevrons - 1) * root.gap
+    height: Math.max(root.chevronHeight, root.chevronHeightOuter) + 8
+
+    Canvas {
+        id: canvas
         anchors.centerIn: parent
-        width: root.chevrons * root.chevronWidth + (root.chevrons - 1) * root.gap
-        height: root.chevronHeight
+        width: root.rowWidth
+        height: Math.max(root.chevronHeight, root.chevronHeightOuter)
 
-        Repeater {
-            model: root.chevrons
+        // Prefer stable AA
+        renderTarget: Canvas.FramebufferObject
+        antialiasing: true
 
-            Item {
-                width: root.chevronWidth
-                height: root.chevronHeight
-                x: index * (root.chevronWidth + root.gap)
-                y: 0
+        onPaint: {
+            var ctx = getContext("2d")
+            ctx.reset()
 
-                readonly property real a: root.alphaFor(index)
-                readonly property int r: root.outwardRank(index)
-                readonly property real baseScale: 1.0 + (r * root.nestStep)
-                // scale removed (Shapes + scaling = shimmer)
-                scale: 1
-                Shape {
-                    preferredRendererType: Shape.CurveRenderer
-                    anchors.fill: parent
-                    antialiasing: true
+            var n = Math.max(1, root.chevrons)
+            var baseH = root.chevronHeight
+            var outerH = root.chevronHeightOuter
 
-                    ShapePath {
-                        strokeWidth: (function() {
-                            var n = Math.max(2, root.chevrons);
-                            var r = root.outwardRank(index);
-                            var t = r / (n - 1); // 0..1 (inside->outside)
-                            var base = root.thickness + t * (root.thicknessOuter - root.thickness);
-                            return base + (a * root.thicknessPulseBoost);
-                        })()
-                        capStyle: ShapePath.RoundCap
-                        joinStyle: ShapePath.RoundJoin
-                        fillColor: "transparent"
-                        strokeColor: Qt.rgba(root.onColor.r, root.onColor.g, root.onColor.b, a)
+            // Center vertically
+            var H = canvas.height
+            var yCenter = H / 2
 
-                        startX: (root.side === "left") ? width : 0
-                        startY: 0
-                        PathLine { x: width / 2; y: height / 2 }
-                        PathLine { x: (root.side === "left") ? width : 0; y: height }
-                    }
+            // Color
+            // QML Canvas uses rgba strings; build once
+            function rgba(alpha) {
+                // onColor is QColor; access r/g/b as 0..1
+                var r = Math.round(root.onColor.r * 255)
+                var g = Math.round(root.onColor.g * 255)
+                var b = Math.round(root.onColor.b * 255)
+                return "rgba(" + r + "," + g + "," + b + "," + alpha + ")"
+            }
+
+            for (var i = 0; i < n; i++) {
+                var rnk = root.outwardRank(i)
+                var t = (n <= 1) ? 0.0 : (rnk / (n - 1))
+
+                var a = root.alphaFor(i)
+                if (a <= 0.0001) continue
+
+                var h = baseH + t * (outerH - baseH)
+                var w = root.chevronWidth
+
+                var x0 = i * (root.chevronWidth + root.gap)
+                var y0 = yCenter - (h / 2)
+
+                // Stroke width grows outward and pulses slightly with alpha
+                var baseStroke = root.thickness + t * (root.thicknessOuter - root.thickness)
+                var stroke = baseStroke + (a * root.thicknessPulseBoost)
+
+                ctx.lineWidth = stroke
+                ctx.lineCap = "round"
+                ctx.lineJoin = "round"
+                ctx.strokeStyle = rgba(a)
+
+                // Chevron geometry:
+                // left side: points left  ( \ / )
+                // right side: points right ( / \ )
+                ctx.beginPath()
+                if (root.side === "left") {
+                    ctx.moveTo(x0 + w, y0)
+                    ctx.lineTo(x0 + w/2, y0 + h/2)
+                    ctx.lineTo(x0 + w, y0 + h)
+                } else {
+                    ctx.moveTo(x0, y0)
+                    ctx.lineTo(x0 + w/2, y0 + h/2)
+                    ctx.lineTo(x0, y0 + h)
                 }
+                ctx.stroke()
             }
         }
+
+        // repaint on animation tick
+        Connections {
+            target: root
+            function onPosChanged() { canvas.requestPaint() }
+        }
     }
+
+    // Ensure first paint
+    Component.onCompleted: canvas.requestPaint()
 }

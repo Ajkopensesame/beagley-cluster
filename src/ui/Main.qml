@@ -136,7 +136,6 @@ Window {
 
     // Left indicator: points LEFT, flows from inside (rightmost) -> outside (leftward)
     W.TurnChevronFlow {
-        scale: 0.92
         chevrons: 12
         id: leftTurnFlow
         parent: gauge
