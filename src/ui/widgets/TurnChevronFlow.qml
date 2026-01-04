@@ -17,20 +17,29 @@ Item {
 
     // Height nesting (more noticeable)
     property real chevronHeight: 26
+    // ===== Flow / glow tuning =====
+    property real tailLen: 12
+    property real gamma: 1.35
+
+    // Always-visible chain (so it animates THROUGH chevrons)
+    property real idleAlpha: 0.10      // faint when inactive
+    property real baseAlpha: 0.06      // faint baseline when active (keeps all chevrons visible)
+    property real aheadAlpha: 0.03     // faint ahead-of-head (prevents "hard off")
+
     property real chevronHeightOuter: 48
 
     // Stroke nesting
-    property real thickness: 6
-    property real thicknessOuter: 12
+    property real thickness: 7
+    property real thicknessOuter: 14
     property real thicknessPulseBoost: 1.5
 
     property color onColor: "#00E676"
 
     // ===== Tail / head shaping =====
     // Smaller tailDecay => longer tail (more arc-like)
-    property real tailDecay: 0.20
+    property real tailDecay: 0.16
     // Smaller headDecay => softer head (more arc-like)
-    property real headDecay: 0.75
+    property real headDecay: 0.55
     // Keep 0 to avoid “faint always-on” when off
     property real tailFloor: 0.0
 
@@ -43,7 +52,7 @@ Item {
         from: 0.0
         to: Math.max(1.0, root.chevrons * 1.0)   // wrap-friendly
         duration: Math.max(1, root.sweepMs)
-        easing.type: Easing.Linear
+        easing.type: Easing.InOutSine
     }
 
     onActiveChanged: {
@@ -58,25 +67,41 @@ Item {
     }
 
     function alphaFor(index) {
+        // Indicator OFF → nothing visible
         if (!root.active) return 0.0
+
         var n = Math.max(1, root.chevrons)
 
-        var li = root.outwardRank(index)     // 0..n-1 inside->outside
+        // Head position (wrap-safe)
         var head = root.pos % n
 
-        // distance behind head, wrapped: 0..n
-        var delta = (head - li + n) % n
+        // Logical inside→outside index
+        var li = root.outwardRank(index)
 
-        // A smooth “arc-like” profile:
-        // - headFactor gives a soft highlight near the head
-        // - tail gives a long fade behind it
-        var headFactor = Math.exp(-delta * root.headDecay)
-        var tail = Math.max(root.tailFloor, Math.exp(-delta * root.tailDecay))
+        // Distance behind head (wrap-aware)
+        var d = head - li
+        if (d < 0) d += n   // 0..n
 
-        var a = tail * headFactor
-        if (a < 0.0) a = 0.0
-        if (a > 1.0) a = 1.0
-        return a
+        // Distance ahead of head
+        var ahead = li - head
+        if (ahead < 0) ahead += n
+
+        // Long tail behind the head
+        var tailSpan = Math.max(1.0, root.tailLen)
+        var tail = Math.exp(-(d / tailSpan) * root.tailDecay)
+
+        // Soft head highlight (arc-like)
+        var headFactor = Math.exp(-d * root.headDecay)
+
+        // Faint forward bleed to prevent hard cutoff
+        var forward = Math.exp(-(ahead / tailSpan) * 1.6) * 0.06
+
+        var a = Math.max(tail * headFactor, forward)
+
+        // Gamma shaping for analog feel
+        a = Math.pow(a, root.gamma)
+
+        return Math.max(0.0, Math.min(1.0, a))
     }
 
     // Size follows content (prevents clipping)
