@@ -1,10 +1,7 @@
 import QtQuick 2.15
 
-Item {
+QtObject {
     id: theme
-    width: 0
-    height: 0
-    visible: false
 
     // Day/Night
     property bool isNight: true
