@@ -45,15 +45,30 @@ Item {
 
     // Stable key (what halo colors should follow)
     readonly property string currentWarningKey: {
-        var t = String(currentWarningText).toLowerCase()
-        if (t.indexOf("brake")  !== -1) return "brake"
-        if (t.indexOf("charge") !== -1) return "charge"
-        if (t.indexOf("check")  !== -1) return "check"
-        if (t.indexOf("a/t")    !== -1 || t === "at") return "at"
-        if (t.indexOf("fuel")   !== -1) return "fuel"
-        if (t.indexOf("door")   !== -1) return "door"
-        return ""
-    }
+    // Always return a canonical, lowercase key
+    var k = String(warningQueue[warningIndex] || "").toLowerCase()
+
+    // Normalize aliases → canonical keys
+    if (k === "brake" || k === "brake_warning" || k === "park_brake")
+        return "brake"
+
+    if (k === "charge" || k === "battery" || k === "charging")
+        return "charge"
+
+    if (k === "check" || k === "check_engine" || k === "mil")
+        return "check"
+
+    if (k === "fuel" || k === "fuel_low")
+        return "fuel"
+
+    if (k === "door" || k === "door_ajar")
+        return "door"
+
+    if (k === "at" || k === "trans" || k === "transmission")
+        return "at"
+
+    return ""
+}
 
     function rebuildWarningQueue() {
         var q = []
@@ -350,20 +365,6 @@ anchors.horizontalCenter: parent.horizontalCenter
             }
 
 
-            // HUD brackets (so it doesn’t look like a “red box”)
-            Repeater {
-                model: 4
-                Rectangle {
-                    width: parent.width * 0.16
-                    height: 4
-                    radius: 2
-                    color: warningColors.haloColor(root.currentWarningKey, root.tDanger)
-                    opacity: 0.55
-                    anchors.centerIn: parent
-                    rotation: index * 90
-                    y: -parent.height * 0.30
-                }
-            }
         }
     }
 
