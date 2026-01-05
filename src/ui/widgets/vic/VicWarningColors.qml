@@ -21,6 +21,7 @@ QtObject {
         if (k === "at" || k.indexOf("a/t") !== -1) return warnRed
         if (k.indexOf("door") !== -1) return warnRed
 
+        if (k.indexOf("oil")  !== -1) return warnRed
         return fallbackColor
     }
 }

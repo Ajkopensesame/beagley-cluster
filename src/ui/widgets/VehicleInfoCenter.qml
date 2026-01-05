@@ -24,10 +24,11 @@ Item {
     property bool warnAT: false
     property bool warnFuelLow: false
     property bool warnBrake: false   // park brake or brake fluid
+    property bool warnOil: false     // oil pressure warning
 
     // --- Derived ---
     readonly property bool hasWarning:
-        warnBrake || warnCharge || warnCheckEngine || warnAT || warnFuelLow || warnDoor
+        warnBrake || warnCharge || warnCheckEngine || warnAT || warnFuelLow || warnOil || warnDoor
     readonly property string driveText: transferLock ? "LOCK" : (drivetrainMode === "4wd" ? "4WD" : "2WD")
 
     // --- Motion tuning ---
@@ -45,30 +46,31 @@ Item {
 
     // Stable key (what halo colors should follow)
     readonly property string currentWarningKey: {
-    // Always return a canonical, lowercase key
-    var k = String(warningQueue[warningIndex] || "").toLowerCase()
+        // Build the same warning queue locally (no shared scope)
+        var q = []
+        if (warnBrake)       q.push("BRAKE")
+        if (warnCharge)      q.push("CHARGE")
+        if (warnCheckEngine) q.push("CHECK")
+        if (warnAT)          q.push("A/T")
+        if (warnFuelLow)     q.push("FUEL")
+        if (warnOil)         q.push("OIL")
+        if (warnDoor)        q.push("DOOR")
 
-    // Normalize aliases → canonical keys
-    if (k === "brake" || k === "brake_warning" || k === "park_brake")
-        return "brake"
+        if (q.length === 0) return ""
 
-    if (k === "charge" || k === "battery" || k === "charging")
-        return "charge"
+        var i = Math.max(0, Math.min(root.warningIndex, q.length - 1))
 
-    if (k === "check" || k === "check_engine" || k === "mil")
-        return "check"
-
-    if (k === "fuel" || k === "fuel_low")
-        return "fuel"
-
-    if (k === "door" || k === "door_ajar")
-        return "door"
-
-    if (k === "at" || k === "trans" || k === "transmission")
-        return "at"
-
-    return ""
-}
+        switch (q[i]) {
+        case "BRAKE":  return "brake"
+        case "CHARGE": return "charge"
+        case "CHECK":  return "check"
+        case "A/T":    return "at"
+        case "FUEL":   return "fuel"
+        case "OIL":    return "oil"
+        case "DOOR":   return "door"
+        default:       return ""
+        }
+    }
 
     function rebuildWarningQueue() {
         var q = []
@@ -78,6 +80,7 @@ Item {
         if (warnCheckEngine) q.push("CHECK")
         if (warnAT)          q.push("A/T")
         if (warnFuelLow)     q.push("FUEL")
+        if (warnOil)         q.push("OIL")
         if (warnDoor)        q.push("DOOR")
 
         warningQueue = q
@@ -96,6 +99,7 @@ Item {
     onWarnCheckEngineChanged: rebuildWarningQueue()
     onWarnATChanged: rebuildWarningQueue()
     onWarnFuelLowChanged: rebuildWarningQueue()
+    onWarnOilChanged: rebuildWarningQueue()
     onWarnDoorChanged: rebuildWarningQueue()
 
     // Force halo repaint when the *displayed* warning changes
@@ -318,31 +322,96 @@ anchors.horizontalCenter: parent.horizontalCenter
             Behavior on opacity { NumberAnimation { duration: root.fast } }
 
             // Warning (ICON + small text)
-            Column {
-                id: warnText
-                anchors.centerIn: parent
-                spacing: 10
 
-                VicWarningIcon {
-                    warningKey: root.currentWarningKey
-                    color: warningColors.haloColor(root.currentWarningKey, root.tDanger)
-                    width: 76
-                    height: 76
-                }
+            
+Column {
+    id: warnText
+    anchors.centerIn: parent
+    spacing: 8
 
-                Text {
-                    text: root.currentWarningText
-                    color: warningColors.haloColor(root.currentWarningKey, root.tDanger)
-                    font.family: root.fontAccent
-                    font.pixelSize: 16
-                    font.bold: true
-                    font.letterSpacing: 3
-                    horizontalAlignment: Text.AlignHCenter
-                    width: parent.width
-                }
-            }
+    // ---- CHECK (top) ----
+    Text {
+        visible: root.currentWarningKey === "check"
+        width: parent.width
+        text: "CHECK"
+        color: warningColors.haloColor(root.currentWarningKey, root.tDanger)
+        font.family: root.fontAccent
+        font.pixelSize: 17
+        font.bold: true
+        font.letterSpacing: 4
+        horizontalAlignment: Text.AlignHCenter
+        opacity: 0.96
+    }
 
-            // ---- Warning cycling (only when 2+ warnings are active) ----
+    // ---- AUTO (top) ----
+    Text {
+        visible: root.currentWarningKey === "at"
+        width: parent.width
+        text: "AUTO"
+        color: warningColors.haloColor(root.currentWarningKey, root.tDanger)
+        font.family: root.fontAccent
+        font.pixelSize: 16
+        font.bold: true
+        font.letterSpacing: 3
+        horizontalAlignment: Text.AlignHCenter
+        opacity: 0.96
+    }
+
+    // ---- ICON ----
+    VicWarningIcon {
+        id: warnIcon
+        warningKey: root.currentWarningKey
+        color: warningColors.haloColor(root.currentWarningKey, root.tDanger)
+        width: 76
+        height: 76
+    }
+
+    // ---- ENGINE (bottom) ----
+    Text {
+        visible: root.currentWarningKey === "check"
+        width: parent.width
+        text: "ENGINE"
+        color: warningColors.haloColor(root.currentWarningKey, root.tDanger)
+        font.family: root.fontAccent
+        font.pixelSize: 17
+        font.bold: true
+        font.letterSpacing: 4
+        horizontalAlignment: Text.AlignHCenter
+        opacity: 0.96
+    }
+
+    // ---- TRANS (bottom) ----
+    Text {
+        visible: root.currentWarningKey === "at"
+        width: parent.width
+        text: "TRANS"
+        color: warningColors.haloColor(root.currentWarningKey, root.tDanger)
+        font.family: root.fontAccent
+        font.pixelSize: 16
+        font.bold: true
+        font.letterSpacing: 3
+        horizontalAlignment: Text.AlignHCenter
+        opacity: 0.96
+    }
+
+    // ---- Generic label (everything else) ----
+    Text {
+        visible: root.currentWarningKey !== "check"
+              && root.currentWarningKey !== "at"
+        width: parent.width
+        text: root.currentWarningText
+        color: warningColors.haloColor(root.currentWarningKey, root.tDanger)
+        font.family: root.fontAccent
+        font.pixelSize: 16
+        font.bold: true
+        font.letterSpacing: 3
+        horizontalAlignment: Text.AlignHCenter
+        opacity: 0.96
+    }
+}
+
+            
+                // ---- Warning cycling (only when 2+ warnings are active) ----
             Timer {
                 id: warnCycle
                 interval: 1300
