@@ -1,7 +1,10 @@
 import QtQuick 2.15
 
-QtObject {
+Item {
     id: theme
+    width: 0
+    height: 0
+    visible: false
 
     // Day/Night
     property bool isNight: true
@@ -16,6 +19,12 @@ QtObject {
 
     function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
+    // ---- Fonts (load once; referenced everywhere) ----
+    // Expose safe font family names (fallbacks avoid alias-population stalls)
+    readonly property string fontDisplay: "Helvetica";
+    readonly property string fontAccent:  "Helvetica";
+    readonly property string fontMono: "Menlo";
+
     // Core semantic colors
     readonly property color bg:    isNight ? "#000000" : "#F5F3FF"
     readonly property color panel: isNight ? "#0B0714" : "#FFFFFF"
@@ -28,9 +37,6 @@ QtObject {
     function speedColor(speedKph) {
         const s = Math.max(0, Number(speedKph) || 0);
 
-        // Smooth transitions:
-        // 0..115: pearlLow -> pearlHigh
-        // 115..130: pearlHigh -> danger
         const t1 = clamp(s / 115.0, 0, 1);
         const t2 = clamp((s - 115.0) / 15.0, 0, 1);
 
@@ -48,15 +54,11 @@ QtObject {
         return mix(base, danger, t2);
     }
 
-    // NOTE: third arg maxRpm is optional; TachGauge should pass it for best results.
     function rpmColor(rpm, redlineStart, maxRpm) {
         const r = Math.max(0, Number(rpm) || 0);
         const red = (redlineStart !== undefined) ? Number(redlineStart) : 5000;
         const max = (maxRpm !== undefined) ? Number(maxRpm) : 6500;
 
-        // Smooth transitions:
-        // 0..redline: pearlLow -> pearlHigh
-        // redline..max: pearlHigh -> danger
         const t1 = clamp(r / Math.max(1, red), 0, 1);
         const t2 = clamp((r - red) / Math.max(1, (max - red)), 0, 1);
 

@@ -2,38 +2,25 @@ import QtQuick 2.15
 
 Item {
     id: root
+    width: 96
+    height: 96
 
-    // Tint color passed in from VicWarningIcon
+    // Injected by VicWarningIcon
     property color color: "red"
 
-    // Outer circle stroke
-    Rectangle {
-        anchors.centerIn: parent
-        width: Math.min(parent.width, parent.height)
-        height: width
-        radius: width / 2
-        color: "transparent"
-        border.width: Math.max(3, width * 0.06)
-        border.color: root.color
-        opacity: 0.95
-    }
+    // Tuning knobs (keep it OEM-ish)
+    readonly property real s: Math.min(width, height)
+    readonly property real strokeW: Math.max(3, s * 0.07)
+    readonly property real ringPad: Math.max(8, s * 0.10)
 
-    // Inner dot (optional “badge” feel)
-    Rectangle {
-        anchors.centerIn: parent
-        width: Math.min(parent.width, parent.height) * 0.12
-        height: width
-        radius: width / 2
-        color: root.color
-        opacity: 0.95
-    }
-
+    
     // Exclamation stem
     Rectangle {
         anchors.horizontalCenter: parent.horizontalCenter
-        y: parent.height * 0.22
-        width: Math.max(4, parent.width * 0.10)
-        height: parent.height * 0.42
+        // visually centered a touch high, like OEM clusters
+        y: root.s * 0.24
+        width: Math.max(5, root.s * 0.12)
+        height: root.s * 0.40
         radius: width / 2
         color: root.color
         opacity: 0.95
@@ -42,11 +29,35 @@ Item {
     // Exclamation dot
     Rectangle {
         anchors.horizontalCenter: parent.horizontalCenter
-        y: parent.height * 0.70
-        width: Math.max(4, parent.width * 0.10)
+        y: root.s * 0.69
+        width: Math.max(6, root.s * 0.13)
         height: width
         radius: width / 2
         color: root.color
         opacity: 0.95
+    }
+
+    // Optional subtle parentheses hint (very light) — OEM-ish "(!)" feel
+    // If you want *only* circle + !, set opacity to 0.0.
+    Text {
+        anchors.centerIn: parent
+        text: "("
+        color: root.color
+        opacity: 0.35
+        font.bold: true
+        font.pixelSize: Math.round(root.s * 0.68)
+        y: -root.s * 0.01
+        x: -root.s * 0.20
+    }
+
+    Text {
+        anchors.centerIn: parent
+        text: ")"
+        color: root.color
+        opacity: 0.35
+        font.bold: true
+        font.pixelSize: Math.round(root.s * 0.68)
+        y: -root.s * 0.01
+        x: root.s * 0.20
     }
 }

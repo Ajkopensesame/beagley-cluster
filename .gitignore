@@ -13,3 +13,7 @@ build/
 *.user
 .DS_Store
 *.bak.*
+
+# Local scratch / experiments
+sandbox/
+src/ui/widgets/VehicleStateCoreAnimated.qml
