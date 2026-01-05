@@ -5,8 +5,8 @@ Item {
     width: 96
     height: 96
 
-    // kept for API consistency (no runtime tint available without Effects)
-    property color color: "yellow"
+    // kept for API consistency
+    property color color: "red"
 
     readonly property real s: Math.min(width, height)
 
@@ -20,5 +20,6 @@ Item {
         antialiasing: true
         asynchronous: true
         cache: false
+        onStatusChanged: console.log("[OilIcon] status=", status, "source=", source)
     }
 }
