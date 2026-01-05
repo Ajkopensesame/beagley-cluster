@@ -11,7 +11,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # --------------------
 # Qt
 # --------------------
-find_package(Qt6 REQUIRED COMPONENTS Quick WebEngineQuick)
+find_package(Qt6 REQUIRED COMPONENTS Quick WebEngineQuick Svg)
 
 qt_standard_project_setup()
 
@@ -63,5 +63,5 @@ qt_add_qml_module(beagley_cluster
 # Link Qt
 # --------------------
 target_link_libraries(beagley_cluster
-    PRIVATE Qt6::Quick Qt6::WebEngineQuick
+    PRIVATE Qt6::Quick Qt6::WebEngineQuick Qt6::Svg
 )

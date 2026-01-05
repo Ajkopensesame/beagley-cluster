@@ -5,8 +5,7 @@ Item {
     width: 96
     height: 96
 
-    // Kept for API consistency (we're not runtime-tinting)
-    property color color: "#FF3B3B"
+    property color color: "yellow" // kept for API consistency
 
     readonly property real s: Math.min(width, height)
 
@@ -14,7 +13,7 @@ Item {
         anchors.centerIn: parent
         width: root.s
         height: root.s
-        source: Qt.resolvedUrl("../../../../../assets/vic/svg/brake-system-warning-svgrepo-com.svg")
+        source: Qt.resolvedUrl("../../../../../assets/vic/svg/fuel-svgrepo-com-yellow.svg")
         fillMode: Image.PreserveAspectFit
         smooth: true
         antialiasing: true
