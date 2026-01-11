@@ -439,6 +439,7 @@ Column {
 
     // Small status line (always present, minimal)
     Text {
+        visible: false
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
         anchors.bottomMargin: 6

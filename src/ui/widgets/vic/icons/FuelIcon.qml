@@ -1,23 +1,52 @@
 import QtQuick 2.15
+import QtQuick.Shapes 1.15
 
 Item {
     id: root
     width: 96
     height: 96
 
-    property color color: "yellow" // kept for API consistency
+    // Injected by VicWarningIcon
+    property color color: "#FFD400"   // fuel warning yellow
 
-    readonly property real s: Math.min(width, height)
+    // viewBox from SVG: "0 0 1024 1024"
+    readonly property real vbX: 0
+    readonly property real vbY: 0
+    readonly property real vbW: 1024
+    readonly property real vbH: 1024
 
-    Image {
-        anchors.centerIn: parent
-        width: root.s
-        height: root.s
-        source: Qt.resolvedUrl("../../../../../assets/vic/svg/fuel-svgrepo-com-yellow.svg")
-        fillMode: Image.PreserveAspectFit
-        smooth: true
+    Shape {
+        anchors.fill: parent
         antialiasing: true
-        asynchronous: true
-        cache: false
+
+        transform: [
+            Translate { x: -root.vbX; y: -root.vbY },
+            Scale { xScale: root.width / root.vbW; yScale: root.height / root.vbH }
+        ]
+
+        ShapePath {
+            strokeColor: "transparent"
+            strokeWidth: 0
+            fillColor: root.color
+            PathSvg { path: "M522.267 910.508c16.962 0 30.72-13.758 30.72-30.72v-736.43c0-16.962-13.758-30.72-30.72-30.72H143.356c-16.962 0-30.72 13.758-30.72 30.72v736.43c0 16.962 13.758 30.72 30.72 30.72h378.911zm0 40.96H143.356c-39.583 0-71.68-32.097-71.68-71.68v-736.43c0-39.583 32.097-71.68 71.68-71.68h378.911c39.583 0 71.68 32.097 71.68 71.68v736.43c0 39.583-32.097 71.68-71.68 71.68zm388.62-678.049v500.265c0 49.412-40.054 89.467-89.467 89.467-49.443 0-89.498-40.054-89.498-89.467 0-11.311-9.169-20.48-20.48-20.48s-20.48 9.169-20.48 20.48c0 72.034 58.393 130.427 130.427 130.427 72.065 0 130.458-58.393 130.458-130.427V273.419c0-11.311-9.169-20.48-20.48-20.48s-20.48 9.169-20.48 20.48z" }
+        }
+        ShapePath {
+            strokeColor: "transparent"
+            strokeWidth: 0
+            fillColor: root.color
+            PathSvg { path: "M731.92 779.436V368.648c0-11.311-9.169-20.48-20.48-20.48s-20.48 9.169-20.48 20.48v410.788c0 11.311 9.169 20.48 20.48 20.48s20.48-9.169 20.48-20.48z" }
+        }
+        ShapePath {
+            strokeColor: "transparent"
+            strokeWidth: 0
+            fillColor: root.color
+            PathSvg { path: "M731.943 365.513v-34.499c0-49.414-40.053-89.467-89.467-89.467-49.415 0-89.477 40.054-89.477 89.467v34.499c0 11.311 9.169 20.48 20.48 20.48s20.48-9.169 20.48-20.48v-34.499c0-26.789 21.722-48.507 48.517-48.507 26.792 0 48.507 21.715 48.507 48.507v34.499c0 11.311 9.169 20.48 20.48 20.48s20.48-9.169 20.48-20.48zM942.5 254.981L767.785 80.266c-7.998-7.998-20.965-7.998-28.963 0s-7.998 20.965 0 28.963l174.715 174.715c7.998 7.998 20.965 7.998 28.963 0s7.998-20.965 0-28.963zM438.84 281.52c5.657 0 10.24-4.583 10.24-10.24V225.2c0-5.657-4.583-10.24-10.24-10.24H225.541a10.238 10.238 0 00-10.24 10.24v46.08c0 5.657 4.583 10.24 10.24 10.24H438.84zm0 40.96H225.541c-28.278 0-51.2-22.922-51.2-51.2V225.2c0-28.278 22.922-51.2 51.2-51.2H438.84c28.278 0 51.2 22.922 51.2 51.2v46.08c0 28.278-22.922 51.2-51.2 51.2z" }
+        }
+        ShapePath {
+            strokeColor: "transparent"
+            strokeWidth: 0
+            fillColor: root.color
+            PathSvg { path: "M928.972 358.832h-48.978c-11.309 0-20.48-9.171-20.48-20.48V191.091c0-11.311-9.169-20.48-20.48-20.48s-20.48 9.169-20.48 20.48v147.261c0 33.931 27.509 61.44 61.44 61.44h48.978c11.311 0 20.48-9.169 20.48-20.48s-9.169-20.48-20.48-20.48z" }
+        }
     }
 }

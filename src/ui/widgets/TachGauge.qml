@@ -357,4 +357,55 @@ Item {
         }
     }
 }
+
+    // --- VIC in tach (render proof; UI-only) ---
+    
+    // --- VIC Self-Test (UI-only) ---
+    // Cycles through warnings so you can verify icons/halo without BBB/UNO.
+    property bool selfTestVIC: true
+    property int vicTestIndex: 0
+    readonly property var vicTestKeys: ["none", "door", "charge", "check", "at", "fuel", "brake", "oil"]
+
+    Timer {
+        id: vicSelfTestTimer
+        interval: 1200
+        repeat: true
+        running: selfTestVIC
+        onTriggered: vicTestIndex = (vicTestIndex + 1) % vicTestKeys.length
+    }
+
+VehicleInfoCenter {
+        id: vicCenter
+        // --- Self-test bindings (UI-only) ---
+        property string _k: parent.vicTestKeys[parent.vicTestIndex]
+        warnDoor: _k === "door"
+        warnCharge: _k === "charge"
+        warnCheckEngine: _k === "check"
+        warnAT: _k === "at"
+        warnFuelLow: _k === "fuel"
+        warnBrake: _k === "brake"
+        warnOil: _k === "oil"
+
+        // Exercise drivetrain text too
+        drivetrainMode: (parent.vicTestIndex % 3 === 0) ? "4wd" : "2wd"
+        transferLock: (parent.vicTestIndex % 5 === 0)
+
+        anchors.centerIn: parent
+
+        // Reasonable hub size:
+        // - scaled to dial area without covering tick labels
+        // - tweak factor if needed (0.34–0.45)
+        readonly property real factor: 0.50
+        readonly property real side: Math.max(0, Math.min(parent.width, parent.height) * factor)
+
+        width: side
+        height: side
+
+        // Keep it from "sitting on top" of the tach markings:
+        // Reduce z so it doesn't occlude major dial elements.
+        // If it disappears, raise gradually (e.g. 200, 400).
+        z: 150
+        visible: true
+    }
+
 }

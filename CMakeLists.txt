@@ -39,6 +39,24 @@ qt_add_qml_module(beagley_cluster
     VERSION 1.0
 
     QML_FILES
+        src/ui/widgets/VehicleInfoCenter.qml
+        src/ui/widgets/vic/ATIcon.qml
+        src/ui/widgets/vic/VicWarningColors.qml
+        src/ui/widgets/vic/VicWarningHalo.qml
+        src/ui/widgets/vic/VicWarningIcon.qml
+        src/ui/widgets/vic/icons/AtIcon.qml
+        src/ui/widgets/vic/icons/BrakeIcon.qml
+        src/ui/widgets/vic/icons/ChargeIcon.qml
+        src/ui/widgets/vic/icons/CheckIcon.qml
+        src/ui/widgets/vic/icons/DoorIcon.qml
+        src/ui/widgets/vic/icons/FuelIcon.qml
+        src/ui/widgets/vic/icons/OilIcon.qml
+        src/ui/widgets/vic/warnings/AtWarning.qml
+        src/ui/widgets/vic/warnings/BrakeWarning.qml
+        src/ui/widgets/vic/warnings/ChargeWarning.qml
+        src/ui/widgets/vic/warnings/CheckWarning.qml
+        src/ui/widgets/vic/warnings/DoorWarning.qml
+        src/ui/widgets/vic/warnings/FuelWarning.qml
         src/ui/widgets/TurnChevronFlow.qml
         src/ui/theme/PurplePearlTheme.qml
         # Entry point

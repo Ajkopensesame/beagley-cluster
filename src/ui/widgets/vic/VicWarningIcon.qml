@@ -6,7 +6,7 @@ Item {
     width: 96
     height: 96
 
-    // canonical keys: "brake|"oil""|"charge"|"check"|"fuel"|"door"|"at"|"oil"
+    // canonical keys: "brake"|"charge"|"check"|"fuel"|"door"|"at"|"oil"
     property string warningKey: ""
     property color color: "red"
 

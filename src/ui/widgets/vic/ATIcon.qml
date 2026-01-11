@@ -1,24 +1,47 @@
 import QtQuick 2.15
+import QtQuick.Shapes 1.15
 
 Item {
     id: root
     width: 96
     height: 96
 
-    // API consistency (not used for tinting)
+    // Injected by VicWarningIcon
     property color color: "#FF3B3B"
 
-    readonly property real s: Math.min(width, height)
+    // viewBox from SVG: "0 0 511.998 511.998"
+    readonly property real vbX: 0
+    readonly property real vbY: 0
+    readonly property real vbW: 511.998
+    readonly property real vbH: 511.998
 
-    Image {
-        anchors.centerIn: parent
-        width: root.s
-        height: root.s
-        source: Qt.resolvedUrl("../../../../assets/vic/svg/gearshift-shift-svgrepo-com.svg")
-        fillMode: Image.PreserveAspectFit
-        smooth: true
+    // Stroke tuned for VIC icon sizes
+    readonly property real sw: Math.max(1.5, width * 0.03)
+
+    Shape {
+        anchors.fill: parent
         antialiasing: true
-        asynchronous: true
-        cache: false
+
+        transform: [
+            Translate { x: -root.vbX; y: -root.vbY },
+            Scale { xScale: root.width / root.vbW; yScale: root.height / root.vbH }
+        ]
+
+        ShapePath {
+            strokeColor: "transparent"
+            strokeWidth: 0
+            fillColor: root.color
+            PathSvg { path: "M298.776,132.17v-8.514h39.461c24.269,0,44.015-19.745,44.015-44.015V44.015C382.252,19.745,362.507,0,338.237,0H226.335
+			c-24.269,0-44.015,19.745-44.015,44.015V78.83c0,24.716,20.109,44.825,44.825,44.825h38.411v8.514h-37.692H206.71
+			c-49.588,0-89.93,40.343-89.93,89.93v199.969c0,49.588,40.343,89.93,89.93,89.93h98.578c49.588,0,89.93-40.343,89.93-89.93
+			V233.231C395.219,197.428,380.483,132.17,298.776,132.17z M227.147,90.437c-6.292-0.001-11.607-5.315-11.607-11.607V44.015
+			c0-5.952,4.842-10.795,10.795-10.795h111.902c5.952,0,10.795,4.842,10.795,10.795v35.627c0,5.952-4.842,10.795-10.795,10.795
+			H227.147z M265.556,165.391v176.482c0,9.173,7.437,16.61,16.61,16.61c9.173,0,16.61-7.437,16.61-16.61V165.39
+			c0,0,11.311-0.911,20.937,1.865l0.145,194.112c0.008,10.052-3.901,19.503-11.006,26.614c-7.104,7.111-16.554,11.027-26.605,11.027
+			c-20.723,0-37.597-16.86-37.612-37.583l-0.146-196.033H265.556z M361.999,422.07L361.999,422.07
+			c0,31.271-25.441,56.71-56.71,56.71h-98.578c-31.271,0-56.71-25.441-56.71-56.71V222.1c0-31.271,25.441-56.71,56.71-56.71h4.557
+			l0.146,196.057c0.03,39.027,31.804,70.779,70.832,70.779c18.93,0,36.724-7.375,50.104-20.764
+			c13.381-13.391,20.741-31.19,20.728-50.119l-0.127-169.913c5.715,8.85,9.049,19.376,9.049,30.673V422.07z" }
+        }
     }
 }

@@ -2,9 +2,16 @@
   <qresource prefix="/">
     <file>ui/Main.qml</file>
     <file>ui/widgets/SpeedGauge.qml</file>
-      <file>ui/mock/MockVehicleState.qml</file>
+    <file>ui/mock/MockVehicleState.qml</file>
     <file>ui/mock/qmldir</file>
     <file>ui/widgets/qmldir</file>
-  <file>assets/vic/svg/gearshift-shift-svgrepo-com.svg</file>
-</qresource>
+
+    <!-- VIC SVG assets -->
+    <file alias="assets/vic/svg/brake-system-warning-svgrepo-com.svg">../assets/vic/svg/brake-system-warning-svgrepo-com.svg</file>
+    <file alias="assets/vic/svg/car-door-4-svgrepo-com.svg">../assets/vic/svg/car-door-4-svgrepo-com.svg</file>
+    <file alias="assets/vic/svg/engine-svgrepo-com.svg">../assets/vic/svg/engine-svgrepo-com.svg</file>
+    <file alias="assets/vic/svg/fuel-svgrepo-com-yellow.svg">../assets/vic/svg/fuel-svgrepo-com-yellow.svg</file>
+    <file alias="assets/vic/svg/gearshift-shift-svgrepo-com.svg">../assets/vic/svg/gearshift-shift-svgrepo-com.svg</file>
+    <file alias="assets/vic/svg/oil-can-solid-svgrepo-com-red.svg">../assets/vic/svg/oil-can-solid-svgrepo-com-red.svg</file>
+  </qresource>
 </RCC>
