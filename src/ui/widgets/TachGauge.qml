@@ -363,6 +363,9 @@ Item {
     // --- VIC Self-Test (UI-only) ---
     // Cycles through warnings so you can verify icons/halo without BBB/UNO.
     property bool selfTestVIC: true
+    // High beam indicator (UI-only for now; wire to vehicle_state later)
+    property bool highBeamOn: false
+
     property int vicTestIndex: 0
     readonly property var vicTestKeys: ["none", "door", "charge", "check", "at", "fuel", "brake", "oil"]
 
@@ -371,8 +374,25 @@ Item {
         interval: 1200
         repeat: true
         running: selfTestVIC
-        onTriggered: vicTestIndex = (vicTestIndex + 1) % vicTestKeys.length
+        onTriggered: { vicTestIndex = (vicTestIndex + 1) % vicTestKeys.length; highBeamOn = (vicTestIndex % 4 === 0) }
     }
+
+    HighBeamHalo {
+        id: highBeamHalo
+        z: 140                 // behind vicCenter (vicCenter is z:150)
+        anchors.centerIn: vicCenter
+
+        // Wrap the VIC with a small gap
+        vicDiameter: Math.max(vicCenter.width, vicCenter.height)
+        gapPx: 10
+        trimPx: 26
+        ringThickness: 22
+
+        active: root.highBeamOn
+        holdMs: 1600
+        heartbeat: true
+    }
+
 
 VehicleInfoCenter {
         id: vicCenter

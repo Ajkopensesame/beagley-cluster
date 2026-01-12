@@ -48,6 +48,7 @@ qt_add_qml_module(beagley_cluster
         src/ui/widgets/vic/icons/BrakeIcon.qml
         src/ui/widgets/vic/icons/ChargeIcon.qml
         src/ui/widgets/vic/icons/CheckIcon.qml
+        src/ui/widgets/vic/icons/HighBeamIcon.qml
         src/ui/widgets/vic/icons/DoorIcon.qml
         src/ui/widgets/vic/icons/FuelIcon.qml
         src/ui/widgets/vic/icons/OilIcon.qml
@@ -68,6 +69,7 @@ qt_add_qml_module(beagley_cluster
         src/ui/widgets/FuelGauge.qml
         src/ui/widgets/SpeedoPearl.qml
         src/ui/widgets/TachGauge.qml
+        src/ui/widgets/HighBeamHalo.qml
         src/ui/widgets/MatrixRain.qml
         src/ui/widgets/MapCenter.qml
 
