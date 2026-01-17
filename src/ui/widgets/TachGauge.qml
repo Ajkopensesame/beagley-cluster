@@ -153,7 +153,7 @@ Item {
                             ctx.save();
                             ctx.fillStyle = theme?.text ?? "white";
                             ctx.globalAlpha = theme?.isNight ? 0.85 : 0.75;
-                            ctx.font = "600 18px Menlo";
+                            ctx.font = "600 18px DejaVu Sans Mono";
                             ctx.textAlign = "center";
                             ctx.textBaseline = "middle";
                             ctx.fillText(
@@ -310,7 +310,7 @@ Item {
 
                 ctx.globalAlpha = theme?.isNight ? 0.90 : 0.75;
                 ctx.fillStyle = theme?.text ?? "white";
-                ctx.font = "700 16px Menlo";
+                ctx.font = "700 16px DejaVu Sans Mono";
                 ctx.textAlign = "center";
                 ctx.textBaseline = "middle";
 

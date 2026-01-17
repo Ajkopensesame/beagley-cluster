@@ -13,7 +13,7 @@ Item {
         text: "CHARGE"
         color: "#FF3B3B"
         font.pixelSize: 34
-        font.family: "Menlo"
+        font.family: "DejaVu Sans Mono"
         font.bold: true
         opacity: active ? 1.0 : 0.7
     }

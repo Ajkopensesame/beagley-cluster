@@ -154,7 +154,7 @@ Item {
 
                 ctx.save();
                 ctx.fillStyle = "white";
-                ctx.font = "700 18px Menlo";
+                ctx.font = "700 18px DejaVu Sans Mono";
                 ctx.textAlign = "center";
                 ctx.textBaseline = "middle";
 
@@ -208,7 +208,7 @@ Item {
         z: 60
         text: root.fuelInt + "%"
         font.pixelSize: 86
-        font.family: "Menlo"
+        font.family: "DejaVu Sans Mono"
         font.letterSpacing: 1
         color: root.gaugeColor
     }

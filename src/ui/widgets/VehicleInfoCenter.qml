@@ -117,9 +117,9 @@ Item {
     readonly property color tHigh:   cOr("#5E35B1", theme ? theme.pearlHigh : undefined)
     readonly property color tDanger: cOr("#FF3B3B", theme ? theme.danger : undefined)
 
-    readonly property string fontDisplay: cOr("Menlo", theme ? theme.fontDisplay : undefined)
-    readonly property string fontAccent:  cOr("Menlo", theme ? theme.fontAccent : undefined)
-    readonly property string fontMono:    cOr("Menlo", theme ? theme.fontMono : undefined)
+    readonly property string fontDisplay: cOr("DejaVu Sans Mono", theme ? theme.fontDisplay : undefined)
+    readonly property string fontAccent:  cOr("DejaVu Sans Mono", theme ? theme.fontAccent : undefined)
+    readonly property string fontMono:    cOr("DejaVu Sans Mono", theme ? theme.fontMono : undefined)
 
     // --- Geometry ---
     readonly property real s: Math.min(width, height)

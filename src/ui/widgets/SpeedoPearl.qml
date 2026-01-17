@@ -117,7 +117,7 @@ Item {
         anchors.topMargin: 42
         text: "km/h"
         font.pixelSize: 20
-        font.family: "Menlo"
+        font.family: "DejaVu Sans Mono"
         color: "#B9B1C7"
     }
 

@@ -41,7 +41,7 @@ Item {
         anchors.centerIn: parent
         text: "AT"
         color: root.color
-        font.family: "Menlo"
+        font.family: "DejaVu Sans Mono"
         font.bold: true
         font.pixelSize: Math.round(root.s * 0.26)
         opacity: 0.95

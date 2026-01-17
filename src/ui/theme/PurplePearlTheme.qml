@@ -20,7 +20,7 @@ QtObject {
     // Expose safe font family names (fallbacks avoid alias-population stalls)
     readonly property string fontDisplay: "Helvetica";
     readonly property string fontAccent:  "Helvetica";
-    readonly property string fontMono: "Menlo";
+    readonly property string fontMono: "DejaVu Sans Mono";
 
     // Core semantic colors
     readonly property color bg:    isNight ? "#000000" : "#F5F3FF"

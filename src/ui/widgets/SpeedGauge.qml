@@ -233,7 +233,7 @@ Item {
 
                 ctx.save();
                 ctx.fillStyle = "white";
-                ctx.font = "700 18px Menlo";
+                ctx.font = "700 18px DejaVu Sans Mono";
                 ctx.textAlign = "center";
                 ctx.textBaseline = "middle";
 
@@ -402,7 +402,7 @@ Item {
 
                 ctx.globalAlpha = theme?.isNight ? 0.90 : 0.75;
                 ctx.fillStyle = theme?.text ?? "white";
-                ctx.font = "700 16px Menlo";
+                ctx.font = "700 16px DejaVu Sans Mono";
                 ctx.textAlign = "center";
                 ctx.textBaseline = "middle";
 
@@ -466,7 +466,7 @@ Item {
         Text {
             anchors.centerIn: parent
             text: "O/D"
-            font.family: "Menlo"
+            font.family: "DejaVu Sans Mono"
             font.pixelSize: 36
             font.weight: Font.Bold
             font.letterSpacing: 4
@@ -489,7 +489,7 @@ Item {
         z: 60
         text: root.speedInt
         font.pixelSize: 120
-        font.family: "Menlo"
+        font.family: "DejaVu Sans Mono"
         font.letterSpacing: 1
         color: root.gaugeColor
     }
@@ -508,7 +508,7 @@ Item {
         anchors.horizontalCenter: speedValueText.horizontalCenter
 
         font.pixelSize: 56
-        font.family: "Menlo"
+        font.family: "DejaVu Sans Mono"
         font.weight: Font.Bold
         font.letterSpacing: 4
 
