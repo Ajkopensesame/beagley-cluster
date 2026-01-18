@@ -21,3 +21,6 @@ src/ui/widgets/VehicleStateCoreAnimated.qml
 # Local build outputs
 build-ninja/
 build/
+
+# Local web experiments
+src/ui/web/test/
