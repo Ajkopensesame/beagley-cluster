@@ -3,7 +3,6 @@ import QtQuick.Window 2.15
 import QtWebEngine
 
 import "./theme" as Theme
-import "mock"
 import BeagleY 1.0
 import "widgets" as W
 
@@ -28,9 +27,12 @@ Window {
     color: appTheme.bg
 
     // ===============================
-    // Mock vehicle data
+    // BBB truth source (C++ context property must be named: vehicleState)
     // ===============================
-    MockVehicleState { id: vehicle }
+    // IMPORTANT:
+    // We alias it to `hub` to avoid binding loops when components also have a `vehicleState` property.
+    readonly property var hub: vehicleState
+    readonly property bool linkOk: hub && hub.connected && !hub.linkStale
 
     Component.onCompleted: {
         root.showNormal()
@@ -42,6 +44,7 @@ Window {
         }
     }
 
+    // Keep: system palette can change (night mode etc.)
     Timer {
         interval: 1000
         running: true
@@ -98,41 +101,51 @@ Window {
     }
 
     // ===============================
-    // Left gauge
+    // Left gauge (Speed)
     // ===============================
     SpeedGauge {
         id: gauge
         anchors.centerIn: leftPanel
         theme: appTheme
-        vehicleState: vehicle
-        speed: vehicle.speedKph
-        coolantC: vehicle.coolantC
+
+        // Pass BBB truth object (alias avoids binding loop)
+        vehicleState: hub
+
+        // Drive values from BBB truth with stale-safe fallback
+        speed:    linkOk ? (hub.speedKph || 0) : 0
+        coolantC: linkOk ? (hub.coolantC || 0) : 0
+
         width: Math.min(leftPanel.width * 0.92, leftPanel.height * 0.92)
         height: width
     }
 
     // ===============================
-    // Center — WebEngine (Stage M1)
+    // Center — WebEngine
     // ===============================
     MapCenterWeb {
         anchors.fill: centerPanel
     }
 
     // ===============================
-    // Right gauge
+    // Right gauge (Tach)
     // ===============================
     TachGauge {
         id: tach
         anchors.centerIn: rightPanel
         theme: appTheme
-        rpm: vehicle.rpm
-        fuelPct: vehicle.fuelPct
+
+        // Pass BBB truth for VIC + warnings
+        vehicleState: hub
+
+        rpm:     linkOk ? (hub.rpm || 0) : 0
+        fuelPct: linkOk ? (hub.fuelPct || 0) : 0
+
         width: Math.min(rightPanel.width * 0.92, rightPanel.height * 0.92)
         height: width
     }
 
     // ===============================
-    // Debug
+    // Debug (truth-only)
     // ===============================
     Text {
         anchors.left: parent.left
@@ -140,11 +153,11 @@ Window {
         anchors.margins: 12
         color: "#80FFFFFF"
         font.pixelSize: 16
-        text: "speed: " + Math.round(vehicle.speedKph)
+        text: linkOk ? ("speed: " + Math.round(hub.speedKph || 0)) : "speed: (STALE)"
     }
 
     // ===============================
-    // Turn indicators
+    // Turn indicators (truth-only + stale gating)
     // ===============================
     W.TurnChevronFlow {
         id: leftTurnFlow
@@ -154,7 +167,8 @@ Window {
         anchors.topMargin: -28
         anchors.right: parent.right
         anchors.rightMargin: 18
-        active: !!vehicle.left_indicator
+
+        active: linkOk && !!hub.leftIndicator
         side: "left"
         thickness: 6
     }
@@ -167,7 +181,8 @@ Window {
         anchors.topMargin: -28
         anchors.left: parent.left
         anchors.leftMargin: 18
-        active: !!vehicle.right_indicator
+
+        active: linkOk && !!hub.rightIndicator
         side: "right"
         thickness: 6
     }

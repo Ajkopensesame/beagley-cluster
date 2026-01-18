@@ -16,7 +16,7 @@ option(WITH_WEBENGINE "Enable Qt WebEngine map support" ON)
 # --------------------
 # Qt
 # --------------------
-find_package(Qt6 REQUIRED COMPONENTS Core Quick Qml Svg)
+find_package(Qt6 REQUIRED COMPONENTS Core Quick Qml Svg WebSockets)
 
 if(WITH_WEBENGINE)
     find_package(Qt6 REQUIRED COMPONENTS WebEngineQuick)
@@ -32,6 +32,7 @@ qt_policy(SET QTP0004 NEW)
 # --------------------
 qt_add_executable(beagley_cluster
     src/main.cpp
+    src/data/VehicleStateClient.cpp
 )
 
 # --------------------
@@ -47,7 +48,7 @@ qt_add_executable(beagley_cluster
 # --------------------
 if(WITH_WEBENGINE)
     qt_add_resources(beagley_cluster web_resources
-        PREFIX "/web"
+     PREFIX "/web"
         BASE "src/ui/web"
         FILES
             src/ui/web/test/index.html
@@ -93,7 +94,6 @@ set(BEAGLEY_QML_FILES
     src/ui/widgets/MapCenter.qml
 
     # Mock data (temporary – will be replaced by BBB later)
-    src/ui/mock/MockVehicleState.qml
 )
 
 # Only include the WebEngine QML file when WebEngine is enabled
@@ -120,6 +120,7 @@ target_link_libraries(beagley_cluster
         Qt6::Quick
         Qt6::Qml
         Qt6::Svg
+        Qt6::WebSockets
 )
 
 if(WITH_WEBENGINE)

@@ -233,7 +233,7 @@ Item {
 
                 ctx.save();
                 ctx.fillStyle = "white";
-                ctx.font = "700 18px DejaVu Sans Mono";
+                ctx.font = '700 18px "DejaVu Sans Mono","Noto Sans Mono",monospace';
                 ctx.textAlign = "center";
                 ctx.textBaseline = "middle";
 
@@ -402,7 +402,7 @@ Item {
 
                 ctx.globalAlpha = theme?.isNight ? 0.90 : 0.75;
                 ctx.fillStyle = theme?.text ?? "white";
-                ctx.font = "700 16px DejaVu Sans Mono";
+                ctx.font = '700 16px "DejaVu Sans Mono","Noto Sans Mono",monospace';
                 ctx.textAlign = "center";
                 ctx.textBaseline = "middle";
 
@@ -420,7 +420,7 @@ Item {
         id: odBadge
         z: 62
 
-        visible: root.vehicleState && root.vehicleState.overdrive === true
+        visible: !!(root.vehicleState && root.vehicleState.overdrive === true)
 
         anchors.bottom: speedValueText.top
         anchors.bottomMargin: 12

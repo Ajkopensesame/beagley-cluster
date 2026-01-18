@@ -154,7 +154,7 @@ Item {
 
                 ctx.save();
                 ctx.fillStyle = "white";
-                ctx.font = "700 18px DejaVu Sans Mono";
+                ctx.font = '700 18px "DejaVu Sans Mono","Noto Sans Mono",monospace';
                 ctx.textAlign = "center";
                 ctx.textBaseline = "middle";
 

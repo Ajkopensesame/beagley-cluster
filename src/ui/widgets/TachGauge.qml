@@ -11,7 +11,6 @@ Item {
     // Public API
     property real rpm: 0
 
-
     // Fuel (0..100) for center mini-gauge
     property real fuelPct: 100
     property real lowFuelPct: 12
@@ -39,11 +38,16 @@ Item {
     readonly property real startAngleDeg: 225
     readonly property real sweepAngleDeg: 210
 
+    // ---- BBB vehicle truth source ----
+    // NOTE: `vehicleState` is expected to be a context property provided by C++ (VehicleStateClient).
+    // If it is missing, QML should fail loudly rather than invent data.
+    property var vehicleState
+
+    // Defensive helper
     function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
     readonly property real progress: clamp(displayRpm / maxRpm, 0, 1)
     readonly property int rpmInt: Math.round(displayRpm)
-
 
     readonly property int fuelInt: Math.round(displayFuel)
     readonly property bool lowFuel: (displayFuel <= lowFuelPct)
@@ -67,6 +71,9 @@ Item {
         return major ? 0.55 : 0.32;
     }
 
+    // ---- Link health gating (never lie silently) ----
+    readonly property bool linkOk: !!vehicleState && vehicleState.connected && !vehicleState.linkStale
+
     // ===== Smooth RPM =====
     Timer {
         interval: 16
@@ -82,7 +89,6 @@ Item {
 
             root.displayRpm += step;
 
-
             // ---- Smooth fuel ----
             const fuelTarget = clamp(root.fuelPct, 0, 100);
             const fuelDiff = fuelTarget - root.displayFuel;
@@ -96,6 +102,7 @@ Item {
             arcCanvas.requestPaint();
             rimCanvas.requestPaint();
             innerShadow.requestPaint();
+            fuelArcCanvas.requestPaint();
         }
     }
 
@@ -153,7 +160,7 @@ Item {
                             ctx.save();
                             ctx.fillStyle = theme?.text ?? "white";
                             ctx.globalAlpha = theme?.isNight ? 0.85 : 0.75;
-                            ctx.font = "600 18px DejaVu Sans Mono";
+                            ctx.font = '600 18px "DejaVu Sans Mono","Noto Sans Mono",monospace';
                             ctx.textAlign = "center";
                             ctx.textBaseline = "middle";
                             ctx.fillText(
@@ -162,8 +169,9 @@ Item {
                                 cy + Math.sin(a) * rLabel
                             );
                             ctx.restore();
-            }
-        }
+                        }
+                    }
+                }
             }
         }
 
@@ -222,12 +230,10 @@ Item {
                 const cx = width / 2;
                 const cy = height / 2;
 
-                // Fuel lives on the "remaining" degrees of the circle (opposite the tach sweep)
                 const rawStartDeg = (root.startAngleDeg + root.sweepAngleDeg) % 360;
                 const rawSweepDeg = 360 - root.sweepAngleDeg;
 
-                // Symmetric angular padding so the fuel arc is smaller AND centered
-                const padDeg = 12;   // increase/decrease this to tune spacing
+                const padDeg = 12;
                 const startDeg = rawStartDeg + padDeg;
                 const sweepDeg = Math.max(0, rawSweepDeg - padDeg * 2);
 
@@ -235,16 +241,13 @@ Item {
                 const sweepRad = sweepDeg * Math.PI / 180;
 
                 const fuel = clamp(root.displayFuel / 100.0, 0, 1);
-
                 const empty = 1.0 - fuel;
 
-                // Band geometry (wide at start -> taper to a point at end)
                 const rOut = width * 0.36;
-                const thickStart = 26;   // wide end (F side)
-                const thickEnd   = 3;    // point end (E side)
+                const thickStart = 26;
+                const thickEnd   = 3;
                 const segments   = 90;
 
-                // Theme colours: "full" = dark purple, "empty" = light purple
                 const dark  = (theme?.pearlHigh ?? root.gaugeColor);
                 const light = (theme?.pearlLow  ?? "#B79CFF");
 
@@ -267,8 +270,6 @@ Item {
                         const a0 = startRad + sweepRad * v0;
                         const a1 = startRad + sweepRad * v1;
 
-                        // IMPORTANT: thickness is based on position along the FULL arc (0..1),
-                        // so the physical arc remains constant, only the colour boundary moves.
                         const th  = thickStart + (thickEnd - thickStart) * v1;
                         const rIn = rOut - th;
 
@@ -280,13 +281,12 @@ Item {
                     }
                 }
 
-                // 1) Base band (always full length): EMPTY/light colour
+                // Base band (empty/light)
                 drawBand(0.0, 1.0, dark);
 
-                // 2) Overlay band (changes with fuel): FULL/dark colour, anchored at the wide end (F)
+                // Overlay band (full/dark), anchored at the wide end (F)
                 drawBand(0.0, empty, light);
 
-                // Rounded caps (physical endpoints always rounded)
                 function capAt(t, color) {
                     const th = thickStart + (thickEnd - thickStart) * t;
                     const rr = rOut - th / 2;
@@ -300,17 +300,16 @@ Item {
                     ctx.fill();
                 }
 
-
-                // Optional: round the moving boundary so it doesn't look "cut"
                 if (empty > 0.0 && empty < 1.0) capAt(empty, dark);
-// F / E labels pinned to the endpoints of the FULL arc
+
+                // F / E labels
                 const labelR = rOut + 18;
                 const angF = startRad;
                 const angE = startRad + sweepRad;
 
                 ctx.globalAlpha = theme?.isNight ? 0.90 : 0.75;
                 ctx.fillStyle = theme?.text ?? "white";
-                ctx.font = "700 16px DejaVu Sans Mono";
+                ctx.font = '700 16px "DejaVu Sans Mono","Noto Sans Mono",monospace';
                 ctx.textAlign = "center";
                 ctx.textBaseline = "middle";
 
@@ -327,7 +326,9 @@ Item {
             visible: false
             anchors.fill: parent
         }
-    }    // ===== Glass / vignette (non-breathing) =====
+    }
+
+    // ===== Glass / vignette (non-breathing) =====
     Canvas {
         id: innerShadow
         anchors.fill: parent
@@ -356,56 +357,37 @@ Item {
             ctx.fill("evenodd");
         }
     }
-}
 
-    // --- VIC in tach (render proof; UI-only) ---
-    
-    // --- VIC Self-Test (UI-only) ---
-    // Cycles through warnings so you can verify icons/halo without BBB/UNO.
-    property bool selfTestVIC: true
-    property int vicTestIndex: 0
-    readonly property var vicTestKeys: ["none", "door", "charge", "check", "at", "fuel", "brake", "oil"]
-
-    Timer {
-        id: vicSelfTestTimer
-        interval: 1200
-        repeat: true
-        running: selfTestVIC
-        onTriggered: vicTestIndex = (vicTestIndex + 1) % vicTestKeys.length
-    }
-
-VehicleInfoCenter {
+    // ==============================
+    // VIC: BBB-truth only (no mock)
+    // ==============================
+    VehicleInfoCenter {
         id: vicCenter
-        // --- Self-test bindings (UI-only) ---
-        property string _k: parent.vicTestKeys[parent.vicTestIndex]
-        warnDoor: _k === "door"
-        warnCharge: _k === "charge"
-        warnCheckEngine: _k === "check"
-        warnAT: _k === "at"
-        warnFuelLow: _k === "fuel"
-        warnBrake: _k === "brake"
-        warnOil: _k === "oil"
-
-        // Exercise drivetrain text too
-        drivetrainMode: (parent.vicTestIndex % 3 === 0) ? "4wd" : "2wd"
-        transferLock: (parent.vicTestIndex % 5 === 0)
-
         anchors.centerIn: parent
 
-        // Reasonable hub size:
-        // - scaled to dial area without covering tick labels
-        // - tweak factor if needed (0.34–0.45)
+        // Size + layering preserved from your original block
         readonly property real factor: 0.50
         readonly property real side: Math.max(0, Math.min(parent.width, parent.height) * factor)
-
         width: side
         height: side
-
-        // Keep it from "sitting on top" of the tach markings:
-        // Reduce z so it doesn't occlude major dial elements.
-        // If it disappears, raise gradually (e.g. 200, 400).
         z: 150
         visible: true
-    }
 
+        // Bind warnings to BBB truth with stale gating.
+        // If link is stale, show nothing rather than inventing warnings.
+        warnDoor:   root.linkOk && !!root.vehicleState && root.vehicleState.warnDoor
+        warnCharge: root.linkOk && !!root.vehicleState && root.vehicleState.warnCharge
+        warnBrake:  root.linkOk && !!root.vehicleState && root.vehicleState.warnBrake
+        warnOil:    root.linkOk && !!root.vehicleState && root.vehicleState.warnOil
+
+        // Not implemented on BBB yet in this step; keep false.
+        warnCheckEngine: false
+        warnAT: false
+        warnFuelLow: false
+
+        // Drivetrain is currently UI-only in your mock.
+        // Keep deterministic defaults until BBB exports real fields.
+        drivetrainMode: ""
+        transferLock: false
+    }
 }
