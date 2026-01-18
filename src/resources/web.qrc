@@ -1,5 +1,9 @@
 <RCC>
   <qresource prefix="/">
-    <file alias="web/index.html">../ui/web/map/index.html</file>
+    <!-- Stage M1: minimal test page -->
+    <file alias="web/test/index.html">../ui/web/test/index.html</file>
+
+    <!-- Keep the map page too -->
+    <file alias="web/map/index.html">../ui/web/map/index.html</file>
   </qresource>
 </RCC>

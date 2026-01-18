@@ -1,5 +1,6 @@
 import QtQuick 2.15
 import QtQuick.Window 2.15
+import QtWebEngine
 
 import "./theme" as Theme
 import "mock"
@@ -20,40 +21,41 @@ Window {
     flags: Qt.Window | Qt.CustomizeWindowHint | Qt.WindowTitleHint | Qt.WindowCloseButtonHint
     visible: true
 
-    // Theme instance (was undefined before)
+    // ===============================
+    // Theme
+    // ===============================
     Theme.PurplePearlTheme { id: appTheme }
-
     color: appTheme.bg
 
-    // Mock data (replace with real VehicleState provider later)
+    // ===============================
+    // Mock vehicle data
+    // ===============================
     MockVehicleState { id: vehicle }
 
     Component.onCompleted: {
-        // Hard-force windowed preview on macOS
-        root.showNormal();
-        root.raise();
-        root.requestActivate();
+        root.showNormal()
+        root.raise()
+        root.requestActivate()
 
-        // Best-effort: follow system palette if available
         if (Qt.application && Qt.application.palette) {
-            appTheme.updateFromSystem(Qt.application.palette);
+            appTheme.updateFromSystem(Qt.application.palette)
         }
     }
 
-    // Lightweight poll to keep theme aligned with system changes.
-    // (Qt.application paletteChanged isn't consistently exposed across setups.)
     Timer {
         interval: 1000
         running: true
         repeat: true
         onTriggered: {
             if (Qt.application && Qt.application.palette) {
-                appTheme.updateFromSystem(Qt.application.palette);
+                appTheme.updateFromSystem(Qt.application.palette)
             }
         }
     }
 
-    // --- Layout panels (3 columns: left / center / right) ---
+    // ===============================
+    // Layout panels
+    // ===============================
     Item {
         id: leftPanel
         anchors.top: parent.top
@@ -78,10 +80,15 @@ Window {
         width: parent.width / 3
     }
 
-    // Background effect
+    // ===============================
+    // Background
+    // ===============================
     MatrixRain {
         anchors.fill: parent
-        rainColor: Qt.rgba(gauge.gaugeColor.r, gauge.gaugeColor.g, gauge.gaugeColor.b, 0.45)
+        rainColor: Qt.rgba(gauge.gaugeColor.r,
+                           gauge.gaugeColor.g,
+                           gauge.gaugeColor.b,
+                           0.45)
         fps: 10
         speedMultiplier: 0.10
         density: 0.12
@@ -90,81 +97,78 @@ Window {
         columns: 0
     }
 
-    // ===== Left (Speed) =====
+    // ===============================
+    // Left gauge
+    // ===============================
     SpeedGauge {
         id: gauge
         anchors.centerIn: leftPanel
         theme: appTheme
         vehicleState: vehicle
         speed: vehicle.speedKph
-
         coolantC: vehicle.coolantC
         width: Math.min(leftPanel.width * 0.92, leftPanel.height * 0.92)
         height: width
     }
 
-
-    // ===== Center (Map) =====
-    MapCenter {
-        id: map
+    // ===============================
+    // Center — WebEngine (Stage M1)
+    // ===============================
+    MapCenterWeb {
         anchors.fill: centerPanel
     }
 
-
-    // ===== Right (Tach) =====
+    // ===============================
+    // Right gauge
+    // ===============================
     TachGauge {
         id: tach
         anchors.centerIn: rightPanel
         theme: appTheme
         rpm: vehicle.rpm
-
         fuelPct: vehicle.fuelPct
         width: Math.min(rightPanel.width * 0.92, rightPanel.height * 0.92)
         height: width
     }
-    // Debug overlay
+
+    // ===============================
+    // Debug
+    // ===============================
     Text {
         anchors.left: parent.left
         anchors.bottom: parent.bottom
         anchors.margins: 12
         color: "#80FFFFFF"
         font.pixelSize: 16
-        text: "speed: " + Math.round(vehicle.speedKph) + "  target: " + Math.round(vehicle.targetSpeedKph)
+        text: "speed: " + Math.round(vehicle.speedKph)
     }
-    // ===== BEGIN TURN ARROWS =====
-    // Inside = nearest the center/map. Outward = toward the outer edges.
 
-    // Left indicator: points LEFT, flows from inside (rightmost) -> outside (leftward)
+    // ===============================
+    // Turn indicators
+    // ===============================
     W.TurnChevronFlow {
-        chevrons: 12
         id: leftTurnFlow
+        chevrons: 12
         parent: gauge
-                        anchors.top: parent.top
-                        anchors.topMargin: -28
-anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.topMargin: -28
+        anchors.right: parent.right
         anchors.rightMargin: 18
-
-        active: !!(vehicle && vehicle.left_indicator)
+        active: !!vehicle.left_indicator
         side: "left"
         thickness: 6
-}
+    }
 
-    // Right indicator: points RIGHT, flows from inside (leftmost) -> outside (rightward)
     W.TurnChevronFlow {
-        chevrons: 12
         id: rightTurnFlow
+        chevrons: 12
         parent: tach
-                anchors.top: parent.top
-                anchors.topMargin: -28
+        anchors.top: parent.top
+        anchors.topMargin: -28
         anchors.left: parent.left
         anchors.leftMargin: 18
-
-        active: !!(vehicle && vehicle.right_indicator)
+        active: !!vehicle.right_indicator
         side: "right"
         thickness: 6
-}
-    // ===== END TURN ARROWS =====
-
-
-
+    }
 }

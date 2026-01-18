@@ -16,7 +16,7 @@ option(WITH_WEBENGINE "Enable Qt WebEngine map support" ON)
 # --------------------
 # Qt
 # --------------------
-find_package(Qt6 REQUIRED COMPONENTS Quick Svg)
+find_package(Qt6 REQUIRED COMPONENTS Core Quick Qml Svg)
 
 if(WITH_WEBENGINE)
     find_package(Qt6 REQUIRED COMPONENTS WebEngineQuick)
@@ -36,17 +36,27 @@ qt_add_executable(beagley_cluster
 
 # --------------------
 # Optional Web resources (only when WebEngine is enabled)
+# Goal:
+#   qrc:/web/test/index.html  ->  :/web/test/index.html
+#   qrc:/web/map/index.html   ->  :/web/map/index.html
+#
+# IMPORTANT:
+# - FILES are real paths on disk (relative to repo root here).
+# - BASE controls what is stripped from those paths when stored in the QRC.
+# - PREFIX sets the root prefix in the compiled resource.
 # --------------------
 if(WITH_WEBENGINE)
     qt_add_resources(beagley_cluster web_resources
         PREFIX "/web"
+        BASE "src/ui/web"
         FILES
+            src/ui/web/test/index.html
             src/ui/web/map/index.html
     )
 endif()
 
 # --------------------
-# QML Module (THIS IS THE IMPORTANT PART)
+# QML Module
 # --------------------
 set(BEAGLEY_QML_FILES
     src/ui/widgets/VehicleInfoCenter.qml
@@ -99,8 +109,6 @@ qt_add_qml_module(beagley_cluster
 
     QML_FILES
         ${BEAGLEY_QML_FILES}
-
-    RESOURCES
 )
 
 # --------------------
@@ -108,7 +116,9 @@ qt_add_qml_module(beagley_cluster
 # --------------------
 target_link_libraries(beagley_cluster
     PRIVATE
+        Qt6::Core
         Qt6::Quick
+        Qt6::Qml
         Qt6::Svg
 )
 

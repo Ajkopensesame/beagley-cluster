@@ -3,15 +3,13 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Cluster Map</title>
-
-    <!-- MapLibre (CDN for v1 prototype) -->
-    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
-    <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+    <title>Cluster Map (Canvas)</title>
 
     <style>
       html, body { height: 100%; margin: 0; background: #000; overflow: hidden; }
-      #map { position: absolute; inset: 0; }
+      #wrap { position: absolute; inset: 0; }
+      canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+
       .hud {
         position: absolute;
         left: 12px; top: 12px;
@@ -22,81 +20,216 @@
         border-radius: 10px;
         user-select: none;
         pointer-events: none;
+        white-space: pre;
+      }
+
+      .hint {
+        position: absolute;
+        left: 12px; bottom: 12px;
+        color: rgba(255,255,255,0.8);
+        font: 12px/1.3 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        background: rgba(0,0,0,0.35);
+        padding: 6px 8px;
+        border-radius: 10px;
+        user-select: none;
+        pointer-events: none;
       }
     </style>
   </head>
 
   <body>
-    <div id="map"></div>
-    <div class="hud" id="hud">MapLibre loading…</div>
+    <div id="wrap">
+      <canvas id="c"></canvas>
+      <div class="hud" id="hud">Canvas map loading…</div>
+      <div class="hint">Canvas mode (no WebGL) • OSM raster tiles</div>
+    </div>
 
     <script>
-      // Simple raster style using OpenStreetMap tiles.
+      // -----------------------------
+      // Canvas 2D raster tile map
+      // -----------------------------
       // NOTE: For production you should NOT hammer public OSM tiles from a fleet.
-      // We will replace this with offline/hosted tiles later.
-      const rasterStyle = {
-        "version": 8,
-        "sources": {
-          "osm": {
-            "type": "raster",
-            "tiles": [
-              "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-            ],
-            "tileSize": 256,
-            "attribution": "© OpenStreetMap contributors"
-          }
-        },
-        "layers": [
-          { "id": "osm", "type": "raster", "source": "osm" }
-        ]
+      // We'll replace with offline/hosted tiles later (MBTiles server or local tile pyramid).
+      const TILE_URL = (z, x, y) => `https://tile.openstreetmap.org/${z}/${x}/${y}.png`;
+      const TILE_SIZE = 256;
+
+      // Start: Brisbane-ish
+      let state = {
+        lat: -27.4698,
+        lng: 153.0251,
+        zoom: 12,
+        bearing: 0 // degrees, used only for HUD right now (rotation optional)
       };
 
-      // Start position: Brisbane-ish (replace later with GPS)
-      let current = { lng: 153.0251, lat: -27.4698, zoom: 12.2, bearing: 0 };
-
-      const map = new maplibregl.Map({
-        container: "map",
-        style: rasterStyle,
-        center: [current.lng, current.lat],
-        zoom: current.zoom,
-        bearing: current.bearing,
-        pitch: 0,
-        attributionControl: false
-      });
-
-      map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right");
-      map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
-
       const hud = document.getElementById("hud");
+      const canvas = document.getElementById("c");
+      const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
 
-      map.on("load", () => {
-        hud.textContent = "MapLibre loaded ✅";
-      });
+      // Simple in-memory tile cache
+      const cache = new Map(); // key -> { img, ok, err, t }
+      const MAX_CACHE = 256;
 
-      // Hook for QML later: you can call this from WebChannel or evaluateJavaScript
+      function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
+
+      function resize() {
+        // Use device pixels for sharpness
+        const dpr = Math.max(1, Math.floor(window.devicePixelRatio || 1));
+        const w = Math.max(1, window.innerWidth);
+        const h = Math.max(1, window.innerHeight);
+        canvas.width = w * dpr;
+        canvas.height = h * dpr;
+        canvas.style.width = w + "px";
+        canvas.style.height = h + "px";
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+      window.addEventListener("resize", () => { resize(); requestDraw(); });
+      resize();
+
+      // Web mercator helpers
+      function lngLatToWorld(lng, lat, z) {
+        const s = TILE_SIZE * Math.pow(2, z);
+        const x = (lng + 180) / 360 * s;
+        const sin = Math.sin(lat * Math.PI / 180);
+        const y = (0.5 - Math.log((1 + sin) / (1 - sin)) / (4 * Math.PI)) * s;
+        return { x, y };
+      }
+
+      function worldToTileXY(wx, wy) {
+        return { tx: Math.floor(wx / TILE_SIZE), ty: Math.floor(wy / TILE_SIZE) };
+      }
+
+      function tileKey(z, x, y) { return `${z}/${x}/${y}`; }
+
+      function evictIfNeeded() {
+        if (cache.size <= MAX_CACHE) return;
+        // evict oldest
+        let oldestK = null;
+        let oldestT = Infinity;
+        for (const [k, v] of cache.entries()) {
+          if (v.t < oldestT) { oldestT = v.t; oldestK = k; }
+        }
+        if (oldestK) cache.delete(oldestK);
+      }
+
+      function loadTile(z, x, y) {
+        const key = tileKey(z, x, y);
+        const hit = cache.get(key);
+        if (hit) { hit.t = performance.now(); return hit; }
+
+        const img = new Image();
+        img.crossOrigin = "anonymous"; // okay for drawing; attribution handled separately
+        const rec = { img, ok: false, err: null, t: performance.now() };
+        cache.set(key, rec);
+        evictIfNeeded();
+
+        img.onload = () => { rec.ok = true; rec.t = performance.now(); requestDraw(); };
+        img.onerror = (e) => { rec.err = e; rec.t = performance.now(); requestDraw(); };
+        img.src = TILE_URL(z, x, y);
+
+        return rec;
+      }
+
+      let drawScheduled = false;
+      function requestDraw() {
+        if (drawScheduled) return;
+        drawScheduled = true;
+        requestAnimationFrame(() => { drawScheduled = false; draw(); });
+      }
+
+      function draw() {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+
+        // background
+        ctx.fillStyle = "#000";
+        ctx.fillRect(0, 0, w, h);
+
+        const z = clamp(Math.round(state.zoom), 1, 19);
+        const centerWorld = lngLatToWorld(state.lng, state.lat, z);
+
+        // Determine visible tile range around center
+        const topLeftWorld = { x: centerWorld.x - w/2, y: centerWorld.y - h/2 };
+        const bottomRightWorld = { x: centerWorld.x + w/2, y: centerWorld.y + h/2 };
+
+        const tl = worldToTileXY(topLeftWorld.x, topLeftWorld.y);
+        const br = worldToTileXY(bottomRightWorld.x, bottomRightWorld.y);
+
+        // World wraps horizontally
+        const tilesPerAxis = Math.pow(2, z);
+
+        let tilesDrawn = 0;
+        let tilesMissing = 0;
+
+        for (let ty = tl.ty; ty <= br.ty; ty++) {
+          if (ty < 0 || ty >= tilesPerAxis) continue; // clamp vertical (no wrap)
+          for (let tx = tl.tx; tx <= br.tx; tx++) {
+            const wrappedX = ((tx % tilesPerAxis) + tilesPerAxis) % tilesPerAxis;
+            const tile = loadTile(z, wrappedX, ty);
+
+            const wx = tx * TILE_SIZE;
+            const wy = ty * TILE_SIZE;
+
+            const dx = Math.round(wx - topLeftWorld.x);
+            const dy = Math.round(wy - topLeftWorld.y);
+
+            if (tile.ok) {
+              ctx.drawImage(tile.img, dx, dy, TILE_SIZE, TILE_SIZE);
+              tilesDrawn++;
+            } else {
+              tilesMissing++;
+              // placeholder tile while loading
+              ctx.fillStyle = "#111";
+              ctx.fillRect(dx, dy, TILE_SIZE, TILE_SIZE);
+              ctx.strokeStyle = "rgba(255,255,255,0.06)";
+              ctx.strokeRect(dx + 0.5, dy + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
+            }
+          }
+        }
+
+        // Vehicle marker (simple)
+        const cx = Math.round(w / 2);
+        const cy = Math.round(h / 2);
+        ctx.save();
+        ctx.translate(cx, cy);
+        // Optional: rotate marker by bearing
+        ctx.rotate((state.bearing || 0) * Math.PI / 180);
+        ctx.fillStyle = "rgba(0, 255, 150, 0.9)";
+        ctx.beginPath();
+        ctx.moveTo(0, -12);
+        ctx.lineTo(7, 10);
+        ctx.lineTo(-7, 10);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+
+        // HUD
+        hud.textContent =
+          `Canvas map ✅ (no WebGL)\n` +
+          `GPS: ${state.lat.toFixed(5)}, ${state.lng.toFixed(5)}  b:${Math.round(state.bearing)}°  z:${z}\n` +
+          `tiles: ${tilesDrawn} drawn, ${tilesMissing} loading`;
+      }
+
+      // Public hook (compatible with your existing QML plan)
       window.setVehiclePose = function(lat, lng, bearingDeg, zoom) {
-        if (typeof zoom === "number") current.zoom = zoom;
-        current.lat = lat; current.lng = lng;
-        current.bearing = (typeof bearingDeg === "number") ? bearingDeg : current.bearing;
-
-        map.easeTo({
-          center: [current.lng, current.lat],
-          bearing: current.bearing,
-          duration: 250
-        });
-
-        hud.textContent = `GPS: ${current.lat.toFixed(5)}, ${current.lng.toFixed(5)}  b:${Math.round(current.bearing)}°`;
+        if (typeof lat === "number") state.lat = lat;
+        if (typeof lng === "number") state.lng = lng;
+        if (typeof bearingDeg === "number") state.bearing = bearingDeg;
+        if (typeof zoom === "number") state.zoom = zoom;
+        requestDraw();
       };
 
       // Demo motion so you can see it moving without GPS
       let t = 0;
       setInterval(() => {
         t += 0.00025;
-        const lat = current.lat + Math.sin(t) * 0.0003;
-        const lng = current.lng + Math.cos(t) * 0.0003;
-        const bearing = (current.bearing + 1.2) % 360;
+        const lat = state.lat + Math.sin(t) * 0.0003;
+        const lng = state.lng + Math.cos(t) * 0.0003;
+        const bearing = (state.bearing + 1.2) % 360;
         window.setVehiclePose(lat, lng, bearing);
       }, 250);
+
+      // Initial draw
+      requestDraw();
     </script>
   </body>
 </html>

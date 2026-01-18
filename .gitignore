@@ -17,3 +17,7 @@ build/
 # Local scratch / experiments
 sandbox/
 src/ui/widgets/VehicleStateCoreAnimated.qml
+
+# Local build outputs
+build-ninja/
+build/
