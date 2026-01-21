@@ -1,6 +1,5 @@
 import QtQuick 2.15
 import QtQuick.Window 2.15
-import QtWebEngine
 
 import "./theme" as Theme
 import BeagleY 1.0
@@ -119,13 +118,27 @@ Window {
         height: width
     }
 
+        // ===============================
+    // Center — MapCenter (NO WebEngine)
     // ===============================
-    // Center — WebEngine
-    // ===============================
-    MapCenterWeb {
+    W.MapCenter {
         anchors.fill: centerPanel
-    }
 
+        // Stable core modes: placeholder/snapshot/video
+        mode: "placeholder"
+
+        // Snapshot mode (later from BBB)
+        snapshotUrl: ""
+
+        // GPS (safe if fields not present yet)
+        lat: linkOk && hub.gpsLat !== undefined ? hub.gpsLat : 0
+        lng: linkOk && hub.gpsLng !== undefined ? hub.gpsLng : 0
+        bearing: linkOk && hub.gpsBearing !== undefined ? hub.gpsBearing : 0
+
+        // Camera-ready (off until later)
+        videoEnabled: false
+        videoUrl: ""
+    }
     // ===============================
     // Right gauge (Tach)
     // ===============================

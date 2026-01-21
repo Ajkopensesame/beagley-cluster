@@ -1,40 +1,64 @@
 import QtQuick 2.15
-import QtQuick.Controls 2.15
 
 Item {
     id: root
     anchors.fill: parent
 
-    readonly property bool noMap: (typeof BEAGLEY_NO_MAP !== "undefined") ? BEAGLEY_NO_MAP : false
+    // "placeholder" | "snapshot" | "video"
+    property string mode: "placeholder"
 
-    Rectangle {
-        anchors.fill: parent
-        color: "black"
-        radius: 18
-        clip: true
+    property real lat: 0
+    property real lng: 0
+    property real bearing: 0
 
-        Loader {
-            anchors.fill: parent
-            active: !root.noMap
-            source: "MapCenterWeb.qml"
+    // Snapshot mode (BBB will serve a periodic map image later)
+    property string snapshotUrl: ""
+    property int snapshotRefreshMs: 1000
+
+    // Video mode (reserved for later)
+    property string videoUrl: ""
+    property bool videoEnabled: false
+
+    readonly property string effectiveMode: {
+        if (mode === "video") {
+            // For now, video is not implemented, but we keep the API.
+            return (videoEnabled && videoUrl !== "") ? "video" : "placeholder"
         }
+        if (mode === "snapshot") {
+            return (snapshotUrl !== "") ? "snapshot" : "placeholder"
+        }
+        return "placeholder"
+    }
 
-        Rectangle {
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.top: parent.top
-            height: root.noMap ? 52 : 0
-            visible: root.noMap
-            color: "#AA000000"
+    Loader {
+        anchors.fill: parent
+        active: true
+        sourceComponent: effectiveMode === "snapshot"
+            ? snapshotComp
+            : placeholderComp
+    }
 
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                anchors.left: parent.left
-                anchors.leftMargin: 12
-                color: "white"
-                font.pixelSize: 14
-                text: "Map: disabled"
-            }
+    Component {
+        id: placeholderComp
+        MapCenterPlaceholder {
+            anchors.fill: parent
+            lat: root.lat
+            lng: root.lng
+            bearing: root.bearing
+            title: (root.mode === "video") ? "CAM" : "MAP"
+            subtitle: (root.mode === "video") ? "video not implemented" : "placeholder"
+        }
+    }
+
+    Component {
+        id: snapshotComp
+        MapCenterSnapshot {
+            anchors.fill: parent
+            lat: root.lat
+            lng: root.lng
+            bearing: root.bearing
+            snapshotUrl: root.snapshotUrl
+            refreshMs: root.snapshotRefreshMs
         }
     }
 }

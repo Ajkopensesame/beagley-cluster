@@ -93,6 +93,8 @@ set(BEAGLEY_QML_FILES
     src/ui/widgets/MatrixRain.qml
     src/ui/widgets/MapCenter.qml
 
+        src/ui/widgets/MapCenterPlaceholder.qml
+        src/ui/widgets/MapCenterSnapshot.qml
     # Mock data (temporary – will be replaced by BBB later)
 )
 
