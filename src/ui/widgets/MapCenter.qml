@@ -1,69 +1,64 @@
 import QtQuick 2.15
-import QtQuick.Controls 2.15
-import QtWebEngine
 
 Item {
     id: root
     anchors.fill: parent
 
-    property bool loaded: false
-    property string err: ""
+    // "placeholder" | "snapshot" | "video"
+    property string mode: "placeholder"
 
-    Rectangle {
-        anchors.fill: parent
-        color: "black"
-        radius: 18
-        clip: true
+    property real lat: 0
+    property real lng: 0
+    property real bearing: 0
 
-        WebEngineView {
-            id: web
-            anchors.fill: parent
+    // Snapshot mode (BBB will serve a periodic map image later)
+    property string snapshotUrl: ""
+    property int snapshotRefreshMs: 1000
 
-            // NOTE: We'll switch this to a simpler qrc path in Step 2.
-            url: "qrc:/web/src/ui/web/map/index.html"
+    // Video mode (reserved for later)
+    property string videoUrl: ""
+    property bool videoEnabled: false
 
-            settings.javascriptEnabled: true
-            settings.localStorageEnabled: true
-            settings.errorPageEnabled: false
-            settings.fullScreenSupportEnabled: false
-            settings.localContentCanAccessRemoteUrls: true
-
-            onLoadingChanged: function(loadRequest) {
-                // Avoid WebEngineLoadRequest enum (not always in scope on Qt 6/macOS).
-                // Empirically stable numeric values:
-                // 0 = LoadStarted, 1 = LoadStopped, 2 = LoadSucceeded, 3 = LoadFailed
-                if (loadRequest.status === 0) {
-                    root.loaded = false
-                    root.err = ""
-                } else if (loadRequest.status === 2) {
-                    root.loaded = true
-                    root.err = ""
-                } else if (loadRequest.status === 3) {
-                    root.loaded = false
-                    root.err = loadRequest.errorString || "Load failed"
-                }
-            }
+    readonly property string effectiveMode: {
+        if (mode === "video") {
+            // For now, video is not implemented, but we keep the API.
+            return (videoEnabled && videoUrl !== "") ? "video" : "placeholder"
         }
+        if (mode === "snapshot") {
+            return (snapshotUrl !== "") ? "snapshot" : "placeholder"
+        }
+        return "placeholder"
+    }
 
-        Rectangle {
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.top: parent.top
-            height: visible ? 52 : 0
-            color: "#AA000000"
-            visible: (!root.loaded) || (root.err.length > 0)
+    Loader {
+        anchors.fill: parent
+        active: true
+        sourceComponent: effectiveMode === "snapshot"
+            ? snapshotComp
+            : placeholderComp
+    }
 
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                anchors.left: parent.left
-                anchors.leftMargin: 12
-                anchors.right: parent.right
-                anchors.rightMargin: 12
-                color: "white"
-                font.pixelSize: 14
-                elide: Text.ElideRight
-                text: root.err.length > 0 ? ("Map: " + root.err) : "Map: loading…"
-            }
+    Component {
+        id: placeholderComp
+        MapCenterPlaceholder {
+            anchors.fill: parent
+            lat: root.lat
+            lng: root.lng
+            bearing: root.bearing
+            title: (root.mode === "video") ? "CAM" : "MAP"
+            subtitle: (root.mode === "video") ? "video not implemented" : "placeholder"
+        }
+    }
+
+    Component {
+        id: snapshotComp
+        MapCenterSnapshot {
+            anchors.fill: parent
+            lat: root.lat
+            lng: root.lng
+            bearing: root.bearing
+            snapshotUrl: root.snapshotUrl
+            refreshMs: root.snapshotRefreshMs
         }
     }
 }

@@ -72,6 +72,8 @@ qt_add_qml_module(beagley_cluster
         src/ui/widgets/HighBeamHalo.qml
         src/ui/widgets/MatrixRain.qml
         src/ui/widgets/MapCenter.qml
+        src/ui/widgets/MapCenterPlaceholder.qml
+        src/ui/widgets/MapCenterSnapshot.qml
 
         # Mock data (temporary – will be replaced by BBB later)
         src/ui/mock/MockVehicleState.qml

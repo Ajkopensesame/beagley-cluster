@@ -27,7 +27,10 @@ Window {
 
     // Mock data (replace with real VehicleState provider later)
     MockVehicleState { id: vehicle }
-
+    // ===============================
+    // Feature flags (authoritative)
+    // ===============================
+    property bool enableMap: false
     Component.onCompleted: {
         // Hard-force windowed preview on macOS
         root.showNormal();
@@ -102,15 +105,30 @@ Window {
         width: Math.min(leftPanel.width * 0.92, leftPanel.height * 0.92)
         height: width
     }
-
-
     // ===== Center (Map) =====
-    MapCenter {
-        id: map
+    Loader {
         anchors.fill: centerPanel
+        active: root.enableMap
+        sourceComponent: mapCenterComp
     }
 
+    Component {
+        id: mapCenterComp
+        W.MapCenter {
+            anchors.fill: parent
+            mode: "snapshot"
+            snapshotUrl: ""   // later: BBB snapshot URL
 
+            // Mock-safe pose for now; wire to hub GPS when available
+            lat: 0
+            lng: 0
+            bearing: 0
+
+            // Cameras later
+            videoEnabled: false
+            videoUrl: ""
+        }
+    }
     // ===== Right (Tach) =====
     TachGauge {
         id: tach
@@ -134,19 +152,19 @@ Window {
     // ===== BEGIN TURN ARROWS =====
     // Inside = nearest the center/map. Outward = toward the outer edges.
 
-    // Left indicator: points LEFT, flows from inside (rightmost) -> outside (leftward)
     W.TurnChevronFlow {
-        chevrons: 12
-        id: leftTurnFlow
-        parent: gauge
-                        anchors.top: parent.top
-                        anchors.topMargin: -28
-anchors.right: parent.right
-        anchors.rightMargin: 18
+    id: leftTurnFlow
+    chevrons: 12
+    parent: gauge
 
-        active: !!(vehicle && vehicle.left_indicator)
-        side: "left"
-        thickness: 6
+    anchors.top: parent.top
+    anchors.topMargin: -28
+    anchors.right: parent.right
+    anchors.rightMargin: 18
+
+    active: !!(vehicle && vehicle.left_indicator)
+    side: "left"
+    thickness: 6
 }
 
     // Right indicator: points RIGHT, flows from inside (leftmost) -> outside (rightward)
