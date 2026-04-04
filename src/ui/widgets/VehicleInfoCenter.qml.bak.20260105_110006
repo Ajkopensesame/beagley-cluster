@@ -1,0 +1,160 @@
+import QtQuick 2.15
+
+Item {
+    id: root
+    width: 240
+    height: 240
+
+    // --- Inputs ---
+    property string drivetrainMode: "2wd"    // "2wd" | "4wd"
+    property bool transferLock: false
+
+    // warnings
+    property bool warnDoor: false
+    property bool warnCharge: false
+    property bool warnCheckEngine: false
+    property bool warnAT: false
+    property bool warnFuelLow: false
+    property bool warnBrake: false   // park brake or brake fluid
+
+    // --- Derived ---
+    readonly property bool hasWarning:
+        warnBrake || warnCharge || warnCheckEngine || warnAT || warnFuelLow || warnDoor
+
+    readonly property string warningText: {
+        if (warnBrake) return "BRAKE"
+        if (warnCharge) return "CHARGE"
+        if (warnCheckEngine) return "CHECK"
+        if (warnAT) return "A/T"
+        if (warnFuelLow) return "FUEL"
+        if (warnDoor) return "DOOR"
+        return ""
+    }
+
+    readonly property string driveText: transferLock ? "4WD LOCK" : (drivetrainMode === "4wd" ? "4WD" : "2WD")
+
+    // --- Motion tuning ---
+    property int fast: 160
+    property int slow: 900
+
+    // =========================
+    // NORMAL MODE (drivetrain)
+    // =========================
+    Item {
+        id: normalLayer
+        anchors.fill: parent
+        opacity: root.hasWarning ? 0 : 1
+        Behavior on opacity { NumberAnimation { duration: root.fast } }
+
+        Rectangle {
+            anchors.centerIn: parent
+            width: parent.width * 0.78
+            height: width
+            radius: width/2
+            color: "transparent"
+            border.color: "white"
+            border.width: 2
+            opacity: 0.18
+        }
+
+        // Brackets (HUD vibe)
+        Repeater {
+            model: 4
+            Rectangle {
+                width: parent.width * 0.12
+                height: 3
+                radius: 2
+                color: "white"
+                opacity: 0.35
+                anchors.centerIn: parent
+                rotation: index * 90
+                y: -parent.height * 0.26
+            }
+        }
+
+        // Drive text (primary)
+        Text {
+            anchors.centerIn: parent
+            text: root.driveText
+            color: "white"
+            font.pixelSize: 28
+            font.bold: true
+            opacity: 0.92
+        }
+
+        // Lock pulse
+        SequentialAnimation on scale {
+            running: root.transferLock && !root.hasWarning
+            loops: Animation.Infinite
+            NumberAnimation { to: 1.03; duration: root.slow; easing.type: Easing.InOutSine }
+            NumberAnimation { to: 1.00; duration: root.slow; easing.type: Easing.InOutSine }
+        }
+
+        // 2WD→4WD micro transition cue
+        Rectangle {
+            id: sweep
+            anchors.centerIn: parent
+            width: parent.width * 0.46
+            height: 2
+            radius: 1
+            color: "white"
+            opacity: 0.0
+        }
+
+        function pulseSweep() {
+            sweep.opacity = 0.0
+            sweep.scale = 0.92
+            sweepAnim.restart()
+        }
+
+        SequentialAnimation {
+            id: sweepAnim
+            running: false
+            NumberAnimation { target: sweep; property: "opacity"; to: 0.45; duration: 60 }
+            NumberAnimation { target: sweep; property: "scale"; to: 1.06; duration: 160; easing.type: Easing.OutCubic }
+            NumberAnimation { target: sweep; property: "opacity"; to: 0.0; duration: 120 }
+        }
+    }
+
+    onDrivetrainModeChanged: if (!hasWarning) normalLayer.pulseSweep()
+    onTransferLockChanged: if (!hasWarning) normalLayer.pulseSweep()
+
+    // =========================
+    // WARNING MODE (dominant)
+    // =========================
+    Item {
+        id: warningLayer
+        anchors.fill: parent
+        opacity: root.hasWarning ? 1 : 0
+        Behavior on opacity { NumberAnimation { duration: root.fast } }
+
+        Rectangle {
+            id: frame
+            anchors.centerIn: parent
+            width: parent.width * 0.86
+            height: parent.height * 0.44
+            radius: 18
+            color: "transparent"
+            border.color: "white"
+            border.width: 3
+            opacity: 0.95
+        }
+
+        Text {
+            anchors.centerIn: frame
+            text: root.warningText
+            color: "white"
+            font.pixelSize: 30
+            font.bold: true
+        }
+
+        SequentialAnimation {
+            id: warnPulse
+            running: false
+            NumberAnimation { target: frame; property: "scale"; to: 1.06; duration: 120 }
+            NumberAnimation { target: frame; property: "scale"; to: 1.00; duration: 170; easing.type: Easing.OutCubic }
+        }
+
+        onOpacityChanged: if (opacity === 1) warnPulse.start()
+    }
+}

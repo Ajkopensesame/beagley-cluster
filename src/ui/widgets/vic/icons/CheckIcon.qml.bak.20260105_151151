@@ -1,0 +1,74 @@
+import QtQuick 2.15
+
+Item {
+    id: root
+    width: 96
+    height: 96
+
+    // Injected by VicWarningIcon
+    property color color: "red"
+
+    readonly property real s: Math.min(width, height)
+    readonly property real r: Math.max(1, s * 0.035)
+
+    // ===== Sleek filled engine silhouette =====
+
+    // Main block (filled)
+    Rectangle {
+        id: block
+        width: root.s * 0.68
+        height: root.s * 0.34
+        x: root.s * 0.16
+        y: root.s * 0.44
+        radius: root.r
+        color: root.color
+        opacity: 0.95
+    }
+
+    // Top cap (filled)
+    Rectangle {
+        width: root.s * 0.38
+        height: root.s * 0.12
+        x: block.x + root.s * 0.12
+        y: block.y - root.s * 0.12
+        radius: Math.max(1, root.r * 0.8)
+        color: root.color
+        opacity: 0.95
+    }
+
+    // Left intake / mount (filled)
+    Rectangle {
+        width: root.s * 0.16
+        height: root.s * 0.20
+        x: block.x - root.s * 0.14
+        y: block.y + root.s * 0.06
+        radius: Math.max(1, root.r * 0.8)
+        color: root.color
+        opacity: 0.95
+    }
+
+    // Exhaust stubs (3 sleek bars)
+    Repeater {
+        model: 3
+        Rectangle {
+            width: root.s * 0.16
+            height: root.s * 0.06
+            radius: height / 2
+            color: root.color
+            opacity: 0.95
+            x: block.x + block.width - (width * 0.30)
+            y: block.y + root.s * (0.07 + index * 0.10)
+        }
+    }
+
+    // Tiny bottom foot (optional stability)
+    Rectangle {
+        width: root.s * 0.22
+        height: root.s * 0.06
+        radius: height / 2
+        color: root.color
+        opacity: 0.95
+        x: block.x + root.s * 0.10
+        y: block.y + block.height + root.s * 0.03
+    }
+}

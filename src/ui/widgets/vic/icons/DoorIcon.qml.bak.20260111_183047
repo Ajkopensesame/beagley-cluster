@@ -1,0 +1,60 @@
+import QtQuick 2.15
+import QtQuick.Shapes 1.15
+
+Item {
+    id: root
+    width: 96
+    height: 96
+
+    // Injected by VicWarningIcon
+    property color color: "#FF3B3B"
+
+    // Make the seam/detail visible even on a solid filled icon
+    // (same hue family, just higher luminance)
+    readonly property color detailColor: Qt.lighter(root.color, 1.9)
+    readonly property real detailOpacity: 0.85
+    readonly property real sw: Math.max(2, width * 0.06)
+
+    // viewBox: 0 0 24 24
+    readonly property real vbX: 0
+    readonly property real vbY: 0
+    readonly property real vbW: 24
+    readonly property real vbH: 24
+
+    Shape {
+        anchors.fill: parent
+        antialiasing: true
+
+        transform: [
+            Translate { x: -root.vbX; y: -root.vbY },
+            Scale { xScale: root.width / root.vbW; yScale: root.height / root.vbH }
+        ]
+
+        // ---- Filled body (1 path) ----
+        // We pull the path directly from the SVG (most "solid" door icons are single-path).
+        // If you ever replace the SVG and the path changes, re-run the extractor or paste the new d= here.
+        ShapePath {
+            strokeColor: "transparent"
+            strokeWidth: 0
+            fillColor: root.color
+
+            // IMPORTANT: This is the *only* <path d="..."> from the SVG.
+            // If your SVG changes, this may need updating.
+            PathSvg { path: "M19,21H5a1,1,0,0,1-1-1V11.41a1,1,0,0,1,.29-.7l7.42-7.42a1,1,0,0,1,.7-.29H19a1,1,0,0,1,1,1V20A1,1,0,0,1,19,21ZM4.1,11H20" }
+        }
+
+        // ---- Line detail (1 line) ----
+        // Render it as a contrasting stroke so it shows on a solid fill.
+        ShapePath {
+            strokeColor: root.detailColor
+            strokeWidth: root.sw
+            fillColor: "transparent"
+            capStyle: ShapePath.RoundCap
+            joinStyle: ShapePath.RoundJoin
+            opacity: root.detailOpacity
+
+            // Convert SVG <line x1 y1 x2 y2> into: M x1 y1 L x2 y2
+            PathSvg { path: "M 14 15 L 16 15" }
+        }
+    }
+}

@@ -1,0 +1,40 @@
+import QtQuick 2.15
+import QtQuick.Shapes 1.15
+
+Item {
+    id: root
+    width: 96
+    height: 96
+
+    // Injected by VicWarningIcon
+    property color color: "#FF3B3B"
+
+    // TODO: set vb to the SVG viewBox width (or max dimension)
+    // Example: if viewBox="0 0 512 512", vb=512
+    readonly property real vb: 512
+
+    // Stroke width tuned for icon sizes
+    readonly property real sw: Math.max(2, width * 0.055)
+
+    Shape {
+        anchors.fill: parent
+        antialiasing: true
+
+        // Scale entire SVG coordinate space into this icon box
+        transform: Scale {
+            xScale: root.width / root.vb
+            yScale: root.height / root.vb
+        }
+
+        // ---- Paste ShapePath blocks here, one per SVG path ----
+        // Example:
+        // ShapePath {
+        //     strokeColor: root.color
+        //     strokeWidth: root.sw
+        //     fillColor: "transparent"
+        //     capStyle: ShapePath.RoundCap
+        //     joinStyle: ShapePath.RoundJoin
+        //     PathSvg { path: "M..." }
+        // }
+    }
+}

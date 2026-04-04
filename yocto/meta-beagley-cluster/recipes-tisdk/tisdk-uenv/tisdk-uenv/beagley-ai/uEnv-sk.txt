@@ -1,0 +1,6 @@
+# BeagleY-AI appliance defaults.
+# Force the board DTB so both extlinux and any EFI fallback use the
+# BeagleY display stack instead of the generic J722S EVM tree.
+default_device_tree=ti/k3-am67a-beagley-ai.dtb
+name_fdt=ti/k3-am67a-beagley-ai.dtb
+fdtfile=ti/k3-am67a-beagley-ai.dtb

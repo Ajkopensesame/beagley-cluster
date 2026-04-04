@@ -1,0 +1,11 @@
+<RCC>
+  <qresource prefix="/">
+    <!-- Stage M1: minimal test page -->
+    <file alias="web/test/index.html">../ui/web/test/index.html</file>
+
+    <!-- Keep the map page too -->
+    <file alias="web/map/index.html">../ui/web/map/index.html</file>
+    <file alias="web/map/vendor/maplibre/maplibre-gl.js">../ui/web/map/vendor/maplibre/maplibre-gl.js</file>
+    <file alias="web/map/vendor/maplibre/maplibre-gl.css">../ui/web/map/vendor/maplibre/maplibre-gl.css</file>
+  </qresource>
+</RCC>

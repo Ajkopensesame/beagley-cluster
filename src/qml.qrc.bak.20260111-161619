@@ -1,0 +1,10 @@
+<RCC>
+  <qresource prefix="/">
+    <file>ui/Main.qml</file>
+    <file>ui/widgets/SpeedGauge.qml</file>
+      <file>ui/mock/MockVehicleState.qml</file>
+    <file>ui/mock/qmldir</file>
+    <file>ui/widgets/qmldir</file>
+  <file>assets/vic/svg/gearshift-shift-svgrepo-com.svg</file>
+</qresource>
+</RCC>

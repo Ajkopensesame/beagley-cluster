@@ -1,0 +1,84 @@
+import QtQuick 2.15
+
+Item {
+    id: root
+    width: 96
+    height: 96
+
+    // Injected by VicWarningIcon
+    property color color: "red"
+
+    readonly property real s: Math.min(width, height)
+    readonly property real stroke: Math.max(5, s * 0.10)
+    readonly property real r: Math.max(1, s * 0.015)
+
+    // =========================
+    // Engine block (main body)
+    // =========================
+    Rectangle {
+        id: block
+        width: root.s * 0.66
+        height: root.s * 0.32
+        x: root.s * 0.18
+        y: root.s * 0.42
+        radius: root.r
+        color: "transparent"
+        border.width: root.stroke
+        border.color: root.color
+    }
+
+    // =========================
+    // Top cap (valve cover)
+    // =========================
+    Rectangle {
+        width: root.s * 0.36
+        height: root.s * 0.10
+        x: block.x + root.s * 0.12
+        y: block.y - root.s * 0.12
+        radius: root.r
+        color: "transparent"
+        border.width: root.stroke
+        border.color: root.color
+    }
+
+    // =========================
+    // Left intake / housing
+    // =========================
+    Rectangle {
+        width: root.s * 0.16
+        height: root.s * 0.18
+        x: block.x - root.s * 0.14
+        y: block.y + root.s * 0.06
+        radius: root.r
+        color: "transparent"
+        border.width: root.stroke
+        border.color: root.color
+    }
+
+    // =========================
+    // Exhaust stubs (3 bars)
+    // =========================
+    Repeater {
+        model: 3
+        Rectangle {
+            width: root.s * 0.14
+            height: root.stroke
+            x: block.x + block.width - root.stroke * 0.4
+            y: block.y + root.s * (0.07 + index * 0.10)
+            radius: 1
+            color: root.color
+        }
+    }
+
+    // =========================
+    // Bottom mount bar
+    // =========================
+    Rectangle {
+        width: root.s * 0.22
+        height: root.stroke
+        x: block.x + root.s * 0.10
+        y: block.y + block.height + root.s * 0.03
+        radius: 1
+        color: root.color
+    }
+}

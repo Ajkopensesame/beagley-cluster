@@ -1,0 +1,20 @@
+[Unit]
+Description=BBB vehicle_state hub with hardware GPS
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/debian/projects/beagley-cluster/tools/bbb_hub
+Environment=BBB_HUB_HOST=0.0.0.0
+Environment=BBB_HUB_PORT=8765
+Environment=GPS_SOURCE_POLICY=hardware_only
+EnvironmentFile=-/etc/default/bbb-hardware-gps
+ExecStart=/bin/bash /home/debian/projects/beagley-cluster/tools/bbb_hub/run_prod.sh
+Restart=always
+RestartSec=2
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

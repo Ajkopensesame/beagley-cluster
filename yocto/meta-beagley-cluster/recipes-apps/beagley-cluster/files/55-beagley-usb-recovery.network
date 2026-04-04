@@ -1,0 +1,10 @@
+[Match]
+Name=usb0
+
+[Link]
+RequiredForOnline=no
+
+[Network]
+Address=192.168.7.2/24
+LLMNR=yes
+MulticastDNS=yes

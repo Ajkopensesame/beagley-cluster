@@ -1,0 +1,96 @@
+import QtQuick 2.15
+
+Item {
+    id: root
+    width: 96
+    height: 96
+
+    // Injected by VicWarningIcon
+    property color color: "red"
+
+    // Thick + readable at small sizes (matches Brake/Charge/Oil)
+    readonly property real s: Math.min(width, height)
+    readonly property real strokeW: Math.max(3, s * 0.07)
+
+    // Mitsubishi-ish: boxy, flatter, less “cartoon”
+    readonly property real rBlock: Math.max(1, s * 0.02)   // minimal radius (almost square)
+    readonly property real rSmall: Math.max(1, s * 0.015)
+
+    // ===== Main engine block (boxy outline) =====
+    Rectangle {
+        id: block
+        width: root.s * 0.70
+        height: root.s * 0.34
+        radius: root.rBlock
+        anchors.horizontalCenter: parent.horizontalCenter
+        y: root.s * 0.42
+        color: "transparent"
+        border.width: root.strokeW
+        border.color: root.color
+        opacity: 0.95
+    }
+
+    // ===== Left “housing” (squared protrusion) =====
+    Rectangle {
+        width: root.s * 0.16
+        height: root.s * 0.20
+        radius: root.rSmall
+        x: block.x - (width * 0.55)
+        y: block.y + block.height * 0.12
+        color: "transparent"
+        border.width: root.strokeW
+        border.color: root.color
+        opacity: 0.95
+    }
+
+    // ===== Top cap (flat valve cover) =====
+    Rectangle {
+        width: root.s * 0.40
+        height: root.s * 0.10
+        radius: root.rSmall
+        x: block.x + block.width * 0.12
+        y: block.y - height * 0.78
+        color: "transparent"
+        border.width: root.strokeW
+        border.color: root.color
+        opacity: 0.95
+    }
+
+    // Small “neck” linking cap to block (helps OEM silhouette)
+    Rectangle {
+        width: root.s * 0.14
+        height: root.s * 0.08
+        radius: root.rSmall
+        x: block.x + block.width * 0.18
+        y: block.y - (height * 0.22)
+        color: "transparent"
+        border.width: root.strokeW
+        border.color: root.color
+        opacity: 0.95
+    }
+
+    // ===== Exhaust stubs (boxy rectangles) =====
+    Repeater {
+        model: 3
+        Rectangle {
+            width: root.s * 0.15
+            height: root.strokeW * 1.10
+            radius: Math.max(1, height * 0.15)
+            color: root.color
+            opacity: 0.95
+            x: block.x + block.width - (root.strokeW * 0.30)
+            y: block.y + block.height * (0.25 + index * 0.23)
+        }
+    }
+
+    // ===== Bottom “foot” (flat mounting hint) =====
+    Rectangle {
+        width: root.s * 0.22
+        height: root.strokeW * 1.10
+        radius: Math.max(1, height * 0.15)
+        color: root.color
+        opacity: 0.95
+        x: block.x + block.width * 0.16
+        y: block.y + block.height + root.strokeW * 0.10
+    }
+}

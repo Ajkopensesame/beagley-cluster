@@ -1,0 +1,30 @@
+[Unit]
+Description=Beagley Cluster Appliance
+After=network-online.target beagley-cluster-provision.service beagley-cluster-gpu-probe.service
+Wants=network-online.target beagley-cluster-provision.service beagley-cluster-gpu-probe.service
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/default/beagley-cluster
+EnvironmentFile=-/etc/default/beagley-cluster.local
+Environment=QT_QPA_PLATFORM=eglfs
+Environment=QT_QPA_EGLFS_INTEGRATION=eglfs_kms
+Environment=QSG_RENDER_LOOP=basic
+Environment=BEAGLEY_UI_VARIANT=embedded
+Environment=BEAGLEY_RENDER_PROFILE=embedded
+Environment=BEAGLEY_EFFECT_LEVEL=low
+Environment=BEAGLEY_MAP_RENDERER=native-online
+Environment=BEAGLEY_REQUIRE_GPU_GATE=1
+Environment=BEAGLEY_GPU_GATE_FILE=/run/beagley_gpu_gate.ok
+Environment=BEAGLEY_GPU_PROBE_STATUS_FILE=/run/beagley_gpu_gate.status
+Environment=BEAGLEY_GPU_PROBE_LOG_FILE=/run/beagley_gpu_gate.log
+Environment=BEAGLEY_PROFILE_METRICS=1
+ExecCondition=/bin/sh -c 'test -f "${BEAGLEY_GPU_GATE_FILE:-/run/beagley_gpu_gate.ok}"'
+ExecStart=/usr/bin/beagley-cluster-launch.sh
+Restart=always
+RestartSec=2
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

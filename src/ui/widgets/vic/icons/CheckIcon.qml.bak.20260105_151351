@@ -1,0 +1,83 @@
+import QtQuick 2.15
+
+Item {
+    id: root
+    width: 96
+    height: 96
+
+    // Injected by VicWarningIcon
+    property color color: "red"
+
+    readonly property real s: Math.min(width, height)
+    readonly property real stroke: Math.max(4, s * 0.08)       // uniform stroke
+    readonly property real r: Math.max(1, s * 0.03)            // subtle rounding (not bubbly)
+
+    // ----------------------------
+    // Outline engine silhouette
+    // ----------------------------
+
+    // Main block outline
+    Rectangle {
+        id: block
+        width: root.s * 0.70
+        height: root.s * 0.34
+        x: root.s * 0.15
+        y: root.s * 0.45
+        radius: root.r
+        color: "transparent"
+        border.width: root.stroke
+        border.color: root.color
+        opacity: 0.95
+    }
+
+    // Top cap outline (valve cover)
+    Rectangle {
+        width: root.s * 0.40
+        height: root.s * 0.12
+        x: block.x + root.s * 0.10
+        y: block.y - root.s * 0.13
+        radius: Math.max(1, root.r * 0.9)
+        color: "transparent"
+        border.width: root.stroke
+        border.color: root.color
+        opacity: 0.95
+    }
+
+    // Left intake / mount outline
+    Rectangle {
+        width: root.s * 0.16
+        height: root.s * 0.20
+        x: block.x - root.s * 0.14
+        y: block.y + root.s * 0.06
+        radius: Math.max(1, root.r * 0.8)
+        color: "transparent"
+        border.width: root.stroke
+        border.color: root.color
+        opacity: 0.95
+    }
+
+    // Exhaust stubs (3 short outline bars)
+    Repeater {
+        model: 3
+        Rectangle {
+            width: root.s * 0.16
+            height: root.stroke
+            radius: height / 2
+            color: root.color
+            opacity: 0.95
+            x: block.x + block.width - (width * 0.25)
+            y: block.y + root.s * (0.08 + index * 0.10)
+        }
+    }
+
+    // Optional small bottom mount line (helps it read as engine)
+    Rectangle {
+        width: root.s * 0.20
+        height: root.stroke
+        radius: height / 2
+        color: root.color
+        opacity: 0.95
+        x: block.x + root.s * 0.12
+        y: block.y + block.height + root.s * 0.03
+    }
+}

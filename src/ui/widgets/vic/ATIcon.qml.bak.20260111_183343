@@ -1,0 +1,38 @@
+import QtQuick 2.15
+import QtQuick.Shapes 1.15
+
+Item {
+    id: root
+    width: 96
+    height: 96
+
+    // Injected by VicWarningIcon
+    property color color: "#FF3B3B"
+
+    readonly property real sw: Math.max(3, width * 0.06)
+
+    Shape {
+        anchors.fill: parent
+        antialiasing: true
+
+        // Rounded badge outline
+        ShapePath {
+            strokeColor: root.color
+            strokeWidth: root.sw
+            fillColor: "transparent"
+            capStyle: ShapePath.RoundCap
+            joinStyle: ShapePath.RoundJoin
+            PathSvg { path: "M20 30 Q20 22 28 22 H68 Q76 22 76 30 V66 Q76 74 68 74 H28 Q20 74 20 66 Z" }
+        }
+    }
+
+    // Text "AT" (simple, reliable)
+    Text {
+        anchors.centerIn: parent
+        text: "AT"
+        color: root.color
+        font.pixelSize: Math.round(root.width * 0.46)
+        font.bold: true
+        renderType: Text.NativeRendering
+    }
+}

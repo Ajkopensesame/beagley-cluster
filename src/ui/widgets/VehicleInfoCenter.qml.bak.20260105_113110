@@ -1,0 +1,224 @@
+import QtQuick 2.15
+
+Item {
+    id: root
+    width: 240
+    height: 240
+
+    // Theme (optional) – pass appTheme in later when embedding in TachGauge/Main
+    property var theme
+
+    // --- Inputs ---
+    property string drivetrainMode: "2wd"    // "2wd" | "4wd"
+    property bool transferLock: false
+
+    // warnings
+    property bool warnDoor: false
+    property bool warnCharge: false
+    property bool warnCheckEngine: false
+    property bool warnAT: false
+    property bool warnFuelLow: false
+    property bool warnBrake: false   // park brake or brake fluid
+
+    // --- Derived ---
+    readonly property bool hasWarning:
+        warnBrake || warnCharge || warnCheckEngine || warnAT || warnFuelLow || warnDoor
+
+    readonly property string warningText: {
+        if (warnBrake) return "BRAKE"
+        if (warnCharge) return "CHARGE"
+        if (warnCheckEngine) return "CHECK"
+        if (warnAT) return "A/T"
+        if (warnFuelLow) return "FUEL"
+        if (warnDoor) return "DOOR"
+        return ""
+    }
+
+    readonly property string driveText: transferLock
+        ? "4WD LOCK"
+        : (drivetrainMode === "4wd" ? "4WD" : "2WD")
+
+    // --- Theme-safe fallbacks ---
+    readonly property color cText:      theme?.text      ?? "#E6FFFFFF"
+    readonly property color cLow:       theme?.pearlLow  ?? "#C7B7FF"
+    readonly property color cHigh:      theme?.pearlHigh ?? "#5E35B1"
+    readonly property color cDanger:    theme?.danger    ?? "#FF3B3B"
+    readonly property bool  isNight:    theme?.isNight   ?? true
+    readonly property string fontMain:  theme?.fontDisplay ?? "Menlo"
+    readonly property string fontAccent: theme?.fontAccent ?? "Menlo"
+
+    // --- Motion tuning ---
+    property int fast: 160
+    property int slow: 900
+
+    // =========================
+    // BASE (glass puck)
+    // =========================
+    Rectangle {
+        id: glass
+        anchors.centerIn: parent
+        width: parent.width * 0.86
+        height: width
+        radius: width / 2
+        color: isNight ? "#0B0714" : "#FFFFFF"
+        opacity: isNight ? 0.55 : 0.75
+        border.width: 2
+        border.color: Qt.rgba(cHigh.r, cHigh.g, cHigh.b, isNight ? 0.55 : 0.35)
+        antialiasing: true
+    }
+
+    // Inner rim (subtle depth)
+    Rectangle {
+        anchors.centerIn: glass
+        width: glass.width * 0.86
+        height: width
+        radius: width / 2
+        color: "transparent"
+        border.width: 2
+        border.color: Qt.rgba(1, 1, 1, isNight ? 0.10 : 0.12)
+        antialiasing: true
+        opacity: 0.9
+    }
+
+    // Glow (very restrained – cluster vibe, not neon sign)
+    Rectangle {
+        anchors.centerIn: glass
+        width: glass.width
+        height: glass.height
+        radius: width / 2
+        color: "transparent"
+        border.width: 16
+        border.color: Qt.rgba(cHigh.r, cHigh.g, cHigh.b, isNight ? 0.10 : 0.07)
+        antialiasing: true
+    }
+
+    // =========================
+    // NORMAL MODE (drivetrain)
+    // =========================
+    Item {
+        id: normalLayer
+        anchors.fill: parent
+        opacity: root.hasWarning ? 0 : 1
+        Behavior on opacity { NumberAnimation { duration: root.fast } }
+
+        // HUD brackets
+        Repeater {
+            model: 4
+            Rectangle {
+                width: parent.width * 0.14
+                height: 3
+                radius: 2
+                color: cText
+                opacity: isNight ? 0.22 : 0.16
+                anchors.centerIn: parent
+                rotation: index * 90
+                y: -parent.height * 0.29
+                antialiasing: true
+            }
+        }
+
+        // Drive text
+        Text {
+            id: driveLabel
+            anchors.centerIn: parent
+            text: root.driveText
+            color: cText
+            font.family: fontAccent
+            font.pixelSize: Math.round(parent.width * 0.13)
+            font.weight: Font.Bold
+            opacity: 0.95
+        }
+
+        // Lock pulse (only when LOCK and no warning)
+        SequentialAnimation on scale {
+            running: root.transferLock && !root.hasWarning
+            loops: Animation.Infinite
+            NumberAnimation { from: 1.00; to: 1.03; duration: root.slow; easing.type: Easing.InOutSine }
+            NumberAnimation { from: 1.03; to: 1.00; duration: root.slow; easing.type: Easing.InOutSine }
+        }
+
+        // Micro sweep line (on mode changes)
+        Rectangle {
+            id: sweep
+            anchors.centerIn: parent
+            width: parent.width * 0.52
+            height: 2
+            radius: 1
+            color: cLow
+            opacity: 0.0
+            antialiasing: true
+        }
+
+        function pulseSweep() {
+            sweep.opacity = 0.0
+            sweep.scale = 0.92
+            sweepAnim.restart()
+        }
+
+        SequentialAnimation {
+            id: sweepAnim
+            running: false
+            NumberAnimation { target: sweep; property: "opacity"; to: 0.55; duration: 60 }
+            NumberAnimation { target: sweep; property: "scale"; to: 1.06; duration: 160; easing.type: Easing.OutCubic }
+            NumberAnimation { target: sweep; property: "opacity"; to: 0.0; duration: 140 }
+        }
+    }
+
+    onDrivetrainModeChanged: if (!hasWarning) normalLayer.pulseSweep()
+    onTransferLockChanged: if (!hasWarning) normalLayer.pulseSweep()
+
+    // =========================
+    // WARNING MODE (dominant)
+    // =========================
+    Item {
+        id: warningLayer
+        anchors.fill: parent
+        opacity: root.hasWarning ? 1 : 0
+        Behavior on opacity { NumberAnimation { duration: root.fast } }
+
+        Rectangle {
+            id: frame
+            anchors.centerIn: parent
+            width: parent.width * 0.86
+            height: parent.height * 0.46
+            radius: 18
+            color: Qt.rgba(0, 0, 0, isNight ? 0.25 : 0.08)
+            border.width: 3
+            border.color: cDanger
+            antialiasing: true
+            opacity: 0.98
+        }
+
+        // Soft danger glow
+        Rectangle {
+            anchors.centerIn: frame
+            width: frame.width
+            height: frame.height
+            radius: frame.radius
+            color: "transparent"
+            border.width: 18
+            border.color: Qt.rgba(cDanger.r, cDanger.g, cDanger.b, 0.12)
+            antialiasing: true
+        }
+
+        Text {
+            anchors.centerIn: frame
+            text: root.warningText
+            color: cText
+            font.family: fontAccent
+            font.pixelSize: Math.round(parent.width * 0.14)
+            font.weight: Font.Bold
+        }
+
+        SequentialAnimation {
+            id: warnPulse
+            running: false
+            NumberAnimation { target: frame; property: "scale"; from: 1.00; to: 1.06; duration: 120; easing.type: Easing.OutCubic }
+            NumberAnimation { target: frame; property: "scale"; from: 1.06; to: 1.00; duration: 180; easing.type: Easing.OutCubic }
+        }
+
+        onOpacityChanged: {
+            if (opacity === 1) warnPulse.restart()
+        }
+    }
+}

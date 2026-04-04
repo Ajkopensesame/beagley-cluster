@@ -1,0 +1,17 @@
+[Unit]
+Description=Beagley Cluster GPU Probe
+After=local-fs.target systemd-modules-load.service beagley-cluster-provision.service
+Wants=beagley-cluster-provision.service
+Before=beagley-cluster.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/default/beagley-cluster
+EnvironmentFile=-/etc/default/beagley-cluster.local
+ExecStart=/usr/libexec/beagley-cluster/beagley-cluster-gpu-probe.sh
+RemainAfterExit=yes
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,13 @@
+[Match]
+Driver=am65-cpsw-nuss
+KernelCommandLine=!root=/dev/nfs
+
+[Link]
+RequiredForOnline=no
+
+[Network]
+Address=192.168.0.46/24
+Gateway=192.168.0.1
+DNS=192.168.0.1
+LLMNR=yes
+MulticastDNS=yes

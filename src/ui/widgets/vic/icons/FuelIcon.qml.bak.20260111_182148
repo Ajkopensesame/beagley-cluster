@@ -1,0 +1,49 @@
+import QtQuick 2.15
+import QtQuick.Shapes 1.15
+
+Item {
+    id: root
+    width: 96
+    height: 96
+
+    // Injected by VicWarningIcon
+    property color color: "yellow"
+
+    readonly property real sw: Math.max(3, width * 0.06)
+
+    Shape {
+        anchors.fill: parent
+        antialiasing: true
+
+        // Simplified fuel pump outline
+        ShapePath {
+            strokeColor: root.color
+            strokeWidth: root.sw
+            fillColor: "transparent"
+            capStyle: ShapePath.RoundCap
+            joinStyle: ShapePath.RoundJoin
+            // Pump body + base
+            PathSvg { path: "M28 20 H58 A6 6 0 0 1 64 26 V70 H28 Z M28 70 H66" }
+        }
+
+        // Pump window
+        ShapePath {
+            strokeColor: root.color
+            strokeWidth: root.sw
+            fillColor: "transparent"
+            capStyle: ShapePath.RoundCap
+            joinStyle: ShapePath.RoundJoin
+            PathSvg { path: "M34 28 H54 V44 H34 Z" }
+        }
+
+        // Hose + nozzle
+        ShapePath {
+            strokeColor: root.color
+            strokeWidth: root.sw
+            fillColor: "transparent"
+            capStyle: ShapePath.RoundCap
+            joinStyle: ShapePath.RoundJoin
+            PathSvg { path: "M64 30 C74 30 74 44 66 44 H60" }
+        }
+    }
+}
