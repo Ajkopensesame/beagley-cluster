@@ -3,233 +3,1093 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Cluster Map (Canvas)</title>
-
+    <title>Beagley Map</title>
+    <link rel="stylesheet" href="./vendor/maplibre/maplibre-gl.css" />
     <style>
-      html, body { height: 100%; margin: 0; background: #000; overflow: hidden; }
-      #wrap { position: absolute; inset: 0; }
-      canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-
-      .hud {
-        position: absolute;
-        left: 12px; top: 12px;
-        color: #fff;
-        font: 13px/1.3 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-        background: rgba(0,0,0,0.45);
-        padding: 8px 10px;
-        border-radius: 10px;
-        user-select: none;
-        pointer-events: none;
-        white-space: pre;
+      :root {
+        --safe-band-left: 33.333vw;
+        --safe-band-right: 33.333vw;
+        --safe-band-top: 18px;
+        --safe-band-bottom: 18px;
+        --safe-band-width: 33.333vw;
       }
 
-      .hint {
+      html, body {
+        height: 100%;
+        margin: 0;
+        background: #02060a;
+        overflow: hidden;
+        font-family: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+      }
+
+      #map {
         position: absolute;
-        left: 12px; bottom: 12px;
-        color: rgba(255,255,255,0.8);
-        font: 12px/1.3 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-        background: rgba(0,0,0,0.35);
-        padding: 6px 8px;
-        border-radius: 10px;
-        user-select: none;
+        inset: 0;
+      }
+
+      .maplibregl-canvas {
+        outline: none;
+      }
+
+      .edgeFade {
+        position: absolute;
+        inset: 0;
         pointer-events: none;
+        z-index: 4;
+        background:
+          linear-gradient(
+            to right,
+            rgba(0, 0, 0, 0.95) 0%,
+            rgba(0, 0, 0, 0.95) 84%,
+            rgba(0, 0, 0, 0.58) 93%,
+            rgba(0, 0, 0, 0.00) 100%
+          ) left / 29% 100% no-repeat,
+          linear-gradient(
+            to left,
+            rgba(0, 0, 0, 0.95) 0%,
+            rgba(0, 0, 0, 0.95) 84%,
+            rgba(0, 0, 0, 0.58) 93%,
+            rgba(0, 0, 0, 0.00) 100%
+          ) right / 29% 100% no-repeat;
+      }
+
+      .safeBandGlow {
+        position: absolute;
+        left: var(--safe-band-left);
+        right: var(--safe-band-right);
+        top: 0;
+        bottom: 0;
+        z-index: 3;
+        pointer-events: none;
+        background:
+          linear-gradient(to bottom, rgba(0, 26, 39, 0.16), rgba(0, 0, 0, 0.00) 20%, rgba(0, 0, 0, 0.00) 80%, rgba(0, 18, 29, 0.16)),
+          radial-gradient(circle at center 40%, rgba(94, 211, 255, 0.08), rgba(0, 0, 0, 0.00) 60%);
+      }
+
+      .centerBanner {
+        position: absolute;
+        left: calc(var(--safe-band-left) + 8px);
+        right: calc(var(--safe-band-right) + 8px);
+        top: calc(var(--safe-band-top) + 6px);
+        padding: 12px 16px 14px;
+        border-radius: 24px;
+        background: rgba(7, 13, 20, 0.88);
+        color: #f5fbff;
+        border: 1px solid rgba(117, 205, 255, 0.18);
+        box-shadow: 0 18px 42px rgba(0, 0, 0, 0.40);
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
+        text-align: center;
+        pointer-events: none;
+        z-index: 6;
+      }
+
+      .centerBanner.hidden {
+        display: none;
+      }
+
+      .centerBanner.compact {
+        padding-top: 11px;
+        padding-bottom: 12px;
+      }
+
+      .centerBanner.hero {
+        padding-top: 15px;
+        padding-bottom: 18px;
+        border-color: rgba(134, 232, 255, 0.28);
+        box-shadow: 0 26px 54px rgba(0, 0, 0, 0.48);
+      }
+
+      .centerBanner.warn {
+        border-color: rgba(255, 191, 92, 0.34);
+        background: rgba(23, 15, 8, 0.90);
+      }
+
+      .centerBanner.danger {
+        border-color: rgba(255, 125, 125, 0.36);
+        background: rgba(25, 9, 11, 0.90);
+      }
+
+      .eyebrow {
+        font: 700 11px/1.2 sans-serif;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: rgba(145, 217, 255, 0.74);
+      }
+
+      .centerBanner.warn .eyebrow {
+        color: rgba(255, 212, 124, 0.82);
+      }
+
+      .centerBanner.danger .eyebrow {
+        color: rgba(255, 159, 159, 0.84);
+      }
+
+      .primary {
+        margin-top: 7px;
+        font: 700 28px/1.12 sans-serif;
+      }
+
+      .centerBanner.hero .primary {
+        margin-top: 8px;
+        font-size: 34px;
+      }
+
+      .secondary {
+        margin-top: 5px;
+        font: 500 15px/1.35 sans-serif;
+        color: rgba(227, 238, 255, 0.74);
+      }
+
+      .status {
+        position: absolute;
+        left: calc(var(--safe-band-left) + 34px);
+        right: calc(var(--safe-band-right) + 34px);
+        bottom: calc(var(--safe-band-bottom) + 124px);
+        padding: 10px 16px;
+        border-radius: 999px;
+        background: rgba(6, 10, 16, 0.78);
+        color: rgba(236, 245, 255, 0.86);
+        border: 1px solid rgba(117, 205, 255, 0.14);
+        box-shadow: 0 18px 42px rgba(0, 0, 0, 0.34);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        text-align: center;
+        font: 600 14px/1.3 sans-serif;
+        letter-spacing: 0.03em;
+        pointer-events: none;
+        z-index: 6;
+      }
+
+      .status.hidden {
+        display: none;
+      }
+
+      .status.warn {
+        color: #ffd661;
+      }
+
+      .status.danger {
+        color: #ff7d7d;
+      }
+
+      .vehicleMarker {
+        width: 64px;
+        height: 64px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        filter: drop-shadow(0 12px 18px rgba(0, 0, 0, 0.5));
+      }
+
+      .maplibregl-marker {
+        z-index: 7;
+      }
+
+      .maplibregl-ctrl-bottom-left,
+      .maplibregl-ctrl-bottom-right {
+        z-index: 2;
       }
     </style>
   </head>
-
   <body>
-    <div id="wrap">
-      <canvas id="c"></canvas>
-      <div class="hud" id="hud">Canvas map loading…</div>
-      <div class="hint">Canvas mode (no WebGL) • OSM raster tiles</div>
+    <div id="map"></div>
+    <div class="edgeFade"></div>
+    <div class="safeBandGlow"></div>
+    <div id="banner" class="centerBanner compact hidden">
+      <div id="bannerEyebrow" class="eyebrow">Navigation</div>
+      <div id="bannerPrimary" class="primary">Search for a destination</div>
+      <div id="bannerSecondary" class="secondary">Tap search to route from live GPS.</div>
     </div>
+    <div id="status" class="status hidden"></div>
 
+    <script src="./styles/embedded-liberty.js"></script>
+    <script src="./vendor/maplibre/maplibre-gl.js"></script>
     <script>
-      // -----------------------------
-      // Canvas 2D raster tile map
-      // -----------------------------
-      // NOTE: For production you should NOT hammer public OSM tiles from a fleet.
-      // We'll replace with offline/hosted tiles later (MBTiles server or local tile pyramid).
-      const TILE_URL = (z, x, y) => `https://tile.openstreetmap.org/${z}/${x}/${y}.png`;
-      const TILE_SIZE = 256;
+      var DEFAULT_STYLE_URL = "qrc:/web/map/styles/embedded-liberty.json";
+      var MIN_ZOOM = 3;
+      var MAX_ZOOM = 19;
+      var FREE_PAN_RESUME_MS = 8000;
+      var SOFTWARE_CAMERA_MIN_INTERVAL_MS = 333;
+      var SOFTWARE_MIN_CAMERA_MOVE_METERS = 12;
+      var SOFTWARE_MIN_BEARING_DELTA = 8;
 
-      // Start: Brisbane-ish
-      let state = {
-        lat: -27.4698,
-        lng: 153.0251,
-        zoom: 12,
-        bearing: 0 // degrees, used only for HUD right now (rotation optional)
+      var banner = document.getElementById("banner");
+      var bannerEyebrow = document.getElementById("bannerEyebrow");
+      var bannerPrimary = document.getElementById("bannerPrimary");
+      var bannerSecondary = document.getElementById("bannerSecondary");
+      var statusEl = document.getElementById("status");
+
+      var params = new URLSearchParams(window.location.search);
+      var preferredStyleUrl = params.get("style") || DEFAULT_STYLE_URL;
+      var preferredStyleJson = null;
+      var embeddedMode = params.get("embedded") === "1";
+      var softwareMode = params.get("software") === "1";
+      var styleMode = params.get("styleMode") || (embeddedMode ? "embedded" : "desktop");
+      var bootStartedAtMs = Date.now();
+      var usingRasterFallback = false;
+      var mapErrorCount = 0;
+      var resumeFollowTimer = null;
+      var firstFrameLogged = false;
+      var styleReadyLogged = false;
+      var interactiveReadyLogged = false;
+      var cachePersistTimer = null;
+      var sawStyleData = false;
+      var firstFrameTimer = null;
+      var cameraCommitTimer = null;
+      var pendingCameraImmediate = false;
+      var lastCameraCommitAtMs = 0;
+      var lastCameraOptions = null;
+
+      if (styleMode === "embedded"
+        && preferredStyleUrl.indexOf("qrc:/web/map/styles/embedded-liberty.json") === 0
+        && window.__BEAGLEY_EMBEDDED_STYLE__) {
+        preferredStyleJson = window.__BEAGLEY_EMBEDDED_STYLE__;
+      }
+
+      var navState = {
+        vehiclePose: {},
+        cameraHints: {},
+        routeOverlay: {},
+        guidanceBanner: {},
+        connectivity: {},
+        manualUnlock: false,
+        overviewKey: "",
+        smoothedBearing: 0
       };
 
-      const hud = document.getElementById("hud");
-      const canvas = document.getElementById("c");
-      const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true });
-
-      // Simple in-memory tile cache
-      const cache = new Map(); // key -> { img, ok, err, t }
-      const MAX_CACHE = 256;
-
-      function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
-
-      function resize() {
-        // Use device pixels for sharpness
-        const dpr = Math.max(1, Math.floor(window.devicePixelRatio || 1));
-        const w = Math.max(1, window.innerWidth);
-        const h = Math.max(1, window.innerHeight);
-        canvas.width = w * dpr;
-        canvas.height = h * dpr;
-        canvas.style.width = w + "px";
-        canvas.style.height = h + "px";
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      }
-      window.addEventListener("resize", () => { resize(); requestDraw(); });
-      resize();
-
-      // Web mercator helpers
-      function lngLatToWorld(lng, lat, z) {
-        const s = TILE_SIZE * Math.pow(2, z);
-        const x = (lng + 180) / 360 * s;
-        const sin = Math.sin(lat * Math.PI / 180);
-        const y = (0.5 - Math.log((1 + sin) / (1 - sin)) / (4 * Math.PI)) * s;
-        return { x, y };
+      function emitReady(stage) {
+        console.log("[BEAGLEY_MAP_READY] " + stage + " " + (Date.now() - bootStartedAtMs));
       }
 
-      function worldToTileXY(wx, wy) {
-        return { tx: Math.floor(wx / TILE_SIZE), ty: Math.floor(wy / TILE_SIZE) };
+      function emitMode(mode) {
+        window.mapRenderMode = mode;
+        console.log("[BEAGLEY_MAP_MODE] " + mode);
       }
 
-      function tileKey(z, x, y) { return `${z}/${x}/${y}`; }
-
-      function evictIfNeeded() {
-        if (cache.size <= MAX_CACHE) return;
-        // evict oldest
-        let oldestK = null;
-        let oldestT = Infinity;
-        for (const [k, v] of cache.entries()) {
-          if (v.t < oldestT) { oldestT = v.t; oldestK = k; }
-        }
-        if (oldestK) cache.delete(oldestK);
+      function safeBandDimensions() {
+        var bandWidth = Math.max(320, Math.min(Math.floor(window.innerWidth / 3), 680));
+        var sideMargin = Math.max(0, Math.floor((window.innerWidth - bandWidth) / 2));
+        return {
+          left: sideMargin,
+          right: sideMargin,
+          top: 18,
+          bottom: 18,
+          width: bandWidth,
+          height: Math.max(0, window.innerHeight - 36)
+        };
       }
 
-      function loadTile(z, x, y) {
-        const key = tileKey(z, x, y);
-        const hit = cache.get(key);
-        if (hit) { hit.t = performance.now(); return hit; }
-
-        const img = new Image();
-        img.crossOrigin = "anonymous"; // okay for drawing; attribution handled separately
-        const rec = { img, ok: false, err: null, t: performance.now() };
-        cache.set(key, rec);
-        evictIfNeeded();
-
-        img.onload = () => { rec.ok = true; rec.t = performance.now(); requestDraw(); };
-        img.onerror = (e) => { rec.err = e; rec.t = performance.now(); requestDraw(); };
-        img.src = TILE_URL(z, x, y);
-
-        return rec;
+      function applySafeBandMetrics() {
+        var band = safeBandDimensions();
+        document.documentElement.style.setProperty("--safe-band-left", band.left + "px");
+        document.documentElement.style.setProperty("--safe-band-right", band.right + "px");
+        document.documentElement.style.setProperty("--safe-band-top", band.top + "px");
+        document.documentElement.style.setProperty("--safe-band-bottom", band.bottom + "px");
+        document.documentElement.style.setProperty("--safe-band-width", band.width + "px");
+        window.safeBand = band;
       }
 
-      let drawScheduled = false;
-      function requestDraw() {
-        if (drawScheduled) return;
-        drawScheduled = true;
-        requestAnimationFrame(() => { drawScheduled = false; draw(); });
+      function currentBannerHeight() {
+        return banner.classList.contains("hidden") ? 0 : Math.ceil(banner.getBoundingClientRect().height);
       }
 
-      function draw() {
-        const w = window.innerWidth;
-        const h = window.innerHeight;
+      function currentStatusHeight() {
+        return statusEl.classList.contains("hidden") ? 0 : Math.ceil(statusEl.getBoundingClientRect().height);
+      }
 
-        // background
-        ctx.fillStyle = "#000";
-        ctx.fillRect(0, 0, w, h);
+      function cameraPadding() {
+        var band = window.safeBand || safeBandDimensions();
+        return {
+          top: band.top + currentBannerHeight() + 24,
+          right: band.right + 16,
+          bottom: band.bottom + currentStatusHeight() + 148,
+          left: band.left + 16
+        };
+      }
 
-        const z = clamp(Math.round(state.zoom), 1, 19);
-        const centerWorld = lngLatToWorld(state.lng, state.lat, z);
+      function fitPadding() {
+        var padding = cameraPadding();
+        return {
+          top: padding.top + 18,
+          right: padding.right + 18,
+          bottom: padding.bottom + 18,
+          left: padding.left + 18
+        };
+      }
 
-        // Determine visible tile range around center
-        const topLeftWorld = { x: centerWorld.x - w/2, y: centerWorld.y - h/2 };
-        const bottomRightWorld = { x: centerWorld.x + w/2, y: centerWorld.y + h/2 };
-
-        const tl = worldToTileXY(topLeftWorld.x, topLeftWorld.y);
-        const br = worldToTileXY(bottomRightWorld.x, bottomRightWorld.y);
-
-        // World wraps horizontally
-        const tilesPerAxis = Math.pow(2, z);
-
-        let tilesDrawn = 0;
-        let tilesMissing = 0;
-
-        for (let ty = tl.ty; ty <= br.ty; ty++) {
-          if (ty < 0 || ty >= tilesPerAxis) continue; // clamp vertical (no wrap)
-          for (let tx = tl.tx; tx <= br.tx; tx++) {
-            const wrappedX = ((tx % tilesPerAxis) + tilesPerAxis) % tilesPerAxis;
-            const tile = loadTile(z, wrappedX, ty);
-
-            const wx = tx * TILE_SIZE;
-            const wy = ty * TILE_SIZE;
-
-            const dx = Math.round(wx - topLeftWorld.x);
-            const dy = Math.round(wy - topLeftWorld.y);
-
-            if (tile.ok) {
-              ctx.drawImage(tile.img, dx, dy, TILE_SIZE, TILE_SIZE);
-              tilesDrawn++;
-            } else {
-              tilesMissing++;
-              // placeholder tile while loading
-              ctx.fillStyle = "#111";
-              ctx.fillRect(dx, dy, TILE_SIZE, TILE_SIZE);
-              ctx.strokeStyle = "rgba(255,255,255,0.06)";
-              ctx.strokeRect(dx + 0.5, dy + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
+      function buildRasterStyle() {
+        return {
+          version: 8,
+          sources: {
+            osm: {
+              type: "raster",
+              tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+              tileSize: 256,
+              attribution: "&copy; OpenStreetMap contributors"
             }
+          },
+          layers: [{ id: "osm", type: "raster", source: "osm" }]
+        };
+      }
+
+      applySafeBandMetrics();
+      emitReady("page_dom_ready");
+
+      var vehicleEl = document.createElement("div");
+      vehicleEl.className = "vehicleMarker";
+      vehicleEl.style.width = "64px";
+      vehicleEl.style.height = "64px";
+      vehicleEl.innerHTML =
+        '<svg viewBox="0 0 96 96" width="64" height="64" aria-hidden="true">' +
+        '<g transform="translate(48 48)">' +
+        '<g id="pajeroIcon" transform="rotate(0)">' +
+        '<ellipse cx="0" cy="28" rx="22" ry="10" fill="rgba(0,0,0,0.26)"/>' +
+        '<rect x="-28" y="-8" width="56" height="32" rx="8" fill="#f7fbff" stroke="#183246" stroke-width="3"/>' +
+        '<path d="M-18 -22 h30 l12 14 v9 h-46 z" fill="#f7fbff" stroke="#183246" stroke-width="3" stroke-linejoin="round"/>' +
+        '<rect x="-14" y="-16" width="16" height="10" rx="2" fill="#8ed4ff" opacity="0.92"/>' +
+        '<rect x="5" y="-16" width="14" height="10" rx="2" fill="#8ed4ff" opacity="0.92"/>' +
+        '<rect x="-32" y="4" width="7" height="11" rx="2" fill="#ffd861"/>' +
+        '<rect x="25" y="4" width="7" height="11" rx="2" fill="#ffd861"/>' +
+        '<rect x="-20" y="18" width="40" height="6" rx="3" fill="#153147"/>' +
+        '<circle cx="-18" cy="26" r="10" fill="#182733"/>' +
+        '<circle cx="18" cy="26" r="10" fill="#182733"/>' +
+        '<circle cx="-18" cy="26" r="5" fill="#b6c9d8"/>' +
+        '<circle cx="18" cy="26" r="5" fill="#b6c9d8"/>' +
+        '<path d="M-22 -3 h44" stroke="#24f0ac" stroke-width="4" opacity="0.95"/>' +
+        "</g></g></svg>";
+
+      var transparentPixel = {
+        width: 1,
+        height: 1,
+        data: new Uint8Array([0, 0, 0, 0])
+      };
+
+      var map = new maplibregl.Map({
+        container: "map",
+        style: preferredStyleJson || preferredStyleUrl,
+        center: [153.0251, -27.4698],
+        zoom: softwareMode ? 15.0 : (embeddedMode ? 15.4 : 16.5),
+        minZoom: MIN_ZOOM,
+        maxZoom: MAX_ZOOM,
+        pitch: softwareMode ? 28 : (embeddedMode ? 42 : 58),
+        bearing: 0,
+        antialias: false,
+        attributionControl: true,
+        renderWorldCopies: !embeddedMode,
+        fadeDuration: softwareMode ? 0 : 300,
+        crossSourceCollisions: !softwareMode
+      });
+
+      var vehicleMarker = new maplibregl.Marker({
+        element: vehicleEl,
+        anchor: "center"
+      }).setLngLat([153.0251, -27.4698]).addTo(map);
+      var pajeroIcon = vehicleEl.querySelector("#pajeroIcon");
+
+      map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-left");
+
+      function clamp(value, minValue, maxValue) {
+        return Math.max(minValue, Math.min(maxValue, value));
+      }
+
+      function radians(value) {
+        return value * Math.PI / 180.0;
+      }
+
+      function degrees(value) {
+        return value * 180.0 / Math.PI;
+      }
+
+      function distanceMeters(aLat, aLng, bLat, bLng) {
+        if (!isFinite(aLat) || !isFinite(aLng) || !isFinite(bLat) || !isFinite(bLng)) return Infinity;
+        var earthRadius = 6378137.0;
+        var dLat = radians(bLat - aLat);
+        var dLng = radians(bLng - aLng);
+        var latMid = radians((aLat + bLat) / 2.0);
+        var x = dLng * Math.cos(latMid);
+        var y = dLat;
+        return Math.sqrt(x * x + y * y) * earthRadius;
+      }
+
+      function normalizeBearing(value) {
+        if (!isFinite(value)) return 0;
+        var wrapped = value % 360;
+        return wrapped < 0 ? wrapped + 360 : wrapped;
+      }
+
+      function lerpBearing(a, b, t) {
+        var delta = ((b - a + 540) % 360) - 180;
+        return normalizeBearing(a + delta * t);
+      }
+
+      function pointFromBearing(originLat, originLng, bearingDeg, distanceMeters) {
+        var earthRadius = 6378137.0;
+        var angularDistance = distanceMeters / earthRadius;
+        var bearingRad = radians(bearingDeg || 0);
+        var lat1 = radians(originLat);
+        var lng1 = radians(originLng);
+        var sinLat1 = Math.sin(lat1);
+        var cosLat1 = Math.cos(lat1);
+        var sinAngular = Math.sin(angularDistance);
+        var cosAngular = Math.cos(angularDistance);
+        var lat2 = Math.asin(sinLat1 * cosAngular + cosLat1 * sinAngular * Math.cos(bearingRad));
+        var lng2 = lng1 + Math.atan2(
+          Math.sin(bearingRad) * sinAngular * cosLat1,
+          cosAngular - sinLat1 * Math.sin(lat2)
+        );
+        return {
+          lat: degrees(lat2),
+          lng: degrees(lng2)
+        };
+      }
+
+      function vehiclePose() {
+        return navState.vehiclePose || {};
+      }
+
+      function cameraHints() {
+        return navState.cameraHints || {};
+      }
+
+      function routeOverlay() {
+        return navState.routeOverlay || {};
+      }
+
+      function guidanceBanner() {
+        return navState.guidanceBanner || {};
+      }
+
+      function connectivity() {
+        return navState.connectivity || {};
+      }
+
+      function routeCoordinates() {
+        var route = routeOverlay().route || {};
+        var geometry = route.geometry || {};
+        return geometry.coordinates || [];
+      }
+
+      function hasRoute() {
+        return routeCoordinates().length > 1;
+      }
+
+      function routeBounds() {
+        var coords = routeCoordinates();
+        if (!coords.length) return null;
+        var bounds = new maplibregl.LngLatBounds();
+        coords.forEach(function(coord) {
+          bounds.extend(coord);
+        });
+        return bounds;
+      }
+
+      function setStatus(text, tone) {
+        statusEl.className = "status";
+        if (!text) {
+          statusEl.classList.add("hidden");
+          statusEl.textContent = "";
+          return;
+        }
+        statusEl.classList.remove("hidden");
+        statusEl.textContent = text;
+        if (tone) statusEl.classList.add(tone);
+      }
+
+      function setBanner(config) {
+        if (!config || !config.primary) {
+          banner.className = "centerBanner compact hidden";
+          return;
+        }
+        banner.className = "centerBanner";
+        banner.classList.add(config.size || "compact");
+        if (config.tone && config.tone !== "normal") banner.classList.add(config.tone);
+        bannerEyebrow.textContent = config.eyebrow || "Navigation";
+        bannerPrimary.textContent = config.primary || "";
+        bannerSecondary.textContent = config.secondary || "";
+      }
+
+      function ensureOverlayLayers() {
+        if (!map.isStyleLoaded()) return;
+
+        if (hasRoute() && !map.getSource("route")) {
+          map.addSource("route", {
+            type: "geojson",
+            data: { type: "FeatureCollection", features: [] }
+          });
+        }
+        if ((hasRoute() || (routeOverlay().destination || {}).label) && !map.getSource("destination")) {
+          map.addSource("destination", {
+            type: "geojson",
+            data: { type: "FeatureCollection", features: [] }
+          });
+        }
+        if (hasRoute() && !map.getSource("next-anchor")) {
+          map.addSource("next-anchor", {
+            type: "geojson",
+            data: { type: "FeatureCollection", features: [] }
+          });
+        }
+
+        if (map.getSource("route") && !map.getLayer("route-casing")) {
+          map.addLayer({
+            id: "route-casing",
+            type: "line",
+            source: "route",
+            layout: { "line-cap": "round", "line-join": "round" },
+            paint: { "line-color": "rgba(5, 10, 18, 0.98)", "line-width": 19 }
+          });
+        }
+        if (map.getSource("route") && !map.getLayer("route-line")) {
+          map.addLayer({
+            id: "route-line",
+            type: "line",
+            source: "route",
+            layout: { "line-cap": "round", "line-join": "round" },
+            paint: { "line-color": "#61c6ff", "line-width": 11 }
+          });
+        }
+        if (map.getSource("destination") && !map.getLayer("destination")) {
+          map.addLayer({
+            id: "destination",
+            type: "circle",
+            source: "destination",
+            paint: {
+              "circle-radius": 8,
+              "circle-color": "#ffb151",
+              "circle-stroke-width": 2,
+              "circle-stroke-color": "#ffffff"
+            }
+          });
+        }
+        if (map.getSource("next-anchor") && !map.getLayer("next-anchor")) {
+          map.addLayer({
+            id: "next-anchor",
+            type: "circle",
+            source: "next-anchor",
+            paint: {
+              "circle-radius": 9,
+              "circle-color": "#ffffff",
+              "circle-stroke-width": 6,
+              "circle-stroke-color": "rgba(82, 255, 225, 0.34)"
+            }
+          });
+        }
+      }
+
+      function applyRouteVisuals() {
+        if (!map.getLayer("route-line")) return;
+        var followMode = routeOverlay().followMode || guidanceBanner().followMode || "auto";
+        var focus = followMode === "approach" || followMode === "turn";
+        map.setPaintProperty("route-casing", "line-width", focus ? 21 : 19);
+        map.setPaintProperty("route-line", "line-width", focus ? 13 : 11);
+        map.setPaintProperty("route-line", "line-color", focus ? "#87ebff" : "#61c6ff");
+        if (map.getLayer("destination")) {
+          map.setPaintProperty("destination", "circle-radius", focus ? 9 : 8);
+        }
+        if (map.getLayer("next-anchor")) {
+          map.setPaintProperty("next-anchor", "circle-radius", focus ? 11 : 9);
+          map.setPaintProperty("next-anchor", "circle-stroke-width", focus ? 8 : 6);
+          map.setPaintProperty("next-anchor", "circle-stroke-color", focus ? "rgba(123, 255, 235, 0.50)" : "rgba(82, 255, 225, 0.34)");
+        }
+      }
+
+      function syncSources() {
+        if (!map.isStyleLoaded()) return;
+        ensureOverlayLayers();
+
+        var coords = routeCoordinates();
+        var routeSource = map.getSource("route");
+        if (routeSource) {
+          routeSource.setData(coords.length > 1 ? {
+            type: "Feature",
+            geometry: { type: "LineString", coordinates: coords },
+            properties: {}
+          } : { type: "FeatureCollection", features: [] });
+        }
+
+        var destination = routeOverlay().destination || {};
+        var destinationSource = map.getSource("destination");
+        if (destinationSource) {
+          destinationSource.setData(isFinite(destination.lat) && isFinite(destination.lng) ? {
+            type: "Feature",
+            geometry: { type: "Point", coordinates: [destination.lng, destination.lat] },
+            properties: {}
+          } : { type: "FeatureCollection", features: [] });
+        }
+
+        var next = routeOverlay().nextManeuver || {};
+        var nextSource = map.getSource("next-anchor");
+        if (nextSource) {
+          nextSource.setData(isFinite(next.lat) && isFinite(next.lng) ? {
+            type: "Feature",
+            geometry: { type: "Point", coordinates: [next.lng, next.lat] },
+            properties: {}
+          } : { type: "FeatureCollection", features: [] });
+        }
+
+        if (map.getLayer("next-anchor")) {
+          var highlight = (routeOverlay().followMode || guidanceBanner().followMode) === "approach"
+            || (routeOverlay().followMode || guidanceBanner().followMode) === "turn";
+          map.setLayoutProperty("next-anchor", "visibility", highlight ? "visible" : "none");
+        }
+
+        applyRouteVisuals();
+      }
+
+      function simplifyStyleForDesktop() {
+        if (styleMode !== "desktop" || !map.isStyleLoaded()) return;
+        var style = map.getStyle();
+        if (!style || !style.layers) return;
+        style.layers.forEach(function(layer) {
+          var id = String(layer.id || "").toLowerCase();
+          if (layer.type === "fill-extrusion" && map.getLayoutProperty(layer.id, "visibility") !== "none") {
+            map.setLayoutProperty(layer.id, "visibility", "none");
+          } else if (layer.type === "symbol") {
+            var keep = id.indexOf("road") >= 0 || id.indexOf("place") >= 0 || id.indexOf("street") >= 0;
+            if (!keep && map.getLayoutProperty(layer.id, "visibility") !== "none") {
+              map.setLayoutProperty(layer.id, "visibility", "none");
+            }
+          }
+        });
+      }
+
+      function updateVehicleMarker() {
+        var pose = vehiclePose();
+        if (!isFinite(pose.lat) || !isFinite(pose.lng)) return;
+        vehicleMarker.setLngLat([pose.lng, pose.lat]);
+        if (pajeroIcon) {
+          pajeroIcon.setAttribute("transform", "rotate(" + normalizeBearing(pose.bearing || 0) + ")");
+        }
+      }
+
+      function updateBannerAndStatus() {
+        var bannerData = guidanceBanner().banner || {};
+        var vehicle = vehiclePose();
+        var networkStatus = guidanceBanner().networkStatus || "online";
+        var providerStatus = guidanceBanner().providerStatus || "offline";
+        var net = connectivity();
+
+        if (!vehicle.gpsReady) {
+          setBanner({
+            eyebrow: "GPS weak",
+            primary: vehicle.usingLastKnown ? "Holding last known BBB pose" : "Waiting for BBB GPS fix",
+            secondary: hasRoute()
+              ? "Current route stays visible until GPS recovers."
+              : "Maps and routing stay blocked until the fix is valid.",
+            tone: "warn",
+            size: "compact"
+          });
+          setStatus("", "");
+          return;
+        }
+
+        if (hasRoute() && bannerData.primary) {
+          var followMode = routeOverlay().followMode || guidanceBanner().followMode || "auto";
+          var bannerSize = (followMode === "approach" || followMode === "turn") ? "hero" : "compact";
+          setBanner({
+            eyebrow: bannerData.eyebrow || "Guidance",
+            primary: bannerData.primary,
+            secondary: bannerData.secondary || "",
+            tone: "normal",
+            size: bannerSize
+          });
+        } else {
+          setBanner(null);
+        }
+
+        if (navState.manualUnlock) {
+          setStatus("Map unlocked. Auto-follow resumes in a few seconds.");
+          return;
+        }
+
+        if (!net.hotspotConnected || !net.hotspotHasIpLease) {
+          setStatus("Connecting hotspot", "warn");
+        } else if (!net.internetOk) {
+          setStatus("Offline: cached route only", "warn");
+        } else if (networkStatus === "degraded" || providerStatus === "route_degraded") {
+          setStatus("Hotspot degraded. Continuing with cached guidance.", "warn");
+        } else if (providerStatus === "search_degraded") {
+          setStatus("Searching via fallback provider", "warn");
+        } else if (networkStatus === "routing") {
+          setStatus("Refreshing route...");
+        } else if (networkStatus === "searching") {
+          setStatus("Searching...");
+        } else if (usingRasterFallback) {
+          setStatus("Using raster fallback");
+        } else {
+          setStatus("");
+        }
+      }
+
+      function resumeAutoFollowLater() {
+        if (resumeFollowTimer) clearTimeout(resumeFollowTimer);
+        resumeFollowTimer = setTimeout(function() {
+          navState.manualUnlock = false;
+          updateCamera(false);
+        }, FREE_PAN_RESUME_MS);
+      }
+
+      function cameraTarget() {
+        var pose = vehiclePose();
+        var camera = cameraHints();
+        var next = routeOverlay().nextManeuver || {};
+        var bearing = normalizeBearing(pose.bearing || 0);
+        navState.smoothedBearing = lerpBearing(navState.smoothedBearing || bearing, bearing, 0.2);
+
+        var lookAheadPoint = pointFromBearing(
+          pose.lat || 0,
+          pose.lng || 0,
+          navState.smoothedBearing,
+          camera.lookAheadMeters || 120
+        );
+
+        var followMode = routeOverlay().followMode || guidanceBanner().followMode || "auto";
+        if ((followMode === "approach" || followMode === "turn")
+          && isFinite(next.lat) && isFinite(next.lng)) {
+          return {
+            lat: pose.lat * 0.35 + next.lat * 0.65,
+            lng: pose.lng * 0.35 + next.lng * 0.65,
+            bearing: navState.smoothedBearing
+          };
+        }
+
+        return {
+          lat: lookAheadPoint.lat,
+          lng: lookAheadPoint.lng,
+          bearing: navState.smoothedBearing
+        };
+      }
+
+      function scheduleCachePersist() {
+        if (cachePersistTimer) clearTimeout(cachePersistTimer);
+        cachePersistTimer = setTimeout(function() {
+          if (!map || !map.loaded()) return;
+          var center = map.getCenter();
+          console.log("[BEAGLEY_MAP_CACHE] " + JSON.stringify({
+            camera: {
+              centerLat: center.lat,
+              centerLng: center.lng,
+              zoom: map.getZoom(),
+              bearing: normalizeBearing(map.getBearing()),
+              pitch: map.getPitch()
+            },
+            route: {
+              coordinates: routeCoordinates()
+            },
+            destination: routeOverlay().destination || {}
+          }));
+        }, 400);
+      }
+
+      function scheduleFirstFrameReady() {
+        if (firstFrameLogged) return;
+        if (typeof map.triggerRepaint === "function") {
+          map.triggerRepaint();
+        }
+        if (firstFrameTimer) clearTimeout(firstFrameTimer);
+        requestAnimationFrame(function() {
+          requestAnimationFrame(function() {
+            if (!firstFrameLogged && (map.isStyleLoaded() || usingRasterFallback)) {
+              markFirstFrameReady();
+            }
+          });
+        });
+        firstFrameTimer = setTimeout(function() {
+          if (!firstFrameLogged && (map.isStyleLoaded() || usingRasterFallback)) {
+            markFirstFrameReady();
+          }
+        }, softwareMode ? 180 : 420);
+      }
+
+      function bearingDelta(a, b) {
+        return Math.abs(((normalizeBearing(a) - normalizeBearing(b) + 540) % 360) - 180);
+      }
+
+      function shouldSkipCameraUpdate(options) {
+        if (!softwareMode || !lastCameraOptions || !options || pendingCameraImmediate) return false;
+        var centerA = lastCameraOptions.center || [];
+        var centerB = options.center || [];
+        var movedMeters = distanceMeters(centerA[1], centerA[0], centerB[1], centerB[0]);
+        var zoomDelta = Math.abs(Number(lastCameraOptions.zoom || 0) - Number(options.zoom || 0));
+        var pitchDelta = Math.abs(Number(lastCameraOptions.pitch || 0) - Number(options.pitch || 0));
+        var bearingDiff = bearingDelta(lastCameraOptions.bearing || 0, options.bearing || 0);
+        return movedMeters < SOFTWARE_MIN_CAMERA_MOVE_METERS
+          && zoomDelta < 0.08
+          && pitchDelta < 1.5
+          && bearingDiff < SOFTWARE_MIN_BEARING_DELTA;
+      }
+
+      function commitCameraUpdate(options, immediate) {
+        if (!map.loaded() || !options) return;
+        if (cameraCommitTimer) {
+          clearTimeout(cameraCommitTimer);
+          cameraCommitTimer = null;
+        }
+        lastCameraCommitAtMs = Date.now();
+        lastCameraOptions = {
+          center: [options.center[0], options.center[1]],
+          bearing: options.bearing,
+          pitch: options.pitch,
+          zoom: options.zoom
+        };
+        pendingCameraImmediate = false;
+        if (softwareMode || immediate || !firstFrameLogged) {
+          map.jumpTo(options);
+        } else {
+          map.easeTo(Object.assign({ duration: embeddedMode ? 420 : 650, essential: true }, options));
+        }
+        scheduleCachePersist();
+      }
+
+      function updateCamera(immediate) {
+        if (!map.loaded()) return;
+
+        var pose = vehiclePose();
+        if (!isFinite(pose.lat) || !isFinite(pose.lng)) {
+          updateBannerAndStatus();
+          syncSources();
+          return;
+        }
+
+        updateVehicleMarker();
+        updateBannerAndStatus();
+        syncSources();
+
+        if (navState.manualUnlock) return;
+
+        var camera = cameraHints();
+        var overviewKey = String((routeOverlay().route || {}).distanceMeters || "")
+          + "|"
+          + String((routeOverlay().destination || {}).label || "")
+          + "|"
+          + String(camera.mode || "");
+
+        if (camera.overview && navState.overviewKey !== overviewKey) {
+          navState.overviewKey = overviewKey;
+          var bounds = routeBounds();
+          if (bounds) {
+            map.fitBounds(bounds, {
+              padding: fitPadding(),
+              duration: softwareMode ? 0 : (camera.fitDurationMs || 1200),
+              maxZoom: 16.4,
+              essential: true
+            });
+            scheduleCachePersist();
+            return;
           }
         }
 
-        // Vehicle marker (simple)
-        const cx = Math.round(w / 2);
-        const cy = Math.round(h / 2);
-        ctx.save();
-        ctx.translate(cx, cy);
-        // Optional: rotate marker by bearing
-        ctx.rotate((state.bearing || 0) * Math.PI / 180);
-        ctx.fillStyle = "rgba(0, 255, 150, 0.9)";
-        ctx.beginPath();
-        ctx.moveTo(0, -12);
-        ctx.lineTo(7, 10);
-        ctx.lineTo(-7, 10);
-        ctx.closePath();
-        ctx.fill();
-        ctx.restore();
+        var target = cameraTarget();
+        var options = {
+          center: [target.lng, target.lat],
+          bearing: target.bearing,
+          pitch: clamp(camera.pitch || (softwareMode ? 30 : (embeddedMode ? 48 : 56)), 0, 70),
+          zoom: clamp(camera.zoom || (softwareMode ? 15.0 : (embeddedMode ? 15.4 : 16.0)), MIN_ZOOM, MAX_ZOOM),
+          padding: cameraPadding()
+        };
 
-        // HUD
-        hud.textContent =
-          `Canvas map ✅ (no WebGL)\n` +
-          `GPS: ${state.lat.toFixed(5)}, ${state.lng.toFixed(5)}  b:${Math.round(state.bearing)}°  z:${z}\n` +
-          `tiles: ${tilesDrawn} drawn, ${tilesMissing} loading`;
+        if (shouldSkipCameraUpdate(options)) {
+          return;
+        }
+
+        if (softwareMode && !immediate) {
+          var now = Date.now();
+          pendingCameraImmediate = false;
+          if ((now - lastCameraCommitAtMs) < SOFTWARE_CAMERA_MIN_INTERVAL_MS) {
+            if (cameraCommitTimer) clearTimeout(cameraCommitTimer);
+            cameraCommitTimer = setTimeout(function() {
+              commitCameraUpdate(options, false);
+            }, SOFTWARE_CAMERA_MIN_INTERVAL_MS - (now - lastCameraCommitAtMs));
+            return;
+          }
+        }
+
+        pendingCameraImmediate = immediate;
+        commitCameraUpdate(options, immediate);
       }
 
-      // Public hook (compatible with your existing QML plan)
-      window.setVehiclePose = function(lat, lng, bearingDeg, zoom) {
-        if (typeof lat === "number") state.lat = lat;
-        if (typeof lng === "number") state.lng = lng;
-        if (typeof bearingDeg === "number") state.bearing = bearingDeg;
-        if (typeof zoom === "number") state.zoom = zoom;
-        requestDraw();
+      function maybeFallbackStyle() {
+        if (usingRasterFallback) return;
+        usingRasterFallback = true;
+        console.warn("[NAV] switching to raster fallback");
+        emitMode("web-raster");
+        map.setStyle(buildRasterStyle());
+      }
+
+      function markStyleReady() {
+        if (styleReadyLogged) return;
+        styleReadyLogged = true;
+        emitReady("style_ready");
+        scheduleFirstFrameReady();
+      }
+
+      function markFirstFrameReady() {
+        if (firstFrameLogged) return;
+        firstFrameLogged = true;
+        if (firstFrameTimer) clearTimeout(firstFrameTimer);
+        emitReady("first_frame_ready");
+        scheduleCachePersist();
+        if (embeddedMode && !softwareMode && !usingRasterFallback) {
+          map.easeTo({
+            pitch: clamp(cameraHints().pitch || 56, 0, 70),
+            duration: 220,
+            essential: true
+          });
+        }
+      }
+
+      map.on("load", function() {
+        emitMode(usingRasterFallback ? "web-raster" : "web-vector");
+        markStyleReady();
+        simplifyStyleForDesktop();
+        updateCamera(true);
+        scheduleFirstFrameReady();
+      });
+
+      map.on("styledata", function() {
+        sawStyleData = true;
+        emitMode(usingRasterFallback ? "web-raster" : "web-vector");
+        markStyleReady();
+        simplifyStyleForDesktop();
+        syncSources();
+        scheduleFirstFrameReady();
+      });
+
+      map.on("render", function() {
+        if (!firstFrameLogged && (sawStyleData || usingRasterFallback)) {
+          markFirstFrameReady();
+        }
+      });
+
+      map.on("idle", function() {
+        if (!interactiveReadyLogged && firstFrameLogged) {
+          interactiveReadyLogged = true;
+          emitReady("interactive_ready");
+        }
+      });
+
+      map.on("moveend", scheduleCachePersist);
+
+      map.on("styleimagemissing", function(ev) {
+        if (!ev || !ev.id || map.hasImage(ev.id)) return;
+        map.addImage(ev.id, transparentPixel);
+      });
+
+      map.on("error", function(ev) {
+        if (ev && ev.error) console.warn("[NAV]", ev.error);
+        mapErrorCount += 1;
+        if (!usingRasterFallback) {
+          maybeFallbackStyle();
+          return;
+        }
+        if (mapErrorCount >= 4) {
+          console.error("[BEAGLEY_MAP_FATAL] repeated_map_errors");
+        }
+      });
+
+      map.on("dragstart", function() {
+        navState.manualUnlock = true;
+        setStatus("Map unlocked. Auto-follow resumes in a few seconds.");
+        resumeAutoFollowLater();
+      });
+
+      map.on("zoomstart", function() {
+        navState.manualUnlock = true;
+        setStatus("Map unlocked. Auto-follow resumes in a few seconds.");
+        resumeAutoFollowLater();
+      });
+
+      function mergeLegacyPayload(payload) {
+        payload = payload || {};
+        navState.vehiclePose = payload.vehiclePose || {};
+        navState.cameraHints = payload.camera || {};
+        navState.routeOverlay = {
+          state: payload.state || "idle",
+          followMode: payload.followMode || "auto",
+          followEnabled: payload.followEnabled !== false,
+          destination: payload.destination || {},
+          route: payload.route || {},
+          progress: payload.progress || {},
+          nextManeuver: payload.nextManeuver || {},
+          followingManeuver: payload.followingManeuver || {}
+        };
+        navState.guidanceBanner = {
+          banner: payload.banner || {},
+          remainingDistanceMeters: payload.remainingDistanceMeters || 0,
+          remainingDurationSeconds: payload.remainingDurationSeconds || 0,
+          eta: payload.eta || "",
+          trafficDelaySeconds: payload.trafficDelaySeconds || 0,
+          networkStatus: payload.networkStatus || "online",
+          providerStatus: payload.providerStatus || "offline",
+          followMode: payload.followMode || "auto"
+        };
+        navState.connectivity = payload.connectivity || {};
+      }
+
+      window.applyNavigationState = function(payload) {
+        mergeLegacyPayload(payload || {});
+        updateCamera(false);
       };
 
-      // Demo motion so you can see it moving without GPS
-      let t = 0;
-      setInterval(() => {
-        t += 0.00025;
-        const lat = state.lat + Math.sin(t) * 0.0003;
-        const lng = state.lng + Math.cos(t) * 0.0003;
-        const bearing = (state.bearing + 1.2) % 360;
-        window.setVehiclePose(lat, lng, bearing);
-      }, 250);
+      window.applyVehiclePose = function(payload) {
+        navState.vehiclePose = payload || {};
+        updateCamera(false);
+      };
 
-      // Initial draw
-      requestDraw();
+      window.applyCameraHints = function(payload) {
+        navState.cameraHints = payload || {};
+        updateCamera(false);
+      };
+
+      window.applyRouteOverlay = function(payload) {
+        navState.routeOverlay = payload || {};
+        updateCamera(false);
+      };
+
+      window.applyGuidanceBanner = function(payload) {
+        navState.guidanceBanner = payload || {};
+        updateBannerAndStatus();
+      };
+
+      window.applyConnectivity = function(payload) {
+        navState.connectivity = payload || {};
+        updateBannerAndStatus();
+      };
+
+      window.clearNavigationState = function() {
+        navState.vehiclePose = {};
+        navState.cameraHints = {};
+        navState.routeOverlay = {};
+        navState.guidanceBanner = {};
+        navState.connectivity = {};
+        navState.manualUnlock = false;
+        navState.overviewKey = "";
+        syncSources();
+        setBanner(null);
+        setStatus("");
+      };
+
+      window.setFollowVehicle = function(on) {
+        navState.manualUnlock = !on;
+        if (!navState.manualUnlock) {
+          if (resumeFollowTimer) clearTimeout(resumeFollowTimer);
+          updateCamera(false);
+        } else {
+          setStatus("Map unlocked. Auto-follow resumes in a few seconds.");
+          resumeAutoFollowLater();
+        }
+      };
+
+      window.addEventListener("resize", function() {
+        applySafeBandMetrics();
+        map.resize();
+        updateCamera(true);
+      });
+
+      window.onerror = function(message, source, lineno, colno) {
+        console.error("[BEAGLEY_MAP_FATAL] js_error:" + message + "@" + source + ":" + lineno + ":" + colno);
+      };
     </script>
   </body>
 </html>

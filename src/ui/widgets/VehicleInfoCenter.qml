@@ -1,99 +1,118 @@
 import "./vic"
+import "./vic/icons" as Icons
 import QtQuick 2.15
 
 Item {
     id: root
 
-    // Warning color helper
     VicWarningColors { id: warningColors }
 
     width: 240
     height: 240
 
-    // Theme (pass PurplePearlTheme from Main/preview)
     property var theme: null
+    property bool simplified: false
+    property bool pulseEnabled: true
 
-    // --- Inputs ---
-    property string drivetrainMode: "2wd"    // "2wd" | "4wd"
+    property string drivetrainMode: "2wd"
     property bool transferLock: false
 
-    // warnings
     property bool warnDoor: false
     property bool warnCharge: false
     property bool warnCheckEngine: false
     property bool warnAT: false
     property bool warnFuelLow: false
-    property bool warnBrake: false   // park brake or brake fluid
-    property bool warnOil: false     // oil pressure warning
+    property bool warnBrake: false
+    property bool warnOil: false
 
-    // --- Derived ---
     readonly property bool hasWarning:
         warnBrake || warnCharge || warnCheckEngine || warnAT || warnFuelLow || warnOil || warnDoor
-    readonly property string driveText: transferLock ? "LOCK" : (drivetrainMode === "4wd" ? "4WD" : "2WD")
 
-    // --- Motion tuning ---
+    readonly property string driveModeKey: {
+        const mode = String(drivetrainMode || "2wd").toLowerCase()
+        if (transferLock) return "lock"
+        if (mode.indexOf("4") !== -1) return "4wd"
+        return "2wd"
+    }
 
-    // ==========================
-    // Warning queue + cycling
-    // ==========================
     property var warningQueue: []
     property int warningIndex: 0
     readonly property int warningCount: warningQueue.length
+    readonly property string currentWarningKey:
+        warningCount > 0 ? warningQueue[warningIndex % warningCount] : ""
 
-    // Display label (what user sees)
-    readonly property string currentWarningText:
-        (warningCount > 0) ? warningQueue[warningIndex % warningCount] : ""
+    property int fast: 160
+    property int slow: 900
 
-    // Stable key (what halo colors should follow)
-    readonly property string currentWarningKey: {
-        // Build the same warning queue locally (no shared scope)
-        var q = []
-        if (warnBrake)       q.push("BRAKE")
-        if (warnCharge)      q.push("CHARGE")
-        if (warnCheckEngine) q.push("CHECK")
-        if (warnAT)          q.push("A/T")
-        if (warnFuelLow)     q.push("FUEL")
-        if (warnOil)         q.push("OIL")
-        if (warnDoor)        q.push("DOOR")
+    function cOr(fallback, v) { return (v !== undefined && v !== null) ? v : fallback }
+    readonly property color tPanel:  cOr("#0B0714", theme ? theme.panel : undefined)
+    readonly property color tText:   cOr("#E6FFFFFF", theme ? theme.text : undefined)
+    readonly property color tLow:    cOr("#C7B7FF", theme ? theme.pearlLow : undefined)
+    readonly property color tHigh:   cOr("#5E35B1", theme ? theme.pearlHigh : undefined)
+    readonly property color tDanger: cOr("#FF3B3B", theme ? theme.danger : undefined)
 
-        if (q.length === 0) return ""
+    readonly property string fontUi: cOr("monospace", theme ? theme.fontMono : undefined)
 
-        var i = Math.max(0, Math.min(root.warningIndex, q.length - 1))
-
-        switch (q[i]) {
-        case "BRAKE":  return "brake"
-        case "CHARGE": return "charge"
-        case "CHECK":  return "check"
-        case "A/T":    return "at"
-        case "FUEL":   return "fuel"
-        case "OIL":    return "oil"
-        case "DOOR":   return "door"
-        default:       return ""
-        }
-    }
+    readonly property real s: Math.min(width, height)
+    readonly property real cx: width / 2
+    readonly property real cy: height / 2
+    readonly property real haloRadius: s * 0.42
+    readonly property real haloThickness: Math.max(4, s * 0.024)
+    readonly property real haloInner: haloRadius - haloThickness - s * 0.036
+    readonly property color activeColor:
+        hasWarning ? warningColors.haloColor(currentWarningKey, tDanger) : tLow
+    readonly property color activeColorSoft:
+        Qt.rgba(activeColor.r, activeColor.g, activeColor.b, hasWarning ? 0.28 : 0.18)
 
     function rebuildWarningQueue() {
         var q = []
-        // Order = priority (edit anytime)
-        if (warnBrake)       q.push("BRAKE")
-        if (warnCharge)      q.push("CHARGE")
-        if (warnCheckEngine) q.push("CHECK")
-        if (warnAT)          q.push("A/T")
-        if (warnFuelLow)     q.push("FUEL")
-        if (warnOil)         q.push("OIL")
-        if (warnDoor)        q.push("DOOR")
-
+        if (warnBrake) q.push("brake")
+        if (warnCharge) q.push("charge")
+        if (warnCheckEngine) q.push("check")
+        if (warnAT) q.push("at")
+        if (warnFuelLow) q.push("fuel")
+        if (warnOil) q.push("oil")
+        if (warnDoor) q.push("door")
         warningQueue = q
+        if (warningQueue.length === 0 || warningIndex >= warningQueue.length)
+            warningIndex = 0
+    }
 
-        if (warningQueue.length === 0) {
-            warningIndex = 0
-        } else if (warningIndex >= warningQueue.length) {
-            warningIndex = 0
+    function warningTitle(key) {
+        switch (key) {
+        case "brake": return "BRAKE"
+        case "charge": return "CHARGE"
+        case "check": return "CHECK"
+        case "at": return "A/T"
+        case "fuel": return "LOW"
+        case "oil": return "OIL"
+        case "door": return "DOOR"
+        default: return ""
+        }
+    }
+
+    function warningSubtitle(key) {
+        switch (key) {
+        case "brake": return "SYSTEM"
+        case "charge": return "VOLTAGE"
+        case "check": return "ENGINE"
+        case "at": return "TRANS"
+        case "fuel": return "FUEL"
+        case "oil": return "PRESSURE"
+        case "door": return "OPEN"
+        default: return ""
+        }
+    }
+
+    function normalSubtitle(key) {
+        switch (key) {
+        case "lock": return "LOCK"
+        case "4wd": return "4WD"
+        default: return "2WD"
         }
     }
 
     Component.onCompleted: rebuildWarningQueue()
-
     onWarnBrakeChanged: rebuildWarningQueue()
     onWarnChargeChanged: rebuildWarningQueue()
     onWarnCheckEngineChanged: rebuildWarningQueue()
@@ -101,352 +120,234 @@ Item {
     onWarnFuelLowChanged: rebuildWarningQueue()
     onWarnOilChanged: rebuildWarningQueue()
     onWarnDoorChanged: rebuildWarningQueue()
+    onHasWarningChanged: halo.requestPaint()
+    onCurrentWarningKeyChanged: halo.requestPaint()
 
-    // Force halo repaint when the *displayed* warning changes
-    onWarningIndexChanged: halo.requestPaint()
-    onCurrentWarningTextChanged: halo.requestPaint()
-    property int fast: 160
-    property int slow: 900
-
-    // --- Theme-safe helpers ---
-    function cOr(fallback, v) { return (v !== undefined && v !== null) ? v : fallback }
-    readonly property color tBg:     cOr("#000000", theme ? theme.bg : undefined)
-    readonly property color tPanel:  cOr("#0B0714", theme ? theme.panel : undefined)
-    readonly property color tText:   cOr("#E6FFFFFF", theme ? theme.text : undefined)
-    readonly property color tLow:    cOr("#C7B7FF", theme ? theme.pearlLow : undefined)
-    readonly property color tHigh:   cOr("#5E35B1", theme ? theme.pearlHigh : undefined)
-    readonly property color tDanger: cOr("#FF3B3B", theme ? theme.danger : undefined)
-
-    readonly property string fontDisplay: cOr("DejaVu Sans Mono", theme ? theme.fontDisplay : undefined)
-    readonly property string fontAccent:  cOr("DejaVu Sans Mono", theme ? theme.fontAccent : undefined)
-    readonly property string fontMono:    cOr("DejaVu Sans Mono", theme ? theme.fontMono : undefined)
-
-    // --- Geometry ---
-    readonly property real s: Math.min(width, height)
-    readonly property real cx: width / 2
-    readonly property real cy: height / 2
-
-    // Halo sizing
-    readonly property real haloRadius: s * 0.40
-        readonly property real haloThickness: Math.max(2, s * 0.018)
-    readonly property real haloInner: Math.max(8, haloRadius - haloThickness * 0.9 - s * 0.030)
-
-    // ================
-    // HALO (background)
-    // ================
     Canvas {
         id: halo
         anchors.fill: parent
         antialiasing: true
-
-        // animate warning pulse via this
+        renderTarget: Canvas.FramebufferObject
         property real pulse: 0.0
 
         onPaint: {
-            var ctx = getContext("2d")
-            ctx.reset()
+            const ctx = getContext("2d")
+            ctx.clearRect(0, 0, width, height)
 
-            var r = root.haloRadius
-            var rIn  = root.haloInner
-            var lineW = root.haloThickness
-                        
-            // Colors
-            var low = root.tLow
-            var high = root.tHigh
-            var danger = root.tDanger            // Pick ring color set
-            var isWarn = root.hasWarning
+            const r = root.haloRadius
+            const inner = root.haloInner
+            const stroke = root.haloThickness
+            const base = root.activeColor
+            const glowAlpha = root.hasWarning ? 0.34 : 0.20
 
-            var low = root.tLow
-            var high = root.tHigh
-            var danger = root.tDanger
-
-            var baseA
-            var baseB
-
-            if (isWarn) {
-                var wcol = warningColors.haloColor(root.currentWarningKey, danger)
-                baseA = Qt.rgba(wcol.r, wcol.g, wcol.b, 0.95)
-                baseB = Qt.rgba(wcol.r * 0.92, wcol.g * 0.92, wcol.b * 0.92, 0.95)
-            } else {
-                baseA = low
-                baseB = high
-            }
-
-            // Soft glow
-            ctx.save()
-            ctx.beginPath()
-            ctx.arc(root.cx, root.cy, r, 0, Math.PI * 2, false)
-            ctx.strokeStyle = Qt.rgba(baseB.r, baseB.g, baseB.b, isWarn ? 0.22 : 0.18)
-            ctx.lineWidth = lineW + (isWarn ? (2 + halo.pulse * 2) : 2)
-            ctx.lineCap = "round"
-            ctx.stroke()
-            ctx.restore()
-
-            // Main halo stroke (gradient sweep)
-            ctx.save()
-            var grad = ctx.createLinearGradient(root.cx - r, root.cy, root.cx + r, root.cy)
-            grad.addColorStop(0.00, Qt.rgba(baseA.r, baseA.g, baseA.b, 0.95))
-            grad.addColorStop(0.50, Qt.rgba(baseB.r, baseB.g, baseB.b, 0.95))
-            grad.addColorStop(1.00, Qt.rgba(baseA.r, baseA.g, baseA.b, 0.95))
-
-            ctx.beginPath()
-            ctx.arc(root.cx, root.cy, r, 0, Math.PI * 2, false)
-            ctx.strokeStyle = grad
-            ctx.lineWidth = lineW
-            ctx.lineCap = "round"
-            ctx.stroke()
-            ctx.restore()
-            // Tiny tick accents around halo (subtle)
-            ctx.save()
-            ctx.translate(root.cx, root.cy)
-            ctx.strokeStyle = Qt.rgba(1, 1, 1, isWarn ? 0.22 : 0.10)
-            ctx.lineWidth = 1
-            for (var i = 0; i < 12; i++) {
+            if (root.simplified) {
                 ctx.save()
-                ctx.rotate(i * (Math.PI * 2 / 12.0))
                 ctx.beginPath()
-                ctx.moveTo(r + 4, 0)
-                ctx.lineTo(r + 8, 0)
+                ctx.arc(root.cx, root.cy, r, -Math.PI * 0.82, Math.PI * 1.18, false)
+                ctx.strokeStyle = Qt.rgba(base.r, base.g, base.b, 0.82 + halo.pulse * 0.06)
+                ctx.lineWidth = stroke
+                ctx.lineCap = "round"
                 ctx.stroke()
                 ctx.restore()
+                return
             }
-            ctx.restore()
-        }
 
-        // repaint triggers
-        onWidthChanged: requestPaint()
-        onHeightChanged: requestPaint()
+            ctx.save()
+            ctx.beginPath()
+            ctx.arc(root.cx, root.cy, r, 0, Math.PI * 2, false)
+            ctx.strokeStyle = Qt.rgba(base.r, base.g, base.b, glowAlpha + halo.pulse * 0.08)
+            ctx.lineWidth = stroke + 8 + halo.pulse * 3
+            ctx.lineCap = "round"
+            ctx.stroke()
+            ctx.restore()
+
+            ctx.save()
+            const grad = ctx.createLinearGradient(root.cx - r, root.cy - r, root.cx + r, root.cy + r)
+            grad.addColorStop(0.0, Qt.rgba(root.tLow.r, root.tLow.g, root.tLow.b, 0.95))
+            grad.addColorStop(0.55, Qt.rgba(base.r, base.g, base.b, 0.98))
+            grad.addColorStop(1.0, Qt.rgba(root.tHigh.r, root.tHigh.g, root.tHigh.b, 0.92))
+            ctx.beginPath()
+            ctx.arc(root.cx, root.cy, r, -Math.PI * 0.82, Math.PI * 1.18, false)
+            ctx.strokeStyle = grad
+            ctx.lineWidth = stroke
+            ctx.lineCap = "round"
+            ctx.stroke()
+            ctx.restore()
+
+        }
     }
 
-    // Pulse only when warning is active (no cheap blinking)
     SequentialAnimation {
         id: warnPulse
-        running: root.hasWarning
+        running: root.hasWarning && root.pulseEnabled
         loops: Animation.Infinite
-        NumberAnimation { target: halo; property: "pulse"; from: 0.0; to: 1.0; duration: 260; easing.type: Easing.OutCubic }
-        NumberAnimation { target: halo; property: "pulse"; from: 1.0; to: 0.0; duration: 540; easing.type: Easing.InOutSine }
-        PauseAnimation { duration: 220 }
+        NumberAnimation { target: halo; property: "pulse"; from: 0.0; to: 1.0; duration: 240; easing.type: Easing.OutCubic }
+        NumberAnimation { target: halo; property: "pulse"; from: 1.0; to: 0.0; duration: 520; easing.type: Easing.InOutSine }
+        PauseAnimation { duration: 180 }
         onRunningChanged: halo.requestPaint()
         onStopped: { halo.pulse = 0.0; halo.requestPaint() }
     }
 
-    // Keep canvas updated on state changes
-    onHasWarningChanged: halo.requestPaint()
-    onDrivetrainModeChanged: halo.requestPaint()
-    onTransferLockChanged: halo.requestPaint()
-
-    // ========================
-    // CENTER CONTENT (inside)
-    // ========================
     Item {
         id: center
         anchors.centerIn: parent
-        width: root.haloInner * 2 * 0.92
+        width: root.haloInner * 2 * 0.98
         height: width
 
-        // soft panel in center
         Rectangle {
-            anchors.centerIn: parent
-            width: parent.width
-            height: parent.height
+            anchors.fill: parent
             radius: width / 2
-            color: root.tPanel
-            opacity: root.hasWarning ? 0.14 : 0.18
+            gradient: Gradient {
+                GradientStop { position: 0.00; color: Qt.rgba(12 / 255, 18 / 255, 30 / 255, 0.98) }
+                GradientStop { position: 0.55; color: Qt.rgba(8 / 255, 13 / 255, 21 / 255, 0.94) }
+                GradientStop { position: 1.00; color: Qt.rgba(2 / 255, 4 / 255, 9 / 255, 0.98) }
+            }
             border.width: 1
-            border.color: Qt.rgba(1, 1, 1, root.hasWarning ? 0.08 : 0.10)
+            border.color: Qt.rgba(root.activeColor.r, root.activeColor.g, root.activeColor.b, root.hasWarning ? 0.20 : 0.12)
         }
 
-        // NORMAL MODE (drivetrain)
+        Canvas {
+            anchors.fill: parent
+            visible: !root.simplified
+            opacity: 0.32
+            onPaint: {
+                const ctx = getContext("2d")
+                ctx.clearRect(0, 0, width, height)
+                ctx.strokeStyle = Qt.rgba(root.activeColor.r, root.activeColor.g, root.activeColor.b, 0.08)
+                ctx.lineWidth = 1
+                for (let y = height * 0.16; y < height * 0.84; y += 10) {
+                    ctx.beginPath()
+                    ctx.moveTo(width * 0.22, y)
+                    ctx.lineTo(width * 0.78, y)
+                    ctx.stroke()
+                }
+            }
+        }
+
         Item {
             id: normalLayer
             anchors.fill: parent
-            opacity: root.hasWarning ? 0 : 1
+            opacity: root.hasWarning ? 0.0 : 1.0
             Behavior on opacity { NumberAnimation { duration: root.fast } }
 
-            // “mechanical bars” instead of boring text
             Column {
-                id: bars
-                anchors.horizontalCenter: parent.horizontalCenter
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: 8
+                anchors.centerIn: parent
+                spacing: 10
 
-                Repeater {
-                    model: (root.drivetrainMode === "4wd") ? 2 : 1
-                    Rectangle {
-                        width: parent.width * 0.46
-                        height: 7
-                        radius: 3.5
-                        color: root.tHigh
-                        opacity: 0.90
-                    }
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: "DRIVE"
+                    color: Qt.rgba(root.tText.r, root.tText.g, root.tText.b, 0.78)
+                    font.family: root.fontUi
+                    font.pixelSize: 13
+                    font.bold: true
+                    font.letterSpacing: 4
+                    horizontalAlignment: Text.AlignHCenter
+                    width: 120
                 }
 
-                Rectangle {
-                    visible: root.transferLock
-                    width: parent.width * 0.30
-                    height: 5
-                    radius: 2.5
+                Icons.DriveStateIcon {
+                    id: driveGlyph
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: 112
+                    height: width
                     color: root.tLow
-                    opacity: 0.90
+                    mode: root.driveModeKey === "2wd" ? "2wd" : "4wd"
+                    locked: root.driveModeKey === "lock"
                 }
-            }
 
-            Text {
-                
-                id: driveTextLabel
-anchors.horizontalCenter: parent.horizontalCenter
-                anchors.top: bars.bottom
-                anchors.topMargin: 14
-                text: root.driveText
-                color: Qt.rgba(root.tText.r, root.tText.g, root.tText.b, 0.92)
-                font.family: root.fontAccent
-                font.pixelSize: 24
-                font.bold: true
-                font.letterSpacing: 3
-            }
-
-            // Lock “breath” (subtle)
-            SequentialAnimation on scale {
-                running: root.transferLock && !root.hasWarning
-                loops: Animation.Infinite
-                NumberAnimation { to: 1.03; duration: root.slow; easing.type: Easing.InOutSine }
-                NumberAnimation { to: 1.00; duration: root.slow; easing.type: Easing.InOutSine }
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: root.normalSubtitle(root.driveModeKey)
+                    color: root.tLow
+                    font.family: root.fontUi
+                    font.pixelSize: 20
+                    font.bold: true
+                    font.letterSpacing: 4
+                    horizontalAlignment: Text.AlignHCenter
+                    width: 120
+                }
             }
         }
 
-        // WARNING MODE (dominant)
         Item {
             id: warningLayer
             anchors.fill: parent
-            opacity: root.hasWarning ? 1 : 0
+            opacity: root.hasWarning ? 1.0 : 0.0
             Behavior on opacity { NumberAnimation { duration: root.fast } }
 
-            // Warning (ICON + small text)
-
-            
-Column {
-    id: warnText
-    anchors.centerIn: parent
-    spacing: 8
-
-    // ---- CHECK (top) ----
-    Text {
-        visible: root.currentWarningKey === "check"
-        width: parent.width
-        text: "CHECK"
-        color: warningColors.haloColor(root.currentWarningKey, root.tDanger)
-        font.family: root.fontAccent
-        font.pixelSize: 17
-        font.bold: true
-        font.letterSpacing: 4
-        horizontalAlignment: Text.AlignHCenter
-        opacity: 0.96
-    }
-
-    // ---- AUTO (top) ----
-    Text {
-        visible: root.currentWarningKey === "at"
-        width: parent.width
-        text: "AUTO"
-        color: warningColors.haloColor(root.currentWarningKey, root.tDanger)
-        font.family: root.fontAccent
-        font.pixelSize: 16
-        font.bold: true
-        font.letterSpacing: 3
-        horizontalAlignment: Text.AlignHCenter
-        opacity: 0.96
-    }
-
-    // ---- ICON ----
-    VicWarningIcon {
-        id: warnIcon
-        warningKey: root.currentWarningKey
-        color: warningColors.haloColor(root.currentWarningKey, root.tDanger)
-        width: 76
-        height: 76
-    }
-
-    // ---- ENGINE (bottom) ----
-    Text {
-        visible: root.currentWarningKey === "check"
-        width: parent.width
-        text: "ENGINE"
-        color: warningColors.haloColor(root.currentWarningKey, root.tDanger)
-        font.family: root.fontAccent
-        font.pixelSize: 17
-        font.bold: true
-        font.letterSpacing: 4
-        horizontalAlignment: Text.AlignHCenter
-        opacity: 0.96
-    }
-
-    // ---- TRANS (bottom) ----
-    Text {
-        visible: root.currentWarningKey === "at"
-        width: parent.width
-        text: "TRANS"
-        color: warningColors.haloColor(root.currentWarningKey, root.tDanger)
-        font.family: root.fontAccent
-        font.pixelSize: 16
-        font.bold: true
-        font.letterSpacing: 3
-        horizontalAlignment: Text.AlignHCenter
-        opacity: 0.96
-    }
-
-    // ---- Generic label (everything else) ----
-    Text {
-        visible: root.currentWarningKey !== "check"
-              && root.currentWarningKey !== "at"
-        width: parent.width
-        text: root.currentWarningText
-        color: warningColors.haloColor(root.currentWarningKey, root.tDanger)
-        font.family: root.fontAccent
-        font.pixelSize: 16
-        font.bold: true
-        font.letterSpacing: 3
-        horizontalAlignment: Text.AlignHCenter
-        opacity: 0.96
-    }
-}
-
-            
-                // ---- Warning cycling (only when 2+ warnings are active) ----
-            Timer {
-                id: warnCycle
-                interval: 1300
-                running: root.hasWarning && root.warningCount > 1
-                repeat: true
-                onTriggered: warnSwap.restart()
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.top: parent.top
+                anchors.topMargin: 22
+                text: root.warningTitle(root.currentWarningKey)
+                color: root.activeColor
+                font.family: root.fontUi
+                font.pixelSize: 13
+                font.bold: true
+                font.letterSpacing: 4
             }
 
-            SequentialAnimation {
-                id: warnSwap
-                running: false
-                NumberAnimation { target: warnText; property: "opacity"; to: 0.0; duration: 130; easing.type: Easing.OutQuad }
-                ScriptAction {
-                    script: {
-                        root.warningIndex = (root.warningIndex + 1) % Math.max(1, root.warningCount)
-                        halo.requestPaint()
+            VicWarningIcon {
+                id: warnIcon
+                anchors.centerIn: parent
+                width: 84
+                height: 84
+                warningKey: root.currentWarningKey
+                color: root.activeColor
+            }
+
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: 28
+                text: root.warningSubtitle(root.currentWarningKey)
+                color: root.activeColor
+                font.family: root.fontUi
+                font.pixelSize: 20
+                font.bold: true
+                font.letterSpacing: 4
+            }
+
+            Row {
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: 14
+                spacing: 8
+
+                Repeater {
+                    model: root.warningCount
+                    Rectangle {
+                        width: index === root.warningIndex ? 20 : 8
+                        height: 4
+                        radius: 2
+                        color: index === root.warningIndex
+                            ? root.activeColor
+                            : Qt.rgba(root.activeColor.r, root.activeColor.g, root.activeColor.b, 0.22)
                     }
                 }
-                NumberAnimation { target: warnText; property: "opacity"; to: 1.0; duration: 170; easing.type: Easing.OutQuad }
             }
-
-
         }
     }
 
-    // Small status line (always present, minimal)
-    Text {
-        visible: false
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: 6
-        text: root.hasWarning ? "ATTENTION" : "STATUS"
-        color: Qt.rgba(root.tText.r, root.tText.g, root.tText.b, root.hasWarning ? 0.65 : 0.45)
-        font.family: root.fontMono
-        font.pixelSize: 12
-        font.letterSpacing: 3
+    Timer {
+        id: warnCycle
+        interval: 1300
+        running: root.hasWarning && root.warningCount > 1
+        repeat: true
+        onTriggered: warnSwap.restart()
+    }
+
+    SequentialAnimation {
+        id: warnSwap
+        running: false
+        NumberAnimation { target: warningLayer; property: "opacity"; to: 0.0; duration: 120; easing.type: Easing.OutQuad }
+        ScriptAction {
+            script: {
+                root.warningIndex = (root.warningIndex + 1) % Math.max(1, root.warningCount)
+                halo.requestPaint()
+            }
+        }
+        NumberAnimation { target: warningLayer; property: "opacity"; to: 1.0; duration: 160; easing.type: Easing.OutQuad }
     }
 }

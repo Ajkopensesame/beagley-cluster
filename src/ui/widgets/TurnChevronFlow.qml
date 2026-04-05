@@ -34,6 +34,11 @@ Item {
     property real thicknessPulseBoost: 1.5
 
     property color onColor: "#00E676"
+    property real backdropPaddingX: 22
+    property real backdropPaddingY: 14
+    property real backdropRadius: 20
+    property real backdropAlpha: 0.68
+    property real backdropShadowAlpha: 0.52
 
     // ===== Tail / head shaping =====
     // Smaller tailDecay => longer tail (more arc-like)
@@ -50,13 +55,13 @@ Item {
         running: root.active
         loops: Animation.Infinite
         from: 0.0
-        to: Math.max(1.0, root.chevrons * 1.0)   // wrap-friendly
+        to: Math.max(0.0, root.chevrons - 1)
         duration: Math.max(1, root.sweepMs)
-        easing.type: Easing.InOutSine
+        easing.type: Easing.Linear
     }
 
     onActiveChanged: {
-        if (!active) pos = 0.0
+        if (active) pos = 0.0
         canvas.requestPaint()
     }
 
@@ -70,21 +75,14 @@ Item {
         // Indicator OFF → nothing visible
         if (!root.active) return 0.0
 
-        var n = Math.max(1, root.chevrons)
-
-        // Head position (wrap-safe)
-        var head = root.pos % n
+        var head = root.pos
 
         // Logical inside→outside index
         var li = root.outwardRank(index)
 
-        // Distance behind head (wrap-aware)
+        // Distance behind head (strict one-way, no wrap)
         var d = head - li
-        if (d < 0) d += n   // 0..n
-
-        // Distance ahead of head
-        var ahead = li - head
-        if (ahead < 0) ahead += n
+        if (d < 0) return 0.0
 
         // Long tail behind the head
         var tailSpan = Math.max(1.0, root.tailLen)
@@ -93,10 +91,7 @@ Item {
         // Soft head highlight (arc-like)
         var headFactor = Math.exp(-d * root.headDecay)
 
-        // Faint forward bleed to prevent hard cutoff
-        var forward = Math.exp(-(ahead / tailSpan) * 1.6) * 0.06
-
-        var a = Math.max(tail * headFactor, forward)
+        var a = tail * headFactor
 
         // Gamma shaping for analog feel
         a = Math.pow(a, root.gamma)
@@ -106,15 +101,74 @@ Item {
 
     // Size follows content (prevents clipping)
     implicitWidth: rowWidth
-    width: implicitWidth
+    width: rowWidth + backdropPaddingX * 2
     property real rowWidth: root.chevrons * root.chevronWidth + (root.chevrons - 1) * root.gap
-    height: Math.max(root.chevronHeight, root.chevronHeightOuter) + 8
+    height: Math.max(root.chevronHeight, root.chevronHeightOuter) + backdropPaddingY * 2
+
+    Canvas {
+        id: backdrop
+        anchors.fill: parent
+        z: 0
+        renderTarget: Canvas.FramebufferObject
+        antialiasing: true
+
+        onPaint: {
+            var ctx = getContext("2d")
+            ctx.reset()
+
+            var x = root.backdropPaddingX * 0.35
+            var y = root.backdropPaddingY * 0.45
+            var w = width - x * 2
+            var h = height - y * 2
+            var r = Math.min(root.backdropRadius, h / 2)
+
+            function roundRectPath(px, py, pw, ph, pr) {
+                ctx.beginPath()
+                ctx.moveTo(px + pr, py)
+                ctx.lineTo(px + pw - pr, py)
+                ctx.quadraticCurveTo(px + pw, py, px + pw, py + pr)
+                ctx.lineTo(px + pw, py + ph - pr)
+                ctx.quadraticCurveTo(px + pw, py + ph, px + pw - pr, py + ph)
+                ctx.lineTo(px + pr, py + ph)
+                ctx.quadraticCurveTo(px, py + ph, px, py + ph - pr)
+                ctx.lineTo(px, py + pr)
+                ctx.quadraticCurveTo(px, py, px + pr, py)
+                ctx.closePath()
+            }
+
+            ctx.save()
+            ctx.shadowColor = "rgba(0,0,0," + root.backdropShadowAlpha + ")"
+            ctx.shadowBlur = 34
+            ctx.shadowOffsetX = 0
+            ctx.shadowOffsetY = 0
+            ctx.fillStyle = "rgba(0,0,0," + root.backdropAlpha + ")"
+            roundRectPath(x, y, w, h, r)
+            ctx.fill()
+            ctx.restore()
+
+            var fade = ctx.createLinearGradient(0, 0, width, 0)
+            if (root.side === "left") {
+                fade.addColorStop(0.0, "rgba(0,0,0,0.82)")
+                fade.addColorStop(0.55, "rgba(0,0,0,0.42)")
+                fade.addColorStop(1.0, "rgba(0,0,0,0.06)")
+            } else {
+                fade.addColorStop(0.0, "rgba(0,0,0,0.06)")
+                fade.addColorStop(0.45, "rgba(0,0,0,0.42)")
+                fade.addColorStop(1.0, "rgba(0,0,0,0.82)")
+            }
+
+            ctx.fillStyle = fade
+            roundRectPath(x, y, w, h, r)
+            ctx.fill()
+        }
+    }
 
     Canvas {
         id: canvas
         anchors.centerIn: parent
         width: root.rowWidth
         height: Math.max(root.chevronHeight, root.chevronHeightOuter)
+        z: 1
 
         // Prefer stable AA
         renderTarget: Canvas.FramebufferObject
@@ -190,4 +244,7 @@ Item {
 
     // Ensure first paint
     Component.onCompleted: canvas.requestPaint()
+    onWidthChanged: backdrop.requestPaint()
+    onHeightChanged: backdrop.requestPaint()
+    onSideChanged: backdrop.requestPaint()
 }

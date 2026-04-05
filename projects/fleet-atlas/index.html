@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>Fleet Atlas</title>
+    <meta
+      name="description"
+      content="Map-first vessel intelligence prototype with canonical query plans, viewport search, and freshness-aware overlays."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+    <link rel="stylesheet" href="./app.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <main class="stage">
+        <div id="map" aria-label="Global ship map"></div>
+
+        <section class="searchComposer">
+          <div class="composerTop">
+            <div class="composerIntro">
+              <p class="eyebrow">Map-first query</p>
+              <h1>Describe what you want, then steer the map to define place.</h1>
+              <p class="lede">
+                The prompt becomes a canonical plan. The current map focus can
+                become the location scope, and the planner cache is reused
+                without freezing freshness.
+              </p>
+            </div>
+            <div class="sourcePill">
+              <span class="sourceDot"></span>
+              <span id="dataModeLabel">Loading fleet feed</span>
+            </div>
+          </div>
+
+          <form id="queryForm" class="queryForm">
+            <input
+              id="queryInput"
+              type="search"
+              autocomplete="off"
+              placeholder="Try: show tankers approaching port in the current view"
+            />
+            <button class="primaryButton" type="submit">Run query</button>
+            <button id="clearQueryButton" class="ghostButton" type="button">
+              Clear
+            </button>
+          </form>
+
+          <div class="composerFoot">
+            <label class="chipToggle">
+              <input id="useViewportInput" type="checkbox" checked />
+              <span>Use current map focus as location</span>
+            </label>
+            <span id="runStatus" class="tinyBadge">Planner idle</span>
+          </div>
+
+          <div class="exampleStrip">
+            <button
+              class="exampleChip"
+              type="button"
+              data-example-query="Show tankers in the current view"
+            >
+              Tankers in view
+            </button>
+            <button
+              class="exampleChip"
+              type="button"
+              data-example-query="Highlight Europe-owned container ships"
+            >
+              Europe-owned containers
+            </button>
+            <button
+              class="exampleChip"
+              type="button"
+              data-example-query="Show vessels heading to Singapore with owners"
+            >
+              Singapore-bound
+            </button>
+            <button
+              class="exampleChip"
+              type="button"
+              data-example-query="Passenger or research traffic in the current view"
+            >
+              Passenger or research
+            </button>
+          </div>
+        </section>
+
+        <section class="mapHud">
+          <div class="legend">
+            <span class="legendItem">
+              <span class="legendSwatch container"></span>
+              Container
+            </span>
+            <span class="legendItem">
+              <span class="legendSwatch tanker"></span>
+              Tanker
+            </span>
+            <span class="legendItem">
+              <span class="legendSwatch bulk"></span>
+              Bulk / Ro-Ro
+            </span>
+            <span class="legendItem">
+              <span class="legendSwatch specialty"></span>
+              Passenger / Research
+            </span>
+          </div>
+          <div class="mapActionStrip">
+            <span id="viewportLabel" class="tinyBadge">World view</span>
+            <button id="resetViewButton" class="ghostButton" type="button">
+              Reset to world
+            </button>
+          </div>
+        </section>
+
+        <aside id="detailCard" class="detailCard">
+          <div class="detailEmpty">
+            <p class="eyebrow">Vessel focus</p>
+            <h2>Select a vessel</h2>
+            <p>
+              Pick a ship from the map or the visible fleet to inspect owner,
+              route, status, flag, and freshness context.
+            </p>
+          </div>
+        </aside>
+      </main>
+
+      <aside class="dock">
+        <div class="brandBlock">
+          <p class="eyebrow">Fleet Atlas</p>
+          <h2>Interactive map first, filters second.</h2>
+          <p class="lede">
+            The sidebar shows what the planner inferred, what stayed fresh, and
+            how the current viewport is shaping the query.
+          </p>
+        </div>
+
+        <section class="panel">
+          <div class="panelHeader">
+            <span>Canonical plan</span>
+            <span id="planCacheBadge" class="tinyBadge">Cold</span>
+          </div>
+          <p id="planSummary" class="panelCopy">
+            The planner has not interpreted a prompt yet.
+          </p>
+          <div class="panelActions">
+            <span id="planLearning" class="panelMeta">
+              Planner memory has not been used yet.
+            </span>
+            <button id="rememberPlanButton" class="ghostButton smallButton" type="button">
+              Remember meaning
+            </button>
+          </div>
+          <div id="planChips" class="planChipGrid"></div>
+        </section>
+
+        <section class="statsGrid">
+          <article class="statCard">
+            <span class="statLabel">Visible vessels</span>
+            <strong id="visibleTotal">0</strong>
+          </article>
+          <article class="statCard">
+            <span class="statLabel">In motion</span>
+            <strong id="inMotionTotal">0</strong>
+          </article>
+          <article class="statCard">
+            <span class="statLabel">Owners</span>
+            <strong id="ownerTotal">0</strong>
+          </article>
+          <article class="statCard">
+            <span class="statLabel">Avg speed</span>
+            <strong id="avgSpeed">0 kt</strong>
+          </article>
+        </section>
+
+        <section class="panel">
+          <div class="panelHeader">
+            <span>Freshness</span>
+            <span id="plannerMode" class="tinyBadge">Awaiting run</span>
+          </div>
+          <div id="sourceFreshness" class="sourceList"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panelHeader">
+            <span>Worker trace</span>
+            <span id="workerModeBadge" class="tinyBadge">Browser</span>
+          </div>
+          <p id="workerRuntime" class="panelCopy">
+            Browser heuristic planner only.
+          </p>
+          <div id="workerTrace" class="sourceList"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panelHeader">
+            <span>Suggested sources</span>
+            <span class="panelMeta">User approval required</span>
+          </div>
+          <p id="sourceScoutStatus" class="panelCopy">
+            Run a prompt to scout relevant public datasets and APIs.
+          </p>
+          <div id="sourceSuggestions" class="sourceList"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panelHeader">
+            <span>Layer toggles</span>
+            <span class="panelMeta">Prompt can suggest these</span>
+          </div>
+          <div class="chipGrid">
+            <label class="chipToggle">
+              <input id="toggleRoutes" type="checkbox" checked />
+              <span>Voyage routes</span>
+            </label>
+            <label class="chipToggle">
+              <input id="togglePorts" type="checkbox" checked />
+              <span>Ports</span>
+            </label>
+            <label class="chipToggle">
+              <input id="toggleLabels" type="checkbox" checked />
+              <span>Ship labels</span>
+            </label>
+            <label class="chipToggle">
+              <input id="toggleOwners" type="checkbox" />
+              <span>Owner tags</span>
+            </label>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panelHeader">
+            <span>Secondary vessel class</span>
+          </div>
+          <div id="typeFilters" class="filterStack"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panelHeader">
+            <span>Secondary voyage status</span>
+          </div>
+          <div id="statusFilters" class="filterStack"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panelHeader">
+            <span>Secondary owner region</span>
+          </div>
+          <div id="regionFilters" class="filterStack"></div>
+        </section>
+
+        <section class="panel vesselFeed">
+          <div class="panelHeader">
+            <span>Visible fleet</span>
+            <span id="feedCount">0</span>
+          </div>
+          <div id="vesselList" class="vesselList"></div>
+        </section>
+      </aside>
+    </div>
+
+    <script src="./config.js"></script>
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

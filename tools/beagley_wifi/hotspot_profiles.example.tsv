@@ -1,0 +1,3 @@
+# id	ssid	psk	priority	fallback_address
+iphone-primary	Josh’s iPhone	qwer1234	100	
+garage-backup	GarageWiFi	anotherpass	80	

@@ -1,5 +1,5 @@
 import QtQuick 2.15
-import "icons"
+import "icons" as Icons
 
 Item {
     id: root
@@ -26,11 +26,11 @@ Item {
         }
     }
 
-    Component { id: brakeComp;  BrakeIcon  { color: root.color } }
-    Component { id: chargeComp; ChargeIcon { color: root.color } }
-    Component { id: checkComp;  CheckIcon  { color: root.color } }
-    Component { id: fuelComp;   FuelIcon   { color: root.color } }
-    Component { id: oilComp;    OilIcon    { color: root.color } }
-    Component { id: doorComp;   DoorIcon   { color: root.color } }
-    Component { id: atComp;     ATIcon     { color: root.color } }
+    Component { id: brakeComp;  Icons.BrakeIcon  { color: root.color } }
+    Component { id: chargeComp; Icons.ChargeIcon { color: root.color } }
+    Component { id: checkComp;  Icons.CheckIcon  { color: root.color } }
+    Component { id: fuelComp;   Icons.FuelIcon   { color: root.color } }
+    Component { id: oilComp;    Icons.OilIcon    { color: root.color } }
+    Component { id: doorComp;   Icons.DoorIcon   { color: root.color } }
+    Component { id: atComp;     Icons.AtIcon     { color: root.color } }
 }

@@ -24,6 +24,14 @@ Window {
     // ===============================
     Theme.PurplePearlTheme { id: appTheme }
     color: appTheme.bg
+    readonly property string effectLevel: (typeof BEAGLEY_EFFECT_LEVEL !== "undefined" && BEAGLEY_EFFECT_LEVEL)
+        ? String(BEAGLEY_EFFECT_LEVEL)
+        : "high"
+    readonly property string mapRenderer: (typeof BEAGLEY_MAP_RENDERER !== "undefined" && BEAGLEY_MAP_RENDERER)
+        ? String(BEAGLEY_MAP_RENDERER)
+        : "native"
+    readonly property bool lowEffectMode: effectLevel === "low" || effectLevel === "off"
+    property real sharedEffectPhase: 0.0
 
     // ===============================
     // BBB truth source (C++ context property must be named: vehicleState)
@@ -32,6 +40,7 @@ Window {
     // We alias it to `hub` to avoid binding loops when components also have a `vehicleState` property.
     readonly property var hub: vehicleState
     readonly property bool linkOk: hub && hub.connected && !hub.linkStale
+    readonly property bool truthOk: linkOk && !hub.bbbStale
 
     Component.onCompleted: {
         root.showNormal()
@@ -53,6 +62,13 @@ Window {
                 appTheme.updateFromSystem(Qt.application.palette)
             }
         }
+    }
+
+    Timer {
+        interval: lowEffectMode ? 140 : 90
+        running: effectLevel !== "off"
+        repeat: true
+        onTriggered: root.sharedEffectPhase += interval / 1000.0
     }
 
     // ===============================
@@ -87,15 +103,21 @@ Window {
     // ===============================
     MatrixRain {
         anchors.fill: parent
+        effectEnabled: effectLevel !== "off"
+        effectLevel: root.effectLevel
+        sharedPhase: root.sharedEffectPhase
         rainColor: Qt.rgba(gauge.gaugeColor.r,
                            gauge.gaugeColor.g,
                            gauge.gaugeColor.b,
                            0.45)
-        fps: 10
-        speedMultiplier: 0.10
-        density: 0.12
-        fontPx: 11
-        fadeAlpha: 0.04
+        fps: 12
+        speedMultiplier: 0.13
+        density: 0.22
+        fontPx: 10
+        fadeAlpha: 0.036
+        tailLength: 32
+        headAlpha: 0.76
+        tailMinAlpha: 0.08
         columns: 0
     }
 
@@ -111,29 +133,43 @@ Window {
         vehicleState: hub
 
         // Drive values from BBB truth with stale-safe fallback
-        speed:    linkOk ? (hub.speedKph || 0) : 0
-        coolantC: linkOk ? (hub.coolantC || 0) : 0
+        speed:    truthOk ? (hub.speedKph || 0) : 0
+        coolantC: truthOk ? (hub.coolantC || 0) : 0
+        effectLevel: root.effectLevel
+        matrixRainEnabled: !root.lowEffectMode
+        matrixRainSharedPhase: root.sharedEffectPhase
 
         width: Math.min(leftPanel.width * 0.92, leftPanel.height * 0.92)
         height: width
     }
 
         // ===============================
-    // Center — MapCenter (NO WebEngine)
+    // Center — MapCenter
     // ===============================
     W.MapCenter {
         anchors.fill: centerPanel
 
-        // Stable core modes: placeholder/snapshot/video
-        mode: "placeholder"
+        mode: (typeof BEAGLEY_NO_MAP !== "undefined" && BEAGLEY_NO_MAP)
+            ? "placeholder"
+            : (root.mapRenderer === "web" ? "web" : "snapshot")
 
-        // Snapshot mode (later from BBB)
-        snapshotUrl: ""
+        // Static OSM snapshot (centered by live GPS), cache-busted in MapCenterSnapshot.refresh().
+        snapshotUrl: "https://staticmap.openstreetmap.de/staticmap.php?center="
+            + (truthOk && hub.gpsLat !== undefined ? hub.gpsLat : -27.4698).toFixed(5)
+            + ","
+            + (truthOk && hub.gpsLng !== undefined ? hub.gpsLng : 153.0251).toFixed(5)
+            + "&zoom=13&size=800x800"
+        snapshotRefreshMs: 0
 
         // GPS (safe if fields not present yet)
-        lat: linkOk && hub.gpsLat !== undefined ? hub.gpsLat : 0
-        lng: linkOk && hub.gpsLng !== undefined ? hub.gpsLng : 0
-        bearing: linkOk && hub.gpsBearing !== undefined ? hub.gpsBearing : 0
+        lat: truthOk && hub.gpsLat !== undefined ? hub.gpsLat : -27.4698
+        lng: truthOk && hub.gpsLng !== undefined ? hub.gpsLng : 153.0251
+        bearing: truthOk && hub.gpsBearing !== undefined ? hub.gpsBearing : 0
+        mapVehiclePose: (typeof navigation !== "undefined" && navigation) ? navigation.mapVehiclePose : ({})
+        mapCameraHints: (typeof navigation !== "undefined" && navigation) ? navigation.mapCameraHints : ({})
+        mapRouteOverlay: (typeof navigation !== "undefined" && navigation) ? navigation.mapRouteOverlay : ({})
+        mapGuidanceBanner: (typeof navigation !== "undefined" && navigation) ? navigation.mapGuidanceBanner : ({})
+        mapConnectivity: (typeof navigation !== "undefined" && navigation) ? navigation.mapConnectivity : ({})
 
         // Camera-ready (off until later)
         videoEnabled: false
@@ -150,8 +186,11 @@ Window {
         // Pass BBB truth for VIC + warnings
         vehicleState: hub
 
-        rpm:     linkOk ? (hub.rpm || 0) : 0
-        fuelPct: linkOk ? (hub.fuelPct || 0) : 0
+        rpm:     truthOk ? (hub.rpm || 0) : 0
+        fuelPct: truthOk ? (hub.fuelPct || 0) : 0
+        effectLevel: root.effectLevel
+        matrixRainEnabled: !root.lowEffectMode
+        matrixRainSharedPhase: root.sharedEffectPhase
 
         width: Math.min(rightPanel.width * 0.92, rightPanel.height * 0.92)
         height: width
@@ -166,7 +205,8 @@ Window {
         anchors.margins: 12
         color: "#80FFFFFF"
         font.pixelSize: 16
-        text: linkOk ? ("speed: " + Math.round(hub.speedKph || 0)) : "speed: (STALE)"
+        text: truthOk ? ("speed: " + Math.round(hub.speedKph || 0))
+                      : (linkOk ? "speed: (BBB STALE)" : "speed: (LINK STALE)")
     }
 
     // ===============================
@@ -181,7 +221,7 @@ Window {
         anchors.right: parent.right
         anchors.rightMargin: 18
 
-        active: linkOk && !!hub.leftIndicator
+        active: truthOk && !!hub.leftIndicator
         side: "left"
         thickness: 6
     }
@@ -195,8 +235,15 @@ Window {
         anchors.left: parent.left
         anchors.leftMargin: 18
 
-        active: linkOk && !!hub.rightIndicator
+        active: truthOk && !!hub.rightIndicator
         side: "right"
         thickness: 6
+    }
+
+    W.WiFiSetupOverlay {
+        id: wifiOverlay
+        anchors.fill: parent
+        wifi: (typeof wifiSetup !== "undefined") ? wifiSetup : null
+        theme: appTheme
     }
 }

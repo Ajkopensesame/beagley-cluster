@@ -1,0 +1,15 @@
+[Unit]
+Description=Beagley Diagnostic Local Filesystems Marker
+After=local-fs.target systemd-journald.service
+Before=beagley-cluster-provision.service beagley-diagnostic-collect.service
+
+[Service]
+Type=oneshot
+ExecCondition=/bin/sh -c 'grep -Eq "(^| )beagley\\.diag=1($| )" /proc/cmdline || test -f /run/beagley-diagnostic.mode'
+ExecStart=/usr/libexec/beagley-cluster/beagley-diagnostic.sh mark-stage local-fs-ready
+RemainAfterExit=yes
+StandardOutput=journal+console
+StandardError=journal+console
+
+[Install]
+WantedBy=multi-user.target

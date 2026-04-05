@@ -5,5 +5,7 @@
 
     <!-- Keep the map page too -->
     <file alias="web/map/index.html">../ui/web/map/index.html</file>
+    <file alias="web/map/vendor/maplibre/maplibre-gl.js">../ui/web/map/vendor/maplibre/maplibre-gl.js</file>
+    <file alias="web/map/vendor/maplibre/maplibre-gl.css">../ui/web/map/vendor/maplibre/maplibre-gl.css</file>
   </qresource>
 </RCC>

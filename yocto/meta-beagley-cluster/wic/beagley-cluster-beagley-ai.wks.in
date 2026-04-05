@@ -1,0 +1,6 @@
+# BeagleY appliance boot media.
+# Keep the proven GRUB/EFI boot path for first-boot reachability while also
+# carrying the extlinux + DTB payload used for BeagleY display experiments.
+bootloader --timeout=3 --append="rootfstype=ext4 ${TI_WKS_BOOTLOADER_APPEND}"
+part --source bootimg-efi --sourceparams="loader=grub-efi" --fstype=vfat --label boot --active --align 1024 --use-uuid --fixed-size 128M
+part / --source rootfs --fstype=ext4 --label root --align 1024 --use-uuid

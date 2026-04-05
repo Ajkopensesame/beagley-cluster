@@ -1,4 +1,5 @@
 import QtQuick 2.15
+import "vic/icons" as VicIcons
 
 Item {
     id: root
@@ -27,8 +28,13 @@ Item {
 
     // Base brightness
     property real glowOpacity: 0.80
+    // Gap size at the top of the halo where the high-beam icon sits.
+    property real topBreakDeg: 44
 
     readonly property real haloDiameter: Math.max(0, vicDiameter - trimPx) + (gapPx * 2) + (ringThickness * 2)
+    readonly property real _outerR: Math.min(width, height) / 2 - 1
+    readonly property real _iconPlateSize: Math.max(22, ringThickness * 2.15)
+    readonly property real _iconCenterY: (height / 2) - _outerR + (ringThickness * 0.55)
 
     width: haloDiameter
     height: haloDiameter
@@ -115,6 +121,7 @@ Item {
     }
 
     Canvas {
+        id: ringCanvas
         anchors.fill: parent
         onPaint: {
             var ctx = getContext("2d")
@@ -124,11 +131,15 @@ Item {
             var cy = height / 2
             var outerR = Math.min(width, height) / 2 - 1
             var innerR = outerR - ringThickness
+            var gapRad = Math.max(0.12, root.topBreakDeg * Math.PI / 180)
+            var start = -Math.PI / 2 + (gapRad / 2)
+            var end = start + (Math.PI * 2 - gapRad)
 
-            // Ring via even-odd fill
+            // Annular segment with a top break for the icon.
             ctx.beginPath()
-            ctx.arc(cx, cy, outerR, 0, Math.PI * 2, false)
-            ctx.arc(cx, cy, innerR, 0, Math.PI * 2, true)
+            ctx.arc(cx, cy, outerR, start, end, false)
+            ctx.arc(cx, cy, innerR, end, start, true)
+            ctx.closePath()
 
             // OEM-ish high beam blue glow
             var grad = ctx.createRadialGradient(cx, cy, innerR, cx, cy, outerR)
@@ -138,7 +149,30 @@ Item {
             grad.addColorStop(1.00, Qt.rgba(0.24, 0.65, 1.0, 0.00))
 
             ctx.fillStyle = grad
-            ctx.fill("evenodd")
+            ctx.fill()
         }
+    }
+
+    onTopBreakDegChanged: ringCanvas.requestPaint()
+    onRingThicknessChanged: ringCanvas.requestPaint()
+    onGlowOpacityChanged: ringCanvas.requestPaint()
+
+    Rectangle {
+        id: iconPlate
+        width: root._iconPlateSize
+        height: width
+        radius: width / 2
+        anchors.horizontalCenter: parent.horizontalCenter
+        y: root._iconCenterY - (height / 2)
+        color: Qt.rgba(0.02, 0.08, 0.14, 0.92)
+        border.width: 1
+        border.color: Qt.rgba(0.35, 0.78, 1.0, 0.58)
+    }
+
+    VicIcons.HighBeamIcon {
+        anchors.centerIn: iconPlate
+        width: iconPlate.width * 0.76
+        height: width
+        color: Qt.rgba(0.52, 0.86, 1.0, 0.98)
     }
 }

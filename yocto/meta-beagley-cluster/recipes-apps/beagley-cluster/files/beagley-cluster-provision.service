@@ -1,0 +1,15 @@
+[Unit]
+Description=Beagley Cluster Appliance Provisioning
+DefaultDependencies=no
+After=local-fs.target
+Before=network-online.target beagley-cluster-gpu-probe.service beagley-cluster.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/beagley-cluster/beagley-cluster-provision.sh
+RemainAfterExit=yes
+StandardOutput=journal+console
+StandardError=journal+console
+
+[Install]
+WantedBy=multi-user.target

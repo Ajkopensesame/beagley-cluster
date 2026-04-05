@@ -25,6 +25,24 @@ Item {
     readonly property real sweepAngleDeg: 210
 
     function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+    function lerp(a, b, t) { return a + (b - a) * t; }
+    function colorWithAlpha(c, a) { return Qt.rgba(c.r, c.g, c.b, a); }
+    function blendToward(c, target, t, a) {
+        return Qt.rgba(
+            lerp(c.r, target.r, t),
+            lerp(c.g, target.g, t),
+            lerp(c.b, target.b, t),
+            a
+        );
+    }
+    function requestGaugePaint() {
+        ticksCanvas.requestPaint();
+        labelCanvas.requestPaint();
+        arcCanvas.requestPaint();
+    }
+    function kickSmoother() {
+        if (!smoothingTimer.running) smoothingTimer.start();
+    }
 
     readonly property real fuelClamped: clamp(displayFuel, 0, 100)
     readonly property real progress: fuelClamped / 100.0
@@ -56,11 +74,13 @@ Item {
 
     // Smooth animation
     Timer {
+        id: smoothingTimer
         interval: 16
-        running: true
+        running: false
         repeat: true
         onTriggered: {
             const dt = interval / 1000.0;
+            const prevFuel = root.displayFuel;
             const target = clamp(root.fuelPct, 0, 100);
             const diff = target - root.displayFuel;
 
@@ -69,10 +89,22 @@ Item {
 
             root.displayFuel += step;
 
-            ticksCanvas.requestPaint();
-            labelCanvas.requestPaint();
-            arcCanvas.requestPaint();
+            const fuelSettled = Math.abs(target - root.displayFuel) < 0.02;
+            const changed = Math.abs(root.displayFuel - prevFuel) > 1e-4;
+            if (changed) requestGaugePaint();
+            if (fuelSettled) running = false;
         }
+    }
+
+    onFuelPctChanged: kickSmoother()
+    onGaugeColorChanged: requestGaugePaint()
+    onWidthChanged: requestGaugePaint()
+    onHeightChanged: requestGaugePaint()
+
+    Component.onCompleted: {
+        displayFuel = clamp(fuelPct, 0, 100)
+        requestGaugePaint()
+        kickSmoother()
     }
 
     // ===== Gauge face =====
@@ -154,7 +186,7 @@ Item {
 
                 ctx.save();
                 ctx.fillStyle = "white";
-                ctx.font = '700 18px "DejaVu Sans Mono","Noto Sans Mono",monospace';
+                ctx.font = "700 18px monospace";
                 ctx.textAlign = "center";
                 ctx.textBaseline = "middle";
 
@@ -181,16 +213,46 @@ Item {
                 const r  = width * 0.40;
 
                 const startRad = (root.startAngleDeg - 90) * Math.PI / 180;
-                const endRad = startRad + root.sweepAngleDeg * root.progress * Math.PI / 180;
+                const fuel = root.progress;
+                const endRad = startRad + root.sweepAngleDeg * fuel * Math.PI / 180;
+                const fullEndRad = startRad + root.sweepAngleDeg * Math.PI / 180;
+                const base = root.gaugeColor;
+                const bright = root.blendToward(base, Qt.color("#FFFFFF"), 0.34, 0.98);
+                const hotEdge = root.blendToward(base, Qt.color("#FFFFFF"), 0.14, 0.74);
+                const coreGrad = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
+                coreGrad.addColorStop(0.0, root.colorWithAlpha(bright, 0.92));
+                coreGrad.addColorStop(0.55, root.colorWithAlpha(base, 0.98));
+                coreGrad.addColorStop(1.0, root.colorWithAlpha(hotEdge, 0.86));
 
-                for (let i = 0; i < 60; i++) {
-                    const t0 = i / 60;
-                    const t1 = (i + 1) / 60;
+                ctx.beginPath();
+                ctx.strokeStyle = root.colorWithAlpha(base, 0.06);
+                ctx.lineCap = "round";
+                ctx.lineWidth = 28;
+                ctx.arc(cx, cy, r, startRad, fullEndRad);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.strokeStyle = root.colorWithAlpha(base, 0.16);
+                ctx.lineCap = "round";
+                ctx.lineWidth = 22;
+                ctx.arc(cx, cy, r, startRad, endRad);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.strokeStyle = root.colorWithAlpha(base, 0.32);
+                ctx.lineCap = "round";
+                ctx.lineWidth = 14;
+                ctx.arc(cx, cy, r, startRad, endRad);
+                ctx.stroke();
+
+                for (let i = 0; i < 64; i++) {
+                    const t0 = i / 64;
+                    const t1 = (i + 1) / 64;
 
                     ctx.beginPath();
-                    ctx.strokeStyle = root.gaugeColor;
+                    ctx.strokeStyle = coreGrad;
                     ctx.lineCap = "round";
-                    ctx.lineWidth = 6 + (26 - 6) * t1;
+                    ctx.lineWidth = 5 + (15 - 5) * t1;
                     ctx.arc(
                         cx, cy, r,
                         startRad + (endRad - startRad) * t0,
@@ -208,7 +270,7 @@ Item {
         z: 60
         text: root.fuelInt + "%"
         font.pixelSize: 86
-        font.family: "DejaVu Sans Mono"
+        font.family: (root.theme && root.theme.fontMono) ? root.theme.fontMono : "monospace"
         font.letterSpacing: 1
         color: root.gaugeColor
     }

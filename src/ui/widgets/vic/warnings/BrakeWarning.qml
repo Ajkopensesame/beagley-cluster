@@ -13,7 +13,7 @@ Item {
         text: "BRAKE"
         color: "#FF3B3B"
         font.pixelSize: 34
-        font.family: "DejaVu Sans Mono"
+        font.family: "monospace"
         font.bold: true
         opacity: active ? 1.0 : 0.7
     }

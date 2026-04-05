@@ -24,3 +24,15 @@ build/
 
 # Local web experiments
 src/ui/web/test/
+
+# Machine-local Yocto workdirs (large; never commit)
+.yocto-work/
+
+# Machine-local WebEngine cache accidentally created under the repo root
+file:/
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/

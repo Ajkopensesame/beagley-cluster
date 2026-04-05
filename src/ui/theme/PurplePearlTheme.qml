@@ -20,7 +20,7 @@ QtObject {
     // Expose safe font family names (fallbacks avoid alias-population stalls)
     readonly property string fontDisplay: "Helvetica";
     readonly property string fontAccent:  "Helvetica";
-    readonly property string fontMono: "DejaVu Sans Mono";
+    readonly property string fontMono: "monospace";
 
     // Core semantic colors
     readonly property color bg:    isNight ? "#000000" : "#F5F3FF"
@@ -29,6 +29,7 @@ QtObject {
 
     readonly property color pearlLow:  isNight ? "#C7B7FF" : "#7E57C2"
     readonly property color pearlHigh: isNight ? "#5E35B1" : "#311B92"
+    readonly property color amber:     isNight ? "#FFC107" : "#FFB300"
     readonly property color danger:    isNight ? "#FF3B3B" : "#C62828"
 
     function speedColor(speedKph) {
