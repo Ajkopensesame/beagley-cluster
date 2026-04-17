@@ -91,6 +91,7 @@ Window {
     }
 
     Item {
+        clip: true
         id: rightPanel
         anchors.top: parent.top
         anchors.bottom: parent.bottom

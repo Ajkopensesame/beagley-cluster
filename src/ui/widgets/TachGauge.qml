@@ -500,7 +500,6 @@ Item {
             font.family: root.theme?.fontMono ?? "monospace"
             font.pixelSize: 16
             font.bold: true
-            letterSpacing: 2
         }
     }
 }
