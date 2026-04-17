@@ -524,6 +524,11 @@ void VehicleStateClient::onDisconnected()
     setLinkStale(true);
     setGpsFixValid(false);
     setGpsPoseValid(false);
+    setDiagnosticOk(false);
+    setDiagnosticSeverity(QStringLiteral("warning"));
+    setDiagnosticStatus(QStringLiteral("link_down"));
+    setDiagnosticSummary(QStringLiteral("VEHICLE DATA LINK DOWN"));
+    setDiagnosticFindingCount(0);
     scheduleReconnect();
 }
 
@@ -561,6 +566,7 @@ void VehicleStateClient::onTextMessageReceived(const QString &msg)
     const QJsonObject indicators = obj.value("indicators").toObject();
     const QJsonObject warnings   = obj.value("warnings").toObject();
     const QJsonObject health     = obj.value("_health").toObject();
+    const QJsonObject diagnostic = obj.value("_diagnostic").toObject();
     const QJsonObject drivetrain = obj.value("drivetrain").toObject();
     const QJsonObject transmission = obj.value("transmission").toObject();
     setGpsSource(obj.value("gpsSource").toString());
@@ -582,6 +588,20 @@ void VehicleStateClient::onTextMessageReceived(const QString &msg)
     setWarnFuelLow(readBoolAny(warnings, {"fuel_low", "fuelLow", "fuel"}, false));
 
     setBbbStale(health.value("stale").toBool(true));
+    if (obj.contains(QStringLiteral("_diagnostic")) && obj.value(QStringLiteral("_diagnostic")).isObject()) {
+        setDiagnosticOk(diagnostic.value("ok").toBool(true));
+        setDiagnosticSeverity(diagnostic.value("severity").toString(QStringLiteral("unknown")));
+        setDiagnosticStatus(diagnostic.value("status").toString(QStringLiteral("unknown")));
+        setDiagnosticSummary(diagnostic.value("summary").toString());
+        setDiagnosticFindingCount(qMax(0, diagnostic.value("findingCount").toInt(0)));
+    } else {
+        const bool upstreamStale = health.value("stale").toBool(true);
+        setDiagnosticOk(!upstreamStale);
+        setDiagnosticSeverity(upstreamStale ? QStringLiteral("warning") : QStringLiteral("ok"));
+        setDiagnosticStatus(upstreamStale ? QStringLiteral("data_stale") : QStringLiteral("nominal"));
+        setDiagnosticSummary(upstreamStale ? QStringLiteral("VEHICLE DATA STALE") : QStringLiteral("SYSTEMS NOMINAL"));
+        setDiagnosticFindingCount(0);
+    }
 
     // Core analogs (top-level keys)
     // Safe defaults if BBB hasn't sent them yet.
@@ -691,6 +711,11 @@ void VehicleStateClient::checkStale()
         setLinkStale(true);
         setGpsFixValid(false);
         setGpsPoseValid(false);
+        setDiagnosticOk(false);
+        setDiagnosticSeverity(QStringLiteral("warning"));
+        setDiagnosticStatus(QStringLiteral("link_stale"));
+        setDiagnosticSummary(QStringLiteral("VEHICLE DATA LINK STALE"));
+        setDiagnosticFindingCount(0);
         return;
     }
 
@@ -705,6 +730,11 @@ void VehicleStateClient::checkStale()
     if (staleNow) {
         setBbbStale(true);
         setGpsFixValid(false);
+        setDiagnosticOk(false);
+        setDiagnosticSeverity(QStringLiteral("warning"));
+        setDiagnosticStatus(QStringLiteral("link_stale"));
+        setDiagnosticSummary(QStringLiteral("VEHICLE DATA LINK STALE"));
+        setDiagnosticFindingCount(0);
     }
 }
 
@@ -811,6 +841,45 @@ void VehicleStateClient::setBbbStale(bool v)
     if (m_bbbStale == v) return;
     m_bbbStale = v;
     emit bbbStaleChanged();
+}
+
+void VehicleStateClient::setDiagnosticOk(bool v)
+{
+    if (m_diagnosticOk == v) return;
+    m_diagnosticOk = v;
+    emit diagnosticChanged();
+}
+
+void VehicleStateClient::setDiagnosticSeverity(const QString &v)
+{
+    const QString normalized = v.trimmed().toLower();
+    if (m_diagnosticSeverity == normalized) return;
+    m_diagnosticSeverity = normalized;
+    emit diagnosticChanged();
+}
+
+void VehicleStateClient::setDiagnosticStatus(const QString &v)
+{
+    const QString normalized = v.trimmed().toLower();
+    if (m_diagnosticStatus == normalized) return;
+    m_diagnosticStatus = normalized;
+    emit diagnosticChanged();
+}
+
+void VehicleStateClient::setDiagnosticSummary(const QString &v)
+{
+    const QString normalized = v.trimmed();
+    if (m_diagnosticSummary == normalized) return;
+    m_diagnosticSummary = normalized;
+    emit diagnosticChanged();
+}
+
+void VehicleStateClient::setDiagnosticFindingCount(int v)
+{
+    const int normalized = qMax(0, v);
+    if (m_diagnosticFindingCount == normalized) return;
+    m_diagnosticFindingCount = normalized;
+    emit diagnosticChanged();
 }
 
 void VehicleStateClient::setSpeedKph(double v)

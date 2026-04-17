@@ -5,6 +5,7 @@
 
 #include <QDateTime>
 #include <QPointF>
+#include <QStringList>
 #include <QtMath>
 
 namespace {
@@ -114,6 +115,7 @@ ClusterRenderModel::ClusterRenderModel(VehicleStateClient *vehicleState,
         connect(m_vehicleState, &VehicleStateClient::warnCheckEngineChanged, this, refreshStatus);
         connect(m_vehicleState, &VehicleStateClient::warnATChanged, this, refreshStatus);
         connect(m_vehicleState, &VehicleStateClient::warnFuelLowChanged, this, refreshStatus);
+        connect(m_vehicleState, &VehicleStateClient::diagnosticChanged, this, refreshStatus);
         connect(m_vehicleState, &VehicleStateClient::gpsLatChanged, this, refreshAnalogs);
         connect(m_vehicleState, &VehicleStateClient::gpsLngChanged, this, refreshAnalogs);
         connect(m_vehicleState, &VehicleStateClient::gpsBearingChanged, this, refreshAnalogs);
@@ -143,6 +145,8 @@ void ClusterRenderModel::syncStatus()
     bool linkOk = false;
     bool truthOk = false;
     bool gpsOk = false;
+    bool diagnosticActive = false;
+    QString diagnosticSeverity;
     int activeWarnings = 0;
     QStringList warnings;
 
@@ -178,12 +182,31 @@ void ClusterRenderModel::syncStatus()
             ++activeWarnings;
             warnings.append(QStringLiteral("LOW FUEL"));
         }
+        diagnosticSeverity = m_vehicleState->diagnosticSeverity();
+        diagnosticActive = truthOk && !m_vehicleState->diagnosticOk();
+        if (diagnosticActive) {
+            ++activeWarnings;
+            const QString summary = m_vehicleState->diagnosticSummary().trimmed();
+            if (warnings.isEmpty() && !summary.isEmpty()) {
+                warnings.append(summary.toUpper());
+            } else {
+                warnings.append(diagnosticSeverity == QLatin1String("error")
+                                    ? QStringLiteral("DIAG ERROR")
+                                    : QStringLiteral("DIAG WARN"));
+            }
+        }
     }
 
     bool internetOk = m_navigation ? m_navigation->internetOk() : false;
     const QString statusText = !linkOk
         ? QStringLiteral("LINK DOWN")
-        : (!truthOk ? QStringLiteral("BBB STALE") : (gpsOk ? QStringLiteral("LIVE") : QStringLiteral("GPS WEAK")));
+        : (!truthOk
+               ? QStringLiteral("BBB STALE")
+               : (diagnosticActive
+                      ? (diagnosticSeverity == QLatin1String("error")
+                             ? QStringLiteral("DIAG ERROR")
+                             : QStringLiteral("DIAG WARN"))
+                      : (gpsOk ? QStringLiteral("LIVE") : QStringLiteral("GPS WEAK"))));
     const QString networkText = m_navigation
         ? m_navigation->networkStatus().replace(QLatin1Char('_'), QLatin1Char(' ')).toUpper()
         : QStringLiteral("OFFLINE");

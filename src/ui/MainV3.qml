@@ -136,6 +136,7 @@ Window {
         if (hub.warnCheckEngine) n++
         if (hub.warnAT) n++
         if (hub.warnFuelLow) n++
+        if (hub.diagnosticOk === false) n++
         return n
     }
 
@@ -149,6 +150,10 @@ Window {
         if (hub.warnCheckEngine) parts.push("CHECK ENGINE")
         if (hub.warnAT) parts.push("A/T")
         if (hub.warnFuelLow) parts.push("LOW FUEL")
+        if (hub.diagnosticOk === false) {
+            if (parts.length === 0 && hub.diagnosticSummary) parts.push(String(hub.diagnosticSummary).toUpperCase())
+            else parts.push(hub.diagnosticSeverity === "error" ? "DIAG ERROR" : "DIAG WARN")
+        }
         return parts.length > 0 ? parts.join("  •  ") : "SYSTEMS NOMINAL"
     }
 
@@ -156,6 +161,9 @@ Window {
         if (!hub || !hub.connected) return "LINK DOWN"
         if (hub.linkStale) return "LINK STALE"
         if (hub.bbbStale) return "BBB STALE"
+        if (hub.diagnosticOk === false) {
+            return hub.diagnosticSeverity === "error" ? "DIAG ERROR" : "DIAG WARN"
+        }
         return "LIVE"
     }
 

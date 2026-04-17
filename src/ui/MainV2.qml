@@ -42,6 +42,7 @@ Window {
         if (hub.warnCheckEngine) n++
         if (hub.warnAT) n++
         if (hub.warnFuelLow) n++
+        if (hub.diagnosticOk === false) n++
         return n
     }
 
@@ -55,6 +56,10 @@ Window {
         if (hub.warnCheckEngine) parts.push("CHECK")
         if (hub.warnAT) parts.push("A/T")
         if (hub.warnFuelLow) parts.push("FUEL")
+        if (hub.diagnosticOk === false) {
+            if (parts.length === 0 && hub.diagnosticSummary) parts.push(String(hub.diagnosticSummary).toUpperCase())
+            else parts.push(hub.diagnosticSeverity === "error" ? "DIAG ERROR" : "DIAG WARN")
+        }
         return parts.length > 0 ? parts.join("  •  ") : "ALL SYSTEMS NOMINAL"
     }
 

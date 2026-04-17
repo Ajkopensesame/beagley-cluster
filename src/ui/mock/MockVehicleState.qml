@@ -26,6 +26,11 @@ Item {
     property real speedKph: 0
     property real rpm: 0
     property real fuelPct: 100
+    property bool diagnosticOk: true
+    property string diagnosticSeverity: "ok"
+    property string diagnosticStatus: "nominal"
+    property string diagnosticSummary: "SYSTEMS NOMINAL"
+    property int diagnosticFindingCount: 0
 
     // Coolant temp (°C) mock
     property real coolantC: 70
@@ -107,4 +112,3 @@ Item {
         }
     }
     }
-
