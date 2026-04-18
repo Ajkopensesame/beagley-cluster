@@ -62,7 +62,7 @@ ssh -o ConnectTimeout=5 "$HOST" "true"
 echo "[beagley-ui] Step 2: Sync QML to $HOST:$REMOTE_ROOT..."
 (
   cd "$ROOT"
-  find src/ui -type f \( -name '*.qml' -o -name 'qmldir' \) | sort | tar -czf - -T -
+  find src/ui -type f \( -name '*.qml' -o -name 'qmldir' \) | sort | COPYFILE_DISABLE=1 tar -czf - -T -
 ) | ssh "$HOST" "set -e;
   tmp='${REMOTE_ROOT}.tmp';
   rm -rf \"\$tmp\";
