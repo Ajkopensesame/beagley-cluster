@@ -152,7 +152,8 @@ run_once() {
 }
 
 run_watch() {
-  trap stop_app EXIT INT TERM
+  trap stop_app EXIT
+  trap 'stop_app; exit 0' INT TERM
   trap 'on_error "$LINENO"' ERR
 
   build_app
