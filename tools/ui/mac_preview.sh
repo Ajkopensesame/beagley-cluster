@@ -127,6 +127,12 @@ stop_app() {
   APP_PID=""
 }
 
+on_error() {
+  local line_no="$1"
+  echo "[mac-preview] failed at line $line_no" >&2
+  stop_app
+}
+
 source_fingerprint() {
   (
     cd "$ROOT"
@@ -147,6 +153,7 @@ run_once() {
 
 run_watch() {
   trap stop_app EXIT INT TERM
+  trap 'on_error "$LINENO"' ERR
 
   build_app
   launch_app
@@ -161,6 +168,12 @@ run_watch() {
     if [[ "${APP_PID:-}" != "" ]] && ! kill -0 "$APP_PID" 2>/dev/null; then
       wait "$APP_PID" 2>/dev/null || true
       APP_PID=""
+      echo "[mac-preview] preview exited; relaunching while watch mode is active"
+      if build_app; then
+        launch_app
+      else
+        echo "[mac-preview] build failed; fix the error and save again"
+      fi
     fi
 
     local next_fp

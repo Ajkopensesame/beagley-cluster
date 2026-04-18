@@ -14,6 +14,21 @@ The default mode runs the `v3` UI, uses the embedded render profile, and enables
 `BEAGLEY_STRESS_SCENE=1` so the gauges and map have visual motion without
 depending on the vehicle hub.
 
+To keep the preview running in the background while editing, use the managed
+starter:
+
+```bash
+cd /Users/joshkomant/projects/beagley-cluster
+./tools/ui/start_mac_preview.sh
+```
+
+Stop it with:
+
+```bash
+cd /Users/joshkomant/projects/beagley-cluster
+./tools/ui/stop_mac_preview.sh
+```
+
 ## Watch While Editing
 
 ```bash
@@ -23,7 +38,8 @@ cd /Users/joshkomant/projects/beagley-cluster
 
 Watch mode rebuilds and relaunches the Mac preview when QML or C++ source files
 change. It is not true in-process QML hot reload; it is an automated
-build-and-restart loop for local visual iteration.
+build-and-restart loop for local visual iteration. If the preview app exits
+while watch mode is active, the watcher relaunches it.
 
 ## Use Live Vehicle Data
 
