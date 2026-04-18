@@ -1,0 +1,64 @@
+# BeagleY UI Dev Workflow
+
+Use this workflow when the Mac preview does not match the real display closely
+enough. The BeagleY stays the renderer, and local QML edits are copied to the
+device.
+
+## One-Time Setup
+
+The installed BeagleY binary must support filesystem QML loading. After that
+binary is deployed, enable QML dev mode:
+
+```bash
+cd /Users/joshkomant/projects/beagley-cluster
+./tools/ui/beagley_enable_qml_dev.sh
+```
+
+This copies `src/ui` QML files to:
+
+```text
+/opt/beagley-cluster/qml-dev
+```
+
+It also installs a systemd drop-in that sets:
+
+```text
+BEAGLEY_QML_DEV_ROOT=/opt/beagley-cluster/qml-dev
+```
+
+## Edit On The Real Display
+
+Run the watcher from a Mac terminal:
+
+```bash
+cd /Users/joshkomant/projects/beagley-cluster
+./tools/ui/beagley_watch_qml.sh
+```
+
+When a QML file under `src/ui` changes, the watcher copies the QML tree to the
+BeagleY, restarts `beagley_cluster`, then runs the health check. If the service
+fails, it collects debug output.
+
+For a single manual sync:
+
+```bash
+cd /Users/joshkomant/projects/beagley-cluster
+./tools/ui/beagley_sync_qml.sh
+```
+
+## Main Files
+
+- `src/ui/MainV3.qml`: current display layout.
+- `src/ui/widgets/`: gauges, map, warnings, status, and supporting UI.
+- `src/main.cpp`: selects compiled QML normally, or filesystem QML when
+  `BEAGLEY_QML_DEV_ROOT` is set.
+
+## Return To Production Mode
+
+```bash
+cd /Users/joshkomant/projects/beagley-cluster
+./tools/ui/beagley_disable_qml_dev.sh
+```
+
+This removes the systemd drop-in and returns the BeagleY to compiled QML from
+the deployed binary.

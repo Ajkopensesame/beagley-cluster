@@ -409,6 +409,40 @@ int main(int argc, char *argv[])
 
     qDebug() << "[UI] variant =" << uiVariant << "entry =" << entryPoint;
     const auto loadEntryPoint = [&](const QString &entry) {
+        const QString qmlDevRoot = QString::fromUtf8(qgetenv("BEAGLEY_QML_DEV_ROOT")).trimmed();
+        if (!qmlDevRoot.isEmpty()) {
+            const QDir devRoot(qmlDevRoot);
+            const QString qmlDevFile = QString::fromUtf8(qgetenv("BEAGLEY_QML_DEV_FILE")).trimmed();
+            QStringList candidates;
+            if (!qmlDevFile.isEmpty()) {
+                candidates.append(qmlDevFile);
+            }
+            candidates.append(devRoot.filePath(QStringLiteral("src/ui/%1.qml").arg(entry)));
+            candidates.append(devRoot.filePath(QStringLiteral("ui/%1.qml").arg(entry)));
+            candidates.append(devRoot.filePath(QStringLiteral("%1.qml").arg(entry)));
+
+            for (const QString &candidate : candidates) {
+                const QFileInfo info(candidate);
+                if (!info.isFile()) {
+                    continue;
+                }
+
+                engine.addImportPath(info.absolutePath());
+                engine.addImportPath(devRoot.absolutePath());
+                qInfo() << "[UI-DEV] loading QML from filesystem"
+                        << "root =" << devRoot.absolutePath()
+                        << "entry =" << info.absoluteFilePath();
+                engine.load(QUrl::fromLocalFile(info.absoluteFilePath()));
+                return;
+            }
+
+            qCritical() << "[UI-DEV] BEAGLEY_QML_DEV_ROOT is set but entry QML was not found"
+                        << "root =" << devRoot.absolutePath()
+                        << "entry =" << entry
+                        << "candidates =" << candidates;
+            return;
+        }
+
 #if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
         engine.loadFromModule("BeagleY", entry);
 #else
