@@ -1,4 +1,5 @@
 EmbeddedBottomRail 1.0 EmbeddedBottomRail.qml
+EmbeddedAnalogGauge 1.0 EmbeddedAnalogGauge.qml
 EmbeddedMapPod 1.0 EmbeddedMapPod.qml
 EmbeddedSpeedPod 1.0 EmbeddedSpeedPod.qml
 EmbeddedStatusRibbon 1.0 EmbeddedStatusRibbon.qml

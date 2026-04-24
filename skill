@@ -1,0 +1,18 @@
+#!/bin/bash
+
+BASE="$HOME/projects/beagley-cluster/skills"
+
+case "$1" in
+
+  elitebook)
+    echo "[RUN] elitebook-connect → Connect to EliteBook"
+    $BASE/elitebook-connect/scripts/connect.sh
+    ;;
+
+  *)
+    echo "Available skills:"
+    echo ""
+    echo "  skill elitebook → Connect to EliteBook"
+    echo ""
+    ;;
+esac

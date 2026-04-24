@@ -4,11 +4,67 @@
 #include "../navigation/NavigationService.h"
 
 #include <QDateTime>
+#include <QPointF>
+#include <QStringList>
+#include <QProcessEnvironment>
 #include <QtMath>
 
 namespace {
 constexpr double kDefaultLat = -27.4698;
 constexpr double kDefaultLng = 153.0251;
+constexpr double kTileSizePx = 256.0;
+
+bool embeddedRenderProfile()
+{
+    static const bool embedded = qEnvironmentVariable("BEAGLEY_RENDER_PROFILE") == QLatin1String("embedded");
+    return embedded;
+}
+
+int renderTickIntervalMs()
+{
+    return embeddedRenderProfile() ? 80 : 16;
+}
+
+double mapPixelStep()
+{
+    return embeddedRenderProfile() ? 6.0 : 0.75;
+}
+
+double mapBearingStepDeg()
+{
+    return embeddedRenderProfile() ? 2.5 : 0.75;
+}
+
+double mapZoomStep()
+{
+    return embeddedRenderProfile() ? 0.20 : 0.05;
+}
+
+double clampLatitude(double latitude)
+{
+    return qBound(-85.05112878, latitude, 85.05112878);
+}
+
+QPointF projectToWorld(double lat, double lng, double zoomLevel)
+{
+    const double latClamped = clampLatitude(lat);
+    const double sinLat = qSin(qDegreesToRadians(latClamped));
+    const double scale = kTileSizePx * qPow(2.0, zoomLevel);
+    const double x = (lng + 180.0) / 360.0 * scale;
+    const double y = (0.5 - qLn((1.0 + sinLat) / (1.0 - sinLat)) / (4.0 * M_PI)) * scale;
+    return QPointF(x, y);
+}
+
+double angleDeltaDegrees(double current, double target)
+{
+    double delta = std::fmod(target - current, 360.0);
+    if (delta > 180.0) {
+        delta -= 360.0;
+    } else if (delta < -180.0) {
+        delta += 360.0;
+    }
+    return delta;
+}
 
 double normalizedZoomForSpeed(double speedKph)
 {
@@ -83,6 +139,7 @@ ClusterRenderModel::ClusterRenderModel(VehicleStateClient *vehicleState,
         connect(m_vehicleState, &VehicleStateClient::warnCheckEngineChanged, this, refreshStatus);
         connect(m_vehicleState, &VehicleStateClient::warnATChanged, this, refreshStatus);
         connect(m_vehicleState, &VehicleStateClient::warnFuelLowChanged, this, refreshStatus);
+        connect(m_vehicleState, &VehicleStateClient::diagnosticChanged, this, refreshStatus);
         connect(m_vehicleState, &VehicleStateClient::gpsLatChanged, this, refreshAnalogs);
         connect(m_vehicleState, &VehicleStateClient::gpsLngChanged, this, refreshAnalogs);
         connect(m_vehicleState, &VehicleStateClient::gpsBearingChanged, this, refreshAnalogs);
@@ -98,7 +155,7 @@ ClusterRenderModel::ClusterRenderModel(VehicleStateClient *vehicleState,
         connect(m_navigation, &NavigationService::networkStatusChanged, this, &ClusterRenderModel::syncStatus);
     }
 
-    m_tickTimer.setInterval(16);
+    m_tickTimer.setInterval(renderTickIntervalMs());
     connect(&m_tickTimer, &QTimer::timeout, this, &ClusterRenderModel::tick);
     m_tickTimer.start();
 
@@ -112,6 +169,8 @@ void ClusterRenderModel::syncStatus()
     bool linkOk = false;
     bool truthOk = false;
     bool gpsOk = false;
+    bool diagnosticActive = false;
+    QString diagnosticSeverity;
     int activeWarnings = 0;
     QStringList warnings;
 
@@ -147,12 +206,31 @@ void ClusterRenderModel::syncStatus()
             ++activeWarnings;
             warnings.append(QStringLiteral("LOW FUEL"));
         }
+        diagnosticSeverity = m_vehicleState->diagnosticSeverity();
+        diagnosticActive = truthOk && !m_vehicleState->diagnosticOk();
+        if (diagnosticActive) {
+            ++activeWarnings;
+            const QString summary = m_vehicleState->diagnosticSummary().trimmed();
+            if (warnings.isEmpty() && !summary.isEmpty()) {
+                warnings.append(summary.toUpper());
+            } else {
+                warnings.append(diagnosticSeverity == QLatin1String("error")
+                                    ? QStringLiteral("DIAG ERROR")
+                                    : QStringLiteral("DIAG WARN"));
+            }
+        }
     }
 
     bool internetOk = m_navigation ? m_navigation->internetOk() : false;
     const QString statusText = !linkOk
         ? QStringLiteral("LINK DOWN")
-        : (!truthOk ? QStringLiteral("BBB STALE") : (gpsOk ? QStringLiteral("LIVE") : QStringLiteral("GPS WEAK")));
+        : (!truthOk
+               ? QStringLiteral("BBB STALE")
+               : (diagnosticActive
+                      ? (diagnosticSeverity == QLatin1String("error")
+                             ? QStringLiteral("DIAG ERROR")
+                             : QStringLiteral("DIAG WARN"))
+                      : (gpsOk ? QStringLiteral("LIVE") : QStringLiteral("GPS WEAK"))));
     const QString networkText = m_navigation
         ? m_navigation->networkStatus().replace(QLatin1Char('_'), QLatin1Char(' ')).toUpper()
         : QStringLiteral("OFFLINE");
@@ -329,20 +407,21 @@ void ClusterRenderModel::tick()
     const double nextLng = moveTowards(m_mapLng, targetLng, 0.12);
     const double nextBearing = moveTowards(m_mapBearing, targetBearing, 0.18);
     const double nextZoomValue = moveTowards(m_mapZoom, targetZoom, 0.08);
+    const QPointF currentWorld = projectToWorld(m_mapLat, m_mapLng, nextZoomValue);
+    const QPointF nextWorld = projectToWorld(nextLat, nextLng, nextZoomValue);
+    const QPointF worldDelta = nextWorld - currentWorld;
 
-    if (qAbs(nextLat - m_mapLat) >= 0.000001) {
+    if ((worldDelta.x() * worldDelta.x()) + (worldDelta.y() * worldDelta.y())
+        >= (mapPixelStep() * mapPixelStep())) {
         m_mapLat = nextLat;
-        mapChangedNow = true;
-    }
-    if (qAbs(nextLng - m_mapLng) >= 0.000001) {
         m_mapLng = nextLng;
         mapChangedNow = true;
     }
-    if (qAbs(nextBearing - m_mapBearing) >= 0.05) {
+    if (qAbs(angleDeltaDegrees(m_mapBearing, nextBearing)) >= mapBearingStepDeg()) {
         m_mapBearing = nextBearing;
         mapChangedNow = true;
     }
-    if (qAbs(nextZoomValue - m_mapZoom) >= 0.01) {
+    if (qAbs(nextZoomValue - m_mapZoom) >= mapZoomStep()) {
         m_mapZoom = nextZoomValue;
         mapChangedNow = true;
     }

@@ -47,6 +47,8 @@ qt_add_executable(beagley_cluster
     src/render/ClusterRenderModel.cpp
     src/render/NativeRasterMapItem.cpp
     src/render/PerformanceMetrics.cpp
+    src/system/NowPlayingService.cpp
+    src/system/NowPlayingService.h
     src/system/WiFiHotspotProfiles.cpp
     src/system/WiFiSetupService.cpp
     src/system/WiFiSsidUtils.cpp
@@ -77,6 +79,13 @@ if(WITH_WEBENGINE)
     )
 endif()
 
+qt_add_resources(beagley_cluster app_font_resources
+    PREFIX "/"
+    BASE "src"
+    FILES
+        src/assets/fonts/Oxanium-Regular.ttf
+)
+
 # --------------------
 # QML Module
 # --------------------
@@ -105,6 +114,7 @@ set(BEAGLEY_QML_FILES
     src/ui/widgets/GaugeChevronOrbit.qml
     src/ui/theme/PurplePearlTheme.qml
     src/ui/widgets/embedded/EmbeddedBottomRail.qml
+    src/ui/widgets/embedded/EmbeddedAnalogGauge.qml
     src/ui/widgets/embedded/EmbeddedMapPod.qml
     src/ui/widgets/embedded/EmbeddedSpeedPod.qml
     src/ui/widgets/embedded/EmbeddedStatusRibbon.qml
@@ -119,6 +129,7 @@ set(BEAGLEY_QML_FILES
     # Widgets
     src/ui/widgets/SpeedGauge.qml
     src/ui/widgets/DialChrome.qml
+    src/ui/widgets/GaugeArcHead.qml
     src/ui/widgets/FuelPumpIcon.qml
     src/ui/widgets/FuelGauge.qml
     src/ui/widgets/SpeedoPearl.qml
@@ -126,8 +137,11 @@ set(BEAGLEY_QML_FILES
     src/ui/widgets/MatrixRain.qml
     src/ui/widgets/MapCenter.qml
     src/ui/widgets/MapCenterBootShell.qml
+    src/ui/widgets/WeatherCorners.qml
+    src/ui/widgets/BomCatalog.js
     src/ui/widgets/HighBeamHalo.qml
     src/ui/widgets/WiFiSetupOverlay.qml
+    src/ui/widgets/MapCenterNative.qml
 
         src/ui/widgets/MapCenterPlaceholder.qml
         src/ui/widgets/MapCenterSnapshot.qml
@@ -173,6 +187,22 @@ endif()
 
 install(TARGETS beagley_cluster RUNTIME DESTINATION bin)
 
+# Qt generates the BeagleY module manifest in the build tree. Installing that
+# metadata lets engine.loadFromModule("BeagleY", ...) resolve the resource-backed
+# QML entries on the target image.
+if(DEFINED INSTALL_QMLDIR AND NOT INSTALL_QMLDIR STREQUAL "")
+    set(BEAGLEY_INSTALL_QMLDIR "${INSTALL_QMLDIR}")
+else()
+    set(BEAGLEY_INSTALL_QMLDIR "qml")
+endif()
+
+install(
+    FILES
+        "${CMAKE_CURRENT_BINARY_DIR}/BeagleY/qmldir"
+        "${CMAKE_CURRENT_BINARY_DIR}/BeagleY/beagley_cluster.qmltypes"
+    DESTINATION "${BEAGLEY_INSTALL_QMLDIR}/BeagleY"
+)
+
 check_ipo_supported(RESULT BEAGLEY_IPO_SUPPORTED OUTPUT BEAGLEY_IPO_ERROR)
 if(BEAGLEY_IPO_SUPPORTED)
     set_property(TARGET beagley_cluster PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
@@ -200,6 +230,14 @@ if(BUILD_TESTING)
     target_include_directories(wifi_ssid_utils_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_link_libraries(wifi_ssid_utils_test PRIVATE Qt6::Core)
     add_test(NAME wifi_ssid_utils_test COMMAND wifi_ssid_utils_test)
+
+    add_executable(navigation_search_ranking_test
+        tests/navigation_search_ranking_test.cpp
+        src/navigation/OpenNavigationProvider.cpp
+    )
+    target_include_directories(navigation_search_ranking_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(navigation_search_ranking_test PRIVATE Qt6::Core Qt6::Network)
+    add_test(NAME navigation_search_ranking_test COMMAND navigation_search_ranking_test)
 
     add_test(
         NAME bbb_nmea_gps_test

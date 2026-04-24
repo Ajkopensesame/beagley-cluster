@@ -4,6 +4,7 @@ Rectangle {
     id: root
 
     property var cluster
+    property string fontFamily: "sans-serif"
 
     color: "#0A1220"
     border.color: "#16314C"
@@ -26,6 +27,7 @@ Rectangle {
             Text {
                 anchors.centerIn: parent
                 color: "white"
+                font.family: root.fontFamily
                 font.pixelSize: 26
                 font.bold: true
                 text: root.cluster.statusText
@@ -47,6 +49,7 @@ Rectangle {
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
                     color: "#8EC9FF"
+                    font.family: root.fontFamily
                     font.pixelSize: 14
                     text: "NETWORK"
                 }
@@ -54,6 +57,7 @@ Rectangle {
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
                     color: "white"
+                    font.family: root.fontFamily
                     font.pixelSize: 26
                     font.bold: true
                     text: root.cluster.networkText
@@ -87,6 +91,7 @@ Rectangle {
                 Text {
                     anchors.centerIn: parent
                     color: modelData.active ? modelData.activeColor : "#6E8397"
+                    font.family: root.fontFamily
                     font.pixelSize: 18
                     font.bold: true
                     text: modelData.label

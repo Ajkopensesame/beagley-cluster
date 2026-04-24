@@ -39,8 +39,9 @@ Item {
     property real timePhase: 0.0
     readonly property bool effectDisabled: !effectEnabled || effectLevel === "off"
     readonly property bool lowEffectMode: effectLevel === "low"
+    readonly property bool embeddedSafeMode: Qt.platform.os === "linux"
     readonly property bool useSharedPhase: !isNaN(sharedPhase)
-    readonly property real renderScale: lowEffectMode ? 0.45 : 1.0
+    readonly property real renderScale: 1.0
     property var greekGlyphs: [
         "Α", "Β", "Γ", "Δ", "Ε", "Ζ", "Η", "Θ", "Ι", "Κ", "Λ", "Μ",
         "Ν", "Ξ", "Ο", "Π", "Ρ", "Σ", "Τ", "Υ", "Φ", "Χ", "Ψ", "Ω"
@@ -116,7 +117,7 @@ Item {
     Canvas {
         id: canvas
         anchors.fill: parent
-        renderTarget: Canvas.FramebufferObject
+        renderTarget: root.embeddedSafeMode ? Canvas.Image : Canvas.FramebufferObject
         antialiasing: false
         smooth: false
         canvasSize: Qt.size(
@@ -126,16 +127,15 @@ Item {
 
         onPaint: {
             var ctx = getContext("2d")
-            ctx.clearRect(0, 0, width, height)
+            const drawWidth = Math.max(1, canvas.canvasSize.width)
+            const drawHeight = Math.max(1, canvas.canvasSize.height)
+            ctx.clearRect(0, 0, drawWidth, drawHeight)
 
             if (root.effectDisabled) {
                 return
             }
 
-            const drawWidth = Math.max(1, canvas.canvasSize.width)
-            const drawHeight = Math.max(1, canvas.canvasSize.height)
             ctx.save()
-            ctx.scale(width / drawWidth, height / drawHeight)
 
             if (root.circularMask) {
                 ctx.save()
@@ -163,12 +163,15 @@ Item {
 
             for (var i = 0; i < root.drops.length; i++) {
                 var isActive = !!root.activeColumns[i]
+                var phaseSource = root.useSharedPhase ? root.sharedPhase : root.timePhase
                 var x = i * scaledColWidth
+                if (root.lowEffectMode)
+                    x += Math.sin(phaseSource * 1.9 + i * 1.73) * Math.max(1, scaledColWidth * 0.18)
                 var headRow = root.drops[i]
                 var headStep = Math.floor(headRow)
                 var headY = headRow * scaledFontPx
                 var pulse = root.glowFloor + (1.0 - root.glowFloor)
-                    * (0.5 + 0.5 * Math.sin((root.useSharedPhase ? root.sharedPhase : root.timePhase) * root.glowSpeed + i * 0.68))
+                    * (0.5 + 0.5 * Math.sin(phaseSource * root.glowSpeed + i * 0.68))
                 if (isActive) {
                     var glyph = root.glyphFor(i, headStep)
 
@@ -191,9 +194,13 @@ Item {
                     }
                 }
 
-                root.drops[i] += root.speedMultiplier * (0.35 + 0.65 * pulse) * root.driftScale
+                var step = root.speedMultiplier * (0.35 + 0.65 * pulse) * root.driftScale
+                if (root.lowEffectMode)
+                    step = Math.max(step, 0.10 + Math.random() * 0.045)
+                root.drops[i] += step
 
-                if (isActive && Math.random() < root.charChangeChance * pulse) {
+                var churnChance = Math.max(root.charChangeChance * pulse, root.lowEffectMode ? 0.030 : 0.0)
+                if (isActive && Math.random() < churnChance) {
                     if (Math.random() < 0.18) {
                         root.assignVerse(i)
                     } else {
@@ -207,7 +214,7 @@ Item {
                     root.drops[i] = -Math.random() * root.tailLength
                     root.assignVerse(i)
                     root.activeColumns[i] = Math.random() < root.density
-                } else if (!isActive && Math.random() < root.density * 0.015) {
+                } else if (!isActive && Math.random() < root.density * (root.lowEffectMode ? 0.045 : 0.015)) {
                     root.drops[i] = -Math.random() * root.tailLength
                     root.assignVerse(i)
                     root.activeColumns[i] = true

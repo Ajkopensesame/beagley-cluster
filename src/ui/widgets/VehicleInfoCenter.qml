@@ -11,6 +11,8 @@ Item {
     height: 240
 
     property var theme: null
+    property bool simplified: false
+    property bool pulseEnabled: true
 
     property string drivetrainMode: "2wd"
     property bool transferLock: false
@@ -48,6 +50,11 @@ Item {
     readonly property color tLow:    cOr("#C7B7FF", theme ? theme.pearlLow : undefined)
     readonly property color tHigh:   cOr("#5E35B1", theme ? theme.pearlHigh : undefined)
     readonly property color tDanger: cOr("#FF3B3B", theme ? theme.danger : undefined)
+    readonly property color neonCyan: "#73F6FF"
+    readonly property color neonViolet: "#9B5CFF"
+    readonly property color neonPink: "#FF4DFF"
+    readonly property color neonDeep: "#6E35FF"
+    readonly property color neonPearl: "#EAD7FF"
 
     readonly property string fontUi: cOr("monospace", theme ? theme.fontMono : undefined)
 
@@ -57,6 +64,7 @@ Item {
     readonly property real haloRadius: s * 0.42
     readonly property real haloThickness: Math.max(4, s * 0.024)
     readonly property real haloInner: haloRadius - haloThickness - s * 0.036
+    readonly property bool embeddedSafeMode: Qt.platform.os === "linux"
     readonly property color activeColor:
         hasWarning ? warningColors.haloColor(currentWarningKey, tDanger) : tLow
     readonly property color activeColorSoft:
@@ -124,7 +132,8 @@ Item {
     Canvas {
         id: halo
         anchors.fill: parent
-        antialiasing: true
+        antialiasing: !root.simplified
+        renderTarget: root.embeddedSafeMode ? Canvas.Image : Canvas.FramebufferObject
         property real pulse: 0.0
 
         onPaint: {
@@ -132,39 +141,58 @@ Item {
             ctx.clearRect(0, 0, width, height)
 
             const r = root.haloRadius
-            const inner = root.haloInner
             const stroke = root.haloThickness
-            const base = root.activeColor
-            const glowAlpha = root.hasWarning ? 0.34 : 0.20
+            const warningPulse = root.hasWarning && root.pulseEnabled ? halo.pulse : 0.0
+            const base = root.hasWarning ? root.activeColor : root.neonViolet
+            const mainStart = -Math.PI * 0.86
+            const mainEnd = Math.PI * 1.16
 
-            ctx.save()
-            ctx.beginPath()
-            ctx.arc(root.cx, root.cy, r, 0, Math.PI * 2, false)
-            ctx.strokeStyle = Qt.rgba(base.r, base.g, base.b, glowAlpha + halo.pulse * 0.08)
-            ctx.lineWidth = stroke + 8 + halo.pulse * 3
-            ctx.lineCap = "round"
-            ctx.stroke()
-            ctx.restore()
+            function withAlpha(color, alpha) {
+                return Qt.rgba(color.r, color.g, color.b, alpha)
+            }
 
-            ctx.save()
-            const grad = ctx.createLinearGradient(root.cx - r, root.cy - r, root.cx + r, root.cy + r)
-            grad.addColorStop(0.0, Qt.rgba(root.tLow.r, root.tLow.g, root.tLow.b, 0.95))
-            grad.addColorStop(0.55, Qt.rgba(base.r, base.g, base.b, 0.98))
-            grad.addColorStop(1.0, Qt.rgba(root.tHigh.r, root.tHigh.g, root.tHigh.b, 0.92))
-            ctx.beginPath()
-            ctx.arc(root.cx, root.cy, r, -Math.PI * 0.82, Math.PI * 1.18, false)
-            ctx.strokeStyle = grad
-            ctx.lineWidth = stroke
-            ctx.lineCap = "round"
-            ctx.stroke()
-            ctx.restore()
+            function drawArc(from, to, widthPx, color, alpha) {
+                ctx.save()
+                ctx.beginPath()
+                ctx.arc(root.cx, root.cy, r, from, to, false)
+                ctx.strokeStyle = withAlpha(color, alpha)
+                ctx.lineWidth = widthPx
+                ctx.lineCap = "round"
+                ctx.stroke()
+                ctx.restore()
+            }
+
+            drawArc(mainStart, mainEnd, stroke * 1.55, root.neonDeep, root.simplified ? 0.16 : 0.22)
+            drawArc(mainStart, mainEnd, stroke * 0.82, root.tLow, root.simplified ? 0.28 : 0.24)
+            drawArc(mainStart, mainEnd, stroke * 0.48, base, root.simplified ? 0.60 : 0.78)
+
+            if (!root.simplified) {
+                drawArc(mainStart - 0.08, mainEnd + 0.08, stroke * 2.15 + warningPulse * 3.0, base, (root.hasWarning ? 0.18 : 0.10) + warningPulse * 0.10)
+
+                const grad = ctx.createLinearGradient(root.cx - r, root.cy - r, root.cx + r, root.cy + r)
+                grad.addColorStop(0.0, withAlpha(root.neonCyan, 0.16))
+                grad.addColorStop(0.38, withAlpha(base, 0.92))
+                grad.addColorStop(0.72, withAlpha(root.neonPink, root.hasWarning ? 0.38 : 0.54))
+                grad.addColorStop(1.0, withAlpha(root.neonPearl, 0.30))
+
+                ctx.save()
+                ctx.beginPath()
+                ctx.arc(root.cx, root.cy, r, mainStart, mainEnd, false)
+                ctx.strokeStyle = grad
+                ctx.lineWidth = stroke * 0.82
+                ctx.lineCap = "round"
+                ctx.stroke()
+                ctx.restore()
+
+                drawArc(-Math.PI * 0.72, -Math.PI * 0.04, Math.max(1, stroke * 0.18), root.neonPearl, 0.36)
+            }
 
         }
     }
 
     SequentialAnimation {
         id: warnPulse
-        running: root.hasWarning
+        running: root.hasWarning && root.pulseEnabled
         loops: Animation.Infinite
         NumberAnimation { target: halo; property: "pulse"; from: 0.0; to: 1.0; duration: 240; easing.type: Easing.OutCubic }
         NumberAnimation { target: halo; property: "pulse"; from: 1.0; to: 0.0; duration: 520; easing.type: Easing.InOutSine }
@@ -178,22 +206,25 @@ Item {
         anchors.centerIn: parent
         width: root.haloInner * 2 * 0.98
         height: width
+        layer.enabled: !root.embeddedSafeMode
+        layer.smooth: !root.embeddedSafeMode
 
         Rectangle {
             anchors.fill: parent
             radius: width / 2
             gradient: Gradient {
-                GradientStop { position: 0.00; color: Qt.rgba(12 / 255, 18 / 255, 30 / 255, 0.98) }
-                GradientStop { position: 0.55; color: Qt.rgba(8 / 255, 13 / 255, 21 / 255, 0.94) }
-                GradientStop { position: 1.00; color: Qt.rgba(2 / 255, 4 / 255, 9 / 255, 0.98) }
+                GradientStop { position: 0.00; color: Qt.rgba(16 / 255, 20 / 255, 34 / 255, root.hasWarning ? 0.40 : 0.24) }
+                GradientStop { position: 0.55; color: Qt.rgba(8 / 255, 10 / 255, 18 / 255, root.hasWarning ? 0.28 : 0.16) }
+                GradientStop { position: 1.00; color: Qt.rgba(2 / 255, 4 / 255, 9 / 255, root.hasWarning ? 0.34 : 0.20) }
             }
-            border.width: 1
-            border.color: Qt.rgba(root.activeColor.r, root.activeColor.g, root.activeColor.b, root.hasWarning ? 0.20 : 0.12)
+            border.width: 0
         }
 
         Canvas {
             anchors.fill: parent
+            visible: !root.simplified
             opacity: 0.32
+            renderTarget: root.embeddedSafeMode ? Canvas.Image : Canvas.FramebufferObject
             onPaint: {
                 const ctx = getContext("2d")
                 ctx.clearRect(0, 0, width, height)
@@ -212,6 +243,8 @@ Item {
             id: normalLayer
             anchors.fill: parent
             opacity: root.hasWarning ? 0.0 : 1.0
+            layer.enabled: !root.embeddedSafeMode
+            layer.smooth: !root.embeddedSafeMode
             Behavior on opacity { NumberAnimation { duration: root.fast } }
 
             Column {
@@ -258,6 +291,8 @@ Item {
             id: warningLayer
             anchors.fill: parent
             opacity: root.hasWarning ? 1.0 : 0.0
+            layer.enabled: !root.embeddedSafeMode
+            layer.smooth: !root.embeddedSafeMode
             Behavior on opacity { NumberAnimation { duration: root.fast } }
 
             Text {
@@ -293,24 +328,6 @@ Item {
                 font.letterSpacing: 4
             }
 
-            Row {
-                anchors.horizontalCenter: parent.horizontalCenter
-                anchors.bottom: parent.bottom
-                anchors.bottomMargin: 14
-                spacing: 8
-
-                Repeater {
-                    model: root.warningCount
-                    Rectangle {
-                        width: index === root.warningIndex ? 20 : 8
-                        height: 4
-                        radius: 2
-                        color: index === root.warningIndex
-                            ? root.activeColor
-                            : Qt.rgba(root.activeColor.r, root.activeColor.g, root.activeColor.b, 0.22)
-                    }
-                }
-            }
         }
     }
 

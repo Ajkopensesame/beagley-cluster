@@ -53,16 +53,20 @@ desktop workflow.
 - replay-driven perf checks emit `[Perf]` with fps, p95, p99, and map counters
 - production image reaches Linux/network/SSH even when the GPU probe fails
 - `beagley-cluster.service` starts only after a passing GPU probe
+- diagnostic image reaches a visible HDMI/systemd console when the boot reaches Linux userspace
+- diagnostic image leaves stage markers and snapshots on the SD card even when networking fails
 
 ## Appliance contract
 
 - Production build defaults to the BeagleY BSP path with `MACHINE=beagley-ai`
 - Build helpers fall back to `MACHINE_POLICY=ti-sdk` only if the BeagleY BSP is absent
-- BeagleY boot media uses U-Boot distro boot with `extlinux`, not the generic EFI/GRUB path
+- Diagnostic bring-up uses a dedicated `beagley-cluster-image-diag` target instead of mutating production defaults
+- BeagleY boot media carries both `extlinux` and EFI boot entries with the same BeagleY DTB
 - The boot partition carries an explicit `k3-am67a-beagley-ai.dtb` selection in both `extlinux.conf` and `uEnv.txt`
 - `beagley-cluster-gpu-probe.service` records the first-boot renderer result under `/run`
 - `beagley-cluster.service` starts only when `/run/beagley_gpu_gate.ok` exists
 - `beagley-cluster-launch.sh` re-enforces `gpu_gate.sh --strict --mode appliance`
 - `beagley-cluster-provision.service` applies optional boot-media overrides
+- `beagley.diag=1` creates `/run/beagley-diagnostic.mode`, suppresses the appliance stack, and records snapshots under `/var/lib/beagley-cluster/diagnostic`
 - Release output is a flashable `wic` bundle with checksum, manifest, and validation report
 - The tracked flash helpers are `yocto/flash-appliance-image-linux.sh` and `yocto/flash-appliance-image-macos.sh`

@@ -6,6 +6,8 @@ BOOT_HOSTNAME_PATH=""
 LOCAL_ENV_PATH="/etc/default/beagley-cluster.local"
 STAMP_DIR="/var/lib/beagley-cluster"
 STAMP_PATH="${STAMP_DIR}/provisioned"
+DIAGNOSTIC_MODE_PATH="/run/beagley-diagnostic.mode"
+DIAGNOSTIC_HELPER="/usr/libexec/beagley-cluster/beagley-diagnostic.sh"
 
 find_first_existing() {
   local candidate
@@ -41,7 +43,19 @@ update_hostname() {
   fi
 }
 
+diag_kernel_mode_enabled() {
+  grep -Eq '(^| )beagley\.diag=1($| )' /proc/cmdline
+}
+
 mkdir -p "$STAMP_DIR" /etc/default
+
+if diag_kernel_mode_enabled; then
+  mkdir -p "$(dirname "$DIAGNOSTIC_MODE_PATH")"
+  : >"$DIAGNOSTIC_MODE_PATH"
+  if [[ -x "$DIAGNOSTIC_HELPER" ]]; then
+    "$DIAGNOSTIC_HELPER" mark-stage provisioning-start || true
+  fi
+fi
 
 BOOT_ENV_PATH="$(find_first_existing /boot/firmware/beagley-cluster.env /boot/beagley-cluster.env || true)"
 BOOT_HOSTNAME_PATH="$(find_first_existing /boot/firmware/beagley-cluster.hostname /boot/beagley-cluster.hostname || true)"
@@ -64,4 +78,5 @@ update_hostname "$PROVISIONED_HOSTNAME"
   echo "boot_env=${BOOT_ENV_PATH:-none}"
   echo "boot_hostname=${BOOT_HOSTNAME_PATH:-none}"
   echo "hostname=${PROVISIONED_HOSTNAME:-unchanged}"
+  echo "diagnostic_mode=$(diag_kernel_mode_enabled && echo enabled || echo disabled)"
 } >"$STAMP_PATH"

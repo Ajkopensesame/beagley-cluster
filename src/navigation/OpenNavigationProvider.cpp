@@ -1,11 +1,20 @@
 #include "OpenNavigationProvider.h"
 
+#include <QLocale>
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QRegularExpression>
 #include <QUrlQuery>
 #include <QtMath>
 
+#include <algorithm>
+
 namespace {
+constexpr int kSearchResultLimit = 8;
+constexpr int kPhotonBiasZoom = 12;
+constexpr double kPhotonBiasScale = 0.15;
+constexpr double kNominatimViewboxRadiusKm = 60.0;
+
 double jsonNumber(const QJsonValue &value, double fallback = 0.0)
 {
     if (value.isDouble()) {
@@ -46,6 +55,485 @@ double resultDistance(double originLat, double originLng, double lat, double lng
     const double h = sinLat * sinLat + qCos(lat1) * qCos(lat2) * sinLng * sinLng;
     return 2.0 * kEarthRadius * qAsin(qSqrt(qBound(0.0, h, 1.0)));
 }
+
+QString defaultSearchCountryCode()
+{
+    if (qEnvironmentVariableIsSet("BEAGLEY_NAV_SEARCH_COUNTRYCODE")) {
+        return QString::fromUtf8(qgetenv("BEAGLEY_NAV_SEARCH_COUNTRYCODE")).trimmed().left(2).toUpper();
+    }
+
+    const QString localeName = QLocale::system().name();
+    const int separator = localeName.indexOf(QLatin1Char('_'));
+    return separator >= 0 ? localeName.mid(separator + 1).left(2).toUpper() : QString();
+}
+
+QString defaultSearchLanguage()
+{
+    if (qEnvironmentVariableIsSet("BEAGLEY_NAV_SEARCH_LANGUAGE")) {
+        return QString::fromUtf8(qgetenv("BEAGLEY_NAV_SEARCH_LANGUAGE")).trimmed();
+    }
+
+    const QString language = QLocale::system().bcp47Name().trimmed();
+    return language == QLatin1String("C") ? QString() : language;
+}
+
+QString photonLanguageCode(const QString &language)
+{
+    if (language.isEmpty()) {
+        return {};
+    }
+
+    QString normalized = language.trimmed();
+    const int dash = normalized.indexOf(QLatin1Char('-'));
+    if (dash >= 0) {
+        normalized = normalized.left(dash);
+    }
+    const int underscore = normalized.indexOf(QLatin1Char('_'));
+    if (underscore >= 0) {
+        normalized = normalized.left(underscore);
+    }
+    return normalized.toLower();
+}
+
+QString normalizedText(const QString &value)
+{
+    const QString decomposed = value.normalized(QString::NormalizationForm_D).toLower();
+    QString out;
+    out.reserve(decomposed.size());
+    bool lastWasSpace = true;
+
+    for (const QChar ch : decomposed) {
+        if (ch.category() == QChar::Mark_NonSpacing || ch.category() == QChar::Mark_SpacingCombining) {
+            continue;
+        }
+        if (ch.isLetterOrNumber()) {
+            out.append(ch);
+            lastWasSpace = false;
+        } else if (!lastWasSpace) {
+            out.append(QLatin1Char(' '));
+            lastWasSpace = true;
+        }
+    }
+
+    return out.trimmed().simplified();
+}
+
+QStringList tokenizeWords(const QString &value)
+{
+    const QString normalized = normalizedText(value);
+    return normalized.isEmpty()
+        ? QStringList()
+        : normalized.split(QLatin1Char(' '), Qt::SkipEmptyParts);
+}
+
+QString addressLine(const QString &houseNumber, const QString &street)
+{
+    if (houseNumber.trimmed().isEmpty()) {
+        return street.trimmed();
+    }
+    if (street.trimmed().isEmpty()) {
+        return houseNumber.trimmed();
+    }
+    return houseNumber.trimmed() + QStringLiteral(" ") + street.trimmed();
+}
+
+QString searchViewbox(double originLat, double originLng, double radiusKm)
+{
+    if (!qIsFinite(originLat) || !qIsFinite(originLng) || radiusKm <= 0.0) {
+        return {};
+    }
+
+    const double latDelta = radiusKm / 111.0;
+    const double lonScale = qMax(0.2, qAbs(qCos(qDegreesToRadians(originLat))));
+    const double lonDelta = radiusKm / (111.320 * lonScale);
+    const double minLon = qMax(-180.0, originLng - lonDelta);
+    const double maxLon = qMin(180.0, originLng + lonDelta);
+    const double north = qMin(90.0, originLat + latDelta);
+    const double south = qMax(-90.0, originLat - latDelta);
+
+    return QStringLiteral("%1,%2,%3,%4")
+        .arg(QString::number(minLon, 'f', 6),
+             QString::number(north, 'f', 6),
+             QString::number(maxLon, 'f', 6),
+             QString::number(south, 'f', 6));
+}
+
+int prefixMatchCount(const QStringList &queryTokens, const QStringList &candidateTokens)
+{
+    int matches = 0;
+    for (const QString &queryToken : queryTokens) {
+        const auto found = std::find_if(candidateTokens.begin(), candidateTokens.end(), [&queryToken](const QString &candidate) {
+            return candidate.startsWith(queryToken);
+        });
+        if (found != candidateTokens.end()) {
+            ++matches;
+        }
+    }
+    return matches;
+}
+
+QString firstQueryNumber(const QStringList &queryTokens)
+{
+    for (const QString &token : queryTokens) {
+        for (const QChar ch : token) {
+            if (ch.isDigit()) {
+                return token;
+            }
+        }
+    }
+    return {};
+}
+
+bool queryLooksAddressLike(const QString &query)
+{
+    const QStringList tokens = tokenizeWords(query);
+    if (tokens.isEmpty()) {
+        return false;
+    }
+
+    for (const QString &token : tokens) {
+        for (const QChar ch : token) {
+            if (ch.isDigit()) {
+                return true;
+            }
+        }
+    }
+
+    static const QStringList streetTokens = {
+        QStringLiteral("street"),
+        QStringLiteral("st"),
+        QStringLiteral("road"),
+        QStringLiteral("rd"),
+        QStringLiteral("avenue"),
+        QStringLiteral("ave"),
+        QStringLiteral("drive"),
+        QStringLiteral("dr"),
+        QStringLiteral("lane"),
+        QStringLiteral("ln"),
+        QStringLiteral("court"),
+        QStringLiteral("ct"),
+        QStringLiteral("place"),
+        QStringLiteral("pl"),
+        QStringLiteral("parade"),
+        QStringLiteral("pde"),
+        QStringLiteral("terrace"),
+        QStringLiteral("tce"),
+        QStringLiteral("crescent"),
+        QStringLiteral("cres"),
+        QStringLiteral("close"),
+        QStringLiteral("circuit"),
+        QStringLiteral("cct"),
+        QStringLiteral("boulevard"),
+        QStringLiteral("blvd"),
+        QStringLiteral("highway"),
+        QStringLiteral("hwy"),
+        QStringLiteral("way"),
+    };
+
+    for (int index = 1; index < tokens.size(); ++index) {
+        if (streetTokens.contains(tokens.at(index))) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool resultLooksSettlement(const SearchResultData &result)
+{
+    static const QStringList settlementTypes = {
+        QStringLiteral("city"),
+        QStringLiteral("district"),
+        QStringLiteral("locality"),
+        QStringLiteral("county"),
+        QStringLiteral("state"),
+        QStringLiteral("country"),
+    };
+    static const QStringList settlementAddressTypes = {
+        QStringLiteral("city"),
+        QStringLiteral("town"),
+        QStringLiteral("village"),
+        QStringLiteral("hamlet"),
+        QStringLiteral("suburb"),
+        QStringLiteral("neighbourhood"),
+        QStringLiteral("municipality"),
+        QStringLiteral("county"),
+        QStringLiteral("state"),
+        QStringLiteral("country"),
+        QStringLiteral("district"),
+    };
+
+    const QString resultType = normalizedText(result.resultType);
+    const QString addressType = normalizedText(result.addressType);
+    const QString osmKey = normalizedText(result.osmKey);
+    const QString osmValue = normalizedText(result.osmValue);
+    const QString category = normalizedText(result.category);
+
+    return settlementTypes.contains(resultType)
+        || settlementAddressTypes.contains(addressType)
+        || osmKey == QLatin1String("place")
+        || (osmKey == QLatin1String("boundary") && osmValue == QLatin1String("administrative"))
+        || category == QLatin1String("boundary");
+}
+
+bool resultLooksStreet(const SearchResultData &result)
+{
+    const QString resultType = normalizedText(result.resultType);
+    const QString addressType = normalizedText(result.addressType);
+    const QString osmKey = normalizedText(result.osmKey);
+    const QString category = normalizedText(result.category);
+
+    return resultType == QLatin1String("street")
+        || addressType == QLatin1String("road")
+        || osmKey == QLatin1String("highway")
+        || category == QLatin1String("highway");
+}
+
+bool resultLooksAddressPoint(const SearchResultData &result)
+{
+    const QString resultType = normalizedText(result.resultType);
+    const QString addressType = normalizedText(result.addressType);
+    const QString osmValue = normalizedText(result.osmValue);
+
+    return !result.houseNumber.trimmed().isEmpty()
+        || (!result.street.trimmed().isEmpty()
+            && (resultType == QLatin1String("house")
+                || addressType == QLatin1String("house")
+                || addressType == QLatin1String("building")
+                || addressType == QLatin1String("place")
+                || osmValue == QLatin1String("house")));
+}
+
+bool resultLooksNatural(const SearchResultData &result)
+{
+    const QString category = normalizedText(result.category);
+    const QString osmKey = normalizedText(result.osmKey);
+    const QString osmValue = normalizedText(result.osmValue);
+
+    return category == QLatin1String("natural")
+        || category == QLatin1String("waterway")
+        || osmKey == QLatin1String("natural")
+        || osmKey == QLatin1String("waterway")
+        || (osmKey == QLatin1String("leisure") && osmValue == QLatin1String("nature reserve"));
+}
+
+bool resultLooksPoi(const SearchResultData &result)
+{
+    if (resultLooksSettlement(result) || resultLooksStreet(result)) {
+        return false;
+    }
+
+    static const QStringList poiKeys = {
+        QStringLiteral("amenity"),
+        QStringLiteral("shop"),
+        QStringLiteral("tourism"),
+        QStringLiteral("leisure"),
+        QStringLiteral("aeroway"),
+        QStringLiteral("railway"),
+        QStringLiteral("historic"),
+        QStringLiteral("office"),
+        QStringLiteral("craft"),
+        QStringLiteral("emergency"),
+        QStringLiteral("healthcare"),
+        QStringLiteral("sport"),
+        QStringLiteral("public transport"),
+        QStringLiteral("building"),
+    };
+
+    const QString osmKey = normalizedText(result.osmKey);
+    const QString category = normalizedText(result.category);
+    const QString resultType = normalizedText(result.resultType);
+
+    return poiKeys.contains(osmKey)
+        || poiKeys.contains(category)
+        || (resultType == QLatin1String("house") && !resultLooksAddressPoint(result));
+}
+
+QStringList categoryTokens(const SearchResultData &result)
+{
+    QStringList tokens = tokenizeWords(result.osmKey
+        + QLatin1Char(' ')
+        + result.osmValue
+        + QLatin1Char(' ')
+        + result.category
+        + QLatin1Char(' ')
+        + result.resultType
+        + QLatin1Char(' ')
+        + result.addressType);
+
+    const QString osmKey = normalizedText(result.osmKey);
+    const QString osmValue = normalizedText(result.osmValue);
+    if (osmKey == QLatin1String("aeroway") || osmValue == QLatin1String("aerodrome")) {
+        tokens << QStringLiteral("airport") << QStringLiteral("airfield");
+    }
+    if (osmKey == QLatin1String("shop") && osmValue == QLatin1String("mall")) {
+        tokens << QStringLiteral("mall") << QStringLiteral("shopping") << QStringLiteral("centre") << QStringLiteral("center");
+    }
+    if (osmKey == QLatin1String("leisure") && osmValue == QLatin1String("nature reserve")) {
+        tokens << QStringLiteral("park") << QStringLiteral("reserve") << QStringLiteral("national");
+    }
+    if (normalizedText(result.category) == QLatin1String("highway")) {
+        tokens << QStringLiteral("street") << QStringLiteral("road");
+    }
+
+    tokens.removeDuplicates();
+    return tokens;
+}
+
+bool queryMatchesCategory(const QStringList &queryTokens, const SearchResultData &result)
+{
+    const QStringList categories = categoryTokens(result);
+    for (const QString &queryToken : queryTokens) {
+        if (categories.contains(queryToken)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+double distanceScore(double distanceMeters)
+{
+    if (!qIsFinite(distanceMeters) || distanceMeters < 0.0) {
+        return 0.0;
+    }
+    if (distanceMeters <= 5000.0) {
+        return 18.0;
+    }
+    if (distanceMeters <= 20000.0) {
+        return 12.0;
+    }
+    if (distanceMeters <= 60000.0) {
+        return 8.0;
+    }
+    if (distanceMeters <= 150000.0) {
+        return 4.0;
+    }
+    return 0.0;
+}
+
+double textMatchScore(const QString &queryNormalized, const QStringList &queryTokens, const SearchResultData &result)
+{
+    const QString primaryNormalized = normalizedText(result.primary);
+    const QString labelNormalized = normalizedText(result.label);
+    const QStringList candidateTokens = tokenizeWords(result.primary
+        + QLatin1Char(' ')
+        + result.label
+        + QLatin1Char(' ')
+        + result.street
+        + QLatin1Char(' ')
+        + result.city
+        + QLatin1Char(' ')
+        + result.houseNumber);
+
+    double score = 0.0;
+    if (!queryNormalized.isEmpty()) {
+        if (primaryNormalized == queryNormalized) {
+            score += 120.0;
+        } else if (labelNormalized == queryNormalized) {
+            score += 105.0;
+        }
+
+        if (primaryNormalized.startsWith(queryNormalized + QLatin1Char(' '))) {
+            score += 85.0;
+        } else if (labelNormalized.startsWith(queryNormalized + QLatin1Char(' '))) {
+            score += 70.0;
+        } else if (primaryNormalized.contains(queryNormalized)) {
+            score += 35.0;
+        } else if (labelNormalized.contains(queryNormalized)) {
+            score += 25.0;
+        }
+    }
+
+    const int matchedTokens = prefixMatchCount(queryTokens, candidateTokens);
+    score += matchedTokens * 12.0;
+    if (!queryTokens.isEmpty()) {
+        if (matchedTokens == queryTokens.size()) {
+            score += 24.0;
+        } else if (matchedTokens == 0) {
+            score -= 35.0;
+        }
+    }
+
+    return score;
+}
+
+double addressIntentScore(const SearchResultData &result, const QStringList &queryTokens)
+{
+    double score = 0.0;
+
+    if (resultLooksAddressPoint(result)) {
+        score += 42.0;
+    } else if (resultLooksStreet(result)) {
+        score += 30.0;
+    } else if (resultLooksSettlement(result)) {
+        score += 16.0;
+    } else if (resultLooksNatural(result)) {
+        score -= 16.0;
+    }
+
+    if (resultLooksPoi(result) && !queryMatchesCategory(queryTokens, result)) {
+        score -= 32.0;
+    }
+
+    const QString queryNumber = firstQueryNumber(queryTokens);
+    if (!queryNumber.isEmpty()) {
+        const QStringList houseTokens = tokenizeWords(result.houseNumber);
+        if (!houseTokens.isEmpty()) {
+            if (houseTokens.contains(queryNumber)) {
+                score += 30.0;
+            } else {
+                score -= 24.0;
+            }
+        } else if (resultLooksStreet(result)) {
+            score += 8.0;
+        } else {
+            score -= 12.0;
+        }
+    }
+
+    return score;
+}
+
+double placeIntentScore(const SearchResultData &result, const QStringList &queryTokens)
+{
+    double score = 0.0;
+
+    if (resultLooksSettlement(result)) {
+        score += 42.0;
+    } else if (resultLooksStreet(result)) {
+        score += 18.0;
+    } else if (resultLooksNatural(result)) {
+        score += 10.0;
+    } else if (resultLooksAddressPoint(result)) {
+        score += 6.0;
+    }
+
+    if (resultLooksPoi(result) && !queryMatchesCategory(queryTokens, result)) {
+        score -= 24.0;
+    }
+
+    return score;
+}
+
+double rankSearchResult(const SearchResultData &result, const QString &query, const QString &countryCodeHint)
+{
+    const QString queryNormalized = normalizedText(query);
+    const QStringList queryTokens = tokenizeWords(query);
+    const bool addressLike = queryLooksAddressLike(query);
+
+    double score = textMatchScore(queryNormalized, queryTokens, result);
+    score += addressLike ? addressIntentScore(result, queryTokens) : placeIntentScore(result, queryTokens);
+    score += distanceScore(result.distanceMeters);
+    score += qMin(8.0, result.importance * 12.0);
+    score += qMax(0, kSearchResultLimit - result.sourceOrder) * 0.35;
+
+    if (!countryCodeHint.isEmpty()
+        && result.countryCode.compare(countryCodeHint, Qt::CaseInsensitive) == 0) {
+        score += 10.0;
+    }
+
+    return score;
+}
 } // namespace
 
 OpenNavigationProvider::OpenNavigationProvider()
@@ -58,29 +546,54 @@ OpenNavigationProvider::OpenNavigationProvider()
     , m_routerUrl(qEnvironmentVariableIsSet("BEAGLEY_NAV_ROUTER_URL")
             ? QString::fromUtf8(qgetenv("BEAGLEY_NAV_ROUTER_URL")).trimmed()
             : QStringLiteral("https://router.project-osrm.org/route/v1/driving"))
+    , m_searchCountryCode(defaultSearchCountryCode())
+    , m_searchLanguage(defaultSearchLanguage())
 {
 }
 
-QNetworkRequest OpenNavigationProvider::buildSearchRequest(const QString &query) const
+QNetworkRequest OpenNavigationProvider::buildSearchRequest(const QString &query, double originLat, double originLng) const
 {
+    if (queryLooksAddressLike(query)) {
+        QUrl url(m_fallbackGeocoderUrl);
+        QUrlQuery urlQuery(url);
+        urlQuery.addQueryItem(QStringLiteral("format"), QStringLiteral("jsonv2"));
+        urlQuery.addQueryItem(QStringLiteral("limit"), QString::number(kSearchResultLimit));
+        urlQuery.addQueryItem(QStringLiteral("addressdetails"), QStringLiteral("1"));
+        urlQuery.addQueryItem(QStringLiteral("layer"), QStringLiteral("address"));
+        urlQuery.addQueryItem(QStringLiteral("bounded"), QStringLiteral("1"));
+        urlQuery.addQueryItem(QStringLiteral("q"), query);
+        if (!m_searchCountryCode.isEmpty()) {
+            urlQuery.addQueryItem(QStringLiteral("countrycodes"), m_searchCountryCode.toLower());
+        }
+        const QString viewbox = searchViewbox(originLat, originLng, kNominatimViewboxRadiusKm);
+        if (!viewbox.isEmpty()) {
+            urlQuery.addQueryItem(QStringLiteral("viewbox"), viewbox);
+        }
+        url.setQuery(urlQuery);
+
+        QNetworkRequest request(url);
+        request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
+        request.setRawHeader("User-Agent", QByteArrayLiteral("BeagleyCluster/1.0"));
+        if (!m_searchLanguage.isEmpty()) {
+            request.setRawHeader("Accept-Language", m_searchLanguage.toUtf8());
+        }
+        return request;
+    }
+
     QUrl url(m_geocoderUrl);
     QUrlQuery urlQuery(url);
-    urlQuery.addQueryItem(QStringLiteral("limit"), QStringLiteral("5"));
+    urlQuery.addQueryItem(QStringLiteral("limit"), QString::number(kSearchResultLimit));
     urlQuery.addQueryItem(QStringLiteral("q"), query);
-    url.setQuery(urlQuery);
-
-    QNetworkRequest request(url);
-    request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
-    return request;
-}
-
-QNetworkRequest OpenNavigationProvider::buildFallbackSearchRequest(const QString &query) const
-{
-    QUrl url(m_fallbackGeocoderUrl);
-    QUrlQuery urlQuery(url);
-    urlQuery.addQueryItem(QStringLiteral("format"), QStringLiteral("jsonv2"));
-    urlQuery.addQueryItem(QStringLiteral("limit"), QStringLiteral("5"));
-    urlQuery.addQueryItem(QStringLiteral("q"), query);
+    if (qIsFinite(originLat) && qIsFinite(originLng)) {
+        urlQuery.addQueryItem(QStringLiteral("lat"), QString::number(originLat, 'f', 6));
+        urlQuery.addQueryItem(QStringLiteral("lon"), QString::number(originLng, 'f', 6));
+        urlQuery.addQueryItem(QStringLiteral("zoom"), QString::number(kPhotonBiasZoom));
+        urlQuery.addQueryItem(QStringLiteral("location_bias_scale"), QString::number(kPhotonBiasScale, 'f', 2));
+    }
+    const QString languageCode = photonLanguageCode(m_searchLanguage);
+    if (!languageCode.isEmpty()) {
+        urlQuery.addQueryItem(QStringLiteral("lang"), languageCode);
+    }
     url.setQuery(urlQuery);
 
     QNetworkRequest request(url);
@@ -89,7 +602,37 @@ QNetworkRequest OpenNavigationProvider::buildFallbackSearchRequest(const QString
     return request;
 }
 
-QList<SearchResultData> OpenNavigationProvider::parseSearchResponse(const QByteArray &payload, double originLat, double originLng) const
+QNetworkRequest OpenNavigationProvider::buildFallbackSearchRequest(const QString &query, double originLat, double originLng) const
+{
+    QUrl url(m_fallbackGeocoderUrl);
+    QUrlQuery urlQuery(url);
+    const bool addressLike = queryLooksAddressLike(query);
+    urlQuery.addQueryItem(QStringLiteral("format"), QStringLiteral("jsonv2"));
+    urlQuery.addQueryItem(QStringLiteral("limit"), QString::number(kSearchResultLimit));
+    urlQuery.addQueryItem(QStringLiteral("addressdetails"), QStringLiteral("1"));
+    urlQuery.addQueryItem(QStringLiteral("q"), query);
+    if (addressLike) {
+        urlQuery.addQueryItem(QStringLiteral("layer"), QStringLiteral("address"));
+        if (!m_searchCountryCode.isEmpty()) {
+            urlQuery.addQueryItem(QStringLiteral("countrycodes"), m_searchCountryCode.toLower());
+        }
+    }
+    const QString viewbox = searchViewbox(originLat, originLng, kNominatimViewboxRadiusKm);
+    if (!viewbox.isEmpty()) {
+        urlQuery.addQueryItem(QStringLiteral("viewbox"), viewbox);
+    }
+    url.setQuery(urlQuery);
+
+    QNetworkRequest request(url);
+    request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
+    request.setRawHeader("User-Agent", QByteArrayLiteral("BeagleyCluster/1.0"));
+    if (!m_searchLanguage.isEmpty()) {
+        request.setRawHeader("Accept-Language", m_searchLanguage.toUtf8());
+    }
+    return request;
+}
+
+QList<SearchResultData> OpenNavigationProvider::parseSearchResponse(const QByteArray &payload, const QString &query, double originLat, double originLng) const
 {
     QList<SearchResultData> results;
     const QJsonDocument doc = QJsonDocument::fromJson(payload);
@@ -111,11 +654,22 @@ QList<SearchResultData> OpenNavigationProvider::parseSearchResponse(const QByteA
             }
         }
     }
-    std::sort(results.begin(), results.end(), [](const SearchResultData &left, const SearchResultData &right) {
-        if (qFuzzyCompare(left.distanceMeters, right.distanceMeters)) {
-            return left.primary < right.primary;
+
+    for (SearchResultData &result : results) {
+        result.rankScore = rankSearchResult(result, query, m_searchCountryCode);
+    }
+
+    std::stable_sort(results.begin(), results.end(), [](const SearchResultData &left, const SearchResultData &right) {
+        if (qAbs(left.rankScore - right.rankScore) > 0.01) {
+            return left.rankScore > right.rankScore;
         }
-        return left.distanceMeters < right.distanceMeters;
+        if (qAbs(left.distanceMeters - right.distanceMeters) > 0.5) {
+            return left.distanceMeters < right.distanceMeters;
+        }
+        if (left.sourceOrder != right.sourceOrder) {
+            return left.sourceOrder < right.sourceOrder;
+        }
+        return left.primary < right.primary;
     });
     return results;
 }
@@ -136,7 +690,7 @@ QNetworkRequest OpenNavigationProvider::buildRouteRequest(double originLat, doub
         + QString::number(destLng, 'f', 6)
         + QStringLiteral(",")
         + QString::number(destLat, 'f', 6)
-        + QStringLiteral("?overview=full&geometries=geojson&steps=true&alternatives=false")));
+        + QStringLiteral("?overview=full&geometries=geojson&steps=true&alternatives=true")));
     request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
     return request;
 }
@@ -152,11 +706,26 @@ QByteArray OpenNavigationProvider::buildRouteBody(double originLat, double origi
 
 RouteData OpenNavigationProvider::parseRouteResponse(const QByteArray &payload, const QVariantMap &destination) const
 {
+    const QList<RouteData> routes = parseRouteAlternativesResponse(payload, destination);
+    return routes.isEmpty() ? RouteData{} : routes.first();
+}
+
+QList<RouteData> OpenNavigationProvider::parseRouteAlternativesResponse(const QByteArray &payload, const QVariantMap &destination) const
+{
     const QJsonDocument doc = QJsonDocument::fromJson(payload);
     if (!doc.isObject()) {
         return {};
     }
-    return parseOsrmRoute(doc.object().toVariantMap(), destination);
+
+    QList<RouteData> parsedRoutes;
+    const QVariantList routes = doc.object().toVariantMap().value(QStringLiteral("routes")).toList();
+    for (const QVariant &routeValue : routes) {
+        const RouteData route = parseOsrmRouteVariant(routeValue.toMap(), destination);
+        if (route.geometry.size() >= 2) {
+            parsedRoutes.append(route);
+        }
+    }
+    return parsedRoutes;
 }
 
 bool OpenNavigationProvider::searchUsesPost() const
@@ -280,28 +849,57 @@ SearchResultData OpenNavigationProvider::parseFeatureResult(const QVariantMap &f
         return {};
     }
 
-    SearchResultData result;
-    result.id = QStringLiteral("search-%1").arg(index);
-    result.primary = firstNonEmpty({
-        properties.value(QStringLiteral("name")).toString(),
-        properties.value(QStringLiteral("street")).toString(),
+    const QString name = properties.value(QStringLiteral("name")).toString().trimmed();
+    const QString street = properties.value(QStringLiteral("street")).toString().trimmed();
+    const QString houseNumber = properties.value(QStringLiteral("housenumber")).toString().trimmed();
+    const QString city = firstNonEmpty({
         properties.value(QStringLiteral("city")).toString(),
-        properties.value(QStringLiteral("country")).toString(),
+        properties.value(QStringLiteral("district")).toString(),
+        properties.value(QStringLiteral("county")).toString(),
+    });
+    const QString state = properties.value(QStringLiteral("state")).toString().trimmed();
+    const QString country = properties.value(QStringLiteral("country")).toString().trimmed();
+    const QString address = addressLine(houseNumber, street);
+
+    SearchResultData result;
+    result.id = QStringLiteral("search-photon-%1").arg(index);
+    result.street = street;
+    result.houseNumber = houseNumber;
+    result.city = city;
+    result.state = state;
+    result.country = country;
+    result.countryCode = properties.value(QStringLiteral("countrycode")).toString().trimmed().toUpper();
+    result.category = properties.value(QStringLiteral("osm_key")).toString().trimmed();
+    result.resultType = properties.value(QStringLiteral("type")).toString().trimmed();
+    result.addressType = result.resultType;
+    result.osmKey = properties.value(QStringLiteral("osm_key")).toString().trimmed();
+    result.osmValue = properties.value(QStringLiteral("osm_value")).toString().trimmed();
+    result.importance = properties.value(QStringLiteral("importance")).toDouble();
+    result.sourceOrder = index;
+    result.primary = firstNonEmpty({
+        name,
+        address,
+        city,
+        state,
+        country,
         QStringLiteral("Destination"),
     });
     result.secondary = trimmedJoin({
-        properties.value(QStringLiteral("street")).toString(),
-        properties.value(QStringLiteral("city")).toString(),
-        properties.value(QStringLiteral("state")).toString(),
-        properties.value(QStringLiteral("country")).toString(),
+        name.isEmpty() ? QString() : address,
+        city,
+        state,
+        country,
     });
     result.label = trimmedJoin({
-        properties.value(QStringLiteral("name")).toString(),
-        properties.value(QStringLiteral("street")).toString(),
-        properties.value(QStringLiteral("city")).toString(),
-        properties.value(QStringLiteral("state")).toString(),
-        properties.value(QStringLiteral("country")).toString(),
+        name,
+        address,
+        city,
+        state,
+        country,
     });
+    if (result.label.isEmpty()) {
+        result.label = result.primary;
+    }
     result.lat = lat;
     result.lng = lng;
     result.distanceMeters = resultDistance(originLat, originLng, lat, lng, index);
@@ -317,18 +915,108 @@ SearchResultData OpenNavigationProvider::parseNominatimResult(const QVariantMap 
     }
 
     const QString label = item.value(QStringLiteral("display_name")).toString().trimmed();
-    const QStringList parts = label.split(QLatin1Char(','));
+    const QVariantMap addressMap = item.value(QStringLiteral("address")).toMap();
+    const QString name = item.value(QStringLiteral("name")).toString().trimmed();
+    const QString houseNumber = firstNonEmpty({
+        addressMap.value(QStringLiteral("house_number")).toString(),
+        item.value(QStringLiteral("house_number")).toString(),
+    });
+    const QString street = firstNonEmpty({
+        addressMap.value(QStringLiteral("road")).toString(),
+        addressMap.value(QStringLiteral("street")).toString(),
+        addressMap.value(QStringLiteral("pedestrian")).toString(),
+        addressMap.value(QStringLiteral("footway")).toString(),
+        addressMap.value(QStringLiteral("cycleway")).toString(),
+    });
+    const QString locality = firstNonEmpty({
+        addressMap.value(QStringLiteral("suburb")).toString(),
+        addressMap.value(QStringLiteral("neighbourhood")).toString(),
+        addressMap.value(QStringLiteral("quarter")).toString(),
+        addressMap.value(QStringLiteral("hamlet")).toString(),
+        addressMap.value(QStringLiteral("village")).toString(),
+        addressMap.value(QStringLiteral("town")).toString(),
+        addressMap.value(QStringLiteral("city")).toString(),
+        addressMap.value(QStringLiteral("municipality")).toString(),
+        addressMap.value(QStringLiteral("county")).toString(),
+    });
+    const QString city = firstNonEmpty({
+        addressMap.value(QStringLiteral("city")).toString(),
+        addressMap.value(QStringLiteral("town")).toString(),
+        addressMap.value(QStringLiteral("village")).toString(),
+        addressMap.value(QStringLiteral("municipality")).toString(),
+        addressMap.value(QStringLiteral("suburb")).toString(),
+        addressMap.value(QStringLiteral("hamlet")).toString(),
+    });
+    const QString state = firstNonEmpty({
+        addressMap.value(QStringLiteral("state")).toString(),
+        addressMap.value(QStringLiteral("region")).toString(),
+    });
+    const QString country = addressMap.value(QStringLiteral("country")).toString().trimmed();
+    const QString countryCode = firstNonEmpty({
+        addressMap.value(QStringLiteral("country_code")).toString(),
+        item.value(QStringLiteral("country_code")).toString(),
+    }).toUpper();
+    const QString address = addressLine(houseNumber, street);
+    const QString localityLine = locality.compare(city, Qt::CaseInsensitive) == 0 ? QString() : locality;
 
     SearchResultData result;
-    result.id = QStringLiteral("search-%1").arg(index);
+    result.id = QStringLiteral("search-nominatim-%1").arg(index);
+    result.street = street;
+    result.houseNumber = houseNumber;
+    result.city = city.isEmpty() ? locality : city;
+    result.state = state;
+    result.country = country;
+    result.countryCode = countryCode;
+    result.category = item.value(QStringLiteral("category")).toString().trimmed();
+    result.resultType = item.value(QStringLiteral("type")).toString().trimmed();
+    result.addressType = item.value(QStringLiteral("addresstype")).toString().trimmed();
+    result.osmKey = result.category;
+    result.osmValue = result.resultType;
+    result.importance = item.value(QStringLiteral("importance")).toDouble();
+    result.sourceOrder = index;
     result.label = label;
-    result.primary = parts.mid(0, 2).join(QStringLiteral(", ")).trimmed();
-    result.secondary = parts.mid(2).join(QStringLiteral(", ")).trimmed();
+    result.primary = firstNonEmpty({
+        name,
+        address,
+        street,
+        locality,
+        city,
+        country,
+        label,
+    });
+    result.secondary = trimmedJoin({
+        name.isEmpty() ? QString() : address,
+        localityLine,
+        city,
+        state,
+        country,
+    });
     if (result.primary.isEmpty()) {
         result.primary = label;
     }
     if (result.secondary.isEmpty()) {
+        result.secondary = trimmedJoin({
+            localityLine,
+            city,
+            state,
+            country,
+        });
+    }
+    if (result.secondary.isEmpty()) {
         result.secondary = QStringLiteral("OpenStreetMap result");
+    }
+    if (result.label.isEmpty()) {
+        result.label = trimmedJoin({
+            name,
+            address,
+            localityLine,
+            city,
+            state,
+            country,
+        });
+    }
+    if (result.label.isEmpty()) {
+        result.label = result.primary;
     }
     result.lat = lat;
     result.lng = lng;
@@ -336,17 +1024,10 @@ SearchResultData OpenNavigationProvider::parseNominatimResult(const QVariantMap 
     return result;
 }
 
-RouteData OpenNavigationProvider::parseOsrmRoute(const QVariantMap &root, const QVariantMap &destination) const
+RouteData OpenNavigationProvider::parseOsrmRouteVariant(const QVariantMap &route, const QVariantMap &destination) const
 {
     RouteData data;
     data.destination = destination;
-
-    const QVariantList routes = root.value(QStringLiteral("routes")).toList();
-    if (routes.isEmpty()) {
-        return data;
-    }
-
-    const QVariantMap route = routes.first().toMap();
     const QVariantMap geometry = route.value(QStringLiteral("geometry")).toMap();
     const QVariantList coordinates = geometry.value(QStringLiteral("coordinates")).toList();
     if (coordinates.size() < 2) {

@@ -1,0 +1,15 @@
+[Unit]
+Description=Beagley Diagnostic Network-Online Marker
+After=systemd-networkd-wait-online.service beagley-diagnostic-collect.service
+Wants=systemd-networkd-wait-online.service beagley-diagnostic-collect.service
+
+[Service]
+Type=oneshot
+ExecCondition=/bin/sh -c 'grep -Eq "(^| )beagley\\.diag=1($| )" /proc/cmdline || test -f /run/beagley-diagnostic.mode'
+ExecStart=/usr/libexec/beagley-cluster/beagley-diagnostic.sh both network-online-reached
+RemainAfterExit=yes
+StandardOutput=journal+console
+StandardError=journal+console
+
+[Install]
+WantedBy=network-online.target

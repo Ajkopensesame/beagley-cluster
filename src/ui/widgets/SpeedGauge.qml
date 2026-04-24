@@ -1,5 +1,4 @@
 import QtQuick 2.15
-import QtQuick.Shapes 1.15
 
 Item {
     id: root
@@ -26,6 +25,7 @@ Item {
         if (gg === "D") return pearlLow;           // Drive: light purple
         if (gg === "2") return pearlLow;           // 2: light purple
         if (gg === "1") return pearlLow;           // 1: light purple
+        if (gg === "L") return pearlLow;           // Low: light purple
 
         return textCol;
     }
@@ -41,6 +41,8 @@ Item {
     property real matrixRainSharedPhase: NaN
 
     property var vehicleState
+    property bool stressScene: false
+    property real stressPhase: 0.0
     // Public API
     property real speed: 0
     property real maxSpeed: 180
@@ -83,8 +85,53 @@ Item {
             a
         );
     }
+    function firstFinite(values) {
+        for (var i = 0; i < values.length; i++) {
+            var n = Number(values[i]);
+            if (isFinite(n)) return n;
+        }
+        return NaN;
+    }
+    function liveOdometerKmValue() {
+        if (!root.vehicleState) return NaN;
+
+        var km = firstFinite([
+            root.vehicleState.odometerKm,
+            root.vehicleState.odoKm,
+            root.vehicleState.mileageKm,
+            root.vehicleState.totalKm,
+            root.vehicleState.odometer
+        ]);
+        if (isFinite(km)) return km;
+
+        var meters = firstFinite([
+            root.vehicleState.odometerMeters,
+            root.vehicleState.odoMeters,
+            root.vehicleState.mileageMeters
+        ]);
+        return isFinite(meters) ? meters / 1000.0 : NaN;
+    }
+    function formatOdometerKm(v) {
+        var s = String(Math.max(0, Math.round(Number(v) || 0)));
+        var out = "";
+        var count = 0;
+        for (var i = s.length - 1; i >= 0; i--) {
+            out = s.charAt(i) + out;
+            count++;
+            if (i > 0 && count % 3 === 0)
+                out = " " + out;
+        }
+        return out;
+    }
     readonly property bool lowEffectMode: effectLevel === "low" || effectLevel === "off"
+    readonly property bool embeddedSafeMode: Qt.platform.os === "linux"
     readonly property color chromeColor: theme?.pearlLow ?? Qt.color("#C7B7FF")
+    readonly property real auxArcCanvasScale: lowEffectMode ? 0.44 : 1.0
+    readonly property real sideArcHeadRadius: lowEffectMode ? 10.5 : 15.5
+    readonly property real speedRepaintThreshold: lowEffectMode ? 0.60 : 1e-4
+    readonly property real coolantRepaintThreshold: lowEffectMode ? 0.30 : 1e-4
+    property real lastPaintedSpeed: 0
+    property real lastPaintedCoolantC: 70
 
     function requestGaugeStaticPaint() {
         dialChrome.requestStaticPaint();
@@ -92,6 +139,8 @@ Item {
     function requestGaugeDynamicPaint() {
         dialChrome.requestDynamicPaint();
         coolantArcCanvas.requestPaint();
+        root.lastPaintedSpeed = root.displaySpeed;
+        root.lastPaintedCoolantC = root.displayCoolantC;
     }
     function kickSmoother() {
         if (!smoothingTimer.running) smoothingTimer.start();
@@ -100,13 +149,31 @@ Item {
     readonly property real progress: clamp(displaySpeed / maxSpeed, 0, 1)
     readonly property int speedInt: Math.round(displaySpeed)
     readonly property bool highSpeed: overSpeed
+    readonly property bool speedHeadScared: displaySpeed > 115
+    readonly property bool coolantHeadScared: displayCoolantC >= 100
+    readonly property var stressGearSequence: ["P", "R", "N", "D", "2", "1", "L"]
+    readonly property string displayGear: root.stressScene
+        ? stressGearSequence[Math.floor(root.stressPhase / 1.05) % stressGearSequence.length]
+        : ((root.vehicleState && root.vehicleState.gear !== undefined) ? root.vehicleState.gear : "P")
+    readonly property bool displayOverdrive: root.stressScene
+        ? Math.sin(root.stressPhase * 0.95) > 0.0
+        : !!(root.vehicleState && root.vehicleState.overdrive === true)
+    readonly property real liveOdometerKm: liveOdometerKmValue()
+    readonly property real displayOdometerKm: root.stressScene
+        ? 284613 + Math.floor(root.stressPhase * 2.4)
+        : liveOdometerKm
+    readonly property string odometerText: isFinite(displayOdometerKm)
+        ? formatOdometerKm(displayOdometerKm)
+        : "------"
     property real flashLevel: 0.0
+    property real coolantLavaPhase: 0.0
 
     // Coolant normalized 0..1 (C -> H)
     readonly property real coolantNorm: clamp(
         (displayCoolantC - coolantColdC) / Math.max(1e-6, (coolantHotC - coolantColdC)),
         0, 1
     )
+    readonly property real coolantVisualNorm: displayCoolantC < coolantColdC ? 0.14 : coolantNorm
 
     // Keep the dial geometry stable so the speed and tach arcs stay optically matched.
     readonly property real faceScale: 1.0
@@ -128,61 +195,21 @@ Item {
         return major ? 0.72 : 0.42;
     }
 
-    // --- Coolant colour ramp (cold->warm->hot) ---
-    function coolantRampColor(t) {
-        // Palette (fallbacks)
-        const cold = "#C7B7FF";  // light purple
-        const warm = "#FFD54A";  // yellow
-        const hot  = "#FF3B3B";  // red
-
-        // 0..0.65: cold->warm, 0.65..1: warm->hot
-        if (t <= 0.65) {
-            const u = t / 0.65;
-            return Qt.rgba(
-                lerp(Qt.color(cold).r, Qt.color(warm).r, u),
-                lerp(Qt.color(cold).g, Qt.color(warm).g, u),
-                lerp(Qt.color(cold).b, Qt.color(warm).b, u),
-                1
-            );
-        } else {
-            const u = (t - 0.65) / 0.35;
-            return Qt.rgba(
-                lerp(Qt.color(warm).r, Qt.color(hot).r, u),
-                lerp(Qt.color(warm).g, Qt.color(hot).g, u),
-                lerp(Qt.color(warm).b, Qt.color(hot).b, u),
-                1
-            );
-        }
-    }
-
-    function mixColors(c1, c2, t, a) {
-        return Qt.rgba(
-            lerp(c1.r, c2.r, t),
-            lerp(c1.g, c2.g, t),
-            lerp(c1.b, c2.b, t),
-            a
-        );
-    }
-
     function coolantActiveColor(tempC) {
         const t = Number(tempC) || 0;
         const purple = theme?.pearlLow ?? Qt.color("#C7B7FF");
         const blue = Qt.color("#63C9FF");
-        const green = Qt.color("#72F7A1");
         const red = theme?.danger ?? Qt.color("#FF3B3B");
 
-        if (t <= 50) return purple;
-        if (t <= 75) return mixColors(purple, blue, (t - 50) / 25.0, 1.0);
-        if (t <= 90) return mixColors(blue, green, (t - 75) / 15.0, 1.0);
-        if (t <= 100) return mixColors(mixColors(purple, green, 0.35, 1.0), green, (t - 90) / 10.0, 1.0);
-        if (t <= 110) return mixColors(green, red, (t - 100) / 10.0, 1.0);
-        return red;
+        if (t < 40) return blue;
+        if (t >= 100) return red;
+        return purple;
     }
 
     // Smooth animation
     Timer {
         id: smoothingTimer
-        interval: 16
+        interval: root.lowEffectMode ? 50 : 16
         running: false
         repeat: true
         onTriggered: {
@@ -210,9 +237,24 @@ Item {
             const coolantSettled = Math.abs(cTarget - root.displayCoolantC) < 0.02;
             const changed = Math.abs(root.displaySpeed - prevSpeed) > 1e-4
                          || Math.abs(root.displayCoolantC - prevCoolant) > 1e-4;
+            const needsRepaint = Math.abs(root.displaySpeed - root.lastPaintedSpeed) >= root.speedRepaintThreshold
+                              || Math.abs(root.displayCoolantC - root.lastPaintedCoolantC) >= root.coolantRepaintThreshold;
+            const settledFlush = speedSettled && coolantSettled
+                              && (Math.abs(root.displaySpeed - root.lastPaintedSpeed) > 1e-4
+                               || Math.abs(root.displayCoolantC - root.lastPaintedCoolantC) > 1e-4);
 
-            if (changed) requestGaugeDynamicPaint();
+            if (changed && (needsRepaint || settledFlush)) requestGaugeDynamicPaint();
             if (speedSettled && coolantSettled) running = false;
+        }
+    }
+
+    Timer {
+        interval: root.lowEffectMode ? 120 : 42
+        running: root.effectLevel !== "off" && !root.lowEffectMode
+        repeat: true
+        onTriggered: {
+            root.coolantLavaPhase += interval / 1000.0
+            coolantArcCanvas.requestPaint()
         }
     }
 
@@ -220,7 +262,10 @@ Item {
     onCoolantCChanged: kickSmoother()
     onMaxSpeedChanged: kickSmoother()
     onGaugeColorChanged: requestGaugeDynamicPaint()
-    onThemeChanged: requestGaugeStaticPaint()
+    onThemeChanged: {
+        requestGaugeStaticPaint()
+        requestGaugeDynamicPaint()
+    }
     onWidthChanged: {
         requestGaugeStaticPaint()
         requestGaugeDynamicPaint()
@@ -228,6 +273,10 @@ Item {
     onHeightChanged: {
         requestGaugeStaticPaint()
         requestGaugeDynamicPaint()
+    }
+    onLowEffectModeChanged: {
+        requestGaugeDynamicPaint()
+        kickSmoother()
     }
 
     Component.onCompleted: {
@@ -275,7 +324,7 @@ Item {
         MatrixRain {
             anchors.fill: parent
             z: 2
-            visible: root.matrixRainEnabled && !root.lowEffectMode
+            visible: root.matrixRainEnabled && root.effectLevel !== "off"
             circularMask: true
             maskRadius: root.rainFaceRadius
             effectEnabled: visible
@@ -287,18 +336,18 @@ Item {
                 0.72,
                 0.96
             )
-            fps: 12
-            speedMultiplier: 0.20
-            density: 0.30
-            glowSpeed: 0.72
-            glowFloor: 0.28
+            fps: root.lowEffectMode ? 7 : 12
+            speedMultiplier: root.lowEffectMode ? 0.11 : 0.20
+            density: root.lowEffectMode ? 0.15 : 0.30
+            glowSpeed: root.lowEffectMode ? 0.58 : 0.72
+            glowFloor: root.lowEffectMode ? 0.22 : 0.28
             driftScale: 0.90
-            charChangeChance: 0.026
-            fontPx: 12
-            fadeAlpha: 0.024
-            tailLength: 48
-            headAlpha: 0.92
-            tailMinAlpha: 0.12
+            charChangeChance: root.lowEffectMode ? 0.032 : 0.026
+            fontPx: root.lowEffectMode ? 18 : 12
+            fadeAlpha: root.lowEffectMode ? 0.075 : 0.024
+            tailLength: root.lowEffectMode ? 12 : 48
+            headAlpha: root.lowEffectMode ? 0.74 : 0.92
+            tailMinAlpha: root.lowEffectMode ? 0.025 : 0.12
         }
 
         DialChrome {
@@ -306,9 +355,11 @@ Item {
             anchors.fill: parent
             z: 20
             theme: root.theme
+            effectLevel: root.effectLevel
             gaugeColor: root.gaugeColor
             chromeColor: root.chromeColor
             progress: root.progress
+            scaredHead: root.speedHeadScared
             maxValue: root.maxSpeed
             startAngleDeg: root.startAngleDeg
             sweepAngleDeg: root.sweepAngleDeg
@@ -319,124 +370,255 @@ Item {
             labelDivisor: 1
         }
 
-        // ---- Coolant arc (FILLED band, opposite speed sweep) ----
-        Canvas {
-            id: coolantArcCanvas
+        // ---- Coolant arc (tapered lava band, opposite speed sweep) ----
+        Item {
+            id: coolantArcLayer
             anchors.fill: parent
             z: 44
 
-            onWidthChanged: requestPaint()
-            onHeightChanged: requestPaint()
+            readonly property real rawStartDeg: (root.startAngleDeg + root.sweepAngleDeg) % 360
+            readonly property real rawSweepDeg: 360 - root.sweepAngleDeg
+            readonly property real padDeg: 12
+            readonly property real startDeg: rawStartDeg + padDeg
+            readonly property real sweepDeg: Math.max(0, rawSweepDeg - padDeg * 2)
+            readonly property real fillStartNorm: 1.0 - root.coolantVisualNorm
+            readonly property real radius: width * 0.36
+            readonly property real labelRadius: radius + 18
+            readonly property color baseDark: root.theme?.pearlHigh ?? root.gaugeColor
+            readonly property color coolantColor: root.coolantActiveColor(root.displayCoolantC)
+            readonly property color coolantBright: root.blendToward(coolantColor, Qt.color("#FFFFFF"), 0.20, 1.0)
+            readonly property real sweepRad: sweepDeg * Math.PI / 180
+            readonly property real headAngleRad: angleRad(startDeg) + sweepRad * fillStartNorm
+            readonly property bool headVisible: root.coolantVisualNorm > 0.002
+            readonly property real headCenterX: width / 2 + Math.cos(headAngleRad) * radius
+            readonly property real headCenterY: height / 2 + Math.sin(headAngleRad) * radius
 
-            Connections {
-                target: root
-                function onDisplayCoolantCChanged() { coolantArcCanvas.requestPaint() }
+            function angleRad(deg) {
+                return (deg - 90) * Math.PI / 180
             }
 
-            onPaint: {
-                const ctx = getContext("2d");
-                ctx.clearRect(0, 0, width, height);
+            function pointX(deg, radius, itemWidth) {
+                return width / 2 + Math.cos(angleRad(deg)) * radius - itemWidth / 2
+            }
 
-                const cx = width / 2;
-                const cy = height / 2;
+            function pointY(deg, radius, itemHeight) {
+                return height / 2 + Math.sin(angleRad(deg)) * radius - itemHeight / 2
+            }
 
-                // Opposite-side arc (same concept as Tach fuel arc)
-                const rawStartDeg = (root.startAngleDeg + root.sweepAngleDeg) % 360;
-                const rawSweepDeg = 360 - root.sweepAngleDeg;
+            Canvas {
+                id: coolantArcCanvas
+                anchors.centerIn: parent
+                width: parent.width * (root.embeddedSafeMode ? 1.0 : root.auxArcCanvasScale)
+                height: parent.height * (root.embeddedSafeMode ? 1.0 : root.auxArcCanvasScale)
+                scale: root.embeddedSafeMode ? 1.0 : (1.0 / root.auxArcCanvasScale)
+                renderTarget: root.embeddedSafeMode ? Canvas.Image : Canvas.FramebufferObject
+                antialiasing: !root.lowEffectMode && !root.embeddedSafeMode
+                smooth: !root.lowEffectMode && !root.embeddedSafeMode
 
-                const padDeg = 12;
-                const startDeg = rawStartDeg + padDeg;
-                const sweepDeg = Math.max(0, rawSweepDeg - padDeg * 2);
+                onWidthChanged: requestPaint()
+                onHeightChanged: requestPaint()
 
-                // startRad ~ top-right, end ~ bottom-left
-                const startRad = (startDeg - 90) * Math.PI / 180;
-                const sweepRad = sweepDeg * Math.PI / 180;
+                onPaint: {
+                    const ctx = getContext("2d")
+                    ctx.clearRect(0, 0, width, height)
 
-                const rOut = width * 0.36;
-                const thickStart = 24;   // wide end (H side)
-                const thickEnd   = 4;    // point end (C side)
-                const segments   = 90;
+                    const cx = width / 2
+                    const cy = height / 2
+                    const r = width * 0.36
+                    const startRad = coolantArcLayer.angleRad(coolantArcLayer.startDeg)
+                    const sweepRad = coolantArcLayer.sweepDeg * Math.PI / 180
+                    const tailT = 1.0
+                    const headT = coolantArcLayer.fillStartNorm
+                    const coolant = coolantArcLayer.coolantColor
+                    const bright = coolantArcLayer.coolantBright
 
-                ctx.save();
-
-                const baseDark = (theme?.pearlHigh ?? root.gaugeColor);
-                const coolantColor = root.coolantActiveColor(root.displayCoolantC);
-                function drawTrack(tFrom, tTo, colorFnOrColor, alpha, widthScale) {
-                    for (let i = 0; i < segments; i++) {
-                        const u0 = i / segments;
-                        const u1 = (i + 1) / segments;
-                        if (u0 >= tTo) break;
-
-                        const v0 = Math.max(u0, tFrom);
-                        const v1 = Math.min(u1, tTo);
-                        if (v1 <= v0) continue;
-
-                        const th = thickStart + (thickEnd - thickStart) * ((v0 + v1) * 0.5);
-                        const rr = rOut - th / 2;
-                        const col = (typeof colorFnOrColor === "function")
-                            ? colorFnOrColor((v0 + v1) * 0.5)
-                            : colorFnOrColor;
-
-                        ctx.beginPath();
-                        ctx.strokeStyle = Qt.rgba(col.r, col.g, col.b, alpha);
-                        ctx.lineCap = "round";
-                        ctx.lineWidth = Math.max(2, th * widthScale);
-                        ctx.arc(cx, cy, rr, startRad + sweepRad * v0, startRad + sweepRad * v1, false);
-                        ctx.stroke();
+                    function rgba(color, alpha) {
+                        return "rgba("
+                            + Math.round(color.r * 255) + ","
+                            + Math.round(color.g * 255) + ","
+                            + Math.round(color.b * 255) + ","
+                            + alpha + ")"
                     }
+
+                    const neonCyan = Qt.color("#73F6FF")
+                    const neonLime = Qt.color("#9B5CFF")
+                    const neonPink = Qt.color("#FF4DFF")
+                    const neonOrange = Qt.color("#6E35FF")
+                    const neonYellow = Qt.color("#EAD7FF")
+                    const coldMode = root.displayCoolantC < root.coolantColdC
+                    const hotMode = root.displayCoolantC >= 100
+                    const lava0 = coldMode ? Qt.color("#63C9FF") : (hotMode ? Qt.color("#FF3B3B") : neonCyan)
+                    const lava1 = coldMode ? Qt.color("#C9F7FF") : (hotMode ? Qt.color("#FF4D6D") : neonPink)
+                    const lava2 = coldMode ? Qt.color("#73F6FF") : (hotMode ? Qt.color("#FF7A4A") : neonLime)
+                    const lava3 = coldMode ? Qt.color("#E7FCFF") : (hotMode ? Qt.color("#FFD1CF") : neonYellow)
+
+                    function pointForT(t, radialOffset) {
+                        const a = startRad + sweepRad * t
+                        return {
+                            x: cx + Math.cos(a) * (r + radialOffset),
+                            y: cy + Math.sin(a) * (r + radialOffset),
+                            a: a
+                        }
+                    }
+
+                    function buildBandPath(fromT, toT, tailWidth, headWidth) {
+                        const outer = []
+                        const inner = []
+                        const steps = Math.max(10, Math.ceil(Math.abs(toT - fromT) * 56))
+                        for (let i = 0; i <= steps; i++) {
+                            const u = i / steps
+                            const eased = 1 - Math.pow(1 - u, 1.45)
+                            const t = fromT + (toT - fromT) * u
+                            const w = tailWidth + (headWidth - tailWidth) * eased
+                            outer.push(pointForT(t, w / 2))
+                            inner.push(pointForT(t, -w / 2))
+                        }
+
+                        ctx.beginPath()
+                        ctx.moveTo(outer[0].x, outer[0].y)
+                        for (let i = 1; i < outer.length; i++) ctx.lineTo(outer[i].x, outer[i].y)
+                        for (let i = inner.length - 1; i >= 0; i--) ctx.lineTo(inner[i].x, inner[i].y)
+                        ctx.closePath()
+
+                        const tail = pointForT(fromT, 0)
+                        const head = pointForT(toT, 0)
+                        ctx.moveTo(tail.x + tailWidth * 0.45, tail.y)
+                        ctx.arc(tail.x, tail.y, Math.max(2, tailWidth * 0.48), 0, Math.PI * 2)
+                        ctx.moveTo(head.x + headWidth * 0.52, head.y)
+                        ctx.arc(head.x, head.y, Math.max(3, headWidth * 0.52), 0, Math.PI * 2)
+                    }
+
+                    function drawBlob(t, radialOffset, radius, color, alpha, stretch, phase) {
+                        const p = pointForT(t, radialOffset)
+                        const grad = ctx.createRadialGradient(0, 0, radius * 0.12, 0, 0, radius)
+                        grad.addColorStop(0.00, rgba(root.blendToward(color, Qt.color("#FFFFFF"), 0.42, 1.0), alpha))
+                        grad.addColorStop(0.62, rgba(color, alpha * 0.40))
+                        grad.addColorStop(1.00, rgba(color, 0.0))
+
+                        ctx.save()
+                        ctx.translate(p.x, p.y)
+                        ctx.rotate(p.a + Math.PI / 2 + Math.sin(phase) * 0.20)
+                        ctx.scale(stretch, 0.62)
+                        ctx.fillStyle = grad
+                        ctx.beginPath()
+                        ctx.arc(0, 0, radius, 0, Math.PI * 2)
+                        ctx.fill()
+                        ctx.restore()
+                    }
+
+                    ctx.save()
+                    ctx.beginPath()
+                    ctx.strokeStyle = rgba(coolantArcLayer.baseDark, root.lowEffectMode ? 0.10 : 0.08)
+                    ctx.lineWidth = root.lowEffectMode ? (10 * root.auxArcCanvasScale) : 22
+                    ctx.lineCap = "round"
+                    ctx.arc(cx, cy, r, startRad, startRad + sweepRad)
+                    ctx.stroke()
+                    ctx.restore()
+
+                    if (root.coolantVisualNorm > 0.002) {
+                        const tailWidth = root.lowEffectMode ? (3.5 * root.auxArcCanvasScale) : 5.5
+                        const headWidth = root.lowEffectMode ? (10 * root.auxArcCanvasScale) : 22
+                        const phase = root.coolantLavaPhase
+
+                        if (root.lowEffectMode) {
+                            ctx.save()
+                            buildBandPath(tailT, headT, tailWidth, headWidth)
+                            const fill = ctx.createLinearGradient(cx - r, cy + r, cx + r, cy - r)
+                            fill.addColorStop(0.00, rgba(lava0, 0.70))
+                            fill.addColorStop(0.42, rgba(lava2, 0.80))
+                            fill.addColorStop(0.76, rgba(bright, 0.68))
+                            fill.addColorStop(1.00, rgba(lava3, 0.58))
+                            ctx.fillStyle = fill
+                            ctx.fill()
+                            ctx.restore()
+
+                            ctx.save()
+                            buildBandPath(tailT, headT,
+                                          1.6 * root.auxArcCanvasScale,
+                                          4.8 * root.auxArcCanvasScale)
+                            ctx.fillStyle = rgba(neonYellow, 0.22)
+                            ctx.fill()
+                            ctx.restore()
+                        } else {
+                            ctx.save()
+                            buildBandPath(tailT, headT, tailWidth, headWidth)
+                            ctx.clip()
+
+                            const fill = ctx.createLinearGradient(cx - r, cy + r, cx + r, cy - r)
+                            fill.addColorStop(0.00, rgba(lava0, 0.54))
+                            fill.addColorStop(0.24, rgba(lava1, 0.66))
+                            fill.addColorStop(0.54, rgba(lava2, 0.76))
+                            fill.addColorStop(0.78, rgba(bright, 0.64))
+                            fill.addColorStop(1.00, rgba(lava3, 0.52))
+                            ctx.fillStyle = fill
+                            ctx.fillRect(0, 0, width, height)
+
+                            for (let i = 0; i < 5; i++) {
+                                const blobColor = [lava0, lava1, lava2, bright, lava3][i % 5]
+                                const u = (phase * (0.11 + i * 0.015) + i * 0.23) % 1.0
+                                const t = tailT + (headT - tailT) * u
+                                const wobble = Math.sin(phase * (1.1 + i * 0.2) + i * 1.7)
+                                const blobR = 11 + i * 1.7
+                                drawBlob(t, wobble * 2.4, blobR, blobColor, 0.56, 1.55, phase + i)
+                            }
+                            ctx.restore()
+
+                            ctx.save()
+                            buildBandPath(tailT, headT, tailWidth, headWidth)
+                            ctx.fillStyle = rgba(neonYellow, 0.18)
+                            ctx.fill()
+                            ctx.restore()
+                        }
+
+                    }
+
+                    if (typeof performanceMetrics !== "undefined" && performanceMetrics)
+                        performanceMetrics.recordPaint("speedGauge.coolantArc")
                 }
+            }
 
-                // Fill from C -> H.
-                // Arc param: 0 at H, 1 at C. Coolant norm: 0 at C, 1 at H.
-                // Therefore filled region is [1 - coolantNorm, 1.0].
-                const tStartFill = 1.0 - root.coolantNorm;
-                drawTrack(0.0, 1.0, baseDark, 0.08, 1.05);
-                drawTrack(0.0, 1.0, baseDark, 0.14, 0.60);
-                drawTrack(tStartFill, 1.0, coolantColor, 0.22, 0.74);
-                drawTrack(tStartFill, 1.0, coolantColor, 0.34, 0.42);
-                drawTrack(tStartFill, 1.0, root.blendToward(coolantColor, Qt.color("#FFFFFF"), 0.20, 1.0), 0.90, 0.18);
+            GaugeArcHead {
+                z: 48
+                visible: coolantArcLayer.headVisible
+                lowEffectMode: root.lowEffectMode
+                scared: root.coolantHeadScared
+                headRadius: root.sideArcHeadRadius
+                x: coolantArcLayer.headCenterX - width / 2
+                y: coolantArcLayer.headCenterY - height / 2
+            }
 
-                // Moving boundary cap
-                function capAt(t, color) {
-                    const th = thickStart + (thickEnd - thickStart) * t;
-                    const rr = rOut - th / 2;
-                    const ang = startRad + sweepRad * t;
-                    const x = cx + Math.cos(ang) * rr;
-                    const y = cy + Math.sin(ang) * rr;
+            Text {
+                width: 24
+                height: 20
+                x: coolantArcLayer.pointX(coolantArcLayer.startDeg, coolantArcLayer.labelRadius, width)
+                y: coolantArcLayer.pointY(coolantArcLayer.startDeg, coolantArcLayer.labelRadius, height)
+                text: "H"
+                color: root.theme?.text ?? "white"
+                opacity: root.theme?.isNight ? 0.90 : 0.75
+                font.family: root.theme?.fontMono ?? "monospace"
+                font.pixelSize: 16
+                font.bold: true
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+            }
 
-                ctx.save();
-                    ctx.fillStyle = color;
-                    ctx.beginPath();
-                    ctx.arc(x, y, Math.max(2, th * 0.18), 0, Math.PI * 2);
-                    ctx.fill();
-                ctx.restore();
-                }
-
-                if (tStartFill > 0.0 && tStartFill < 1.0) {
-                    capAt(tStartFill, root.blendToward(coolantColor, Qt.color("#FFFFFF"), 0.12, 1.0));
-                }
-
-
-                // Rounded physical endpoint caps (match Tach fuel arc style)
-                // t=0.0 is the H end (wide), t=1.0 is the C end (point)
-                // Labels pinned to endpoints
-                const labelR = rOut + 18;
-                const angH = startRad;
-                const angC = startRad + sweepRad;
-
-                ctx.globalAlpha = theme?.isNight ? 0.90 : 0.75;
-                ctx.fillStyle = theme?.text ?? "white";
-                ctx.font = "700 16px monospace";
-                ctx.textAlign = "center";
-                ctx.textBaseline = "middle";
-
-                ctx.fillText("H", cx + Math.cos(angH) * labelR, cy + Math.sin(angH) * labelR);
-                ctx.fillText("C", cx + Math.cos(angC) * labelR, cy + Math.sin(angC) * labelR);
-
-                ctx.restore();
-
-                if (typeof performanceMetrics !== "undefined" && performanceMetrics)
-                    performanceMetrics.recordPaint("speedGauge.coolantArc")
+            Text {
+                width: 24
+                height: 20
+                x: coolantArcLayer.pointX(coolantArcLayer.startDeg + coolantArcLayer.sweepDeg,
+                                           coolantArcLayer.labelRadius,
+                                           width)
+                y: coolantArcLayer.pointY(coolantArcLayer.startDeg + coolantArcLayer.sweepDeg,
+                                           coolantArcLayer.labelRadius,
+                                           height)
+                text: "C"
+                color: root.theme?.text ?? "white"
+                opacity: root.theme?.isNight ? 0.90 : 0.75
+                font.family: root.theme?.fontMono ?? "monospace"
+                font.pixelSize: 16
+                font.bold: true
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
             }
         }
     }
@@ -476,9 +658,10 @@ Item {
 Item {
         id: odBadge
         z: 62
-        readonly property bool active: !!(root.vehicleState && root.vehicleState.overdrive === true)
+        readonly property bool active: root.displayOverdrive
         readonly property color odColor: (root.theme && root.theme.amber) ? root.theme.amber : "#FFC107"
-        visible: true
+        readonly property color odDimColor: Qt.rgba(odColor.r, odColor.g, odColor.b, 0.28)
+        visible: active
 
         anchors.bottom: speedValueText.top
         anchors.bottomMargin: 12
@@ -494,8 +677,8 @@ Item {
             radius: height / 2
             color: odBadge.active ? "#140A22" : "#100D16"
             border.width: 2
-            border.color: odBadge.odColor
-            opacity: odBadge.active ? 0.94 : 0.70
+            border.color: odBadge.active ? odBadge.odColor : odBadge.odDimColor
+            opacity: odBadge.active ? 0.94 : 0.46
         }
 
         // Outer glow (soft)
@@ -505,7 +688,7 @@ Item {
             color: "transparent"
             border.width: 14
             border.color: Qt.rgba(odBadge.odColor.r, odBadge.odColor.g, odBadge.odColor.b, odBadge.active ? 0.17 : 0.10)
-            opacity: odBadge.active ? 1.0 : 0.45
+            opacity: odBadge.active ? 1.0 : 0.20
         }
 
         // Inner highlight line (depth)
@@ -529,7 +712,7 @@ Item {
             font.weight: Font.Bold
             font.letterSpacing: 4
             color: odBadge.odColor
-            opacity: odBadge.active ? 1.0 : 0.78
+            opacity: odBadge.active ? 1.0 : 0.30
         }
 
         // Micro-pulse so it feels alive (subtle)
@@ -559,16 +742,16 @@ Item {
         id: gearReadout
         z: 61
         anchors.top: speedValueText.bottom
-        anchors.topMargin: 8
+        anchors.topMargin: 4
         anchors.horizontalCenter: speedValueText.horizontalCenter
         width: 96
-        height: 72
+        height: 58
 
         Text {
             id: gearText
             anchors.centerIn: parent
 
-            text: (root.vehicleState && root.vehicleState.gear !== undefined) ? root.vehicleState.gear : "P"
+            text: root.displayGear
 
             font.pixelSize: 54
             font.family: (root.theme && root.theme.fontMono) ? root.theme.fontMono : "monospace"
@@ -585,6 +768,47 @@ Item {
                 loops: Animation.Infinite
                 NumberAnimation { from: 1.0; to: 0.20; duration: 220 }
                 NumberAnimation { from: 0.20; to: 1.0; duration: 220 }
+            }
+        }
+    }
+
+    Item {
+        id: odometerReadout
+        z: 61
+        anchors.top: gearReadout.bottom
+        anchors.topMargin: -4
+        anchors.horizontalCenter: gearReadout.horizontalCenter
+        width: 230
+        height: 46
+
+        Column {
+            anchors.centerIn: parent
+            spacing: -2
+
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: root.odometerText
+                font.family: (root.theme && root.theme.fontMono) ? root.theme.fontMono : "monospace"
+                font.pixelSize: 22
+                font.weight: Font.Bold
+                font.letterSpacing: 0
+                color: root.theme?.pearlLow ?? "#C7B7FF"
+                horizontalAlignment: Text.AlignHCenter
+                style: Text.Outline
+                styleColor: "#F0000000"
+            }
+
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: "KM"
+                font.family: (root.theme && root.theme.fontMono) ? root.theme.fontMono : "monospace"
+                font.pixelSize: 12
+                font.weight: Font.Bold
+                font.letterSpacing: 0
+                color: Qt.rgba(root.chromeColor.r, root.chromeColor.g, root.chromeColor.b, 0.62)
+                horizontalAlignment: Text.AlignHCenter
+                style: Text.Outline
+                styleColor: "#D0000000"
             }
         }
     }

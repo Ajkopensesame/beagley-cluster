@@ -23,6 +23,9 @@ class NavigationService : public QObject
     Q_PROPERTY(QVariantList searchResults READ searchResults NOTIFY searchResultsChanged)
     Q_PROPERTY(QVariantList recents READ recents NOTIFY recentsChanged)
     Q_PROPERTY(QVariantMap activeRoute READ activeRoute NOTIFY routeChanged)
+    Q_PROPERTY(QVariantList routeAlternatives READ routeAlternatives NOTIFY routeAlternativesChanged)
+    Q_PROPERTY(int selectedRouteAlternative READ selectedRouteAlternative NOTIFY selectedRouteAlternativeChanged)
+    Q_PROPERTY(bool guidanceStarted READ guidanceStarted NOTIFY guidanceStartedChanged)
     Q_PROPERTY(QVariantMap nextManeuver READ nextManeuver NOTIFY guidanceChanged)
     Q_PROPERTY(QVariantMap followingManeuver READ followingManeuver NOTIFY guidanceChanged)
     Q_PROPERTY(QVariantMap banner READ banner NOTIFY guidanceChanged)
@@ -51,6 +54,9 @@ public:
     QVariantList searchResults() const { return m_searchResults; }
     QVariantList recents() const { return m_recents; }
     QVariantMap activeRoute() const { return m_activeRoute; }
+    QVariantList routeAlternatives() const { return m_routeAlternatives; }
+    int selectedRouteAlternative() const { return m_selectedRouteAlternative; }
+    bool guidanceStarted() const { return m_guidanceStarted; }
     QVariantMap nextManeuver() const { return m_nextManeuver; }
     QVariantMap followingManeuver() const { return m_followingManeuver; }
     QVariantMap banner() const { return m_banner; }
@@ -74,6 +80,8 @@ public:
     Q_INVOKABLE void search(const QString &query);
     Q_INVOKABLE void selectSearchResult(const QString &id);
     Q_INVOKABLE void setDestination(double lat, double lng, const QString &label);
+    Q_INVOKABLE void selectRouteAlternative(int index);
+    Q_INVOKABLE void startGuidance();
     Q_INVOKABLE void clearRoute();
     Q_INVOKABLE void setFollowEnabled(bool enabled);
     Q_INVOKABLE void setMuted(bool muted);
@@ -84,6 +92,9 @@ signals:
     void searchResultsChanged();
     void recentsChanged();
     void routeChanged();
+    void routeAlternativesChanged();
+    void selectedRouteAlternativeChanged();
+    void guidanceStartedChanged();
     void guidanceChanged();
     void mutedChanged();
     void networkStatusChanged();
@@ -123,6 +134,9 @@ private:
     void setSearchResults(const QVariantList &results);
     void setRecents(const QVariantList &recents);
     void setActiveRoute(const QVariantMap &route);
+    void setRouteAlternatives(const QVariantList &alternatives);
+    void setSelectedRouteAlternative(int index);
+    void setGuidanceStarted(bool started);
     void setNextManeuver(const QVariantMap &maneuver);
     void setFollowingManeuver(const QVariantMap &maneuver);
     void setBanner(const QVariantMap &banner);
@@ -146,10 +160,11 @@ private:
     void updateConnectivityStatus();
     void requestRoute(bool reroute);
     void beginRouteRequest(bool reroute);
+    void applyRouteData(const RouteData &data, bool overviewActive);
     void updateFromVehicle();
     void updateGuidance();
     void updateMapPayload();
-    void runFallbackSearch(const QString &query, const Pose &pose);
+    void runFallbackSearch(const QString &query, const Pose &pose, quint64 requestSerial);
     void maybeTriggerPrompts();
     void maybeRefreshRoute();
     void persistCache() const;
@@ -163,7 +178,9 @@ private:
     bool providersAllowed() const;
     bool gpsReady() const;
     bool gpsReliableHeading() const;
+    bool isCurrentSearchRequest(quint64 requestSerial, const QString &query) const;
     QVariantMap searchResultAt(const QString &id) const;
+    QVariantMap routeVariantFromData(const RouteData &data) const;
     QList<RouteProfilePoint> buildRouteProfile(const QVariantList &geometry) const;
     double metersBetween(double aLat, double aLng, double bLat, double bLng) const;
     double headingBetween(double aLat, double aLng, double bLat, double bLng) const;
@@ -196,6 +213,7 @@ private:
     QVariantList m_searchResults;
     QVariantList m_recents;
     QVariantMap m_activeRoute;
+    QVariantList m_routeAlternatives;
     QVariantMap m_nextManeuver;
     QVariantMap m_followingManeuver;
     QVariantMap m_banner;
@@ -217,9 +235,12 @@ private:
     QVariantMap m_mapConnectivity;
 
     QVariantMap m_destination;
+    QList<RouteData> m_routeAlternativeData;
     QList<RouteManeuverData> m_routeManeuvers;
     QList<RouteProfilePoint> m_routeProfile;
     QString m_lastSearchQuery;
+    int m_selectedRouteAlternative = -1;
+    bool m_guidanceStarted = false;
     bool m_followEnabled = true;
     bool m_overviewActive = false;
     bool m_rerouting = false;
@@ -232,6 +253,10 @@ private:
     double m_currentLateralMeters = 0.0;
     qint64 m_lastRouteRequestMs = 0;
     qint64 m_lastGpsBlockedLogMs = 0;
+    quint64 m_searchRequestSerial = 0;
+    quint64 m_activeSearchRequestSerial = 0;
+    quint64 m_routeRequestSerial = 0;
+    quint64 m_activeRouteRequestSerial = 0;
     QString m_lastAdvancePromptId;
     QString m_lastFinalPromptId;
     qint64 m_lastPromptMs = 0;

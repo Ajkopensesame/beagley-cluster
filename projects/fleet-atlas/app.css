@@ -1,0 +1,896 @@
+:root {
+  color-scheme: dark;
+  --ink: #f5f4eb;
+  --muted: rgba(232, 236, 237, 0.68);
+  --panel: rgba(8, 21, 31, 0.78);
+  --panel-strong: rgba(6, 17, 25, 0.92);
+  --line: rgba(145, 186, 201, 0.18);
+  --line-strong: rgba(145, 186, 201, 0.34);
+  --accent-sea: #4ad1c8;
+  --accent-sand: #f5be6a;
+  --accent-coral: #f0765e;
+  --accent-ice: #86c9ff;
+  --accent-lime: #bddf62;
+  --shadow: 0 24px 70px rgba(0, 0, 0, 0.34);
+  --radius-xl: 28px;
+  --radius-lg: 22px;
+  --radius-md: 16px;
+  --radius-sm: 12px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+  margin: 0;
+  background:
+    radial-gradient(circle at top left, rgba(15, 94, 110, 0.28), transparent 28%),
+    radial-gradient(circle at top right, rgba(190, 115, 60, 0.22), transparent 30%),
+    linear-gradient(160deg, #08121a 0%, #0b1f2a 42%, #051015 100%);
+  color: var(--ink);
+  font-family: "Space Grotesk", sans-serif;
+}
+
+body {
+  overflow: hidden;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  min-height: 100vh;
+  gap: 18px;
+  padding: 18px;
+}
+
+.stage,
+.dock,
+.detailCard,
+.searchComposer,
+.mapHud,
+.statCard,
+.panel,
+.ghostButton,
+.primaryButton {
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.stage {
+  position: relative;
+  min-width: 0;
+  min-height: calc(100vh - 36px);
+}
+
+#map {
+  width: 100%;
+  height: 100%;
+  min-height: calc(100vh - 36px);
+  border: 1px solid rgba(153, 194, 210, 0.18);
+  border-radius: 34px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.searchComposer {
+  position: absolute;
+  top: 22px;
+  left: 22px;
+  right: 22px;
+  z-index: 550;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: min(980px, calc(100% - 44px));
+  padding: 18px;
+  border: 1px solid rgba(149, 190, 203, 0.22);
+  border-radius: 26px;
+  background:
+    linear-gradient(180deg, rgba(8, 22, 31, 0.88), rgba(6, 15, 22, 0.72)),
+    radial-gradient(circle at top right, rgba(74, 209, 200, 0.08), transparent 22%);
+  box-shadow: 0 24px 90px rgba(0, 0, 0, 0.26);
+}
+
+.composerTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.composerIntro {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 720px;
+}
+
+.composerIntro h1,
+.brandBlock h2,
+.detailEmpty h2,
+.detailTitle {
+  margin: 0;
+  font-size: clamp(1.6rem, 2vw, 2.45rem);
+  line-height: 0.98;
+  letter-spacing: -0.04em;
+}
+
+.eyebrow {
+  margin: 0;
+  color: rgba(166, 222, 214, 0.74);
+  font: 600 12px/1.2 "IBM Plex Mono", monospace;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.lede,
+.detailEmpty p,
+.detailMeta,
+.routeCopy,
+.panelCopy {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.queryForm {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 10px;
+}
+
+.queryForm input {
+  width: 100%;
+  padding: 16px 18px;
+  border: 1px solid rgba(149, 189, 202, 0.2);
+  border-radius: 18px;
+  outline: none;
+  background: rgba(8, 18, 24, 0.92);
+  color: var(--ink);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.queryForm input::placeholder {
+  color: rgba(195, 208, 212, 0.38);
+}
+
+.composerFoot,
+.mapActionStrip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.exampleStrip,
+.chipGrid,
+.filterStack,
+.planChipGrid,
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.exampleChip,
+.chipToggle,
+.filterToggle,
+.planChip,
+.tinyBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(7, 18, 25, 0.76);
+  color: rgba(227, 235, 236, 0.92);
+}
+
+.exampleChip,
+.ghostButton,
+.primaryButton,
+.chipToggle,
+.filterToggle {
+  cursor: pointer;
+}
+
+.ghostButton:disabled,
+.primaryButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.exampleChip {
+  font-size: 0.88rem;
+}
+
+.sourcePill,
+.statCard,
+.panel,
+.mapHud {
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+}
+
+.sourcePill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  width: fit-content;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: rgba(7, 20, 28, 0.58);
+  color: rgba(234, 244, 243, 0.88);
+  font-size: 0.95rem;
+}
+
+.sourceDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent-sea);
+  box-shadow: 0 0 0 5px rgba(74, 209, 200, 0.14);
+}
+
+.primaryButton,
+.ghostButton {
+  padding: 11px 16px;
+  border-radius: 18px;
+}
+
+.smallButton {
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-size: 0.84rem;
+}
+
+.primaryButton {
+  border: 1px solid rgba(76, 209, 198, 0.26);
+  background: linear-gradient(180deg, rgba(28, 137, 129, 0.86), rgba(12, 95, 97, 0.96));
+  color: #f7fffe;
+}
+
+.ghostButton {
+  border: 1px solid rgba(160, 198, 209, 0.2);
+  background: rgba(11, 25, 34, 0.86);
+  color: var(--ink);
+}
+
+.tinyBadge {
+  min-height: 30px;
+  padding: 6px 10px;
+  font: 500 0.75rem/1 "IBM Plex Mono", monospace;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.tinyBadge.isWarm {
+  border-color: rgba(74, 209, 200, 0.3);
+  color: #a6fff6;
+}
+
+.tinyBadge.isStale {
+  border-color: rgba(245, 190, 106, 0.26);
+  color: #ffd287;
+}
+
+.tinyBadge.isCold {
+  border-color: rgba(160, 198, 209, 0.18);
+  color: rgba(228, 234, 235, 0.88);
+}
+
+.mapHud {
+  position: absolute;
+  left: 22px;
+  right: 22px;
+  bottom: 22px;
+  z-index: 520;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 24px;
+  background: rgba(5, 15, 22, 0.72);
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(226, 233, 234, 0.84);
+  font-size: 0.85rem;
+}
+
+.legendSwatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.07);
+}
+
+.legendSwatch.container {
+  background: var(--accent-sea);
+}
+
+.legendSwatch.tanker {
+  background: var(--accent-coral);
+}
+
+.legendSwatch.bulk {
+  background: var(--accent-sand);
+}
+
+.legendSwatch.specialty {
+  background: var(--accent-ice);
+}
+
+.dock {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: calc(100vh - 36px);
+  max-height: calc(100vh - 36px);
+  padding: 20px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  background:
+    linear-gradient(180deg, rgba(16, 40, 55, 0.7), rgba(7, 17, 26, 0.9)),
+    radial-gradient(circle at top right, rgba(74, 209, 200, 0.12), transparent 24%);
+  box-shadow: var(--shadow);
+}
+
+.brandBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.statCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 15px 16px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, rgba(11, 25, 34, 0.82), rgba(6, 14, 20, 0.72));
+}
+
+.statLabel,
+.panelHeader,
+.panelMeta,
+.filterToggle small,
+.feedRoute,
+.feedMeta,
+.detailMetricLabel,
+.mapLabel,
+.ownerBadge,
+.sourceMeta,
+.sourceStatus,
+.leaflet-control-attribution {
+  font-family: "IBM Plex Mono", monospace;
+}
+
+.statLabel {
+  color: rgba(212, 225, 229, 0.66);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.statCard strong {
+  font-size: 1.7rem;
+  letter-spacing: -0.04em;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, rgba(10, 22, 31, 0.82), rgba(6, 16, 22, 0.66));
+}
+
+.panelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: rgba(205, 218, 222, 0.74);
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.panelMeta {
+  color: rgba(189, 205, 209, 0.54);
+  font-size: 0.72rem;
+}
+
+.panelActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.planChip {
+  min-height: 32px;
+  padding: 7px 10px;
+  font-size: 0.78rem;
+}
+
+.planChip.isLocation {
+  border-color: rgba(134, 201, 255, 0.24);
+  color: #c7e5ff;
+}
+
+.planChip.isFilter {
+  border-color: rgba(74, 209, 200, 0.24);
+  color: #aefdf6;
+}
+
+.planChip.isRelation {
+  border-color: rgba(245, 190, 106, 0.22);
+  color: #ffd899;
+}
+
+.planChip.isText {
+  border-color: rgba(181, 223, 98, 0.2);
+  color: #daf397;
+}
+
+.planChip.isManual {
+  border-color: rgba(240, 120, 94, 0.22);
+  color: #ffc0b2;
+}
+
+.chipToggle,
+.filterToggle {
+  user-select: none;
+}
+
+.filterToggle {
+  justify-content: space-between;
+  min-width: 132px;
+}
+
+.chipToggle input,
+.filterToggle input {
+  accent-color: var(--accent-sea);
+}
+
+.filterToggle small {
+  color: rgba(189, 205, 209, 0.56);
+  font-size: 0.72rem;
+}
+
+.sourceList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sourceRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 12px;
+  padding: 12px;
+  border: 1px solid rgba(150, 187, 198, 0.14);
+  border-radius: var(--radius-md);
+  background: rgba(7, 17, 24, 0.58);
+}
+
+.sourceSuggestion {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.sourceHeaderLine {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sourceLabel {
+  font-weight: 500;
+}
+
+.sourceStatus {
+  color: rgba(233, 239, 238, 0.9);
+  font-size: 0.76rem;
+}
+
+.sourceMeta {
+  color: rgba(194, 210, 213, 0.58);
+  font-size: 0.72rem;
+}
+
+.sourceLink {
+  color: #9edfff;
+  font-size: 0.74rem;
+  word-break: break-all;
+}
+
+.sourceLink:hover {
+  color: #caf1ff;
+}
+
+.sourceActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sourceActionButton.isActive {
+  border-color: rgba(134, 201, 255, 0.3);
+  color: #c7e5ff;
+}
+
+.vesselFeed {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.vesselList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 120px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.vesselCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: rgba(8, 18, 25, 0.62);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.vesselCard:hover,
+.vesselCard.isSelected {
+  transform: translateY(-1px);
+  border-color: var(--line-strong);
+  background: rgba(11, 26, 36, 0.92);
+}
+
+.feedTopline,
+.feedRoute {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.feedTitle {
+  margin: 0;
+  font-size: 1rem;
+  letter-spacing: -0.03em;
+}
+
+.feedType {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.feedRoute {
+  color: rgba(213, 226, 231, 0.72);
+  font-size: 0.75rem;
+  letter-spacing: 0.03em;
+}
+
+.feedMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: rgba(196, 211, 214, 0.62);
+  font-size: 0.74rem;
+}
+
+.statusBadge,
+.metricPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(243, 243, 239, 0.92);
+}
+
+.statusBadge.isTransit {
+  background: rgba(74, 209, 200, 0.14);
+  color: #a6fff6;
+}
+
+.statusBadge.isApproach {
+  background: rgba(245, 190, 106, 0.16);
+  color: #ffd287;
+}
+
+.statusBadge.isHold {
+  background: rgba(240, 118, 94, 0.18);
+  color: #ffb0a0;
+}
+
+.detailCard {
+  position: absolute;
+  right: 22px;
+  bottom: 98px;
+  z-index: 560;
+  width: min(390px, calc(100% - 44px));
+  padding: 18px;
+  border: 1px solid rgba(147, 191, 204, 0.2);
+  border-radius: var(--radius-xl);
+  background:
+    linear-gradient(180deg, rgba(9, 21, 28, 0.9), rgba(6, 15, 21, 0.84)),
+    radial-gradient(circle at top right, rgba(74, 209, 200, 0.08), transparent 25%);
+  box-shadow: 0 24px 90px rgba(0, 0, 0, 0.34);
+}
+
+.detailContent {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.detailHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.detailMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.detailMetrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.detailMetric {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid rgba(150, 187, 198, 0.14);
+  border-radius: var(--radius-md);
+  background: rgba(6, 15, 22, 0.62);
+}
+
+.detailMetricLabel {
+  color: rgba(197, 212, 216, 0.62);
+  font-size: 0.73rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.detailMetricValue {
+  font-size: 1rem;
+}
+
+.routeBand {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border-radius: var(--radius-md);
+  background: rgba(7, 19, 27, 0.64);
+  border: 1px solid rgba(151, 192, 204, 0.14);
+}
+
+.routeTitle {
+  font-size: 0.76rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(197, 211, 215, 0.62);
+}
+
+.routeChain {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink);
+  font-size: 1rem;
+  line-height: 1.25;
+}
+
+.routeArrow {
+  color: rgba(134, 201, 255, 0.75);
+}
+
+.detailEmpty {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fleetTagIcon,
+.fleetTagIcon * {
+  pointer-events: none;
+}
+
+.fleetTagIcon {
+  background: transparent;
+  border: 0;
+}
+
+.mapLabel,
+.ownerBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: max-content;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(4, 12, 16, 0.72);
+  color: rgba(241, 245, 241, 0.92);
+  font-size: 0.73rem;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.24);
+}
+
+.ownerBadge {
+  border-color: rgba(245, 190, 106, 0.18);
+  background: rgba(33, 21, 8, 0.76);
+  color: #ffdba3;
+}
+
+.leaflet-container {
+  background: #061018;
+  font: inherit;
+}
+
+.leaflet-control-zoom {
+  border: 1px solid rgba(154, 196, 209, 0.18) !important;
+  border-radius: 18px !important;
+  overflow: hidden;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.24);
+}
+
+.leaflet-control-zoom a {
+  background: rgba(9, 19, 26, 0.92) !important;
+  color: var(--ink) !important;
+  border-bottom-color: rgba(154, 196, 209, 0.14) !important;
+}
+
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: rgba(10, 20, 28, 0.94);
+  color: var(--ink);
+}
+
+.leaflet-popup-content {
+  margin: 14px 16px;
+}
+
+.leaflet-tooltip {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+}
+
+.leaflet-tooltip-top::before,
+.leaflet-tooltip-bottom::before,
+.leaflet-tooltip-left::before,
+.leaflet-tooltip-right::before {
+  display: none;
+}
+
+@media (max-width: 1280px) {
+  body {
+    overflow: auto;
+  }
+
+  .shell {
+    grid-template-columns: 1fr;
+    min-height: auto;
+  }
+
+  .dock {
+    min-height: auto;
+    max-height: none;
+  }
+
+  #map,
+  .stage {
+    min-height: 72vh;
+  }
+}
+
+@media (max-width: 900px) {
+  .queryForm {
+    grid-template-columns: 1fr;
+  }
+
+  .composerTop,
+  .mapHud {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .detailCard {
+    left: 22px;
+    right: 22px;
+    bottom: 132px;
+    width: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .shell {
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .searchComposer,
+  .mapHud,
+  .detailCard {
+    left: 12px;
+    right: 12px;
+  }
+
+  .searchComposer {
+    top: 12px;
+  }
+
+  .mapHud {
+    bottom: 12px;
+  }
+
+  .detailCard {
+    bottom: 154px;
+  }
+
+  .statsGrid,
+  .detailMetrics {
+    grid-template-columns: 1fr;
+  }
+
+  .chipToggle,
+  .filterToggle,
+  .exampleChip {
+    width: 100%;
+    justify-content: center;
+  }
+}

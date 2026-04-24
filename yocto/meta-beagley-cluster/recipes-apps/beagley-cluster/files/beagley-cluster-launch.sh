@@ -4,7 +4,11 @@ set -euo pipefail
 export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-eglfs}"
 export QT_QPA_EGLFS_INTEGRATION="${QT_QPA_EGLFS_INTEGRATION:-eglfs_kms}"
 export QSG_RENDER_LOOP="${QSG_RENDER_LOOP:-basic}"
-export BEAGLEY_UI_VARIANT="${BEAGLEY_UI_VARIANT:-embedded}"
+# The appliance launcher should always land on the embedded UI. Local override
+# files are still useful for bench toggles like font paths, but letting them
+# switch the entrypoint back to the desktop V3 shell strands the map on the
+# snapshot path instead of the production native renderer.
+export BEAGLEY_UI_VARIANT="embedded"
 export BEAGLEY_RENDER_PROFILE="${BEAGLEY_RENDER_PROFILE:-embedded}"
 export BEAGLEY_EFFECT_LEVEL="${BEAGLEY_EFFECT_LEVEL:-low}"
 export BEAGLEY_MAP_RENDERER="${BEAGLEY_MAP_RENDERER:-native-online}"

@@ -191,6 +191,7 @@ cleanup_stale_bitbake_state() {
   local build_root="$PWD"
   local bitbake_sock="$build_root/bitbake.sock"
   local bitbake_lock="$build_root/bitbake.lock"
+  local cooker_log="$build_root/bitbake-cookerdaemon.log"
   local -a active_client_pids=()
   local -a server_pids=()
 
@@ -217,6 +218,7 @@ cleanup_stale_bitbake_state() {
   fi
 
   rm -f "$bitbake_sock" "$bitbake_lock"
+  rm -f "$cooker_log"
 }
 
 recent_fetch_failure_detected() {
@@ -234,7 +236,129 @@ recent_bitbake_timeout_detected() {
   local server_timeout_pattern='Timeout while waiting for a reply from the bitbake server|No reply from server in [0-9]+s|Idle loop didn'\''t finish queued commands after 30s'
 
   [[ -f "$cooker_log" ]] || return 1
-  grep -Eq "$server_timeout_pattern" "$cooker_log"
+  tail -n 200 "$cooker_log" | grep -Eq "$server_timeout_pattern"
+}
+
+recent_sysroot_collision_log() {
+  local work_root="$PWD/arago-tmp-default-glibc/work"
+  local latest_log=""
+
+  [[ -d "$work_root" ]] || return 1
+
+  latest_log="$(
+    find "$work_root" -path '*/temp/log.do_*' -type f -mmin -180 -print0 2>/dev/null \
+      | xargs -0 grep -El 'FileExistsError: \[Errno 17\] File exists: .*recipe-sysroot(-native)?' 2>/dev/null \
+      2>/dev/null \
+      | xargs -r ls -1t 2>/dev/null \
+      | head -n 1
+  )"
+
+  [[ -n "$latest_log" ]] || return 1
+  printf '%s\n' "$latest_log"
+}
+
+recent_sysroot_collision_detected() {
+  recent_sysroot_collision_log >/dev/null
+}
+
+recent_shared_area_collision_log() {
+  local work_root="$PWD/arago-tmp-default-glibc/work"
+  local latest_log=""
+
+  [[ -d "$work_root" ]] || return 1
+
+  latest_log="$(
+    find "$work_root" -path '*/temp/log.do_*' -type f -mmin -180 -print0 2>/dev/null \
+      | xargs -0 grep -El 'trying to install files into a shared area when those files already exist' 2>/dev/null \
+      2>/dev/null \
+      | xargs -r ls -1t 2>/dev/null \
+      | head -n 1
+  )"
+
+  [[ -n "$latest_log" ]] || return 1
+  printf '%s\n' "$latest_log"
+}
+
+recent_shared_area_collision_detected() {
+  recent_shared_area_collision_log >/dev/null
+}
+
+cleanup_recent_shared_area_collision_state() {
+  local log_path=""
+  local -a stale_paths=()
+  local deploy_root_ti="$PWD/deploy-ti/images"
+  local deploy_root_std="$PWD/deploy/images"
+  local stale_path=""
+
+  log_path="$(recent_shared_area_collision_log)" || return 1
+
+  mapfile -t stale_paths < <(
+    awk '
+      /^[[:space:]]+\/.*$/ {
+        current=$1
+        next
+      }
+      /\(not matched to any task\)/ {
+        if (current != "") {
+          print current
+          current=""
+        }
+      }
+    ' "$log_path"
+  )
+
+  [[ ${#stale_paths[@]} -gt 0 ]] || return 1
+
+  for stale_path in "${stale_paths[@]}"; do
+    case "$stale_path" in
+      "$deploy_root_ti"/*|"$deploy_root_std"/*)
+        ;;
+      *)
+        log "skipping suspicious shared-area cleanup path: $stale_path"
+        continue
+        ;;
+    esac
+
+    if [[ -e "$stale_path" || -L "$stale_path" ]]; then
+      log "removing stale deploy artifact: $stale_path"
+      rm -f "$stale_path"
+    fi
+  done
+}
+
+cleanup_recent_sysroot_collision_state() {
+  local log_path=""
+  local recipe_workdir=""
+  local work_rel=""
+  local target_triplet=""
+  local recipe_name=""
+  local recipe_version=""
+  local stamp_dir=""
+
+  log_path="$(recent_sysroot_collision_log)" || return 1
+  recipe_workdir="$(dirname "$(dirname "$log_path")")"
+
+  case "$recipe_workdir" in
+    "$PWD"/arago-tmp-default-glibc/work/*/*/*) ;;
+    *)
+      log "skipping suspicious sysroot collision cleanup path: $recipe_workdir"
+      return 1
+      ;;
+  esac
+
+  work_rel="${recipe_workdir#"$PWD"/arago-tmp-default-glibc/work/}"
+  target_triplet="${work_rel%%/*}"
+  recipe_name="${work_rel#*/}"
+  recipe_name="${recipe_name%%/*}"
+  recipe_version="${work_rel##*/}"
+  stamp_dir="$PWD/arago-tmp-default-glibc/stamps/${target_triplet}/${recipe_name}"
+
+  log "detected stale native sysroot state; removing ${recipe_workdir}"
+  rm -rf "$recipe_workdir"
+  if [[ -d "$stamp_dir" ]]; then
+    log "removing stale stamps for ${recipe_name} (${recipe_version})"
+    find "$stamp_dir" -maxdepth 1 -name "${recipe_version}.*" -delete
+  fi
 }
 
 patch_bitbake_reply_timeout() {
@@ -259,6 +383,7 @@ run_bitbake_with_retries() {
   local attempt=1
   local delay_seconds=20
   local status=0
+  local retry_reason=""
 
   while true; do
     if bitbake "$IMAGE_NAME"; then
@@ -271,11 +396,22 @@ run_bitbake_with_retries() {
       return "$status"
     fi
 
-    if ! recent_fetch_failure_detected && ! recent_bitbake_timeout_detected; then
+    retry_reason=""
+    if recent_fetch_failure_detected; then
+      retry_reason="fetch failure"
+    elif recent_bitbake_timeout_detected; then
+      retry_reason="bitbake timeout"
+    elif recent_sysroot_collision_detected; then
+      retry_reason="native sysroot collision"
+      cleanup_recent_sysroot_collision_state || true
+    elif recent_shared_area_collision_detected; then
+      retry_reason="shared deploy artifact collision"
+      cleanup_recent_shared_area_collision_state || true
+    else
       return "$status"
     fi
 
-    log "bitbake hit a retryable failure; retrying attempt $((attempt + 1))/${YOCTO_BITBAKE_RETRIES} after ${delay_seconds}s"
+    log "bitbake hit a retryable ${retry_reason}; retrying attempt $((attempt + 1))/${YOCTO_BITBAKE_RETRIES} after ${delay_seconds}s"
     cleanup_stale_bitbake_state
     sleep "$delay_seconds"
     attempt=$((attempt + 1))
@@ -425,6 +561,15 @@ require_file_contains_regex() {
   grep -Eq "$regex" "$file_path" || fail "${description} missing expected content (${regex})"
 }
 
+require_file_not_contains_regex() {
+  local file_path="$1"
+  local description="$2"
+  local regex="$3"
+
+  [[ -f "$file_path" ]] || fail "missing ${description}: ${file_path}"
+  grep -Eq "$regex" "$file_path" && fail "${description} contains forbidden content (${regex})"
+}
+
 require_tar_contains_path() {
   local tar_path="$1"
   local description="$2"
@@ -477,11 +622,13 @@ validate_release_image() {
     require_deploy_artifact "$deploy_dir" "BeagleY tiboot3" "tiboot3*.bin"
     require_deploy_artifact "$deploy_dir" "BeagleY tispl" "tispl*.bin"
     require_deploy_artifact "$deploy_dir" "BeagleY U-Boot image" "u-boot*.img"
+    require_deploy_artifact "$deploy_dir" "BeagleY EFI loader" "grub-efi-bootaa64.efi"
     require_deploy_artifact "$deploy_dir" "BeagleY kernel image" "Image*"
     require_deploy_artifact "$deploy_dir" "BeagleY device tree" "k3-am67a-beagley-ai*.dtb"
-    if [[ -n "$wks_export_path" ]]; then
-      require_file_contains_regex "$wks_export_path" "BeagleY board-bsp WKS export" 'bootimg-efi'
-    fi
+    [[ -n "$wks_export_path" ]] || fail "missing BeagleY board-bsp WKS export"
+    require_file_contains_regex "$wks_export_path" "BeagleY board-bsp WKS export" 'bootimg-efi'
+    require_file_contains_regex "$wks_export_path" "BeagleY rendered kernel append" 'net\.ifnames=0'
+    require_file_not_contains_regex "$wks_export_path" "BeagleY WKS export" '\$\{[A-Za-z0-9_]+\}'
     require_file_contains_regex "$image_env_path" "BeagleY image boot payload contract" '^IMAGE_BOOT_FILES=.*Image'
     require_file_contains_regex "$image_env_path" "BeagleY image EFI boot payload contract" '^IMAGE_EFI_BOOT_FILES=.*Image'
     require_file_contains_regex "$image_env_path" "BeagleY image DTB payload contract" 'k3-am67a-beagley-ai\.dtb;dtb/ti/k3-am67a-beagley-ai\.dtb'
@@ -497,6 +644,17 @@ validate_release_image() {
   require_manifest_package "$rootfs_manifest" '^openssh($|-.*)' "OpenSSH runtime"
   require_manifest_package "$rootfs_manifest" '^kmod$' "kmod for lsmod"
   require_manifest_package "$rootfs_manifest" '^(kmscube|mesa-demos($|-.*)|mesa-demos-eglinfo$)$' "GPU probe prerequisite (kmscube or eglinfo provider)"
+  if [[ "$MACHINE_NAME" == "beagley-ai" ]]; then
+    require_manifest_package "$rootfs_manifest" '^iw$' "BeagleY Wi-Fi tooling"
+    require_manifest_package "$rootfs_manifest" '^wpa-supplicant($|-.*)' "BeagleY Wi-Fi supplicant"
+    require_manifest_package "$rootfs_manifest" '^wireless-regdb-static$' "BeagleY regulatory database"
+    require_manifest_package "$rootfs_manifest" '^cc33xx-fw$' "BeagleY CC33xx firmware"
+    require_manifest_package "$rootfs_manifest" '^cc33xx-target-scripts$' "BeagleY CC33xx helper scripts"
+    require_manifest_package "$rootfs_manifest" '^cc33conf$' "BeagleY CC33xx config utility"
+    require_manifest_package "$rootfs_manifest" '^cc33calibrator$' "BeagleY CC33xx calibration utility"
+    require_manifest_package "$rootfs_manifest" '^kernel-module-cc33xx(-.*)?$' "BeagleY CC33xx kernel module"
+    require_manifest_package "$rootfs_manifest" '^kernel-module-cc33xx-sdio(-.*)?$' "BeagleY CC33xx SDIO kernel module"
+  fi
   require_tar_contains_path "$rootfs_tar" "rootfs networkd runtime" './usr/lib/systemd/system/systemd-networkd.service'
   echo "rootfs_contract=ok" >>"$validation_report"
 
@@ -506,13 +664,28 @@ validate_release_image() {
   require_package_path_regex "beagley-cluster" '(^|[[:space:]])/(usr/)?lib/systemd/system/beagley-cluster\.service$' "cluster systemd unit"
   require_package_path_regex "beagley-cluster" '(^|[[:space:]])/(usr/)?lib/systemd/system/beagley-cluster-gpu-probe\.service$' "GPU probe systemd unit"
   require_package_path_regex "beagley-cluster" '(^|[[:space:]])/(usr/)?lib/systemd/system/beagley-cluster-provision\.service$' "provisioning systemd unit"
+  require_package_path_regex "beagley-cluster" '(^|[[:space:]])/(usr/)?lib/systemd/system/beagley-diagnostic-local-fs\.service$' "diagnostic local-fs unit"
+  require_package_path_regex "beagley-cluster" '(^|[[:space:]])/(usr/)?lib/systemd/system/beagley-diagnostic-collect\.service$' "diagnostic collector unit"
+  require_package_path_regex "beagley-cluster" '(^|[[:space:]])/(usr/)?lib/systemd/system/beagley-diagnostic-network-online\.service$' "diagnostic network-online unit"
   require_package_path_regex "beagley-cluster" '(^|[[:space:]])/usr/libexec/beagley-cluster/beagley-cluster-gpu-probe\.sh$' "GPU probe script"
   require_package_path_regex "beagley-cluster" '(^|[[:space:]])/usr/libexec/beagley-cluster/beagley-cluster-provision\.sh$' "provisioning script"
+  require_package_path_regex "beagley-cluster" '(^|[[:space:]])/usr/libexec/beagley-cluster/beagley-diagnostic\.sh$' "diagnostic helper script"
+  require_package_path_regex "beagley-cluster" '(^|[[:space:]])/usr/lib/qml/BeagleY/qmldir$' "BeagleY QML module manifest"
+  require_package_path_regex "beagley-cluster" '(^|[[:space:]])/usr/lib/qml/BeagleY/beagley_cluster\.qmltypes$' "BeagleY QML type metadata"
   require_package_path_regex "beagley-cluster" '(^|[[:space:]])/etc/default/beagley-cluster$' "default environment file"
   require_package_path_regex "beagley-cluster" '(^|[[:space:]])/etc/systemd/network/05-beagley-eth-debug\.network$' "deterministic wired debug network file"
   require_package_path_regex "beagley-cluster" '(^|[[:space:]])/etc/systemd/network/55-beagley-usb-recovery\.network$' "deterministic USB recovery network file"
   require_package_path_regex "beagley-cluster" '(^|[[:space:]])/etc/systemd/network/12-en\.network$' "Ethernet DHCP networkd override for en* interfaces"
   require_package_path_regex "beagley-cluster" '(^|[[:space:]])/etc/systemd/journald\.conf\.d/persistent\.conf$' "persistent journald config"
+  if [[ "$IMAGE_NAME" == "beagley-cluster-image-diag" ]]; then
+    require_file_contains_regex "$wks_export_path" "BeagleY diagnostic WKS export" 'console=tty1'
+    require_file_contains_regex "$wks_export_path" "BeagleY diagnostic WKS export" 'beagley\.diag=1'
+    require_file_not_contains_regex "$wks_export_path" "BeagleY diagnostic WKS export" '(^|[[:space:]])quiet($|[[:space:]])'
+    require_file_contains_regex "$extlinux_path" "BeagleY diagnostic extlinux payload" 'console=tty1'
+    require_file_contains_regex "$extlinux_path" "BeagleY diagnostic extlinux payload" 'beagley\.diag=1'
+    require_file_not_contains_regex "$extlinux_path" "BeagleY diagnostic extlinux payload" '(^|[[:space:]])quiet($|[[:space:]])'
+    echo "diagnostic_mode=enabled" >>"$validation_report"
+  fi
   echo "package_payload=ok" >>"$validation_report"
   echo "result=pass" >>"$validation_report"
 

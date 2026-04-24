@@ -4,8 +4,10 @@
 #include <QImage>
 #include <QMutex>
 #include <QPointer>
+#include <QPointF>
 #include <QQuickItem>
 #include <QSet>
+#include <QSize>
 #include <QVariantList>
 
 class QNetworkAccessManager;
@@ -65,6 +67,7 @@ protected:
     QSGNode *updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *) override;
     void componentComplete() override;
     void geometryChange(const QRectF &newGeometry, const QRectF &oldGeometry) override;
+    void updatePolish() override;
 
 private:
     struct VisibleTile {
@@ -82,6 +85,7 @@ private:
     QPointF projectToScreen(double lat, double lng, double zoomLevel, const QPointF &topLeftWorld) const;
     QString tileKey(int z, int x, int y) const;
     void requestTile(int z, int x, int y);
+    void scheduleTileRefresh();
     void recordCounter(const QString &bucket, int amount = 1);
 
     double m_centerLat = -27.4698;
@@ -103,4 +107,13 @@ private:
     QNetworkAccessManager *m_network = nullptr;
 
     QHash<QString, QSGTexture *> m_textures;
+    QSize m_lastCompositeSize;
+    QPointF m_lastCompositeTopLeftWorld;
+    int m_lastCompositeZoom = -1;
+    bool m_haveCompositeState = false;
+    QSize m_lastTileRefreshSize;
+    QPointF m_lastTileRefreshTopLeftWorld;
+    int m_lastTileRefreshZoom = -1;
+    bool m_haveTileRefreshState = false;
+    bool m_tileRefreshPending = false;
 };

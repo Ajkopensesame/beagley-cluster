@@ -4,6 +4,7 @@ Rectangle {
     id: root
 
     property var cluster
+    property string fontFamily: "sans-serif"
     property color fillColor: "#10261A"
     property color strokeColor: "#1F7A45"
 
@@ -19,6 +20,7 @@ Rectangle {
         Text {
             anchors.verticalCenter: parent.verticalCenter
             color: "white"
+            font.family: root.fontFamily
             font.pixelSize: 28
             font.bold: true
             text: root.cluster.warningSummary
@@ -32,6 +34,7 @@ Rectangle {
         Text {
             anchors.verticalCenter: parent.verticalCenter
             color: "#C7DAE8"
+            font.family: root.fontFamily
             font.pixelSize: 24
             text: "SPD " + Math.round(root.cluster.speedKph) + "  |  RPM " + Math.round(root.cluster.rpm)
         }

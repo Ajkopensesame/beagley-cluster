@@ -1,0 +1,101 @@
+[
+  {
+    "id": "osm-overpass",
+    "name": "OpenStreetMap Overpass",
+    "url": "https://overpass-api.de/api/interpreter",
+    "category": "places",
+    "license": "ODbL",
+    "scope": "global",
+    "freshness": "community edits, frequently updated",
+    "summary": "Query public map features, points of interest, roads, and buildings from OpenStreetMap.",
+    "tags": ["map", "poi", "places", "restaurants", "churches", "roads", "stores", "kfc", "geospatial"]
+  },
+  {
+    "id": "wikidata-sparql",
+    "name": "Wikidata SPARQL",
+    "url": "https://query.wikidata.org/",
+    "category": "entities",
+    "license": "CC0",
+    "scope": "global",
+    "freshness": "community maintained",
+    "summary": "Structured facts about places, companies, landmarks, and many public entities.",
+    "tags": ["entities", "ownership", "places", "companies", "churches", "landmarks", "public facts"]
+  },
+  {
+    "id": "geonames",
+    "name": "GeoNames",
+    "url": "https://www.geonames.org/export/web-services.html",
+    "category": "geocoding",
+    "license": "CC BY 4.0",
+    "scope": "global",
+    "freshness": "reference dataset",
+    "summary": "Global place names, alternate names, and geocoding helpers.",
+    "tags": ["places", "cities", "countries", "geocoding", "boundaries", "location"]
+  },
+  {
+    "id": "open-meteo",
+    "name": "Open-Meteo",
+    "url": "https://open-meteo.com/",
+    "category": "weather",
+    "license": "public API terms apply",
+    "scope": "global",
+    "freshness": "forecast and current conditions",
+    "summary": "Free weather forecast and current-condition API for map overlays and local conditions.",
+    "tags": ["weather", "temperature", "wind", "rain", "forecast", "climate", "overlay"]
+  },
+  {
+    "id": "world-bank",
+    "name": "World Bank Indicators API",
+    "url": "https://datahelpdesk.worldbank.org/knowledgebase/articles/889392-about-the-indicators-api-documentation",
+    "category": "statistics",
+    "license": "World Bank open data terms",
+    "scope": "global",
+    "freshness": "periodic statistical releases",
+    "summary": "Country and regional economic, demographic, and development indicators.",
+    "tags": ["population", "economy", "income", "development", "country stats", "indicators"]
+  },
+  {
+    "id": "gdelt",
+    "name": "GDELT",
+    "url": "https://www.gdeltproject.org/",
+    "category": "events",
+    "license": "public project terms",
+    "scope": "global",
+    "freshness": "near real-time event indexing",
+    "summary": "Global event, media, and geospatial signal data for current activity and trend overlays.",
+    "tags": ["news", "events", "protests", "conflict", "media", "signals", "timeline"]
+  },
+  {
+    "id": "opensky",
+    "name": "OpenSky Network",
+    "url": "https://opensky-network.org/",
+    "category": "transport",
+    "license": "OpenSky terms apply",
+    "scope": "global",
+    "freshness": "live and historical flight data",
+    "summary": "Open air-traffic data for live and historical aircraft positions.",
+    "tags": ["planes", "aircraft", "flights", "transport", "live positions", "aviation"]
+  },
+  {
+    "id": "usgs-earthquake",
+    "name": "USGS Earthquake Hazards",
+    "url": "https://earthquake.usgs.gov/fdsnws/event/1/",
+    "category": "hazards",
+    "license": "USGS public data",
+    "scope": "global",
+    "freshness": "near real-time hazard feed",
+    "summary": "Earthquake event feeds and hazard data for map overlays and alerting.",
+    "tags": ["earthquakes", "hazards", "disasters", "alerts", "seismic", "risk"]
+  },
+  {
+    "id": "openaq",
+    "name": "OpenAQ",
+    "url": "https://openaq.org/",
+    "category": "environment",
+    "license": "OpenAQ terms apply",
+    "scope": "global",
+    "freshness": "air-quality observations",
+    "summary": "Air-quality data and environmental monitoring for map overlays.",
+    "tags": ["air quality", "pollution", "environment", "sensors", "health", "overlay"]
+  }
+]

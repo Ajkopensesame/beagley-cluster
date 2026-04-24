@@ -8,6 +8,7 @@ Before=beagley-cluster.service
 Type=oneshot
 EnvironmentFile=-/etc/default/beagley-cluster
 EnvironmentFile=-/etc/default/beagley-cluster.local
+ExecCondition=/bin/sh -c '! grep -Eq "(^| )beagley\\.diag=1($| )" /proc/cmdline && test ! -f /run/beagley-diagnostic.mode'
 ExecStart=/usr/libexec/beagley-cluster/beagley-cluster-gpu-probe.sh
 RemainAfterExit=yes
 StandardOutput=journal

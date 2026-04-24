@@ -26,6 +26,7 @@
 #include "render/ClusterRenderModel.h"
 #include "render/NativeRasterMapItem.h"
 #include "render/PerformanceMetrics.h"
+#include "system/NowPlayingService.h"
 #include "system/WiFiSetupService.h"
 
 #ifdef WITH_WEBENGINE
@@ -61,6 +62,10 @@ protected:
             || host == QLatin1String("tiles.openfreemap.org")
             || host == QLatin1String("assets.openfreemap.com")
             || host.endsWith(QLatin1String(".openfreemap.org"));
+        const bool bomHost =
+            host == QLatin1String("bom.gov.au")
+            || host == QLatin1String("www.bom.gov.au")
+            || host.endsWith(QLatin1String(".bom.gov.au"));
         const bool vectorAssetPath = path.endsWith(QLatin1String(".pbf"))
             || path.endsWith(QLatin1String(".json"))
             || path.endsWith(QLatin1String(".png"))
@@ -69,10 +74,12 @@ protected:
             || path.contains(QLatin1String("/glyphs/"))
             || path.contains(QLatin1String("/fonts/"))
             || path.contains(QLatin1String("/sprites/"));
-        if (osmOrOpenfreemapHost || vectorAssetPath) {
+        if (osmOrOpenfreemapHost || vectorAssetPath || bomHost) {
             if (!patchedRequest.hasRawHeader("User-Agent")) {
                 patchedRequest.setRawHeader("User-Agent", m_userAgent);
             }
+        }
+        if (osmOrOpenfreemapHost || vectorAssetPath) {
             patchedRequest.setAttribute(QNetworkRequest::CacheLoadControlAttribute, QNetworkRequest::PreferCache);
             patchedRequest.setAttribute(QNetworkRequest::CacheSaveControlAttribute, true);
         }
@@ -274,7 +281,7 @@ int main(int argc, char *argv[])
     const bool preferSnapshotMap = forceSnapshotMap || mapRenderer != QLatin1String("web");
 
     if (renderProfile == QLatin1String("embedded") && !qEnvironmentVariableIsSet("QSG_RENDER_LOOP")) {
-        qputenv("QSG_RENDER_LOOP", QByteArrayLiteral("basic"));
+        qputenv("QSG_RENDER_LOOP", QByteArrayLiteral("threaded"));
     }
     qputenv("BEAGLEY_RENDER_PROFILE", renderProfile.toUtf8());
     qputenv("BEAGLEY_EFFECT_LEVEL", effectLevel.toUtf8());
@@ -381,12 +388,23 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("navigation", &navigation);
     ClusterRenderModel clusterRenderModel(&vehicleState, &navigation);
     engine.rootContext()->setContextProperty("clusterRenderModel", &clusterRenderModel);
+    NowPlayingService nowPlaying;
+    engine.rootContext()->setContextProperty("nowPlaying", &nowPlaying);
 
-    QString uiVariant = qEnvironmentVariableIsSet("BEAGLEY_UI_VARIANT")
-                            ? QString::fromUtf8(qgetenv("BEAGLEY_UI_VARIANT")).trimmed().toLower()
+    const QString uiVariantOverride = QString::fromUtf8(qgetenv("BEAGLEY_UI_VARIANT")).trimmed().toLower();
+    const bool uiVariantExplicit = !uiVariantOverride.isEmpty();
+    QString uiVariant = uiVariantExplicit
+                            ? uiVariantOverride
                             : (renderProfile == QLatin1String("embedded")
                                   ? QStringLiteral("embedded")
                                   : QStringLiteral("v3"));
+    if (embeddedDisplay
+        && !uiVariantExplicit
+        && uiVariant != QLatin1String("embedded")
+        && uiVariant != QLatin1String("appliance")) {
+        qWarning() << "[UI] forcing embedded variant on embedded display, requested =" << uiVariant;
+        uiVariant = QStringLiteral("embedded");
+    }
     QString entryPoint;
     if (uiVariant == QLatin1String("embedded") || uiVariant == QLatin1String("appliance")) {
         entryPoint = QStringLiteral("MainEmbedded");
@@ -400,6 +418,40 @@ int main(int argc, char *argv[])
 
     qDebug() << "[UI] variant =" << uiVariant << "entry =" << entryPoint;
     const auto loadEntryPoint = [&](const QString &entry) {
+        const QString qmlDevRoot = QString::fromUtf8(qgetenv("BEAGLEY_QML_DEV_ROOT")).trimmed();
+        if (!qmlDevRoot.isEmpty()) {
+            const QDir devRoot(qmlDevRoot);
+            const QString qmlDevFile = QString::fromUtf8(qgetenv("BEAGLEY_QML_DEV_FILE")).trimmed();
+            QStringList candidates;
+            if (!qmlDevFile.isEmpty()) {
+                candidates.append(qmlDevFile);
+            }
+            candidates.append(devRoot.filePath(QStringLiteral("src/ui/%1.qml").arg(entry)));
+            candidates.append(devRoot.filePath(QStringLiteral("ui/%1.qml").arg(entry)));
+            candidates.append(devRoot.filePath(QStringLiteral("%1.qml").arg(entry)));
+
+            for (const QString &candidate : candidates) {
+                const QFileInfo info(candidate);
+                if (!info.isFile()) {
+                    continue;
+                }
+
+                engine.addImportPath(info.absolutePath());
+                engine.addImportPath(devRoot.absolutePath());
+                qInfo() << "[UI-DEV] loading QML from filesystem"
+                        << "root =" << devRoot.absolutePath()
+                        << "entry =" << info.absoluteFilePath();
+                engine.load(QUrl::fromLocalFile(info.absoluteFilePath()));
+                return;
+            }
+
+            qCritical() << "[UI-DEV] BEAGLEY_QML_DEV_ROOT is set but entry QML was not found"
+                        << "root =" << devRoot.absolutePath()
+                        << "entry =" << entry
+                        << "candidates =" << candidates;
+            return;
+        }
+
 #if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
         engine.loadFromModule("BeagleY", entry);
 #else

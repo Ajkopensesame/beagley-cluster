@@ -28,6 +28,10 @@ Item {
 
     // Base brightness
     property real glowOpacity: 0.80
+    readonly property color neonCyan: "#73F6FF"
+    readonly property color neonViolet: "#9B5CFF"
+    readonly property color neonPearl: "#EAD7FF"
+    readonly property color panelInk: "#060C18"
     // Gap size at the top of the halo where the high-beam icon sits.
     property real topBreakDeg: 44
 
@@ -35,6 +39,7 @@ Item {
     readonly property real _outerR: Math.min(width, height) / 2 - 1
     readonly property real _iconPlateSize: Math.max(22, ringThickness * 2.15)
     readonly property real _iconCenterY: (height / 2) - _outerR + (ringThickness * 0.55)
+    readonly property bool embeddedSafeMode: Qt.platform.os === "linux"
 
     width: haloDiameter
     height: haloDiameter
@@ -48,6 +53,8 @@ Item {
     // Fade in/out (but don't instantly drop)
     opacity: _shown ? 1.0 : 0.0
     visible: opacity > 0.001
+    layer.enabled: visible && !root.embeddedSafeMode
+    layer.smooth: !root.embeddedSafeMode
 
     Behavior on opacity { NumberAnimation { duration: 180 } }
 
@@ -123,6 +130,8 @@ Item {
     Canvas {
         id: ringCanvas
         anchors.fill: parent
+        antialiasing: true
+        renderTarget: root.embeddedSafeMode ? Canvas.Image : Canvas.FramebufferObject
         onPaint: {
             var ctx = getContext("2d")
             ctx.clearRect(0, 0, width, height)
@@ -130,26 +139,32 @@ Item {
             var cx = width / 2
             var cy = height / 2
             var outerR = Math.min(width, height) / 2 - 1
-            var innerR = outerR - ringThickness
+            var midR = outerR - ringThickness * 0.5
             var gapRad = Math.max(0.12, root.topBreakDeg * Math.PI / 180)
             var start = -Math.PI / 2 + (gapRad / 2)
             var end = start + (Math.PI * 2 - gapRad)
 
-            // Annular segment with a top break for the icon.
-            ctx.beginPath()
-            ctx.arc(cx, cy, outerR, start, end, false)
-            ctx.arc(cx, cy, innerR, end, start, true)
-            ctx.closePath()
+            function withAlpha(color, alpha) {
+                return Qt.rgba(color.r, color.g, color.b, alpha)
+            }
 
-            // OEM-ish high beam blue glow
-            var grad = ctx.createRadialGradient(cx, cy, innerR, cx, cy, outerR)
-            grad.addColorStop(0.00, Qt.rgba(0.24, 0.65, 1.0, 0.00))
-            grad.addColorStop(0.35, Qt.rgba(0.24, 0.65, 1.0, glowOpacity * 0.55))
-            grad.addColorStop(0.70, Qt.rgba(0.24, 0.65, 1.0, glowOpacity))
-            grad.addColorStop(1.00, Qt.rgba(0.24, 0.65, 1.0, 0.00))
+            function arc(radius, widthPx, color, alpha, from, to) {
+                ctx.beginPath()
+                ctx.arc(cx, cy, radius, from, to, false)
+                ctx.strokeStyle = withAlpha(color, alpha)
+                ctx.lineWidth = widthPx
+                ctx.lineCap = "round"
+                ctx.stroke()
+            }
 
-            ctx.fillStyle = grad
-            ctx.fill()
+            arc(midR, ringThickness * 1.85, root.neonCyan, root.glowOpacity * 0.18, start, end)
+            arc(midR, ringThickness * 1.26, root.neonViolet, root.glowOpacity * 0.24, start, end)
+            arc(midR, ringThickness * 0.78, root.neonCyan, root.glowOpacity * 0.88, start, end)
+            arc(midR - ringThickness * 0.16, Math.max(1, ringThickness * 0.18), root.neonPearl, 0.74, start + 0.18, end - 0.24)
+
+            var capSpan = Math.min(0.55, (end - start) * 0.14)
+            arc(midR, ringThickness * 0.92, root.neonPearl, 0.52, start, start + capSpan)
+            arc(midR, ringThickness * 0.92, root.neonPearl, 0.42, end - capSpan, end)
         }
     }
 
@@ -164,15 +179,15 @@ Item {
         radius: width / 2
         anchors.horizontalCenter: parent.horizontalCenter
         y: root._iconCenterY - (height / 2)
-        color: Qt.rgba(0.02, 0.08, 0.14, 0.92)
+        color: Qt.rgba(root.panelInk.r, root.panelInk.g, root.panelInk.b, 0.92)
         border.width: 1
-        border.color: Qt.rgba(0.35, 0.78, 1.0, 0.58)
+        border.color: Qt.rgba(root.neonCyan.r, root.neonCyan.g, root.neonCyan.b, 0.70)
     }
 
     VicIcons.HighBeamIcon {
         anchors.centerIn: iconPlate
         width: iconPlate.width * 0.76
         height: width
-        color: Qt.rgba(0.52, 0.86, 1.0, 0.98)
+        color: Qt.rgba(root.neonCyan.r, root.neonCyan.g, root.neonCyan.b, 0.98)
     }
 }

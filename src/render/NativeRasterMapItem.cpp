@@ -14,12 +14,14 @@
 #include <QSGTexture>
 #include <QStandardPaths>
 #include <QUrl>
+#include <QPainter>
 
 #include <QtMath>
 
 namespace {
 constexpr int kTileSizePx = 256;
 constexpr qreal kRouteCullDistancePx = 3.0;
+constexpr qreal kTileRefreshStepPx = 96.0;
 
 double clampLatitude(double latitude)
 {
@@ -40,8 +42,8 @@ class MapSceneRoot final : public QSGNode
 public:
     MapSceneRoot()
     {
-        tileLayer = new QSGNode;
-        appendChildNode(tileLayer);
+        mapNode = new QSGSimpleTextureNode;
+        appendChildNode(mapNode);
 
         routeNode = new QSGGeometryNode;
         auto *routeGeometry = new QSGGeometry(QSGGeometry::defaultAttributes_Point2D(), 0);
@@ -67,8 +69,7 @@ public:
         appendChildNode(vehicleNode);
     }
 
-    QSGNode *tileLayer = nullptr;
-    QHash<QString, QSGSimpleTextureNode *> tileNodes;
+    QSGSimpleTextureNode *mapNode = nullptr;
     QSGGeometryNode *routeNode = nullptr;
     QSGGeometryNode *vehicleNode = nullptr;
 };
@@ -94,7 +95,7 @@ void NativeRasterMapItem::setCenterLat(double value)
     }
     m_centerLat = value;
     if (m_componentReady) {
-        updateVisibleTiles();
+        scheduleTileRefresh();
     }
     emit viewChanged();
     update();
@@ -107,7 +108,7 @@ void NativeRasterMapItem::setCenterLng(double value)
     }
     m_centerLng = value;
     if (m_componentReady) {
-        updateVisibleTiles();
+        scheduleTileRefresh();
     }
     emit viewChanged();
     update();
@@ -120,7 +121,7 @@ void NativeRasterMapItem::setZoom(double value)
     }
     m_zoom = qBound(1.0, value, 19.0);
     if (m_componentReady) {
-        updateVisibleTiles();
+        scheduleTileRefresh();
     }
     emit viewChanged();
     update();
@@ -164,7 +165,7 @@ void NativeRasterMapItem::setTileUrlTemplate(const QString &value)
     }
     m_tileUrlTemplate = value;
     if (m_componentReady) {
-        updateVisibleTiles();
+        scheduleTileRefresh();
     }
     emit tileUrlTemplateChanged();
     update();
@@ -187,7 +188,7 @@ void NativeRasterMapItem::setCacheDirectory(const QString &value)
     m_cacheDirectory = value;
     if (m_componentReady) {
         ensureNetwork();
-        updateVisibleTiles();
+        scheduleTileRefresh();
     }
     emit cacheDirectoryChanged();
 }
@@ -206,7 +207,8 @@ void NativeRasterMapItem::componentComplete()
     QQuickItem::componentComplete();
     m_componentReady = true;
     ensureNetwork();
-    updateVisibleTiles();
+    scheduleTileRefresh();
+    update();
 }
 
 void NativeRasterMapItem::geometryChange(const QRectF &newGeometry, const QRectF &oldGeometry)
@@ -215,8 +217,17 @@ void NativeRasterMapItem::geometryChange(const QRectF &newGeometry, const QRectF
     if (!m_componentReady || newGeometry.size() == oldGeometry.size()) {
         return;
     }
-    updateVisibleTiles();
+    scheduleTileRefresh();
     update();
+}
+
+void NativeRasterMapItem::updatePolish()
+{
+    if (!m_componentReady || !m_tileRefreshPending) {
+        return;
+    }
+    m_tileRefreshPending = false;
+    updateVisibleTiles();
 }
 
 void NativeRasterMapItem::ensureNetwork()
@@ -340,9 +351,41 @@ void NativeRasterMapItem::requestTile(int z, int x, int y)
 
 void NativeRasterMapItem::updateVisibleTiles()
 {
+    const int z = qRound(m_zoom);
+    const QSize viewSize(qMax(1, int(width())), qMax(1, int(height())));
+    const QPointF centerWorld = projectToWorld(m_centerLat, m_centerLng, z);
+    const QPointF topLeftWorld = centerWorld - QPointF(width() / 2.0, height() / 2.0);
+    const QPointF topLeftDelta = topLeftWorld - m_lastTileRefreshTopLeftWorld;
+    const bool cameraMovedEnough = !m_haveTileRefreshState
+        || qAbs(topLeftDelta.x()) >= kTileRefreshStepPx
+        || qAbs(topLeftDelta.y()) >= kTileRefreshStepPx;
+    const bool refreshVisibleSet = !m_haveTileRefreshState
+        || m_lastTileRefreshSize != viewSize
+        || m_lastTileRefreshZoom != z
+        || cameraMovedEnough;
+    if (!refreshVisibleSet) {
+        return;
+    }
+
+    m_lastTileRefreshSize = viewSize;
+    m_lastTileRefreshTopLeftWorld = topLeftWorld;
+    m_lastTileRefreshZoom = z;
+    m_haveTileRefreshState = true;
+
     const QList<VisibleTile> tiles = visibleTiles();
     for (const VisibleTile &tile : tiles) {
         requestTile(tile.z, tile.x, tile.y);
+    }
+}
+
+void NativeRasterMapItem::scheduleTileRefresh()
+{
+    if (!m_componentReady) {
+        return;
+    }
+    if (!m_tileRefreshPending) {
+        m_tileRefreshPending = true;
+        polish();
     }
 }
 
@@ -371,61 +414,67 @@ QSGNode *NativeRasterMapItem::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeD
         m_dirtyTextures.clear();
     }
 
-    for (const QString &key : dirtyTextures) {
-        QSGTexture *texture = m_textures.take(key);
-        delete texture;
-    }
-
     const QList<VisibleTile> tiles = visibleTiles();
-    QSet<QString> visibleKeys;
-    for (const VisibleTile &tile : tiles) {
-        visibleKeys.insert(tile.key);
-        const QImage image = tileImages.value(tile.key);
-        if (image.isNull()) {
-            continue;
-        }
-
-        QSGTexture *texture = m_textures.value(tile.key, nullptr);
-        if (!texture && window()) {
-            texture = window()->createTextureFromImage(image);
-            m_textures.insert(tile.key, texture);
-            recordCounter(QStringLiteral("map.tileUpload"));
-        }
-        if (!texture) {
-            continue;
-        }
-
-        QSGSimpleTextureNode *node = root->tileNodes.value(tile.key, nullptr);
-        if (!node) {
-            node = new QSGSimpleTextureNode;
-            root->tileLayer->appendChildNode(node);
-            root->tileNodes.insert(tile.key, node);
-        }
-        node->setOwnsTexture(false);
-        node->setTexture(texture);
-        node->setRect(tile.rect);
-        node->markDirty(QSGNode::DirtyGeometry);
-        node->markDirty(QSGNode::DirtyMaterial);
-    }
-
-    const QList<QString> existingKeys = root->tileNodes.keys();
-    for (const QString &key : existingKeys) {
-        if (visibleKeys.contains(key)) {
-            continue;
-        }
-
-        if (QSGSimpleTextureNode *node = root->tileNodes.take(key)) {
-            root->tileLayer->removeChildNode(node);
-            delete node;
-        }
-
-        QSGTexture *texture = m_textures.take(key);
-        delete texture;
-    }
-
     const int z = qRound(m_zoom);
     const QPointF centerWorld = projectToWorld(m_centerLat, m_centerLng, z);
     const QPointF topLeftWorld = centerWorld - QPointF(width() / 2.0, height() / 2.0);
+    if (window() && width() > 0 && height() > 0) {
+        const QSize compositeSize(qMax(1, int(width())), qMax(1, int(height())));
+        const QPointF topLeftDelta = topLeftWorld - m_lastCompositeTopLeftWorld;
+        const bool cameraMovedEnough = !m_haveCompositeState
+            || qAbs(topLeftDelta.x()) >= 1.0
+            || qAbs(topLeftDelta.y()) >= 1.0;
+        const bool rebuildComposite = !m_textures.contains(QStringLiteral("__composite__"))
+            || !m_haveCompositeState
+            || m_lastCompositeSize != compositeSize
+            || m_lastCompositeZoom != z
+            || cameraMovedEnough
+            || !dirtyTextures.isEmpty();
+
+        if (rebuildComposite) {
+            QImage composite(compositeSize, QImage::Format_ARGB32_Premultiplied);
+            composite.fill(QColor(0x06, 0x11, 0x1D));
+
+            QPainter painter(&composite);
+            painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
+            bool drewTile = false;
+            for (const VisibleTile &tile : tiles) {
+                const QImage image = tileImages.value(tile.key);
+                if (image.isNull()) {
+                    continue;
+                }
+                painter.drawImage(tile.rect, image, image.rect());
+                drewTile = true;
+            }
+            painter.end();
+
+            for (const QString &key : dirtyTextures) {
+                Q_UNUSED(key);
+            }
+            QSGTexture *oldTexture = m_textures.take(QStringLiteral("__composite__"));
+            delete oldTexture;
+            QSGTexture *texture = window()->createTextureFromImage(composite);
+            if (texture) {
+                m_textures.insert(QStringLiteral("__composite__"), texture);
+                m_lastCompositeSize = compositeSize;
+                m_lastCompositeTopLeftWorld = topLeftWorld;
+                m_lastCompositeZoom = z;
+                m_haveCompositeState = true;
+                if (drewTile) {
+                    recordCounter(QStringLiteral("map.tileUpload"));
+                }
+            }
+        }
+
+        QSGTexture *texture = m_textures.value(QStringLiteral("__composite__"), nullptr);
+        if (texture) {
+            root->mapNode->setOwnsTexture(false);
+            root->mapNode->setTexture(texture);
+            root->mapNode->setRect(0, 0, width(), height());
+            root->mapNode->markDirty(QSGNode::DirtyGeometry);
+            root->mapNode->markDirty(QSGNode::DirtyMaterial);
+        }
+    }
 
     if (m_routePath.size() >= 2) {
         QVector<QPointF> routePoints;

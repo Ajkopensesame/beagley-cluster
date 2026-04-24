@@ -7,6 +7,7 @@ Rectangle {
 
     property var cluster
     property var metrics
+    property string fontFamily: "sans-serif"
     property color panelFill: "#081220"
     property color panelStroke: "#14324A"
 
@@ -48,12 +49,14 @@ Rectangle {
 
             Text {
                 color: "#7BA5C9"
+                font.family: root.fontFamily
                 font.pixelSize: 15
                 text: "GUIDANCE"
             }
 
             Text {
                 color: "white"
+                font.family: root.fontFamily
                 font.pixelSize: 26
                 font.bold: true
                 elide: Text.ElideRight
@@ -63,6 +66,7 @@ Rectangle {
 
             Text {
                 color: "#C7DAE8"
+                font.family: root.fontFamily
                 font.pixelSize: 17
                 elide: Text.ElideRight
                 width: parent.width
@@ -90,6 +94,7 @@ Rectangle {
             Text {
                 anchors.verticalCenter: parent.verticalCenter
                 color: "#8EC9FF"
+                font.family: root.fontFamily
                 font.pixelSize: 18
                 text: root.cluster.gpsOk ? "GPS LIVE" : "GPS HOLD"
             }
@@ -97,6 +102,7 @@ Rectangle {
             Text {
                 anchors.verticalCenter: parent.verticalCenter
                 color: "white"
+                font.family: root.fontFamily
                 font.pixelSize: 18
                 text: root.cluster.etaText.length > 0 ? ("ETA " + root.cluster.etaText) : "ETA --"
             }
@@ -110,6 +116,7 @@ Rectangle {
             Text {
                 anchors.verticalCenter: parent.verticalCenter
                 color: "#C7DAE8"
+                font.family: root.fontFamily
                 font.pixelSize: 18
                 text: Qt.formatDateTime(new Date(), "hh:mm")
             }

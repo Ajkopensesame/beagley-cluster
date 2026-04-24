@@ -1,7 +1,7 @@
 [Unit]
 Description=Beagley Cluster Appliance
-After=network-online.target beagley-cluster-provision.service beagley-cluster-gpu-probe.service
-Wants=network-online.target beagley-cluster-provision.service beagley-cluster-gpu-probe.service
+After=network.target beagley-cluster-provision.service beagley-cluster-gpu-probe.service
+Wants=beagley-cluster-provision.service beagley-cluster-gpu-probe.service
 
 [Service]
 Type=simple
@@ -18,8 +18,9 @@ Environment=BEAGLEY_REQUIRE_GPU_GATE=1
 Environment=BEAGLEY_GPU_GATE_FILE=/run/beagley_gpu_gate.ok
 Environment=BEAGLEY_GPU_PROBE_STATUS_FILE=/run/beagley_gpu_gate.status
 Environment=BEAGLEY_GPU_PROBE_LOG_FILE=/run/beagley_gpu_gate.log
-Environment=BEAGLEY_PROFILE_METRICS=1
-ExecCondition=/bin/sh -c 'test -f "${BEAGLEY_GPU_GATE_FILE:-/run/beagley_gpu_gate.ok}"'
+Environment=BEAGLEY_PROFILE_METRICS=0
+ExecCondition=/bin/sh -c '! grep -Eq "(^| )beagley\\.diag=1($| )" /proc/cmdline && test ! -f /run/beagley-diagnostic.mode'
+ExecStartPre=/bin/sh -c 'gate="${BEAGLEY_GPU_GATE_FILE:-/run/beagley_gpu_gate.ok}"; i=0; while [ "$i" -lt 30 ]; do [ -f "$gate" ] && exit 0; i=$((i + 1)); sleep 1; done; echo "beagley-cluster: missing GPU gate file: $gate" >&2; exit 1'
 ExecStart=/usr/bin/beagley-cluster-launch.sh
 Restart=always
 RestartSec=2

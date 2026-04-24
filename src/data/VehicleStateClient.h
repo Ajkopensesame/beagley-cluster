@@ -36,6 +36,13 @@ class VehicleStateClient : public QObject
     // BBB-declared stale (separate from linkStale)
     Q_PROPERTY(bool bbbStale READ bbbStale NOTIFY bbbStaleChanged)
 
+    // Normalized diagnostic status emitted by the BBB hub.
+    Q_PROPERTY(bool diagnosticOk READ diagnosticOk NOTIFY diagnosticChanged)
+    Q_PROPERTY(QString diagnosticSeverity READ diagnosticSeverity NOTIFY diagnosticChanged)
+    Q_PROPERTY(QString diagnosticStatus READ diagnosticStatus NOTIFY diagnosticChanged)
+    Q_PROPERTY(QString diagnosticSummary READ diagnosticSummary NOTIFY diagnosticChanged)
+    Q_PROPERTY(int diagnosticFindingCount READ diagnosticFindingCount NOTIFY diagnosticChanged)
+
     // Core analogs (truth from BBB)
     Q_PROPERTY(double speedKph READ speedKph NOTIFY speedKphChanged)
     Q_PROPERTY(int    rpm READ rpm NOTIFY rpmChanged)
@@ -79,6 +86,11 @@ public:
     bool warnFuelLow() const { return m_warnFuelLow; }
 
     bool bbbStale() const { return m_bbbStale; }
+    bool diagnosticOk() const { return m_diagnosticOk; }
+    QString diagnosticSeverity() const { return m_diagnosticSeverity; }
+    QString diagnosticStatus() const { return m_diagnosticStatus; }
+    QString diagnosticSummary() const { return m_diagnosticSummary; }
+    int diagnosticFindingCount() const { return m_diagnosticFindingCount; }
 
     double speedKph() const { return m_speedKph; }
     int    rpm() const { return m_rpm; }
@@ -119,6 +131,7 @@ signals:
     void warnATChanged();
     void warnFuelLowChanged();
     void bbbStaleChanged();
+    void diagnosticChanged();
 
     void speedKphChanged();
     void rpmChanged();
@@ -177,6 +190,11 @@ private:
     void setWarnAT(bool v);
     void setWarnFuelLow(bool v);
     void setBbbStale(bool v);
+    void setDiagnosticOk(bool v);
+    void setDiagnosticSeverity(const QString &v);
+    void setDiagnosticStatus(const QString &v);
+    void setDiagnosticSummary(const QString &v);
+    void setDiagnosticFindingCount(int v);
 
     void setSpeedKph(double v);
     void setRpm(int v);
@@ -237,6 +255,11 @@ private:
     bool m_warnAT = false;
     bool m_warnFuelLow = false;
     bool m_bbbStale = true;
+    bool m_diagnosticOk = true;
+    QString m_diagnosticSeverity = QStringLiteral("unknown");
+    QString m_diagnosticStatus = QStringLiteral("unknown");
+    QString m_diagnosticSummary;
+    int m_diagnosticFindingCount = 0;
 
     double m_speedKph = 0.0;
     int    m_rpm = 0;

@@ -1,6 +1,38 @@
-.yocto-work/
-build/
-node_modules/
 .DS_Store
-.idea/
-.vscode/
+build/
+*.user
+*.user.*
+
+# Local backups
+*.bak
+*.bak2
+*.save
+
+# build outputs
+/build/
+*.user
+.DS_Store
+*.bak.*
+
+# Local scratch / experiments
+sandbox/
+src/ui/widgets/VehicleStateCoreAnimated.qml
+
+# Local build outputs
+build-ninja/
+build/
+
+# Local web experiments
+src/ui/web/test/
+
+# Machine-local Yocto workdirs (large; never commit)
+.yocto-work/
+
+# Machine-local WebEngine cache accidentally created under the repo root
+file:/
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/

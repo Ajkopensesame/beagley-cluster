@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vehicle Hub CAN Workbench</title>
+  <style>
+    :root {
+      --bg: #10151b;
+      --panel: #18212b;
+      --panel-2: #202c38;
+      --text: #edf3f7;
+      --muted: #9fb0bd;
+      --accent: #58d6a5;
+      --warn: #f1c45f;
+      --grid: #324351;
+    }
+    body {
+      margin: 0;
+      background: radial-gradient(circle at top left, #253848 0, var(--bg) 45rem);
+      color: var(--text);
+      font: 14px/1.45 "Avenir Next", "Gill Sans", sans-serif;
+    }
+    header {
+      padding: 28px 34px 16px;
+    }
+    h1, h2, h3 {
+      margin: 0;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    h1 {
+      font-size: clamp(28px, 4vw, 52px);
+    }
+    h2 {
+      font-size: 20px;
+      margin-bottom: 12px;
+    }
+    h3 {
+      font-size: 15px;
+      color: var(--accent);
+      margin: 10px 0 8px;
+    }
+    main {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+      gap: 18px;
+      padding: 0 34px 34px;
+    }
+    section {
+      background: rgba(24, 33, 43, 0.92);
+      border: 1px solid #2b3c4a;
+      border-radius: 18px;
+      box-shadow: 0 18px 60px rgba(0, 0, 0, 0.25);
+      padding: 18px;
+      overflow: hidden;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th, td {
+      border-bottom: 1px solid var(--grid);
+      padding: 8px 7px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    code {
+      color: var(--accent);
+    }
+    .muted {
+      color: var(--muted);
+    }
+    .grid {
+      display: grid;
+      gap: 14px;
+    }
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: var(--panel-2);
+      color: var(--accent);
+      font-size: 12px;
+      margin-right: 6px;
+    }
+    .bar {
+      display: inline-block;
+      height: 9px;
+      min-width: 3px;
+      border-radius: 9px;
+      background: linear-gradient(90deg, #4b6cf0, var(--accent));
+    }
+    .byte-cell {
+      display: grid;
+      grid-template-columns: repeat(8, minmax(16px, 1fr));
+      gap: 4px;
+    }
+    .byte {
+      min-height: 18px;
+      border-radius: 5px;
+      background: #24313d;
+      color: var(--text);
+      text-align: center;
+      font-size: 11px;
+      padding-top: 3px;
+    }
+    .chart {
+      width: 100%;
+      height: 190px;
+      background: #0d1217;
+      border-radius: 12px;
+      border: 1px solid var(--grid);
+    }
+    pre {
+      overflow: auto;
+      max-height: 360px;
+      background: #0d1217;
+      border: 1px solid var(--grid);
+      border-radius: 12px;
+      padding: 12px;
+    }
+    @media (max-width: 900px) {
+      main {
+        grid-template-columns: 1fr;
+        padding: 0 18px 18px;
+      }
+      header {
+        padding: 22px 18px 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Vehicle Hub CAN Workbench</h1>
+    <p class="muted">Offline deterministic CAN discovery for named vehicle signals. The cluster keeps consuming <code>rpm</code> and <code>speedKph</code>.</p>
+  </header>
+  <main>
+    <div class="grid">
+      <section>
+        <h2>CAN ID Activity</h2>
+        <div id="activity"></div>
+      </section>
+      <section>
+        <h2>Candidate Overlays</h2>
+        <div id="charts" class="grid"></div>
+      </section>
+    </div>
+    <div class="grid">
+      <section>
+        <h2>Guided Labels</h2>
+        <div id="labels"></div>
+      </section>
+      <section>
+        <h2>Top Candidates</h2>
+        <div id="rankings" class="grid"></div>
+      </section>
+      <section>
+        <h2>Export Preview</h2>
+        <pre id="export"></pre>
+      </section>
+    </div>
+  </main>
+  <script>
+    async function boot() {
+      const response = await fetch("/analysis.json");
+      const analysis = await response.json();
+      renderActivity(analysis);
+      renderLabels(analysis);
+      renderRankings(analysis);
+      renderCharts(analysis);
+      renderExport(analysis);
+    }
+
+    function renderActivity(analysis) {
+      const ids = [...(analysis.idSummary || [])].sort((a, b) => b.frameCount - a.frameCount).slice(0, 40);
+      const maxCount = Math.max(1, ...ids.map(item => item.frameCount));
+      const rows = ids.map(item => {
+        const barWidth = Math.max(3, Math.round(150 * item.frameCount / maxCount));
+        const bytes = (item.byteStats || []).slice(0, 8).map(byte => {
+          const heat = Math.min(1, byte.unique / 128);
+          const color = `rgba(${Math.round(60 + 120 * heat)}, ${Math.round(110 + 120 * heat)}, ${Math.round(150 + 60 * heat)}, 0.9)`;
+          const bitSummary = (item.bitStats || [])
+            .filter(bit => bit.byte === byte.byte)
+            .map(bit => `b${bit.bit}:${bit.transitions}`)
+            .join(" ");
+          return `<span class="byte" style="background:${color}" title="byte ${byte.byte}: ${byte.unique} unique; bit transitions ${bitSummary}">${byte.byte}</span>`;
+        }).join("");
+        return `<tr>
+          <td><code>${item.canId}</code></td>
+          <td><span class="bar" style="width:${barWidth}px"></span> ${item.frameCount}</td>
+          <td>${item.sampleHz} Hz</td>
+          <td><div class="byte-cell">${bytes}</div></td>
+        </tr>`;
+      }).join("");
+      document.querySelector("#activity").innerHTML = `<table>
+        <thead><tr><th>ID</th><th>Frames</th><th>Rate</th><th>Byte Activity</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+    }
+
+    function renderLabels(analysis) {
+      const labels = analysis.labelWindows || [];
+      if (!labels.length) {
+        document.querySelector("#labels").innerHTML = `<p class="muted">No guided label windows were loaded.</p>`;
+        return;
+      }
+      document.querySelector("#labels").innerHTML = labels.map(item =>
+        `<div><span class="pill">${item.label}</span><code>${item.start}</code> to <code>${item.end}</code> <span class="muted">${item.target || ""} ${item.trend || ""}</span></div>`
+      ).join("");
+    }
+
+    function renderRankings(analysis) {
+      const rankings = analysis.candidateRankings || {};
+      document.querySelector("#rankings").innerHTML = Object.keys(rankings).map(signal => {
+        const rows = rankings[signal].slice(0, 8).map(candidate => `<tr>
+          <td>${Math.round(candidate.confidence * 100)}%</td>
+          <td><code>${candidate.canId}</code></td>
+          <td>b${candidate.startBit}/${candidate.length}</td>
+          <td>${candidate.endian}${candidate.signed ? " signed" : ""}</td>
+          <td>${candidate.verified ? "verified" : "unverified"}</td>
+        </tr>`).join("");
+        return `<div><h3>${signal}</h3><table>
+          <thead><tr><th>Confidence</th><th>ID</th><th>Field</th><th>Encoding</th><th>Status</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table></div>`;
+      }).join("");
+    }
+
+    function renderCharts(analysis) {
+      const top = analysis.topSignals || {};
+      document.querySelector("#charts").innerHTML = Object.keys(top).map(signal => {
+        const candidate = top[signal];
+        return `<div><h3>${signal}: <code>${candidate.candidateId}</code></h3>${drawSeries(candidate.seriesPreview || [])}</div>`;
+      }).join("");
+    }
+
+    function renderExport(analysis) {
+      const signals = {};
+      for (const [signal, candidate] of Object.entries(analysis.topSignals || {})) {
+        if (!candidate.verified) continue;
+        signals[signal] = {
+          canId: candidate.canId,
+          startBit: candidate.startBit,
+          length: candidate.length,
+          endian: candidate.endian,
+          signed: candidate.signed,
+          scale: candidate.scale,
+          offset: candidate.offset,
+          unit: candidate.unit,
+          confidence: candidate.confidence,
+          verified: true,
+          pipeline: candidate.pipeline,
+          evidence: candidate.evidence
+        };
+      }
+      const rejectedSignals = {};
+      for (const [signal, decision] of Object.entries(analysis.signalDecisions || {})) {
+        if (decision.verified) continue;
+        rejectedSignals[signal] = decision;
+      }
+      document.querySelector("#export").textContent = JSON.stringify({version: 1, signals, rejectedSignals}, null, 2);
+    }
+
+    function drawSeries(points) {
+      if (points.length < 2) return `<p class="muted">Not enough points to draw.</p>`;
+      const width = 820;
+      const height = 190;
+      const xs = points.map(point => point.timestamp);
+      const ys = points.map(point => point.value);
+      const minX = Math.min(...xs);
+      const maxX = Math.max(...xs);
+      const minY = Math.min(...ys);
+      const maxY = Math.max(...ys);
+      const scaleX = x => 16 + ((x - minX) / Math.max(maxX - minX, 1e-9)) * (width - 32);
+      const scaleY = y => height - 16 - ((y - minY) / Math.max(maxY - minY, 1e-9)) * (height - 32);
+      const d = points.map((point, index) => `${index ? "L" : "M"}${scaleX(point.timestamp).toFixed(1)} ${scaleY(point.value).toFixed(1)}`).join(" ");
+      return `<svg class="chart" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">
+        <path d="M16 16 V174 H804" fill="none" stroke="#324351"/>
+        <path d="${d}" fill="none" stroke="#58d6a5" stroke-width="3"/>
+        <text x="18" y="28" fill="#9fb0bd">${minY.toFixed(1)} to ${maxY.toFixed(1)}</text>
+      </svg>`;
+    }
+
+    boot().catch(error => {
+      document.body.innerHTML = `<pre>${String(error.stack || error)}</pre>`;
+    });
+  </script>
+</body>
+</html>

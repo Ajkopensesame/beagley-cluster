@@ -4,18 +4,21 @@ Item {
     id: root
     anchors.fill: parent
 
-    // "placeholder" | "snapshot"(native) | "video" | "web"(desktop/debug)
+    // "placeholder" | "native" | "snapshot" | "video" | "web"
     property string mode: "placeholder"
     property bool webFallbackActive: false
     property string webFallbackReason: ""
     property string webRenderMode: "web-vector"
     readonly property string mapRenderMode: effectiveMode === "web"
         ? webRenderMode
-        : (effectiveMode === "snapshot" ? "snapshot" : "placeholder")
+        : (effectiveMode === "native"
+            ? "native-online"
+            : (effectiveMode === "snapshot" ? "snapshot" : "placeholder"))
 
     property real lat: 0
     property real lng: 0
     property real bearing: 0
+    property real zoom: NaN
     property real speedKph: 0
     property bool fixedOriginEnabled: false
     property real fixedOriginLat: NaN
@@ -36,6 +39,7 @@ Item {
     // Video mode (reserved for later)
     property string videoUrl: ""
     property bool videoEnabled: false
+    readonly property bool forceSnapshotMode: (typeof BEAGLEY_FORCE_SNAPSHOT_MAP !== "undefined" && BEAGLEY_FORCE_SNAPSHOT_MAP)
 
     onModeChanged: {
         if (mode !== "web") {
@@ -65,12 +69,18 @@ Item {
     }
 
     readonly property string effectiveMode: {
+        if (forceSnapshotMode && (mode === "native" || mode === "web")) {
+            return "snapshot"
+        }
         if (mode === "web") {
             return webFallbackActive ? "snapshot" : "web"
         }
         if (mode === "video") {
             // For now, video is not implemented, but we keep the API.
             return (videoEnabled && videoUrl !== "") ? "video" : "placeholder"
+        }
+        if (mode === "native") {
+            return "native"
         }
         if (mode === "snapshot") {
             return "snapshot"
@@ -82,7 +92,9 @@ Item {
         id: contentLoader
         anchors.fill: parent
         active: effectiveMode !== "web"
-        sourceComponent: effectiveMode === "snapshot" ? snapshotComp : placeholderComp
+        sourceComponent: effectiveMode === "native"
+            ? nativeComp
+            : (effectiveMode === "snapshot" ? snapshotComp : placeholderComp)
     }
 
     Loader {
@@ -125,6 +137,29 @@ Item {
         function onRenderModeChanged() {
             if (webLoader.item && webLoader.item.renderMode)
                 root.webRenderMode = webLoader.item.renderMode
+        }
+    }
+
+    Component {
+        id: nativeComp
+        MapCenterNative {
+            anchors.fill: parent
+            lat: root.lat
+            lng: root.lng
+            bearing: root.bearing
+            zoom: root.zoom
+            speedKph: root.speedKph
+            fixedOriginEnabled: root.fixedOriginEnabled
+            fixedOriginLat: root.fixedOriginLat
+            fixedOriginLng: root.fixedOriginLng
+            fixedOriginLabel: root.fixedOriginLabel
+            navigationState: root.navigationState
+            mapVehiclePose: root.mapVehiclePose
+            mapCameraHints: root.mapCameraHints
+            mapRouteOverlay: root.mapRouteOverlay
+            mapGuidanceBanner: root.mapGuidanceBanner
+            mapConnectivity: root.mapConnectivity
+            interactionEnabled: root.interactionEnabled
         }
     }
 

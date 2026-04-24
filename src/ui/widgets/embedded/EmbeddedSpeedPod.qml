@@ -4,89 +4,43 @@ Rectangle {
     id: root
 
     property var cluster
+    property string fontFamily: "sans-serif"
     property color panelFill: "#081220"
     property color panelStroke: "#14324A"
     property color needleColor: "#FFB03B"
-    readonly property real speedAngle: -126 + Math.min(252, Math.max(0, root.cluster.speedKph * 2.1))
+    readonly property real speedValue: root.cluster ? Number(root.cluster.speedKph || 0) : 0
+    readonly property real fuelValue: root.cluster ? Number(root.cluster.fuelPct || 0) : 0
+    readonly property real coolantValue: root.cluster ? Number(root.cluster.coolantC || 0) : 0
 
     radius: 34
     color: panelFill
     border.color: panelStroke
     border.width: 1
 
-    Rectangle {
-        width: 360
-        height: 360
-        radius: 180
+    EmbeddedAnalogGauge {
+        id: gauge
+        width: Math.max(1, Math.min(parent.width - 40, parent.height - 130))
+        height: width
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: parent.top
-        anchors.topMargin: 26
-        color: "#071019"
-        border.color: "#1C4867"
-        border.width: 2
-
-        Repeater {
-            model: 13
-
-            delegate: Rectangle {
-                width: index % 3 === 0 ? 30 : 18
-                height: 3
-                radius: 2
-                color: index < 7 ? "#4CD9FF" : "#35556E"
-                anchors.centerIn: parent
-                transform: [
-                    Translate { y: -150 },
-                    Rotation {
-                        origin.x: width / 2
-                        origin.y: 150 + height / 2
-                        angle: -126 + (index * 21)
-                    }
-                ]
-            }
-        }
-
-        Rectangle {
-            width: 120
-            height: 6
-            radius: 3
-            color: root.needleColor
-            anchors.centerIn: parent
-            transform: Rotation {
-                origin.x: 18
-                origin.y: 3
-                angle: root.speedAngle
-            }
-            x: parent.width / 2 - 18
-            y: parent.height / 2 - 3
-        }
-
-        Rectangle {
-            width: 22
-            height: 22
-            radius: 11
-            color: root.needleColor
-            anchors.centerIn: parent
-        }
-
-        Column {
-            anchors.centerIn: parent
-            spacing: 0
-
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                color: "white"
-                font.pixelSize: 108
-                font.bold: true
-                text: Math.round(root.cluster.speedKph)
-            }
-
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                color: "#7BA5C9"
-                font.pixelSize: 24
-                text: "KM/H"
-            }
-        }
+        anchors.topMargin: 18
+        value: root.speedValue
+        maxValue: 140
+        dangerStart: 116
+        minorStep: 10
+        majorStep: 20
+        labelStep: 20
+        labelDivisor: 1
+        valueText: String(Math.round(displayValue))
+        unitText: "KM/H"
+        labelText: "SPEED"
+        valueFontSize: 104
+        unitFontSize: 23
+        fontFamily: root.fontFamily
+        accentColor: root.needleColor
+        dangerColor: "#E34848"
+        trackColor: "#31546C"
+        mutedTextColor: "#91B7D5"
     }
 
     Row {
@@ -98,8 +52,8 @@ Rectangle {
 
         Repeater {
             model: [
-                { label: "FUEL", value: Math.round(root.cluster.fuelPct) + "%" },
-                { label: "COOLANT", value: Math.round(root.cluster.coolantC) + " C" }
+                { label: "FUEL", value: Math.round(root.fuelValue) + "%", fill: Math.max(0, Math.min(1, root.fuelValue / 100.0)), color: "#4CD9FF" },
+                { label: "COOLANT", value: Math.round(root.coolantValue) + " C", fill: Math.max(0, Math.min(1, (root.coolantValue - 40.0) / 70.0)), color: root.coolantValue >= 105 ? "#E34848" : "#FFB03B" }
             ]
 
             delegate: Rectangle {
@@ -117,6 +71,7 @@ Rectangle {
                     Text {
                         anchors.horizontalCenter: parent.horizontalCenter
                         color: "#7BA5C9"
+                        font.family: root.fontFamily
                         font.pixelSize: 16
                         text: modelData.label
                     }
@@ -124,9 +79,33 @@ Rectangle {
                     Text {
                         anchors.horizontalCenter: parent.horizontalCenter
                         color: "white"
+                        font.family: root.fontFamily
                         font.pixelSize: 34
                         font.bold: true
                         text: modelData.value
+                    }
+
+                    Rectangle {
+                        width: 128
+                        height: 7
+                        radius: 4
+                        color: "#142435"
+                        antialiasing: true
+
+                        Rectangle {
+                            width: parent.width * modelData.fill
+                            height: parent.height
+                            radius: parent.radius
+                            color: modelData.color
+                            antialiasing: true
+
+                            Behavior on width {
+                                NumberAnimation {
+                                    duration: 140
+                                    easing.type: Easing.OutCubic
+                                }
+                            }
+                        }
                     }
                 }
             }

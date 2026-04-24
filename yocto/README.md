@@ -7,6 +7,13 @@ The production target is a Yocto image built on top of TI Processor SDK Linux
 `yocto/meta-beagley-cluster` adds the cluster application, the staged GPU-probe
 and app systemd services, and the image recipe used for release images.
 
+For boot-failure diagnosis there is also a dedicated image target:
+
+- `beagley-cluster-image-diag`
+
+That image keeps the same BeagleY boot payload as production, but switches the
+kernel args and service behavior into a verbose diagnostic mode.
+
 ## Expected workflow
 
 1. Bootstrap a TI Processor SDK Linux 11.00 workspace on a Linux host or VM.
@@ -118,16 +125,17 @@ directory is missing BeagleY boot artifacts, if the `beagley-cluster` package is
 missing `/usr/bin/beagley_cluster` or its systemd units, or if the image lacks
 SSH or a GPU probe prerequisite such as `kmscube`.
 
-For `MACHINE=beagley-ai`, the boot contract is now the non-EFI U-Boot
-distro-boot path. The build emits:
+For `MACHINE=beagley-ai`, the boot contract is now a dual-path BeagleY image.
+The build emits:
 
 - `extlinux/extlinux.conf` with an explicit `ti/k3-am67a-beagley-ai.dtb`
+- `EFI/BOOT/bootaa64.efi` and `EFI/BOOT/grub.cfg`
 - `uEnv.txt` that also sets `fdtfile=ti/k3-am67a-beagley-ai.dtb`
 - a boot payload contract that includes `Image` and the BeagleY DTB on the
   boot partition
 
-The validation step fails the build if that BeagleY boot contract regresses
-back to an EFI/GRUB image layout.
+The diagnostic image also validates that both boot paths carry the verbose
+console args, including `console=tty1` and `beagley.diag=1`.
 
 ## Release output
 
@@ -168,6 +176,11 @@ The appliance now brings the board up in two stages:
 
 This keeps SSH and logs available for diagnosis while still preventing the UI
 from running on `llvmpipe`, `swrast`, or any other software renderer.
+
+In `beagley-cluster-image-diag`, the appliance and GPU-probe services are
+explicitly suppressed, while `beagley-diagnostic-*` services leave stage
+markers and snapshots under `/var/lib/beagley-cluster/diagnostic` and, when
+possible, on the FAT boot partition under `beagley-diag/`.
 
 ## macOS flashing
 
