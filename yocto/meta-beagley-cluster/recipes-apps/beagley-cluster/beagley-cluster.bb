@@ -9,8 +9,9 @@ BEAGLEY_CLUSTER_GIT_BRANCH ?= "main"
 
 SRC_URI = " \
     ${BEAGLEY_CLUSTER_GIT_URL};branch=${BEAGLEY_CLUSTER_GIT_BRANCH} \
-    file://beagley-cluster.service \
+    file://beagley_cluster.service \
     file://beagley-cluster-gpu-probe.service \
+    file://beagley-cluster-touch-probe.service \
     file://beagley-cluster-provision.service \
     file://beagley-diagnostic-local-fs.service \
     file://beagley-diagnostic-collect.service \
@@ -22,6 +23,7 @@ SRC_URI = " \
     file://beagley-cluster-journal.conf \
     file://beagley-cluster-launch.sh \
     file://beagley-cluster-gpu-probe.sh \
+    file://beagley-touch-gate.sh \
     file://beagley-gpu-gate.sh \
     file://beagley-cluster-provision.sh \
     file://beagley-diagnostic.sh \
@@ -53,8 +55,9 @@ EXTRA_OECMAKE += " \
     -DCMAKE_BUILD_TYPE=Release \
 "
 
-SYSTEMD_SERVICE:${PN} = "beagley-cluster.service"
+SYSTEMD_SERVICE:${PN} = "beagley_cluster.service"
 SYSTEMD_SERVICE:${PN} += " beagley-cluster-gpu-probe.service"
+SYSTEMD_SERVICE:${PN} += " beagley-cluster-touch-probe.service"
 SYSTEMD_SERVICE:${PN} += " beagley-cluster-provision.service"
 SYSTEMD_SERVICE:${PN} += " beagley-diagnostic-local-fs.service"
 SYSTEMD_SERVICE:${PN} += " beagley-diagnostic-collect.service"
@@ -63,8 +66,9 @@ SYSTEMD_AUTO_ENABLE:${PN} = "enable"
 
 do_install:append() {
     install -d ${D}${systemd_system_unitdir}
-    install -m 0644 ${WORKDIR}/beagley-cluster.service ${D}${systemd_system_unitdir}/beagley-cluster.service
+    install -m 0644 ${WORKDIR}/beagley_cluster.service ${D}${systemd_system_unitdir}/beagley_cluster.service
     install -m 0644 ${WORKDIR}/beagley-cluster-gpu-probe.service ${D}${systemd_system_unitdir}/beagley-cluster-gpu-probe.service
+    install -m 0644 ${WORKDIR}/beagley-cluster-touch-probe.service ${D}${systemd_system_unitdir}/beagley-cluster-touch-probe.service
     install -m 0644 ${WORKDIR}/beagley-cluster-provision.service ${D}${systemd_system_unitdir}/beagley-cluster-provision.service
     install -m 0644 ${WORKDIR}/beagley-diagnostic-local-fs.service ${D}${systemd_system_unitdir}/beagley-diagnostic-local-fs.service
     install -m 0644 ${WORKDIR}/beagley-diagnostic-collect.service ${D}${systemd_system_unitdir}/beagley-diagnostic-collect.service
@@ -81,6 +85,7 @@ do_install:append() {
 
     install -d ${D}${libexecdir}/beagley-cluster
     install -m 0755 ${WORKDIR}/beagley-cluster-gpu-probe.sh ${D}${libexecdir}/beagley-cluster/beagley-cluster-gpu-probe.sh
+    install -m 0755 ${WORKDIR}/beagley-touch-gate.sh ${D}${libexecdir}/beagley-cluster/beagley-touch-gate.sh
     install -m 0755 ${WORKDIR}/beagley-cluster-provision.sh ${D}${libexecdir}/beagley-cluster/beagley-cluster-provision.sh
     install -m 0755 ${WORKDIR}/beagley-diagnostic.sh ${D}${libexecdir}/beagley-cluster/beagley-diagnostic.sh
 
@@ -112,8 +117,9 @@ do_install:append() {
 }
 
 FILES:${PN} += " \
-    ${systemd_system_unitdir}/beagley-cluster.service \
+    ${systemd_system_unitdir}/beagley_cluster.service \
     ${systemd_system_unitdir}/beagley-cluster-gpu-probe.service \
+    ${systemd_system_unitdir}/beagley-cluster-touch-probe.service \
     ${systemd_system_unitdir}/beagley-cluster-provision.service \
     ${systemd_system_unitdir}/beagley-diagnostic-local-fs.service \
     ${systemd_system_unitdir}/beagley-diagnostic-collect.service \
@@ -121,6 +127,7 @@ FILES:${PN} += " \
     ${bindir}/beagley-cluster-launch.sh \
     ${bindir}/beagley-gpu-gate \
     ${libexecdir}/beagley-cluster/beagley-cluster-gpu-probe.sh \
+    ${libexecdir}/beagley-cluster/beagley-touch-gate.sh \
     ${libexecdir}/beagley-cluster/beagley-cluster-provision.sh \
     ${libexecdir}/beagley-cluster/beagley-diagnostic.sh \
     ${sysconfdir}/default/beagley-cluster \

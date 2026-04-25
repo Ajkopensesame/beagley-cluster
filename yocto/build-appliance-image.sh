@@ -661,7 +661,7 @@ validate_release_image() {
   require_package_path_regex "beagley-cluster" '(^|[[:space:]])/usr/bin/beagley_cluster$' "/usr/bin/beagley_cluster"
   require_package_path_regex "beagley-cluster" '(^|[[:space:]])/usr/bin/beagley-cluster-launch\.sh$' "launch wrapper"
   require_package_path_regex "beagley-cluster" '(^|[[:space:]])/usr/bin/beagley-gpu-gate$' "GPU gate helper"
-  require_package_path_regex "beagley-cluster" '(^|[[:space:]])/(usr/)?lib/systemd/system/beagley-cluster\.service$' "cluster systemd unit"
+  require_package_path_regex "beagley-cluster" '(^|[[:space:]])/(usr/)?lib/systemd/system/beagley_cluster\.service$' "cluster systemd unit"
   require_package_path_regex "beagley-cluster" '(^|[[:space:]])/(usr/)?lib/systemd/system/beagley-cluster-gpu-probe\.service$' "GPU probe systemd unit"
   require_package_path_regex "beagley-cluster" '(^|[[:space:]])/(usr/)?lib/systemd/system/beagley-cluster-provision\.service$' "provisioning systemd unit"
   require_package_path_regex "beagley-cluster" '(^|[[:space:]])/(usr/)?lib/systemd/system/beagley-diagnostic-local-fs\.service$' "diagnostic local-fs unit"

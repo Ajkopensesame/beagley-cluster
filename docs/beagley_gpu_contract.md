@@ -130,7 +130,7 @@ The Yocto appliance now runs this in two stages:
 
 - `beagley-cluster-gpu-probe.service` runs the strict appliance gate during boot,
   writes `/run/beagley_gpu_gate.status`, and leaves the OS reachable on failure.
-- `beagley-cluster.service` only starts when `/run/beagley_gpu_gate.ok` exists,
+- `beagley_cluster.service` only starts when `/run/beagley_gpu_gate.ok` exists,
   then re-runs the strict gate before launching the app.
 
 When software rendering is detected and `pvrsrvkm` is loaded, gate output now includes
@@ -145,7 +145,7 @@ issues are explicit instead of silent.
 
 ## Production Service Contract
 
-- Systemd unit: `beagley-cluster.service`
+- Systemd unit: `beagley_cluster.service`
 - Yocto boot probe unit: `beagley-cluster-gpu-probe.service`
 - Yocto launch wrapper: `/usr/bin/beagley-cluster-launch.sh`
 - Production must not launch the cluster with `BEAGLEY_REQUIRE_GPU_GATE=0`

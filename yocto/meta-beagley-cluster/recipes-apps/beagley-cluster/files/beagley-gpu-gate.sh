@@ -56,6 +56,9 @@ probe_renderer_output() {
   if [[ -z "$drm_card" ]]; then
     drm_card="$(find_connected_drm_card || true)"
   fi
+  if [[ -z "$drm_card" && -e /dev/dri/card0 ]]; then
+    drm_card="/dev/dri/card0"
+  fi
   if [[ -n "$drm_card" ]]; then
     kmscube_args+=(-D "$drm_card")
   fi

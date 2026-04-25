@@ -1393,11 +1393,15 @@ bool NavigationService::hotspotPathReady() const
     if (!m_wifiSetup) {
         return true;
     }
-    return m_wifiSetup->connected() && m_wifiSetup->hasIpLease();
+    return m_wifiSetup->internetReachable()
+        || (m_wifiSetup->connected() && m_wifiSetup->hasIpLease());
 }
 
 bool NavigationService::providersAllowed() const
 {
+    if (!envEnabled("BEAGLEY_NAV_REQUIRE_HOTSPOT_GATE", false)) {
+        return true;
+    }
     return hotspotPathReady();
 }
 

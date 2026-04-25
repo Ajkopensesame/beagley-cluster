@@ -69,7 +69,8 @@ The script configures:
 - `ssh.service` (enabled)
 - hotspot-specific fallback IPs reconciled from the active saved hotspot profile
 - persistent `wlan0` power-save policy (`off` by default for hotspot stability)
-- gateway watchdog that auto-recovers `wlan0` if association exists but DHCP/gateway health fails
+- gateway watchdog that auto-recovers `wlan0` if association, DHCP, or the TI
+  CC33xx driver gets stuck after beacon loss
 - optional BBB gateway mode on `eth0` with persistent IPv4 forwarding
 - network state reloaded without bouncing the active Ethernet SSH session
 
@@ -190,6 +191,17 @@ Expected shape:
 - the highest-priority saved hotspot in range is selected automatically
 - hotspot SSH can use the configured fallback address for that known hotspot if `.local` resolution is unavailable
 - in BBB gateway mode, `net.ipv4.ip_forward=1` and BBB traffic egresses through `wlan0`
+
+Recovery contract:
+
+- `wpa_supplicant@wlan0` failures with `Could not set interface wlan0 flags (UP): Device or resource busy`
+  are treated as CC33xx driver-stuck states.
+- The watchdog first tries DHCP/networkd refresh for lease-only failures.
+- For supplicant/driver failures it stops supplicant, unloads/reloads
+  `cc33xx_sdio cc33xx`, restarts `systemd-networkd`, resets the failed
+  supplicant state, and starts `wpa_supplicant@wlan0` again.
+- Internet probe failure alone does not force a radio reset unless
+  `REQUIRE_INTERNET=1` is set in `/etc/default/beagley-hotspot-watchdog`.
 
 In app logs:
 

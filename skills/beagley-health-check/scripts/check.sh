@@ -22,15 +22,32 @@ resolve_ipv4_candidates() {
   fi | awk 'NF && !seen[$0]++'
 }
 
+candidate_targets() {
+  {
+    printf '%s\n' "$HOST_NAME"
+    printf '%s\n' ${BEAGLEY_EXTRA_HOSTS:-beagley-ai.modem beagley.local beagley.modem}
+    resolve_ipv4_candidates
+  } | awk 'NF && !seen[$0]++'
+}
+
+ssh_target_reachable() {
+  local target="$1"
+  ssh -o BatchMode=yes \
+    -o ConnectTimeout=5 \
+    -o ConnectionAttempts=1 \
+    -o StrictHostKeyChecking=accept-new \
+    "${HOST_USER}@${target}" true >/dev/null 2>&1
+}
+
 pick_reachable_target() {
   local candidate
   while IFS= read -r candidate; do
     [[ -n "$candidate" ]] || continue
-    if nc_22_reachable "$candidate"; then
+    if nc_22_reachable "$candidate" || ssh_target_reachable "$candidate"; then
       printf '%s' "$candidate"
       return 0
     fi
-  done < <(resolve_ipv4_candidates)
+  done < <(candidate_targets)
   return 1
 }
 
