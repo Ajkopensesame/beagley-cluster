@@ -5,7 +5,10 @@ Wants=network-online.target
 
 [Service]
 Type=simple
+User=debian
+Group=debian
 WorkingDirectory=/home/debian/projects/beagley-cluster/tools/bbb_hub
+Environment=PYTHONUNBUFFERED=1
 Environment=BBB_HUB_HOST=0.0.0.0
 Environment=BBB_HUB_PORT=8765
 Environment=GPS_SOURCE_POLICY=hardware_only

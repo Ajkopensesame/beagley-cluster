@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="/home/debian/projects/beagley-cluster"
 PROJECT_USER="debian"
 PROJECT_GROUP="debian"
-UNIT_NAME="beagley-cluster.service"
+UNIT_NAME="beagley_cluster.service"
 SYSTEMD_UNIT_DIR="/etc/systemd/system"
 DEFAULT_ENV_FILE="/etc/default/beagley-cluster"
 ENABLE_NOW=0
@@ -21,7 +21,7 @@ Options:
   --project-root <path>    Repo root on the Beagley (default: /home/debian/projects/beagley-cluster)
   --user <name>            Service user (default: debian)
   --group <name>           Service group (default: debian)
-  --unit-name <name>       Systemd unit name (default: beagley-cluster.service)
+  --unit-name <name>       Systemd unit name (default: beagley_cluster.service)
   --enable-now             Enable and start the service immediately
   -h, --help               Show help
 EOF

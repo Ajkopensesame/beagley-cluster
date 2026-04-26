@@ -390,6 +390,9 @@ FAIL_THRESHOLD=${fail_threshold}
 COOLDOWN_SEC=${cooldown_sec}
 PROBE_TARGET=${probe_target}
 STATE_FILE=/run/beagley-hotspot-watchdog.state
+DRIVER_RESET_ENABLE=1
+DRIVER_MODULES="cc33xx_sdio cc33xx"
+REQUIRE_INTERNET=0
 EOF
 
   cat >"$script_file" <<'EOF'
@@ -403,6 +406,9 @@ export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 : "${COOLDOWN_SEC:=45}"
 : "${PROBE_TARGET:=auto}"
 : "${STATE_FILE:=/run/beagley-hotspot-watchdog.state}"
+: "${DRIVER_RESET_ENABLE:=1}"
+: "${DRIVER_MODULES:=cc33xx_sdio cc33xx}"
+: "${REQUIRE_INTERNET:=0}"
 
 log() {
   logger -t beagley-hotspot-watchdog "$*"
@@ -423,15 +429,45 @@ try_dhcp_refresh() {
 }
 
 full_radio_reset() {
+  local first_module=""
+
   ip neigh flush dev "$IFACE" >/dev/null 2>&1 || true
   ip addr flush dev "$IFACE" scope global >/dev/null 2>&1 || true
+  systemctl stop "wpa_supplicant@${IFACE}.service" >/dev/null 2>&1 || true
   ip link set "$IFACE" down >/dev/null 2>&1 || true
+
+  if [[ "$DRIVER_RESET_ENABLE" != "0" && "$DRIVER_RESET_ENABLE" != "false" && "$DRIVER_RESET_ENABLE" != "off" && "$DRIVER_RESET_ENABLE" != "no" ]]; then
+    # The TI CC33xx driver can recover enough for wlan0 to exist while still
+    # returning EBUSY to wpa_supplicant. A module cycle is the validated
+    # recovery path for that state.
+    set -- $DRIVER_MODULES
+    first_module="${1:-}"
+    if [[ -n "$first_module" ]]; then
+      modprobe -r "$@" >/dev/null 2>&1 || true
+      sleep 2
+      modprobe "$first_module" >/dev/null 2>&1 || true
+    fi
+  fi
+
   sleep 2
-  ip link set "$IFACE" up >/dev/null 2>&1 || true
-  sleep 2
-  systemctl restart "wpa_supplicant@${IFACE}.service" >/dev/null 2>&1 || true
   systemctl restart systemd-networkd.service >/dev/null 2>&1 || true
+  systemctl reset-failed "wpa_supplicant@${IFACE}.service" >/dev/null 2>&1 || true
+  systemctl start "wpa_supplicant@${IFACE}.service" >/dev/null 2>&1 || true
   networkctl reconfigure "$IFACE" >/dev/null 2>&1 || true
+}
+
+supplicant_unhealthy() {
+  local active sub result
+
+  active="$(systemctl show "wpa_supplicant@${IFACE}.service" -p ActiveState --value 2>/dev/null || true)"
+  sub="$(systemctl show "wpa_supplicant@${IFACE}.service" -p SubState --value 2>/dev/null || true)"
+  result="$(systemctl show "wpa_supplicant@${IFACE}.service" -p Result --value 2>/dev/null || true)"
+
+  if [[ "$active" != "active" || "$sub" != "running" ]]; then
+    reason="supplicant-${active:-unknown}-${sub:-unknown}-${result:-unknown}"
+    return 0
+  fi
+  return 1
 }
 
 assoc_known=0
@@ -471,9 +507,18 @@ if [[ "$target" == "auto" ]]; then
   target="$gateway"
 fi
 
+now="$(date +%s)"
+count=0
+last_restart=0
+if [[ -f "$STATE_FILE" ]]; then
+  read -r count last_restart < "$STATE_FILE" || true
+fi
+
 healthy=1
 reason=""
-if [[ "$assoc_known" == "1" && "$connected" != "1" ]]; then
+if supplicant_unhealthy; then
+  healthy=0
+elif [[ "$assoc_known" == "1" && "$connected" != "1" ]]; then
   healthy=0
   reason="not-associated"
 elif [[ "$ip_ok" != "1" ]]; then
@@ -486,15 +531,13 @@ elif [[ -z "$target" ]]; then
   healthy=0
   reason="no-probe-target"
 elif ! ping -I "$IFACE" -c 1 -W 1 "$target" >/dev/null 2>&1; then
+  if [[ "$REQUIRE_INTERNET" != "1" && "$REQUIRE_INTERNET" != "true" && "$REQUIRE_INTERNET" != "yes" ]]; then
+    log "internet probe failed iface=${IFACE} target=${target}; link is associated with ipv4/default route, leaving radio up"
+    printf '0 %s\n' "$last_restart" > "$STATE_FILE"
+    exit 0
+  fi
   healthy=0
   reason="probe-failed:${target}"
-fi
-
-now="$(date +%s)"
-count=0
-last_restart=0
-if [[ -f "$STATE_FILE" ]]; then
-  read -r count last_restart < "$STATE_FILE" || true
 fi
 
 if [[ "$healthy" == "1" ]]; then

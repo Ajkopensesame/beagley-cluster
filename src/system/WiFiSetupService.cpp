@@ -35,6 +35,12 @@ QString valueForPrefix(const QString &text, const QString &prefix)
     return QString();
 }
 
+bool looksLikeIpv4Address(const QString &value)
+{
+    static const QRegularExpression ipv4Re(QStringLiteral("^\\d{1,3}(?:\\.\\d{1,3}){3}$"));
+    return ipv4Re.match(value.trimmed()).hasMatch();
+}
+
 QString blockForMarkers(const QString &text, const QString &beginMarker, const QString &endMarker)
 {
     const int beginIndex = text.indexOf(beginMarker);
@@ -285,10 +291,8 @@ WiFiSetupService::WiFiSetupService(QObject *parent)
         scheduleReconcile();
     });
 
-    QTimer::singleShot(0, this, [this]() {
-        refreshStatusInternal(true);
-        scheduleReconcile();
-    });
+    refreshStatusInternal(true);
+    scheduleReconcile();
 }
 
 void WiFiSetupService::setInterfaceName(const QString &name)
@@ -579,13 +583,25 @@ bool WiFiSetupService::refreshStatusInternal(bool forceProbe)
         return false;
     }
 
+    const ExecResult supplicantResult = runCommand(QStringLiteral("bash"),
+                                                   {QStringLiteral("-lc"),
+                                                    QStringLiteral("wpa_cli -i ") + shellQuote(m_interfaceName) + QStringLiteral(" status")});
+    const QString supplicantText = supplicantResult.stdOut + QLatin1Char('\n') + supplicantResult.stdErr;
+    const QString supplicantState = valueForPrefix(supplicantText, QStringLiteral("wpa_state="));
+    const QString supplicantSsid = valueForPrefix(supplicantText, QStringLiteral("ssid="));
+    const QString supplicantIp = valueForPrefix(supplicantText, QStringLiteral("ip_address="));
+    const bool supplicantCompleted = supplicantState.compare(QStringLiteral("COMPLETED"), Qt::CaseInsensitive) == 0;
+    const bool supplicantHasIp = looksLikeIpv4Address(supplicantIp);
+
     const ExecResult ipResult = runCommand(QStringLiteral("bash"),
                                            {QStringLiteral("-lc"),
                                             QStringLiteral("ip -4 -br a show ") + shellQuote(m_interfaceName)});
-    const bool hasIpLeaseNow = ipResult.exitCode == 0
-        && ipResult.stdOut.contains(QStringLiteral(" UP "))
-        && ipResult.stdOut.contains(QLatin1Char('.'));
-    setHasIpLease(hasIpLeaseNow);
+    static const QRegularExpression upRe(QStringLiteral("\\bUP\\b"));
+    static const QRegularExpression cidrIpv4Re(QStringLiteral("\\b\\d{1,3}(?:\\.\\d{1,3}){3}/\\d+\\b"));
+    const bool ipCommandHasLease = ipResult.exitCode == 0
+        && upRe.match(ipResult.stdOut).hasMatch()
+        && cidrIpv4Re.match(ipResult.stdOut).hasMatch();
+    setHasIpLease(ipCommandHasLease || supplicantHasIp);
 
     const ExecResult linkResult = runCommand(QStringLiteral("bash"),
                                              {QStringLiteral("-lc"),
@@ -601,8 +617,14 @@ bool WiFiSetupService::refreshStatusInternal(bool forceProbe)
     if (ssidMatch.hasMatch()) {
         connectedNow = true;
         ssidNow = ssidMatch.captured(1).trimmed();
+    } else if (supplicantCompleted) {
+        connectedNow = true;
+        ssidNow = supplicantSsid.trimmed();
     } else if (linkText.contains(QStringLiteral("Not connected"), Qt::CaseInsensitive)) {
         connectedNow = false;
+    }
+    if (ssidNow.isEmpty() && !supplicantSsid.trimmed().isEmpty()) {
+        ssidNow = supplicantSsid.trimmed();
     }
 
     bool connectionStateChanged = false;
@@ -660,6 +682,23 @@ bool WiFiSetupService::refreshStatusInternal(bool forceProbe)
                                        m_activeProfileId,
                                        m_activeFallbackAddress));
     updateSetupMessaging();
+
+    const QString connectivitySummary = QStringLiteral("%1|%2|%3|%4|%5")
+        .arg(m_connected ? QLatin1String("connected") : QLatin1String("disconnected"),
+             m_hasIpLease ? QLatin1String("ip") : QLatin1String("no_ip"),
+             m_internetReachable ? QLatin1String("internet") : QLatin1String("no_internet"),
+             m_networkState,
+             m_currentSsid);
+    if (connectivitySummary != m_lastConnectivitySummary) {
+        m_lastConnectivitySummary = connectivitySummary;
+        qInfo() << "[WiFiSetupService] state"
+                << "interface=" << m_interfaceName
+                << "connected=" << m_connected
+                << "ipLease=" << m_hasIpLease
+                << "internet=" << m_internetReachable
+                << "networkState=" << m_networkState
+                << "ssid=" << m_currentSsid;
+    }
 
     if (shouldAutoShowPrompt()) {
         if (!m_promptDismissed) {

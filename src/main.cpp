@@ -20,12 +20,14 @@
 #include <QVariantMap>
 #include <QJsonDocument>
 #include <QDateTime>
+#include <QImage>
 
 #include "data/VehicleStateClient.h"
 #include "navigation/NavigationService.h"
 #include "render/ClusterRenderModel.h"
 #include "render/NativeRasterMapItem.h"
 #include "render/PerformanceMetrics.h"
+#include "system/NowPlayingService.h"
 #include "system/WiFiSetupService.h"
 
 #ifdef WITH_WEBENGINE
@@ -61,6 +63,10 @@ protected:
             || host == QLatin1String("tiles.openfreemap.org")
             || host == QLatin1String("assets.openfreemap.com")
             || host.endsWith(QLatin1String(".openfreemap.org"));
+        const bool bomHost =
+            host == QLatin1String("bom.gov.au")
+            || host == QLatin1String("www.bom.gov.au")
+            || host.endsWith(QLatin1String(".bom.gov.au"));
         const bool vectorAssetPath = path.endsWith(QLatin1String(".pbf"))
             || path.endsWith(QLatin1String(".json"))
             || path.endsWith(QLatin1String(".png"))
@@ -69,10 +75,12 @@ protected:
             || path.contains(QLatin1String("/glyphs/"))
             || path.contains(QLatin1String("/fonts/"))
             || path.contains(QLatin1String("/sprites/"));
-        if (osmOrOpenfreemapHost || vectorAssetPath) {
+        if (osmOrOpenfreemapHost || vectorAssetPath || bomHost) {
             if (!patchedRequest.hasRawHeader("User-Agent")) {
                 patchedRequest.setRawHeader("User-Agent", m_userAgent);
             }
+        }
+        if (osmOrOpenfreemapHost || vectorAssetPath) {
             patchedRequest.setAttribute(QNetworkRequest::CacheLoadControlAttribute, QNetworkRequest::PreferCache);
             patchedRequest.setAttribute(QNetworkRequest::CacheSaveControlAttribute, true);
         }
@@ -381,6 +389,8 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("navigation", &navigation);
     ClusterRenderModel clusterRenderModel(&vehicleState, &navigation);
     engine.rootContext()->setContextProperty("clusterRenderModel", &clusterRenderModel);
+    NowPlayingService nowPlaying;
+    engine.rootContext()->setContextProperty("nowPlaying", &nowPlaying);
 
     const QString uiVariantOverride = QString::fromUtf8(qgetenv("BEAGLEY_UI_VARIANT")).trimmed().toLower();
     const bool uiVariantExplicit = !uiVariantOverride.isEmpty();
@@ -504,6 +514,28 @@ int main(int argc, char *argv[])
                     << "sceneGraphBackend =" << window->sceneGraphBackend()
                     << "persistentGraphics =" << window->isPersistentGraphics()
                     << "persistentSceneGraph =" << window->isPersistentSceneGraph();
+            const QString screenshotPath =
+                QString::fromUtf8(qgetenv("BEAGLEY_SCREENSHOT_PATH")).trimmed();
+            if (!screenshotPath.isEmpty()) {
+                bool ok = false;
+                const int delayMs = QString::fromUtf8(qgetenv("BEAGLEY_SCREENSHOT_DELAY_MS"))
+                                        .toInt(&ok);
+                const int captureDelayMs = ok ? qMax(0, delayMs) : 3000;
+                QTimer::singleShot(captureDelayMs, window, [window, screenshotPath, &app]() {
+                    const QImage image = window->grabWindow();
+                    const bool saved = !image.isNull() && image.save(screenshotPath);
+                    qInfo() << "[Screenshot] path =" << screenshotPath
+                            << "size =" << image.size()
+                            << "saved =" << saved;
+                    const QString exitValue =
+                        QString::fromUtf8(qgetenv("BEAGLEY_SCREENSHOT_EXIT")).trimmed().toLower();
+                    if (exitValue == QLatin1String("1")
+                        || exitValue == QLatin1String("true")
+                        || exitValue == QLatin1String("yes")) {
+                        app.quit();
+                    }
+                });
+            }
             break;
         }
     }

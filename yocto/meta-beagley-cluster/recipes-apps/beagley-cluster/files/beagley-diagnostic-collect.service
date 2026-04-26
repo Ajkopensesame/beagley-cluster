@@ -2,7 +2,7 @@
 Description=Beagley Diagnostic Collector
 After=beagley-cluster-provision.service beagley-diagnostic-local-fs.service
 Wants=beagley-cluster-provision.service beagley-diagnostic-local-fs.service
-Before=beagley-cluster-gpu-probe.service beagley-cluster.service
+Before=beagley-cluster-gpu-probe.service beagley-cluster-touch-probe.service beagley_cluster.service
 
 [Service]
 Type=oneshot

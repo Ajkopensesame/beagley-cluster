@@ -88,7 +88,8 @@ Item {
             rotation: tangentDeg
             scale: sizeScale
             antialiasing: true
-            layer.enabled: false
+            layer.enabled: true
+            layer.smooth: true
 
             Shape {
                 anchors.fill: parent

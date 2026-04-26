@@ -54,6 +54,13 @@ QString formatDuration(double seconds)
         : QStringLiteral("%1 h %2 min").arg(hours).arg(rem);
 }
 
+QString routeOptionLabel(int index)
+{
+    return index == 0
+        ? QStringLiteral("Fastest")
+        : QStringLiteral("Alt %1").arg(index + 1);
+}
+
 double clampValue(double value, double minValue, double maxValue)
 {
     return qMax(minValue, qMin(maxValue, value));
@@ -170,6 +177,8 @@ void NavigationService::search(const QString &query)
 {
     const QString trimmed = query.trimmed();
     m_lastSearchQuery = trimmed;
+    const quint64 requestSerial = ++m_searchRequestSerial;
+    m_activeSearchRequestSerial = requestSerial;
     if (trimmed.size() < 2) {
         setSearchResults({});
         if (m_state == QLatin1String("searching")) {
@@ -190,12 +199,17 @@ void NavigationService::search(const QString &query)
 
     setState(QStringLiteral("searching"));
     setNetworkStatus(QStringLiteral("searching"));
-    QNetworkRequest request = m_provider.buildSearchRequest(trimmed);
+    const Pose pose = currentPose();
+    QNetworkRequest request = m_provider.buildSearchRequest(trimmed, pose.lat, pose.lng);
+    const QString requestQuery = trimmed;
     QNetworkReply *reply = m_provider.searchUsesPost()
         ? m_network.post(request, QByteArray())
         : m_network.get(request);
-    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, requestSerial, requestQuery]() {
         reply->deleteLater();
+        if (!isCurrentSearchRequest(requestSerial, requestQuery)) {
+            return;
+        }
         if (reply->error() != QNetworkReply::NoError) {
             qWarning() << "[NavigationService] primary search failed" << reply->url() << reply->errorString();
             if (m_wifiSetup) {
@@ -203,19 +217,19 @@ void NavigationService::search(const QString &query)
             }
             setProviderStatus(QStringLiteral("search_degraded"));
             const Pose pose = currentPose();
-            runFallbackSearch(m_lastSearchQuery, pose);
+            runFallbackSearch(requestQuery, pose, requestSerial);
             return;
         }
 
         const Pose pose = currentPose();
-        QList<SearchResultData> parsed = m_provider.parseSearchResponse(reply->readAll(), pose.lat, pose.lng);
+        QList<SearchResultData> parsed = m_provider.parseSearchResponse(reply->readAll(), requestQuery, pose.lat, pose.lng);
         if (parsed.isEmpty()) {
             qWarning() << "[NavigationService] primary search returned no results, falling back" << reply->url();
             if (m_wifiSetup) {
                 m_wifiSetup->refreshStatus();
             }
             setProviderStatus(QStringLiteral("search_degraded"));
-            runFallbackSearch(m_lastSearchQuery, pose);
+            runFallbackSearch(requestQuery, pose, requestSerial);
             return;
         }
         QVariantList results;
@@ -254,6 +268,12 @@ void NavigationService::setDestination(double lat, double lng, const QString &la
     if (m_destination.isEmpty()) {
         return;
     }
+    ++m_routeRequestSerial;
+    m_activeRouteRequestSerial = m_routeRequestSerial;
+    m_routeAlternativeData.clear();
+    setRouteAlternatives({});
+    setSelectedRouteAlternative(-1);
+    setGuidanceStarted(false);
 
     QVariantList nextRecents;
     for (const QVariant &item : m_recents) {
@@ -277,8 +297,37 @@ void NavigationService::setDestination(double lat, double lng, const QString &la
     requestRoute(false);
 }
 
+void NavigationService::selectRouteAlternative(int index)
+{
+    if (index < 0 || index >= m_routeAlternativeData.size()) {
+        return;
+    }
+    setSelectedRouteAlternative(index);
+    setGuidanceStarted(false);
+    applyRouteData(m_routeAlternativeData.at(index), true);
+    persistCache();
+    updateGuidance();
+}
+
+void NavigationService::startGuidance()
+{
+    if (m_activeRoute.isEmpty()) {
+        return;
+    }
+
+    m_followEnabled = true;
+    m_overviewActive = true;
+    m_overviewTimer.start();
+    setGuidanceStarted(true);
+    updateGuidance();
+    persistCache();
+}
+
 void NavigationService::clearRoute()
 {
+    ++m_routeRequestSerial;
+    m_activeRouteRequestSerial = m_routeRequestSerial;
+    m_routeAlternativeData.clear();
     m_destination.clear();
     m_routeManeuvers.clear();
     m_routeProfile.clear();
@@ -294,6 +343,9 @@ void NavigationService::clearRoute()
     m_rerouteVoiceTimer.stop();
     m_overviewActive = false;
     m_overviewTimer.stop();
+    setRouteAlternatives({});
+    setSelectedRouteAlternative(-1);
+    setGuidanceStarted(false);
     setActiveRoute({});
     setNextManeuver({});
     setFollowingManeuver({});
@@ -394,6 +446,34 @@ void NavigationService::setActiveRoute(const QVariantMap &route)
     }
     m_activeRoute = route;
     emit routeChanged();
+    updateMapPayload();
+}
+
+void NavigationService::setRouteAlternatives(const QVariantList &alternatives)
+{
+    if (m_routeAlternatives == alternatives) {
+        return;
+    }
+    m_routeAlternatives = alternatives;
+    emit routeAlternativesChanged();
+}
+
+void NavigationService::setSelectedRouteAlternative(int index)
+{
+    if (m_selectedRouteAlternative == index) {
+        return;
+    }
+    m_selectedRouteAlternative = index;
+    emit selectedRouteAlternativeChanged();
+}
+
+void NavigationService::setGuidanceStarted(bool started)
+{
+    if (m_guidanceStarted == started) {
+        return;
+    }
+    m_guidanceStarted = started;
+    emit guidanceStartedChanged();
     updateMapPayload();
 }
 
@@ -678,6 +758,10 @@ void NavigationService::beginRouteRequest(bool reroute)
         return;
     }
 
+    const quint64 requestSerial = ++m_routeRequestSerial;
+    m_activeRouteRequestSerial = requestSerial;
+    const QVariantMap requestDestination = m_destination;
+
     setState(reroute ? QStringLiteral("rerouting") : QStringLiteral("routing"));
     setNetworkStatus(QStringLiteral("routing"));
     m_rerouting = reroute;
@@ -699,8 +783,11 @@ void NavigationService::beginRouteRequest(bool reroute)
             m_destination.value(QStringLiteral("lng")).toDouble()))
         : m_network.get(request);
     m_lastRouteRequestMs = QDateTime::currentMSecsSinceEpoch();
-    connect(reply, &QNetworkReply::finished, this, [this, reply, reroute]() {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, reroute, requestSerial, requestDestination]() {
         reply->deleteLater();
+        if (requestSerial != m_activeRouteRequestSerial || requestDestination != m_destination) {
+            return;
+        }
         m_rerouteVoiceTimer.stop();
         if (reply->error() != QNetworkReply::NoError) {
             qWarning() << "[NavigationService] route request failed" << reply->url() << reply->errorString();
@@ -717,8 +804,8 @@ void NavigationService::beginRouteRequest(bool reroute)
             return;
         }
 
-        const RouteData data = m_provider.parseRouteResponse(reply->readAll(), m_destination);
-        if (data.geometry.size() < 2) {
+        QList<RouteData> routes = m_provider.parseRouteAlternativesResponse(reply->readAll(), m_destination);
+        if (routes.isEmpty()) {
             qWarning() << "[NavigationService] route response invalid" << reply->url();
             if (m_wifiSetup) {
                 m_wifiSetup->refreshStatus();
@@ -732,39 +819,33 @@ void NavigationService::beginRouteRequest(bool reroute)
             return;
         }
 
-        const bool hadRoute = !m_activeRoute.isEmpty();
-        QVariantMap route = {
-            {QStringLiteral("geometry"), QVariantMap{
-                {QStringLiteral("type"), QStringLiteral("LineString")},
-                {QStringLiteral("coordinates"), data.geometry},
-            }},
-            {QStringLiteral("distanceMeters"), data.distanceMeters},
-            {QStringLiteral("durationSeconds"), data.durationSeconds},
-            {QStringLiteral("destination"), data.destination},
-        };
-        setActiveRoute(route);
-        m_routeProfile = buildRouteProfile(data.geometry);
-        m_routeManeuvers = data.maneuvers;
-        for (RouteManeuverData &maneuver : m_routeManeuvers) {
-            maneuver.progressMeters = snapToRoute(maneuver.lat, maneuver.lng).progressMeters;
-        }
-        std::sort(m_routeManeuvers.begin(), m_routeManeuvers.end(), [](const RouteManeuverData &left, const RouteManeuverData &right) {
-            return left.progressMeters < right.progressMeters;
+        std::sort(routes.begin(), routes.end(), [](const RouteData &left, const RouteData &right) {
+            return left.durationSeconds < right.durationSeconds;
         });
-        m_lastAdvancePromptId.clear();
-        m_lastFinalPromptId.clear();
-        m_currentManeuverIndex = -1;
-        m_overviewActive = reroute || !hadRoute;
-        if (m_overviewActive) {
-            m_overviewTimer.start();
-        } else {
-            m_overviewTimer.stop();
+
+        const bool hadRoute = !m_activeRoute.isEmpty();
+        m_routeAlternativeData = routes;
+        QVariantList routeAlternatives;
+        const double fastestDuration = routes.first().durationSeconds;
+        for (int index = 0; index < routes.size(); ++index) {
+            const RouteData &candidate = routes.at(index);
+            routeAlternatives.append(QVariantMap{
+                {QStringLiteral("index"), index},
+                {QStringLiteral("label"), routeOptionLabel(index)},
+                {QStringLiteral("distanceMeters"), candidate.distanceMeters},
+                {QStringLiteral("durationSeconds"), candidate.durationSeconds},
+                {QStringLiteral("deltaSeconds"), qMax(0.0, candidate.durationSeconds - fastestDuration)},
+                {QStringLiteral("maneuverCount"), candidate.maneuvers.size()},
+                {QStringLiteral("destination"), candidate.destination},
+            });
         }
+        setRouteAlternatives(routeAlternatives);
+        setSelectedRouteAlternative(0);
+        applyRouteData(routes.first(), reroute || !hadRoute);
         m_rerouting = false;
         setNetworkStatus(QStringLiteral("online"));
         setProviderStatus(QStringLiteral("online"));
         setState(QStringLiteral("active"));
-        route.insert(QStringLiteral("maneuverCount"), m_routeManeuvers.size());
         m_lastProgressMeters = 0.0;
         m_offRouteHits = 0;
         m_regressionSinceMs = 0;
@@ -839,6 +920,7 @@ void NavigationService::updateGuidance()
     const Pose pose = currentPose();
     const bool liveGpsReady = gpsReady();
     const bool hasRoute = !m_activeRoute.isEmpty() && !m_routeProfile.isEmpty();
+    const bool previewMode = hasRoute && !m_guidanceStarted;
 
     if (!hasRoute) {
         const QString primary = m_destination.isEmpty()
@@ -900,47 +982,72 @@ void NavigationService::updateGuidance()
             setFollowingManeuver({});
         }
 
-        QString secondary = QStringLiteral("%1 to maneuver | %2 remaining | ETA %3")
-            .arg(formatDistance(distanceToManeuver),
-                 formatDistance(remainingDistance),
-                 m_eta.isEmpty() ? QStringLiteral("--") : m_eta);
-        if (m_trafficDelaySeconds > 0.0) {
-            secondary += QStringLiteral(" | +%1 min traffic").arg(qRound(m_trafficDelaySeconds / 60.0));
-        } else if (m_networkStatus != QLatin1String("online")) {
-            secondary += QStringLiteral(" | %1").arg(m_networkStatus.replace(QLatin1Char('_'), QLatin1Char(' ')));
-        }
-
-        setBanner({
-            {QStringLiteral("eyebrow"), m_followEnabled ? QStringLiteral("Guidance") : QStringLiteral("Map unlocked")},
-            {QStringLiteral("primary"), current.instruction},
-            {QStringLiteral("secondary"), secondary},
-            {QStringLiteral("road"), current.road},
-            {QStringLiteral("distanceMeters"), distanceToManeuver},
-        });
-
-        if (!m_followEnabled) {
-            setFollowMode(QStringLiteral("free_pan"));
-        } else if (m_overviewActive) {
+        if (previewMode) {
+            const QString primary = m_destination.value(QStringLiteral("primary")).toString();
+            const QString previewPrimary = primary.isEmpty()
+                ? QStringLiteral("Route preview ready")
+                : primary;
+            QString previewSecondary = QStringLiteral("%1 remaining | ETA %2 | Tap Start to begin")
+                .arg(formatDistance(remainingDistance),
+                     m_eta.isEmpty() ? QStringLiteral("--") : m_eta);
+            if (m_trafficDelaySeconds > 0.0) {
+                previewSecondary += QStringLiteral(" | +%1 min traffic").arg(qRound(m_trafficDelaySeconds / 60.0));
+            }
+            setBanner({
+                {QStringLiteral("eyebrow"), QStringLiteral("Route preview")},
+                {QStringLiteral("primary"), previewPrimary},
+                {QStringLiteral("secondary"), previewSecondary},
+                {QStringLiteral("road"), current.road},
+                {QStringLiteral("distanceMeters"), distanceToManeuver},
+            });
             setFollowMode(QStringLiteral("overview"));
-        } else if (distanceToManeuver > 1200.0) {
-            setFollowMode(QStringLiteral("long_leg_relax"));
-        } else if (distanceToManeuver <= finalPromptDistance(pose.speedKph)) {
-            setFollowMode(QStringLiteral("turn"));
-        } else if (distanceToManeuver <= qMax(120.0, pose.speedKph * 6.0)) {
-            setFollowMode(QStringLiteral("approach"));
         } else {
-            setFollowMode(QStringLiteral("auto"));
-        }
+            QString secondary = QStringLiteral("%1 to maneuver | %2 remaining | ETA %3")
+                .arg(formatDistance(distanceToManeuver),
+                     formatDistance(remainingDistance),
+                     m_eta.isEmpty() ? QStringLiteral("--") : m_eta);
+            if (m_trafficDelaySeconds > 0.0) {
+                secondary += QStringLiteral(" | +%1 min traffic").arg(qRound(m_trafficDelaySeconds / 60.0));
+            } else if (m_networkStatus != QLatin1String("online")) {
+                QString networkSummary = m_networkStatus;
+                secondary += QStringLiteral(" | %1").arg(networkSummary.replace(QLatin1Char('_'), QLatin1Char(' ')));
+            }
 
-        maybeTriggerPrompts();
+            setBanner({
+                {QStringLiteral("eyebrow"), m_followEnabled ? QStringLiteral("Guidance") : QStringLiteral("Map unlocked")},
+                {QStringLiteral("primary"), current.instruction},
+                {QStringLiteral("secondary"), secondary},
+                {QStringLiteral("road"), current.road},
+                {QStringLiteral("distanceMeters"), distanceToManeuver},
+            });
+
+            if (!m_followEnabled) {
+                setFollowMode(QStringLiteral("free_pan"));
+            } else if (m_overviewActive) {
+                setFollowMode(QStringLiteral("overview"));
+            } else if (distanceToManeuver > 1200.0) {
+                setFollowMode(QStringLiteral("long_leg_relax"));
+            } else if (distanceToManeuver <= finalPromptDistance(pose.speedKph)) {
+                setFollowMode(QStringLiteral("turn"));
+            } else if (distanceToManeuver <= qMax(120.0, pose.speedKph * 6.0)) {
+                setFollowMode(QStringLiteral("approach"));
+            } else {
+                setFollowMode(QStringLiteral("auto"));
+            }
+
+            maybeTriggerPrompts();
+        }
     } else {
         setNextManeuver({});
         setFollowingManeuver({});
         setBanner({
-            {QStringLiteral("eyebrow"), QStringLiteral("Arrival")},
-            {QStringLiteral("primary"), QStringLiteral("Arrive at destination")},
+            {QStringLiteral("eyebrow"), previewMode ? QStringLiteral("Route preview") : QStringLiteral("Arrival")},
+            {QStringLiteral("primary"), previewMode ? QStringLiteral("Destination selected") : QStringLiteral("Arrive at destination")},
             {QStringLiteral("secondary"), formatDistance(remainingDistance)},
         });
+        if (previewMode) {
+            setFollowMode(QStringLiteral("overview"));
+        }
     }
 
     if (snap.lateralMeters > 35.0) {
@@ -957,7 +1064,7 @@ void NavigationService::updateGuidance()
         m_regressionSinceMs = 0;
     }
 
-    if (liveGpsReady && !m_rerouting && !m_destination.isEmpty()) {
+    if (!previewMode && liveGpsReady && !m_rerouting && !m_destination.isEmpty()) {
         const qint64 now = QDateTime::currentMSecsSinceEpoch();
         const bool progressRegressed = m_regressionSinceMs > 0 && (now - m_regressionSinceMs) >= kRerouteMinDistanceMs;
         if (m_offRouteHits >= 2 || progressRegressed) {
@@ -993,6 +1100,7 @@ void NavigationService::updateMapPayload()
         {QStringLiteral("state"), m_state},
         {QStringLiteral("followMode"), m_followMode},
         {QStringLiteral("followEnabled"), m_followEnabled},
+        {QStringLiteral("guidanceStarted"), m_guidanceStarted},
         {QStringLiteral("destination"), m_destination},
         {QStringLiteral("route"), m_activeRoute},
         {QStringLiteral("progress"), QVariantMap{
@@ -1058,7 +1166,7 @@ void NavigationService::updateMapPayload()
     }
 }
 
-void NavigationService::runFallbackSearch(const QString &query, const Pose &pose)
+void NavigationService::runFallbackSearch(const QString &query, const Pose &pose, quint64 requestSerial)
 {
     const QString trimmed = query.trimmed();
     if (trimmed.size() < 2) {
@@ -1067,10 +1175,13 @@ void NavigationService::runFallbackSearch(const QString &query, const Pose &pose
         return;
     }
 
-    QNetworkRequest request = m_provider.buildFallbackSearchRequest(trimmed);
+    QNetworkRequest request = m_provider.buildFallbackSearchRequest(trimmed, pose.lat, pose.lng);
     QNetworkReply *reply = m_network.get(request);
-    connect(reply, &QNetworkReply::finished, this, [this, reply, pose]() {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, pose, requestSerial, trimmed]() {
         reply->deleteLater();
+        if (!isCurrentSearchRequest(requestSerial, trimmed)) {
+            return;
+        }
         if (reply->error() != QNetworkReply::NoError) {
             qWarning() << "[NavigationService] fallback search failed" << reply->url() << reply->errorString();
             const bool providerPathOk = providersAllowed();
@@ -1081,7 +1192,7 @@ void NavigationService::runFallbackSearch(const QString &query, const Pose &pose
             return;
         }
 
-        QList<SearchResultData> parsed = m_provider.parseSearchResponse(reply->readAll(), pose.lat, pose.lng);
+        QList<SearchResultData> parsed = m_provider.parseSearchResponse(reply->readAll(), trimmed, pose.lat, pose.lng);
         QVariantList results;
         for (const SearchResultData &result : parsed) {
             results.append(QVariantMap{
@@ -1130,7 +1241,7 @@ void NavigationService::maybeTriggerPrompts()
 
 void NavigationService::maybeRefreshRoute()
 {
-    if (m_activeRoute.isEmpty() || m_destination.isEmpty() || m_rerouting) {
+    if (!m_guidanceStarted || m_activeRoute.isEmpty() || m_destination.isEmpty() || m_rerouting) {
         return;
     }
     if (!gpsReady()) {
@@ -1175,6 +1286,7 @@ void NavigationService::persistCache() const
     const QVariantMap root = {
         {QStringLiteral("destination"), m_destination},
         {QStringLiteral("route"), m_activeRoute},
+        {QStringLiteral("guidanceStarted"), m_guidanceStarted},
         {QStringLiteral("maneuvers"), maneuvers},
     };
     file.write(QJsonDocument::fromVariant(root).toJson(QJsonDocument::Compact));
@@ -1195,6 +1307,9 @@ void NavigationService::loadCache()
     }
 
     m_destination = root.value(QStringLiteral("destination")).toMap();
+    m_guidanceStarted = root.contains(QStringLiteral("guidanceStarted"))
+        ? root.value(QStringLiteral("guidanceStarted")).toBool()
+        : true;
     setActiveRoute(route);
     m_routeProfile = buildRouteProfile(route.value(QStringLiteral("geometry")).toMap().value(QStringLiteral("coordinates")).toList());
 
@@ -1278,11 +1393,15 @@ bool NavigationService::hotspotPathReady() const
     if (!m_wifiSetup) {
         return true;
     }
-    return m_wifiSetup->connected() && m_wifiSetup->hasIpLease();
+    return m_wifiSetup->internetReachable()
+        || (m_wifiSetup->connected() && m_wifiSetup->hasIpLease());
 }
 
 bool NavigationService::providersAllowed() const
 {
+    if (!envEnabled("BEAGLEY_NAV_REQUIRE_HOTSPOT_GATE", false)) {
+        return true;
+    }
     return hotspotPathReady();
 }
 
@@ -1314,6 +1433,11 @@ bool NavigationService::gpsReliableHeading() const
     return m_vehicleState->speedKph() > 15.0;
 }
 
+bool NavigationService::isCurrentSearchRequest(quint64 requestSerial, const QString &query) const
+{
+    return requestSerial == m_activeSearchRequestSerial && query == m_lastSearchQuery;
+}
+
 QVariantMap NavigationService::searchResultAt(const QString &id) const
 {
     for (const QVariant &item : m_searchResults) {
@@ -1323,6 +1447,42 @@ QVariantMap NavigationService::searchResultAt(const QString &id) const
         }
     }
     return {};
+}
+
+QVariantMap NavigationService::routeVariantFromData(const RouteData &data) const
+{
+    return {
+        {QStringLiteral("geometry"), QVariantMap{
+            {QStringLiteral("type"), QStringLiteral("LineString")},
+            {QStringLiteral("coordinates"), data.geometry},
+        }},
+        {QStringLiteral("distanceMeters"), data.distanceMeters},
+        {QStringLiteral("durationSeconds"), data.durationSeconds},
+        {QStringLiteral("destination"), data.destination},
+        {QStringLiteral("maneuverCount"), data.maneuvers.size()},
+    };
+}
+
+void NavigationService::applyRouteData(const RouteData &data, bool overviewActive)
+{
+    setActiveRoute(routeVariantFromData(data));
+    m_routeProfile = buildRouteProfile(data.geometry);
+    m_routeManeuvers = data.maneuvers;
+    for (RouteManeuverData &maneuver : m_routeManeuvers) {
+        maneuver.progressMeters = snapToRoute(maneuver.lat, maneuver.lng).progressMeters;
+    }
+    std::sort(m_routeManeuvers.begin(), m_routeManeuvers.end(), [](const RouteManeuverData &left, const RouteManeuverData &right) {
+        return left.progressMeters < right.progressMeters;
+    });
+    m_lastAdvancePromptId.clear();
+    m_lastFinalPromptId.clear();
+    m_currentManeuverIndex = -1;
+    m_overviewActive = overviewActive;
+    if (m_overviewActive) {
+        m_overviewTimer.start();
+    } else {
+        m_overviewTimer.stop();
+    }
 }
 
 QList<NavigationService::RouteProfilePoint> NavigationService::buildRouteProfile(const QVariantList &geometry) const

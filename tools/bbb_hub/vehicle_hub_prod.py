@@ -75,6 +75,12 @@ FAULT_RECORDER_BUFFER_SECONDS = float(os.getenv("FAULT_RECORDER_BUFFER_SECONDS",
 FAULT_RECORDER_MAX_BUFFER_FRAMES = int(os.getenv("FAULT_RECORDER_MAX_BUFFER_FRAMES", "300"))
 FAULT_RECORDER_MIN_INTERVAL_SECONDS = float(os.getenv("FAULT_RECORDER_MIN_INTERVAL_SECONDS", "10.0"))
 DIAGNOSTIC_MODE = os.getenv("DIAGNOSTIC_MODE", "normal").strip().lower()
+VEHICLE_BENCH_SIM_ENABLED = os.getenv("BBB_VEHICLE_BENCH_SIM", "0").strip().lower() not in {
+    "0",
+    "false",
+    "off",
+    "no",
+}
 
 VIC_SEQUENCE = [
     {"warning": "brake"},
@@ -129,7 +135,42 @@ class VehicleHub:
         if self._serial_inputs is not None:
             await self._serial_inputs.run()
 
-    def _build_base_state(self, t: float) -> dict:
+    def _build_empty_vehicle_state(self) -> dict:
+        return {
+            "type": "vehicle_state",
+            "version": 1,
+            "speedKph": 0.0,
+            "rpm": 0.0,
+            "fuelPct": 0.0,
+            "coolantC": 0.0,
+            "gear": "P",
+            "overdrive": False,
+            "drivetrain": {
+                "mode": "2wd",
+                "transfer_lock": False,
+            },
+            "indicators": {
+                "left": False,
+                "right": False,
+                "high_beam": False,
+            },
+            "warnings": {
+                "brake": False,
+                "oil": False,
+                "charge": False,
+                "door": False,
+                "check_engine": False,
+                "at": False,
+                "fuel_low": False,
+            },
+            "_health": {
+                "stale": True,
+                "vehicleSource": "none",
+                "benchVehicleSim": False,
+            },
+        }
+
+    def _build_bench_vehicle_state(self, t: float) -> dict:
         speed = max(0.0, min(130.0, 65.0 + 65.0 * math.sin(t * 0.22)))
         left = (t % 2.0) < 1.0
         right = ((t + 1.0) % 2.0) < 1.0
@@ -178,6 +219,8 @@ class VehicleHub:
             },
             "_health": {
                 "stale": False,
+                "vehicleSource": "bench_sim",
+                "benchVehicleSim": True,
             },
         }
 
@@ -284,14 +327,22 @@ class VehicleHub:
             decoded = self._can_replay.snapshot()
             merge_vehicle_overlay(state, decoded)
             decoded_signals.update(decoded)
-            state["_health"]["canReplay"] = self._can_replay.health()
+            health = self._can_replay.health()
+            state["_health"]["canReplay"] = health
             state["_health"]["canReplayDiagnostics"] = self._can_replay.diagnostics()
+            if decoded and not health.get("stale", True):
+                state["_health"]["stale"] = False
+                state["_health"]["vehicleSource"] = "can_replay"
         if self._can_live is not None:
             decoded = self._can_live.snapshot()
             merge_vehicle_overlay(state, decoded)
             decoded_signals.update(decoded)
-            state["_health"]["canLive"] = self._can_live.health()
+            health = self._can_live.health()
+            state["_health"]["canLive"] = health
             state["_health"]["canLiveDiagnostics"] = self._can_live.diagnostics()
+            if decoded and not health.get("stale", True):
+                state["_health"]["stale"] = False
+                state["_health"]["vehicleSource"] = "can_live"
         if decoded_signals:
             state["_health"]["canDecodedSignals"] = sorted(decoded_signals)
         elif (CAN_RAW_LOG or CAN_LIVE_INTERFACE) and self._can_replay is None and self._can_live is None:
@@ -311,7 +362,11 @@ class VehicleHub:
             return
         overlay = self._serial_inputs.snapshot()
         merge_vehicle_overlay(state, overlay)
-        state["_health"]["serialVehicleInputs"] = self._serial_inputs.health()
+        health = self._serial_inputs.health()
+        state["_health"]["serialVehicleInputs"] = health
+        if overlay and not health.get("stale", True):
+            state["_health"]["stale"] = False
+            state["_health"]["vehicleSource"] = "serial"
 
     def _apply_fault_recording(self, state: dict) -> None:
         if self._fault_recorder is None:
@@ -369,7 +424,11 @@ class VehicleHub:
 
     async def next_state(self) -> dict:
         t = time.time() - self._started_at
-        state = self._build_base_state(t)
+        state = (
+            self._build_bench_vehicle_state(t)
+            if VEHICLE_BENCH_SIM_ENABLED
+            else self._build_empty_vehicle_state()
+        )
         self._apply_can_overlay(state)
         self._apply_serial_overlay(state)
         sample, health = self._gps.snapshot()
@@ -435,6 +494,7 @@ async def main() -> None:
 
     print(f"[bbb_hub] vehicle_state ws://{WS_HOST}:{WS_PORT}")
     print(f"[bbb_hub] gps source policy: hardware_only")
+    print(f"[bbb_hub] bench vehicle sim: {'enabled' if VEHICLE_BENCH_SIM_ENABLED else 'disabled'}")
     print(f"[bbb_hub] GPS device: {GPS_DEVICE} @ {GPS_BAUD}")
     print(f"[bbb_hub] GPS read timeout: {GPS_READ_TIMEOUT_MS} ms | stale: {GPS_STALE_MS} ms")
 

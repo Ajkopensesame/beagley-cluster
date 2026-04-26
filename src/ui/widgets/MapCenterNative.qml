@@ -22,6 +22,8 @@ Item {
     property var mapGuidanceBanner: ({})
     property var mapConnectivity: ({})
     property bool interactionEnabled: true
+    readonly property bool embeddedMapThrottle: (typeof BEAGLEY_RENDER_PROFILE !== "undefined"
+        && String(BEAGLEY_RENDER_PROFILE) === "embedded")
 
     readonly property var resolvedVehicleBucket: hasKeys(mapVehiclePose)
         ? mapVehiclePose
@@ -53,6 +55,13 @@ Item {
         return !!resolvedVehicleBucket.gpsReady || !!resolvedVehicleBucket.usingLastKnown
     }
 
+    property real nativeCenterLat: resolvedLat
+    property real nativeCenterLng: resolvedLng
+    property real nativeBearing: resolvedBearing
+    property real nativeZoom: resolvedZoom
+    property bool nativeVehicleVisible: vehicleVisibleResolved
+    property var nativeRoutePath: resolvedRoutePath
+
     function hasKeys(value) {
         return !!value && Object.keys(value).length > 0
     }
@@ -68,6 +77,15 @@ Item {
 
     function clamp(value, minValue, maxValue) {
         return Math.max(minValue, Math.min(maxValue, value))
+    }
+
+    function angleDeltaDegrees(current, target) {
+        var delta = (target - current) % 360
+        if (delta > 180)
+            delta -= 360
+        else if (delta < -180)
+            delta += 360
+        return delta
     }
 
     function computeZoom() {
@@ -122,6 +140,73 @@ Item {
             navigation.setFollowEnabled(enabled)
     }
 
+    function needsEmbeddedViewSync() {
+        if (!embeddedMapThrottle)
+            return true
+
+        if (!isFinite(Number(nativeCenterLat)) || !isFinite(Number(nativeCenterLng)))
+            return true
+
+        if (Math.abs(Number(resolvedLat) - Number(nativeCenterLat)) >= 0.00005)
+            return true
+        if (Math.abs(Number(resolvedLng) - Number(nativeCenterLng)) >= 0.00005)
+            return true
+        if (Math.abs(angleDeltaDegrees(Number(nativeBearing), Number(resolvedBearing))) >= 3.0)
+            return true
+        if (Math.abs(Number(resolvedZoom) - Number(nativeZoom)) >= 0.20)
+            return true
+        if (nativeVehicleVisible !== vehicleVisibleResolved)
+            return true
+        return false
+    }
+
+    function syncNativeView(force) {
+        if (!force && !needsEmbeddedViewSync())
+            return
+        nativeCenterLat = resolvedLat
+        nativeCenterLng = resolvedLng
+        nativeBearing = resolvedBearing
+        nativeZoom = resolvedZoom
+        nativeVehicleVisible = vehicleVisibleResolved
+    }
+
+    onResolvedLatChanged: {
+        if (!embeddedMapThrottle)
+            nativeCenterLat = resolvedLat
+    }
+    onResolvedLngChanged: {
+        if (!embeddedMapThrottle)
+            nativeCenterLng = resolvedLng
+    }
+    onResolvedBearingChanged: {
+        if (!embeddedMapThrottle)
+            nativeBearing = resolvedBearing
+    }
+    onResolvedZoomChanged: {
+        if (!embeddedMapThrottle)
+            nativeZoom = resolvedZoom
+    }
+    onVehicleVisibleResolvedChanged: {
+        if (!embeddedMapThrottle)
+            nativeVehicleVisible = vehicleVisibleResolved
+        else
+            syncNativeView(false)
+    }
+    onResolvedRoutePathChanged: nativeRoutePath = resolvedRoutePath
+
+    Component.onCompleted: {
+        nativeRoutePath = resolvedRoutePath
+        syncNativeView(true)
+    }
+
+    Timer {
+        id: embeddedViewSyncTimer
+        interval: 180
+        running: root.embeddedMapThrottle
+        repeat: true
+        onTriggered: root.syncNativeView(false)
+    }
+
     Rectangle {
         anchors.fill: parent
         color: "#06111D"
@@ -130,12 +215,12 @@ Item {
     NativeRasterMapItem {
         id: nativeMap
         anchors.fill: parent
-        centerLat: root.resolvedLat
-        centerLng: root.resolvedLng
-        zoom: root.resolvedZoom
-        vehicleBearing: root.resolvedBearing
-        vehicleVisible: root.vehicleVisibleResolved
-        routePath: root.resolvedRoutePath
+        centerLat: root.nativeCenterLat
+        centerLng: root.nativeCenterLng
+        zoom: root.nativeZoom
+        vehicleBearing: root.nativeBearing
+        vehicleVisible: root.nativeVehicleVisible
+        routePath: root.nativeRoutePath
         userAgent: "BeagleyCluster/1.0 (native-online)"
         metrics: (typeof performanceMetrics !== "undefined") ? performanceMetrics : null
     }

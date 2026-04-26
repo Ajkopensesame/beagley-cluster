@@ -11,9 +11,23 @@ struct SearchResultData
     QString label;
     QString primary;
     QString secondary;
+    QString street;
+    QString houseNumber;
+    QString city;
+    QString state;
+    QString country;
+    QString countryCode;
+    QString category;
+    QString resultType;
+    QString addressType;
+    QString osmKey;
+    QString osmValue;
     double lat = 0.0;
     double lng = 0.0;
     double distanceMeters = 0.0;
+    double importance = 0.0;
+    double rankScore = 0.0;
+    int sourceOrder = 0;
 };
 
 struct RouteManeuverData
@@ -45,13 +59,14 @@ class OpenNavigationProvider
 public:
     OpenNavigationProvider();
 
-    QNetworkRequest buildSearchRequest(const QString &query) const;
-    QNetworkRequest buildFallbackSearchRequest(const QString &query) const;
-    QList<SearchResultData> parseSearchResponse(const QByteArray &payload, double originLat, double originLng) const;
+    QNetworkRequest buildSearchRequest(const QString &query, double originLat, double originLng) const;
+    QNetworkRequest buildFallbackSearchRequest(const QString &query, double originLat, double originLng) const;
+    QList<SearchResultData> parseSearchResponse(const QByteArray &payload, const QString &query, double originLat, double originLng) const;
 
     QNetworkRequest buildRouteRequest(double originLat, double originLng, double destLat, double destLng) const;
     QByteArray buildRouteBody(double originLat, double originLng, double destLat, double destLng) const;
     RouteData parseRouteResponse(const QByteArray &payload, const QVariantMap &destination) const;
+    QList<RouteData> parseRouteAlternativesResponse(const QByteArray &payload, const QVariantMap &destination) const;
 
     bool searchUsesPost() const;
     bool routeUsesPost() const;
@@ -67,9 +82,11 @@ private:
 
     SearchResultData parseFeatureResult(const QVariantMap &feature, double originLat, double originLng, int index) const;
     SearchResultData parseNominatimResult(const QVariantMap &item, double originLat, double originLng, int index) const;
-    RouteData parseOsrmRoute(const QVariantMap &root, const QVariantMap &destination) const;
+    RouteData parseOsrmRouteVariant(const QVariantMap &route, const QVariantMap &destination) const;
 
     QString m_geocoderUrl;
     QString m_fallbackGeocoderUrl;
     QString m_routerUrl;
+    QString m_searchCountryCode;
+    QString m_searchLanguage;
 };

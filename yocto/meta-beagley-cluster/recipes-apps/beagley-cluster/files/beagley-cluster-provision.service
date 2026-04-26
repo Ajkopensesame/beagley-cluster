@@ -2,7 +2,7 @@
 Description=Beagley Cluster Appliance Provisioning
 DefaultDependencies=no
 After=local-fs.target
-Before=network-online.target beagley-cluster-gpu-probe.service beagley-cluster.service
+Before=network-online.target beagley-cluster-gpu-probe.service beagley_cluster.service
 
 [Service]
 Type=oneshot

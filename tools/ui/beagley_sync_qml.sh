@@ -62,7 +62,7 @@ ssh -o ConnectTimeout=5 "$HOST" "true"
 echo "[beagley-ui] Step 2: Sync QML to $HOST:$REMOTE_ROOT..."
 (
   cd "$ROOT"
-  find src/ui -type f \( -name '*.qml' -o -name 'qmldir' \) | sort | COPYFILE_DISABLE=1 tar -czf - -T -
+  find src/ui -type f \( -name '*.qml' -o -name '*.js' -o -name 'qmldir' \) | sort | COPYFILE_DISABLE=1 tar -czf - -T -
 ) | ssh "$HOST" "set -e;
   tmp='${REMOTE_ROOT}.tmp';
   rm -rf \"\$tmp\";
@@ -71,7 +71,7 @@ echo "[beagley-ui] Step 2: Sync QML to $HOST:$REMOTE_ROOT..."
   rm -rf '$REMOTE_ROOT';
   mv \"\$tmp\" '$REMOTE_ROOT';
   chown -R root:root '$REMOTE_ROOT' 2>/dev/null || true;
-  find '$REMOTE_ROOT/src/ui' -type f \\( -name '*.qml' -o -name 'qmldir' \\) | wc -l"
+  find '$REMOTE_ROOT/src/ui' -type f \\( -name '*.qml' -o -name '*.js' -o -name 'qmldir' \\) | wc -l"
 
 if [[ "$RESTART" != "1" ]]; then
   echo "[beagley-ui] Sync complete; restart skipped"

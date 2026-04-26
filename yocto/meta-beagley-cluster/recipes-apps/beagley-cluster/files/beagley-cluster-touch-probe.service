@@ -1,0 +1,21 @@
+[Unit]
+Description=Beagley Touch Input Probe
+After=local-fs.target systemd-udev-settle.service
+Wants=systemd-udev-settle.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/default/beagley-cluster
+EnvironmentFile=-/etc/default/beagley-cluster.local
+Environment=BEAGLEY_TOUCH_GATE_FILE=/run/beagley_touch_gate.ok
+Environment=BEAGLEY_TOUCH_PROBE_STATUS_FILE=/run/beagley_touch_gate.status
+Environment=BEAGLEY_TOUCH_PROBE_LOG_FILE=/run/beagley_touch_gate.log
+Environment=BEAGLEY_TOUCH_GATE_TIMEOUT=60
+ExecCondition=/bin/sh -c '! grep -Eq "(^| )beagley\\.diag=1($| )" /proc/cmdline && test ! -f /run/beagley-diagnostic.mode'
+ExecStart=/bin/sh -c '/usr/libexec/beagley-cluster/beagley-touch-gate.sh --write-ok "${BEAGLEY_TOUCH_GATE_FILE:-/run/beagley_touch_gate.ok}" --timeout "${BEAGLEY_TOUCH_GATE_TIMEOUT:-60}"'
+RemainAfterExit=yes
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

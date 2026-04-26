@@ -170,7 +170,7 @@ The appliance now brings the board up in two stages:
 1. `beagley-cluster-gpu-probe.service` runs `beagley-gpu-gate` during boot,
    records pass/fail details under `/run/beagley_gpu_gate.status`, and keeps the
    OS reachable even when the renderer is wrong.
-2. `beagley-cluster.service` starts only if the probe produced
+2. `beagley_cluster.service` starts only if the probe produced
    `/run/beagley_gpu_gate.ok`, then re-runs the strict gate before launching the
    full-screen app.
 

@@ -1,0 +1,37 @@
+[Unit]
+Description=Beagley Cluster Appliance
+After=network.target beagley-cluster-provision.service beagley-cluster-gpu-probe.service
+Wants=beagley-cluster-provision.service beagley-cluster-gpu-probe.service
+
+[Service]
+Type=simple
+Environment=QT_QPA_PLATFORM=eglfs
+Environment=QT_QPA_EGLFS_INTEGRATION=eglfs_kms
+Environment=QSG_RENDER_LOOP=basic
+Environment=BEAGLEY_UI_VARIANT=embedded
+Environment=BEAGLEY_RENDER_PROFILE=embedded
+Environment=BEAGLEY_EFFECT_LEVEL=low
+Environment=BEAGLEY_MAP_RENDERER=native-online
+Environment=BEAGLEY_REQUIRE_GPU_GATE=1
+Environment=BEAGLEY_GPU_GATE_FILE=/run/beagley_gpu_gate.ok
+Environment=BEAGLEY_GPU_PROBE_STATUS_FILE=/run/beagley_gpu_gate.status
+Environment=BEAGLEY_GPU_PROBE_LOG_FILE=/run/beagley_gpu_gate.log
+Environment=BEAGLEY_REQUIRE_TOUCH_GATE=0
+Environment=BEAGLEY_TOUCH_GATE_FILE=/run/beagley_touch_gate.ok
+Environment=BEAGLEY_TOUCH_PROBE_STATUS_FILE=/run/beagley_touch_gate.status
+Environment=BEAGLEY_TOUCH_PROBE_LOG_FILE=/run/beagley_touch_gate.log
+Environment=BEAGLEY_TOUCH_GATE_TIMEOUT=60
+Environment=BEAGLEY_PROFILE_METRICS=0
+EnvironmentFile=-/etc/default/beagley-cluster
+EnvironmentFile=-/etc/default/beagley-cluster.local
+ExecCondition=/bin/sh -c '! grep -Eq "(^| )beagley\\.diag=1($| )" /proc/cmdline && test ! -f /run/beagley-diagnostic.mode'
+ExecStartPre=/bin/sh -c 'value="${BEAGLEY_REQUIRE_GPU_GATE:-1}"; case "$value" in 0|false|False|FALSE|off|Off|OFF|no|No|NO) exit 0 ;; esac; gate="${BEAGLEY_GPU_GATE_FILE:-/run/beagley_gpu_gate.ok}"; i=0; while [ "$i" -lt 30 ]; do [ -f "$gate" ] && exit 0; i=$((i + 1)); sleep 1; done; echo "beagley-cluster: missing GPU gate file: $gate" >&2; exit 1'
+ExecStartPre=/bin/sh -c 'value="${BEAGLEY_REQUIRE_TOUCH_GATE:-1}"; case "$value" in 0|false|False|FALSE|off|Off|OFF|no|No|NO) exit 0 ;; esac; gate="${BEAGLEY_TOUCH_GATE_FILE:-/run/beagley_touch_gate.ok}"; timeout="${BEAGLEY_TOUCH_GATE_TIMEOUT:-60}"; i=0; while [ "$i" -lt "$timeout" ]; do [ -f "$gate" ] && exit 0; i=$((i + 1)); sleep 1; done; echo "beagley-cluster: missing touch gate file: $gate" >&2; exit 1'
+ExecStart=/usr/bin/beagley-cluster-launch.sh
+Restart=always
+RestartSec=2
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

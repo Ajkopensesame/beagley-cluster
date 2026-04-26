@@ -6,15 +6,39 @@
 #include <QDateTime>
 #include <QPointF>
 #include <QStringList>
+#include <QProcessEnvironment>
 #include <QtMath>
 
 namespace {
 constexpr double kDefaultLat = -27.4698;
 constexpr double kDefaultLng = 153.0251;
 constexpr double kTileSizePx = 256.0;
-constexpr double kMapPixelStep = 0.75;
-constexpr double kMapBearingStepDeg = 0.75;
-constexpr double kMapZoomStep = 0.05;
+
+bool embeddedRenderProfile()
+{
+    static const bool embedded = qEnvironmentVariable("BEAGLEY_RENDER_PROFILE") == QLatin1String("embedded");
+    return embedded;
+}
+
+int renderTickIntervalMs()
+{
+    return embeddedRenderProfile() ? 80 : 16;
+}
+
+double mapPixelStep()
+{
+    return embeddedRenderProfile() ? 6.0 : 0.75;
+}
+
+double mapBearingStepDeg()
+{
+    return embeddedRenderProfile() ? 2.5 : 0.75;
+}
+
+double mapZoomStep()
+{
+    return embeddedRenderProfile() ? 0.20 : 0.05;
+}
 
 double clampLatitude(double latitude)
 {
@@ -131,7 +155,7 @@ ClusterRenderModel::ClusterRenderModel(VehicleStateClient *vehicleState,
         connect(m_navigation, &NavigationService::networkStatusChanged, this, &ClusterRenderModel::syncStatus);
     }
 
-    m_tickTimer.setInterval(16);
+    m_tickTimer.setInterval(renderTickIntervalMs());
     connect(&m_tickTimer, &QTimer::timeout, this, &ClusterRenderModel::tick);
     m_tickTimer.start();
 
@@ -388,16 +412,16 @@ void ClusterRenderModel::tick()
     const QPointF worldDelta = nextWorld - currentWorld;
 
     if ((worldDelta.x() * worldDelta.x()) + (worldDelta.y() * worldDelta.y())
-        >= (kMapPixelStep * kMapPixelStep)) {
+        >= (mapPixelStep() * mapPixelStep())) {
         m_mapLat = nextLat;
         m_mapLng = nextLng;
         mapChangedNow = true;
     }
-    if (qAbs(angleDeltaDegrees(m_mapBearing, nextBearing)) >= kMapBearingStepDeg) {
+    if (qAbs(angleDeltaDegrees(m_mapBearing, nextBearing)) >= mapBearingStepDeg()) {
         m_mapBearing = nextBearing;
         mapChangedNow = true;
     }
-    if (qAbs(nextZoomValue - m_mapZoom) >= kMapZoomStep) {
+    if (qAbs(nextZoomValue - m_mapZoom) >= mapZoomStep()) {
         m_mapZoom = nextZoomValue;
         mapChangedNow = true;
     }

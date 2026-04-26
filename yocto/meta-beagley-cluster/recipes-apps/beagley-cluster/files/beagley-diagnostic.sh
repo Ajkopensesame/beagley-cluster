@@ -107,7 +107,7 @@ mark_stage() {
 
 collect_snapshot() {
   local stage_name="$1"
-  local slug timestamp snapshot_dir model_file summary_file failed_units_file
+  local slug timestamp snapshot_dir model_file summary_file failed_units_file input_file event_node event_name
 
   diag_mode_enabled || return 0
 
@@ -130,6 +130,32 @@ collect_snapshot() {
   ip -br a >"${snapshot_dir}/ip-br-a.txt" 2>&1 || true
   lsmod >"${snapshot_dir}/lsmod.txt" 2>&1 || true
   find /sys/class/drm -maxdepth 3 -mindepth 1 -printf '%P\n' >"${snapshot_dir}/drm-tree.txt" 2>&1 || true
+  input_file="${snapshot_dir}/input-devices.txt"
+  {
+    printf '### /proc/bus/input/devices\n'
+    cat /proc/bus/input/devices 2>&1 || true
+    printf '\n### /sys/class/input\n'
+    find /sys/class/input -maxdepth 3 -mindepth 1 -printf '%P\n' 2>&1 || true
+    printf '\n### event properties\n'
+    for event_node in /dev/input/event*; do
+      [[ -e "$event_node" ]] || continue
+      printf -- '--- %s\n' "$event_node"
+      event_name="$(basename "$event_node")"
+      if [[ -r "/sys/class/input/${event_name}/device/name" ]]; then
+        printf 'name=%s\n' "$(cat "/sys/class/input/${event_name}/device/name")"
+      fi
+      if [[ -r "/sys/class/input/${event_name}/device/capabilities/abs" ]]; then
+        printf 'capabilities_abs=%s\n' "$(cat "/sys/class/input/${event_name}/device/capabilities/abs")"
+      fi
+      if [[ -r "/sys/class/input/${event_name}/device/properties" ]]; then
+        printf 'properties=%s\n' "$(cat "/sys/class/input/${event_name}/device/properties")"
+      fi
+      udevadm info --query=property --name="$event_node" 2>/dev/null \
+        | grep -E '^(DEVNAME|DEVPATH|ID_INPUT|ID_MODEL|ID_VENDOR)=' || true
+    done
+    printf '\n### touch gate\n'
+    cat /run/beagley_touch_gate.status /run/beagley_touch_gate.ok /run/beagley_touch_gate.log 2>/dev/null || true
+  } >"$input_file" 2>&1 || true
   systemctl --failed --no-pager --no-legend >"$failed_units_file" 2>&1 || true
   journalctl -b --no-pager -n 200 >"${snapshot_dir}/journal-tail.txt" 2>&1 || true
 

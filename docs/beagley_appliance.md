@@ -52,7 +52,7 @@ desktop workflow.
 - no production `Canvas` paint loops
 - replay-driven perf checks emit `[Perf]` with fps, p95, p99, and map counters
 - production image reaches Linux/network/SSH even when the GPU probe fails
-- `beagley-cluster.service` starts only after a passing GPU probe
+- `beagley_cluster.service` starts only after a passing GPU probe
 - diagnostic image reaches a visible HDMI/systemd console when the boot reaches Linux userspace
 - diagnostic image leaves stage markers and snapshots on the SD card even when networking fails
 
@@ -64,8 +64,14 @@ desktop workflow.
 - BeagleY boot media carries both `extlinux` and EFI boot entries with the same BeagleY DTB
 - The boot partition carries an explicit `k3-am67a-beagley-ai.dtb` selection in both `extlinux.conf` and `uEnv.txt`
 - `beagley-cluster-gpu-probe.service` records the first-boot renderer result under `/run`
-- `beagley-cluster.service` starts only when `/run/beagley_gpu_gate.ok` exists
+- `beagley_cluster.service` starts only when `/run/beagley_gpu_gate.ok` exists
 - `beagley-cluster-launch.sh` re-enforces `gpu_gate.sh --strict --mode appliance`
+- `beagley-cluster-touch-probe.service` records touchscreen readiness under
+  `/run/beagley_touch_gate.*`
+- production starts with touch as an advisory probe by default, so the display
+  reaches the cluster even if USB touch fails to enumerate after a power cycle
+- lab validation can opt into fail-closed touch startup with
+  `BEAGLEY_REQUIRE_TOUCH_GATE=1`
 - `beagley-cluster-provision.service` applies optional boot-media overrides
 - `beagley.diag=1` creates `/run/beagley-diagnostic.mode`, suppresses the appliance stack, and records snapshots under `/var/lib/beagley-cluster/diagnostic`
 - Release output is a flashable `wic` bundle with checksum, manifest, and validation report

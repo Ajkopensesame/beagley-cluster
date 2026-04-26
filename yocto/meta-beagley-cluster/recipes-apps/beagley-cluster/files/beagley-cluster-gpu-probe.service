@@ -2,7 +2,7 @@
 Description=Beagley Cluster GPU Probe
 After=local-fs.target systemd-modules-load.service beagley-cluster-provision.service
 Wants=beagley-cluster-provision.service
-Before=beagley-cluster.service
+Before=beagley_cluster.service
 
 [Service]
 Type=oneshot

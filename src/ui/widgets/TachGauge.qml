@@ -45,6 +45,8 @@ Item {
     // NOTE: `vehicleState` is expected to be a context property provided by C++ (VehicleStateClient).
     // If it is missing, QML should fail loudly rather than invent data.
     property var vehicleState
+    property bool stressScene: false
+    property real stressPhase: 0.0
 
     // Defensive helper
     function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
@@ -79,15 +81,23 @@ Item {
         return mixColors(quarterTint, red, t, 1.0);
     }
     readonly property bool lowEffectMode: effectLevel === "low" || effectLevel === "off"
+    readonly property bool embeddedSafeMode: Qt.platform.os === "linux"
     readonly property color chromeColor: theme?.pearlLow ?? Qt.color("#C7B7FF")
+    readonly property real auxArcCanvasScale: lowEffectMode ? 0.44 : 1.0
+    readonly property real sideArcHeadRadius: lowEffectMode ? 10.5 : 15.5
+    readonly property real rpmRepaintThreshold: lowEffectMode ? 35.0 : 1e-4
+    readonly property real fuelRepaintThreshold: lowEffectMode ? 0.30 : 1e-4
+    property real lastPaintedRpm: 0
+    property real lastPaintedFuel: 100
 
     function requestGaugeStaticPaint() {
         dialChrome.requestStaticPaint();
     }
     function requestGaugeDynamicPaint() {
         dialChrome.requestDynamicPaint();
-        rimCanvas.requestPaint();
         fuelArcCanvas.requestPaint();
+        root.lastPaintedRpm = root.displayRpm;
+        root.lastPaintedFuel = root.displayFuel;
     }
     function kickSmoother() {
         if (!smoothingTimer.running) smoothingTimer.start();
@@ -99,12 +109,15 @@ Item {
     readonly property int fuelInt: Math.round(displayFuel)
     readonly property bool lowFuel: (displayFuel <= lowFuelPct)
     readonly property bool highRpm: displayRpm >= redlineStart
+    readonly property bool tachHeadScared: displayRpm > 3500
+    readonly property bool fuelHeadScared: displayFuel <= 15
 
     // Keep the dial geometry stable so the speed and tach arcs stay optically matched.
     readonly property real faceScale: 1.0
     readonly property real faceYOffset: 0
     readonly property real rainFaceRadius: width * 0.438
     property real flashLevel: 0.0
+    property real fuelLavaPhase: 0.0
 
     function fallbackRpmColor(v) {
         return (v >= redlineStart) ? "#FF3B3B" : "#5E35B1";
@@ -125,10 +138,41 @@ Item {
                                && !vehicleState.linkStale
                                && !vehicleState.bbbStale
 
+    readonly property bool displayHighBeam: root.stressScene
+        ? Math.sin(root.stressPhase * 0.72) > 0.20
+        : root.linkOk && !!root.vehicleState && !!root.vehicleState.highBeam
+    readonly property bool displayWarnDoor: root.stressScene
+        ? true
+        : root.linkOk && !!root.vehicleState && !!root.vehicleState.warnDoor
+    readonly property bool displayWarnCharge: root.stressScene
+        ? true
+        : root.linkOk && !!root.vehicleState && !!root.vehicleState.warnCharge
+    readonly property bool displayWarnBrake: root.stressScene
+        ? true
+        : root.linkOk && !!root.vehicleState && !!root.vehicleState.warnBrake
+    readonly property bool displayWarnOil: root.stressScene
+        ? true
+        : root.linkOk && !!root.vehicleState && !!root.vehicleState.warnOil
+    readonly property bool displayWarnCheckEngine: root.stressScene
+        ? true
+        : root.linkOk && !!root.vehicleState && !!root.vehicleState.warnCheckEngine
+    readonly property bool displayWarnAT: root.stressScene
+        ? true
+        : root.linkOk && !!root.vehicleState && !!root.vehicleState.warnAT
+    readonly property bool displayWarnFuelLow: root.stressScene
+        ? true
+        : root.linkOk && !!root.vehicleState && !!root.vehicleState.warnFuelLow
+    readonly property string displayDrivetrainMode: root.stressScene
+        ? (Math.sin(root.stressPhase * 0.22) > 0.45 ? "4wd" : "2wd")
+        : (root.linkOk && !!root.vehicleState ? root.vehicleState.drivetrainMode : "2wd")
+    readonly property bool displayTransferLock: root.stressScene
+        ? Math.sin(root.stressPhase * 0.18 + 1.1) > 0.78
+        : root.linkOk && !!root.vehicleState && !!root.vehicleState.transferLock
+
     // ===== Smooth RPM =====
     Timer {
         id: smoothingTimer
-        interval: 16
+        interval: root.lowEffectMode ? 50 : 16
         running: false
         repeat: true
         onTriggered: {
@@ -156,9 +200,24 @@ Item {
             const fuelSettled = Math.abs(fuelTarget - root.displayFuel) < 0.02;
             const changed = Math.abs(root.displayRpm - prevRpm) > 1e-4
                          || Math.abs(root.displayFuel - prevFuel) > 1e-4;
+            const needsRepaint = Math.abs(root.displayRpm - root.lastPaintedRpm) >= root.rpmRepaintThreshold
+                              || Math.abs(root.displayFuel - root.lastPaintedFuel) >= root.fuelRepaintThreshold;
+            const settledFlush = rpmSettled && fuelSettled
+                              && (Math.abs(root.displayRpm - root.lastPaintedRpm) > 1e-4
+                               || Math.abs(root.displayFuel - root.lastPaintedFuel) > 1e-4);
 
-            if (changed) requestGaugeDynamicPaint();
+            if (changed && (needsRepaint || settledFlush)) requestGaugeDynamicPaint();
             if (rpmSettled && fuelSettled) running = false;
+        }
+    }
+
+    Timer {
+        interval: root.lowEffectMode ? 120 : 42
+        running: root.effectLevel !== "off" && !root.lowEffectMode
+        repeat: true
+        onTriggered: {
+            root.fuelLavaPhase += interval / 1000.0
+            fuelArcCanvas.requestPaint()
         }
     }
 
@@ -231,7 +290,7 @@ Item {
         MatrixRain {
             anchors.fill: parent
             z: 2
-            visible: root.matrixRainEnabled && !root.lowEffectMode
+            visible: root.matrixRainEnabled && root.effectLevel !== "off"
             circularMask: true
             maskRadius: root.rainFaceRadius
             effectEnabled: visible
@@ -243,18 +302,18 @@ Item {
                 0.72,
                 0.96
             )
-            fps: 12
-            speedMultiplier: 0.20
-            density: 0.30
-            glowSpeed: 0.72
-            glowFloor: 0.28
+            fps: root.lowEffectMode ? 7 : 12
+            speedMultiplier: root.lowEffectMode ? 0.11 : 0.20
+            density: root.lowEffectMode ? 0.15 : 0.30
+            glowSpeed: root.lowEffectMode ? 0.58 : 0.72
+            glowFloor: root.lowEffectMode ? 0.22 : 0.28
             driftScale: 0.90
-            charChangeChance: 0.026
-            fontPx: 12
-            fadeAlpha: 0.024
-            tailLength: 48
-            headAlpha: 0.92
-            tailMinAlpha: 0.12
+            charChangeChance: root.lowEffectMode ? 0.032 : 0.026
+            fontPx: root.lowEffectMode ? 18 : 12
+            fadeAlpha: root.lowEffectMode ? 0.075 : 0.024
+            tailLength: root.lowEffectMode ? 12 : 48
+            headAlpha: root.lowEffectMode ? 0.74 : 0.92
+            tailMinAlpha: root.lowEffectMode ? 0.025 : 0.12
         }
 
         DialChrome {
@@ -266,6 +325,7 @@ Item {
             gaugeColor: root.gaugeColor
             chromeColor: root.chromeColor
             progress: root.progress
+            scaredHead: root.tachHeadScared
             maxValue: root.maxRpm
             startAngleDeg: root.startAngleDeg
             sweepAngleDeg: root.sweepAngleDeg
@@ -276,119 +336,250 @@ Item {
             labelDivisor: 1000
         }
 
-        // ---- Fuel arc (FILLED band, opposite tach) ----
-        Canvas {
-            id: fuelArcCanvas
-            anchors.centerIn: parent
-            width: parent.width * (root.lowEffectMode ? 0.42 : 1.0)
-            height: parent.height * (root.lowEffectMode ? 0.42 : 1.0)
+        // ---- Fuel arc (tapered lava band, opposite tach) ----
+        Item {
+            id: fuelArcLayer
+            anchors.fill: parent
             z: 44
-            scale: root.lowEffectMode ? (1.0 / 0.42) : 1.0
-            renderTarget: Canvas.FramebufferObject
 
-            onWidthChanged: requestPaint()
-            onHeightChanged: requestPaint()
+            readonly property real rawStartDeg: (root.startAngleDeg + root.sweepAngleDeg) % 360
+            readonly property real rawSweepDeg: 360 - root.sweepAngleDeg
+            readonly property real padDeg: 12
+            readonly property real startDeg: rawStartDeg + padDeg
+            readonly property real sweepDeg: Math.max(0, rawSweepDeg - padDeg * 2)
+            readonly property real fuelNorm: clamp(root.displayFuel / 100.0, 0, 1)
+            readonly property real fillStartNorm: 1.0 - fuelNorm
+            readonly property real radius: width * 0.36
+            readonly property real labelRadius: radius + 18
+            readonly property color baseDark: root.theme?.pearlHigh ?? root.gaugeColor
+            readonly property color fuelColor: root.fuelActiveColor(fuelNorm)
+            readonly property color fuelBright: root.blendToward(fuelColor, Qt.color("#FFFFFF"), 0.20, 1.0)
+            readonly property real sweepRad: sweepDeg * Math.PI / 180
+            readonly property real headAngleRad: angleRad(startDeg) + sweepRad * fillStartNorm
+            readonly property bool headVisible: fuelNorm > 0.002
+            readonly property real headCenterX: width / 2 + Math.cos(headAngleRad) * radius
+            readonly property real headCenterY: height / 2 + Math.sin(headAngleRad) * radius
 
-            onPaint: {
-                const ctx = getContext("2d");
-                ctx.clearRect(0, 0, width, height);
+            function angleRad(deg) {
+                return (deg - 90) * Math.PI / 180
+            }
 
-                const cx = width / 2;
-                const cy = height / 2;
+            function pointX(deg, radius, itemWidth) {
+                return width / 2 + Math.cos(angleRad(deg)) * radius - itemWidth / 2
+            }
 
-                const rawStartDeg = (root.startAngleDeg + root.sweepAngleDeg) % 360;
-                const rawSweepDeg = 360 - root.sweepAngleDeg;
+            function pointY(deg, radius, itemHeight) {
+                return height / 2 + Math.sin(angleRad(deg)) * radius - itemHeight / 2
+            }
 
-                const padDeg = 12;
-                const startDeg = rawStartDeg + padDeg;
-                const sweepDeg = Math.max(0, rawSweepDeg - padDeg * 2);
+            Canvas {
+                id: fuelArcCanvas
+                anchors.centerIn: parent
+                width: parent.width * (root.embeddedSafeMode ? 1.0 : root.auxArcCanvasScale)
+                height: parent.height * (root.embeddedSafeMode ? 1.0 : root.auxArcCanvasScale)
+                scale: root.embeddedSafeMode ? 1.0 : (1.0 / root.auxArcCanvasScale)
+                renderTarget: root.embeddedSafeMode ? Canvas.Image : Canvas.FramebufferObject
+                antialiasing: !root.lowEffectMode && !root.embeddedSafeMode
+                smooth: !root.lowEffectMode && !root.embeddedSafeMode
 
-                const startRad = (startDeg - 90) * Math.PI / 180;
-                const sweepRad = sweepDeg * Math.PI / 180;
+                onWidthChanged: requestPaint()
+                onHeightChanged: requestPaint()
 
-                const fuel = clamp(root.displayFuel / 100.0, 0, 1);
+                onPaint: {
+                    const ctx = getContext("2d")
+                    ctx.clearRect(0, 0, width, height)
 
-                const rOut = width * 0.36;
-                const thickStart = 24;
-                const thickEnd   = 4;
-                const segments   = root.lowEffectMode ? 12 : 90;
+                    const cx = width / 2
+                    const cy = height / 2
+                    const r = width * 0.36
+                    const startRad = fuelArcLayer.angleRad(fuelArcLayer.startDeg)
+                    const sweepRad = fuelArcLayer.sweepDeg * Math.PI / 180
+                    const tailT = 1.0
+                    const headT = fuelArcLayer.fillStartNorm
+                    const fuel = fuelArcLayer.fuelColor
+                    const bright = fuelArcLayer.fuelBright
 
-                const dark  = (theme?.pearlHigh ?? root.gaugeColor);
-                const light = (theme?.pearlLow  ?? "#B79CFF");
-
-                ctx.save();
-
-                function drawTrack(tFrom, tTo, color, alpha, widthScale) {
-                    for (let i = 0; i < segments; i++) {
-                        const u0 = i / segments;
-                        const u1 = (i + 1) / segments;
-
-                        if (u0 >= tTo) break;
-
-                        const v0 = Math.max(u0, tFrom);
-                        const v1 = Math.min(u1, tTo);
-                        if (v1 <= v0) continue;
-
-                        const th  = thickStart + (thickEnd - thickStart) * v1;
-                        const rr = rOut - th / 2;
-                        ctx.beginPath();
-                        ctx.strokeStyle = Qt.rgba(color.r, color.g, color.b, alpha);
-                        ctx.lineCap = "round";
-                        ctx.lineWidth = Math.max(2, th * widthScale);
-                        ctx.arc(cx, cy, rr, startRad + sweepRad * v0, startRad + sweepRad * v1, false);
-                        ctx.stroke();
+                    function rgba(color, alpha) {
+                        return "rgba("
+                            + Math.round(color.r * 255) + ","
+                            + Math.round(color.g * 255) + ","
+                            + Math.round(color.b * 255) + ","
+                            + alpha + ")"
                     }
+
+                    const neonCyan = Qt.color("#73F6FF")
+                    const neonLime = Qt.color("#9B5CFF")
+                    const neonPink = Qt.color("#FF4DFF")
+                    const neonOrange = Qt.color("#6E35FF")
+                    const neonYellow = Qt.color("#EAD7FF")
+
+                    function pointForT(t, radialOffset) {
+                        const a = startRad + sweepRad * t
+                        return {
+                            x: cx + Math.cos(a) * (r + radialOffset),
+                            y: cy + Math.sin(a) * (r + radialOffset),
+                            a: a
+                        }
+                    }
+
+                    function buildBandPath(fromT, toT, tailWidth, headWidth) {
+                        const outer = []
+                        const inner = []
+                        const steps = Math.max(10, Math.ceil(Math.abs(toT - fromT) * 56))
+                        for (let i = 0; i <= steps; i++) {
+                            const u = i / steps
+                            const eased = 1 - Math.pow(1 - u, 1.45)
+                            const t = fromT + (toT - fromT) * u
+                            const w = tailWidth + (headWidth - tailWidth) * eased
+                            outer.push(pointForT(t, w / 2))
+                            inner.push(pointForT(t, -w / 2))
+                        }
+
+                        ctx.beginPath()
+                        ctx.moveTo(outer[0].x, outer[0].y)
+                        for (let i = 1; i < outer.length; i++) ctx.lineTo(outer[i].x, outer[i].y)
+                        for (let i = inner.length - 1; i >= 0; i--) ctx.lineTo(inner[i].x, inner[i].y)
+                        ctx.closePath()
+
+                        const tail = pointForT(fromT, 0)
+                        const head = pointForT(toT, 0)
+                        ctx.moveTo(tail.x + tailWidth * 0.45, tail.y)
+                        ctx.arc(tail.x, tail.y, Math.max(2, tailWidth * 0.48), 0, Math.PI * 2)
+                        ctx.moveTo(head.x + headWidth * 0.52, head.y)
+                        ctx.arc(head.x, head.y, Math.max(3, headWidth * 0.52), 0, Math.PI * 2)
+                    }
+
+                    function drawBlob(t, radialOffset, radius, color, alpha, stretch, phase) {
+                        const p = pointForT(t, radialOffset)
+                        const grad = ctx.createRadialGradient(0, 0, radius * 0.12, 0, 0, radius)
+                        grad.addColorStop(0.00, rgba(root.blendToward(color, Qt.color("#FFFFFF"), 0.42, 1.0), alpha))
+                        grad.addColorStop(0.62, rgba(color, alpha * 0.40))
+                        grad.addColorStop(1.00, rgba(color, 0.0))
+
+                        ctx.save()
+                        ctx.translate(p.x, p.y)
+                        ctx.rotate(p.a + Math.PI / 2 + Math.sin(phase) * 0.20)
+                        ctx.scale(stretch, 0.62)
+                        ctx.fillStyle = grad
+                        ctx.beginPath()
+                        ctx.arc(0, 0, radius, 0, Math.PI * 2)
+                        ctx.fill()
+                        ctx.restore()
+                    }
+
+                    ctx.save()
+                    ctx.beginPath()
+                    ctx.strokeStyle = rgba(fuelArcLayer.baseDark, root.lowEffectMode ? 0.10 : 0.08)
+                    ctx.lineWidth = root.lowEffectMode ? (10 * root.auxArcCanvasScale) : 22
+                    ctx.lineCap = "round"
+                    ctx.arc(cx, cy, r, startRad, startRad + sweepRad)
+                    ctx.stroke()
+                    ctx.restore()
+
+                    if (fuelArcLayer.fuelNorm > 0.002) {
+                        const tailWidth = root.lowEffectMode ? (3.5 * root.auxArcCanvasScale) : 5.5
+                        const headWidth = root.lowEffectMode ? (10 * root.auxArcCanvasScale) : 22
+                        const phase = root.fuelLavaPhase
+
+                        if (root.lowEffectMode) {
+                            ctx.save()
+                            buildBandPath(tailT, headT, tailWidth, headWidth)
+                            const fill = ctx.createLinearGradient(cx - r, cy + r, cx + r, cy - r)
+                            fill.addColorStop(0.00, rgba(neonLime, 0.64))
+                            fill.addColorStop(0.42, rgba(neonCyan, 0.74))
+                            fill.addColorStop(0.76, rgba(bright, 0.66))
+                            fill.addColorStop(1.00, rgba(neonOrange, 0.56))
+                            ctx.fillStyle = fill
+                            ctx.fill()
+                            ctx.restore()
+
+                            ctx.save()
+                            buildBandPath(tailT, headT,
+                                          1.6 * root.auxArcCanvasScale,
+                                          4.8 * root.auxArcCanvasScale)
+                            ctx.fillStyle = rgba(neonYellow, 0.22)
+                            ctx.fill()
+                            ctx.restore()
+                        } else {
+                            ctx.save()
+                            buildBandPath(tailT, headT, tailWidth, headWidth)
+                            ctx.clip()
+
+                            const fill = ctx.createLinearGradient(cx - r, cy + r, cx + r, cy - r)
+                            fill.addColorStop(0.00, rgba(neonLime, 0.48))
+                            fill.addColorStop(0.24, rgba(neonCyan, 0.64))
+                            fill.addColorStop(0.54, rgba(neonPink, 0.72))
+                            fill.addColorStop(0.78, rgba(bright, 0.62))
+                            fill.addColorStop(1.00, rgba(neonOrange, 0.52))
+                            ctx.fillStyle = fill
+                            ctx.fillRect(0, 0, width, height)
+
+                            for (let i = 0; i < 5; i++) {
+                                const blobColor = [neonLime, neonCyan, neonPink, neonOrange, neonYellow][i % 5]
+                                const u = (phase * (0.10 + i * 0.014) + i * 0.21) % 1.0
+                                const t = tailT + (headT - tailT) * u
+                                const wobble = Math.sin(phase * (1.0 + i * 0.2) + i * 1.9)
+                                const blobR = 11 + i * 1.7
+                                drawBlob(t, wobble * 2.4, blobR, blobColor, 0.56, 1.55, phase + i)
+                            }
+                            ctx.restore()
+
+                            ctx.save()
+                            buildBandPath(tailT, headT, tailWidth, headWidth)
+                            ctx.fillStyle = rgba(neonYellow, 0.18)
+                            ctx.fill()
+                            ctx.restore()
+                        }
+
+                    }
+
+                    if (typeof performanceMetrics !== "undefined" && performanceMetrics)
+                        performanceMetrics.recordPaint("tachGauge.fuelArc")
                 }
+            }
 
-                const fuelColor = root.fuelActiveColor(fuel);
+            GaugeArcHead {
+                z: 48
+                visible: fuelArcLayer.headVisible
+                lowEffectMode: root.lowEffectMode
+                scared: root.fuelHeadScared
+                headRadius: root.sideArcHeadRadius
+                x: fuelArcLayer.headCenterX - width / 2
+                y: fuelArcLayer.headCenterY - height / 2
+            }
 
-                const fuelStart = 1.0 - fuel;
-                if (root.lowEffectMode) {
-                    drawTrack(0.0, 1.0, dark, 0.10, 0.40);
-                    drawTrack(fuelStart, 1.0, root.blendToward(fuelColor, Qt.color("#FFFFFF"), 0.12, 1.0), 0.88, 0.18);
-                } else {
-                    drawTrack(0.0, 1.0, dark, 0.08, 1.05);
-                    drawTrack(0.0, 1.0, dark, 0.14, 0.60);
-                    drawTrack(fuelStart, 1.0, fuelColor, 0.22, 0.74);
-                    drawTrack(fuelStart, 1.0, fuelColor, 0.34, 0.42);
-                    drawTrack(fuelStart, 1.0, root.blendToward(fuelColor, Qt.color("#FFFFFF"), 0.20, 1.0), 0.90, 0.18);
-                }
+            Text {
+                width: 24
+                height: 20
+                x: fuelArcLayer.pointX(fuelArcLayer.startDeg, fuelArcLayer.labelRadius, width)
+                y: fuelArcLayer.pointY(fuelArcLayer.startDeg, fuelArcLayer.labelRadius, height)
+                text: "F"
+                color: root.theme?.text ?? "white"
+                opacity: root.theme?.isNight ? 0.90 : 0.75
+                font.family: root.theme?.fontMono ?? "monospace"
+                font.pixelSize: 16
+                font.bold: true
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+            }
 
-                function capAt(t, color) {
-                    const th = thickStart + (thickEnd - thickStart) * t;
-                    const rr = rOut - th / 2;
-                    const ang = startRad + sweepRad * t;
-                    const x = cx + Math.cos(ang) * rr;
-                    const y = cy + Math.sin(ang) * rr;
-
-                    ctx.fillStyle = color;
-                    ctx.beginPath();
-                    ctx.arc(x, y, Math.max(2, th * 0.18), 0, Math.PI * 2);
-                    ctx.fill();
-                }
-
-                if (fuelStart > 0.0 && fuelStart < 1.0) {
-                    capAt(fuelStart, root.blendToward(fuelColor, Qt.color("#FFFFFF"), 0.12, 1.0));
-                }
-
-                // F / E labels
-                const labelR = rOut + 18;
-                const angF = startRad;
-                const angE = startRad + sweepRad;
-
-                ctx.globalAlpha = theme?.isNight ? 0.90 : 0.75;
-                ctx.fillStyle = theme?.text ?? "white";
-                ctx.font = "700 16px monospace";
-                ctx.textAlign = "center";
-                ctx.textBaseline = "middle";
-
-                ctx.fillText("F", cx + Math.cos(angF) * labelR, cy + Math.sin(angF) * labelR);
-                ctx.fillText("E", cx + Math.cos(angE) * labelR, cy + Math.sin(angE) * labelR);
-
-                ctx.restore();
-
-                if (typeof performanceMetrics !== "undefined" && performanceMetrics)
-                    performanceMetrics.recordPaint("tachGauge.fuelArc")
+            Text {
+                width: 24
+                height: 20
+                x: fuelArcLayer.pointX(fuelArcLayer.startDeg + fuelArcLayer.sweepDeg,
+                                        fuelArcLayer.labelRadius,
+                                        width)
+                y: fuelArcLayer.pointY(fuelArcLayer.startDeg + fuelArcLayer.sweepDeg,
+                                        fuelArcLayer.labelRadius,
+                                        height)
+                text: "E"
+                color: root.theme?.text ?? "white"
+                opacity: root.theme?.isNight ? 0.90 : 0.75
+                font.family: root.theme?.fontMono ?? "monospace"
+                font.pixelSize: 16
+                font.bold: true
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
             }
         }
 
@@ -430,14 +621,10 @@ Item {
         }
     }
 
-    // ==============================
-    // VIC: BBB-truth only (no mock)
-    // ==============================
     VehicleInfoCenter {
         id: vicCenter
         anchors.centerIn: parent
 
-        // Size + layering preserved from your original block
         readonly property real factor: 0.50
         readonly property real side: Math.max(0, Math.min(parent.width, parent.height) * factor)
         width: side
@@ -447,59 +634,26 @@ Item {
         simplified: root.lowEffectMode
         pulseEnabled: !root.lowEffectMode
 
-        // Bind warnings to BBB truth with stale gating.
-        // If link is stale, show nothing rather than inventing warnings.
-        warnDoor:   root.linkOk && !!root.vehicleState && root.vehicleState.warnDoor
-        warnCharge: root.linkOk && !!root.vehicleState && root.vehicleState.warnCharge
-        warnBrake:  root.linkOk && !!root.vehicleState && root.vehicleState.warnBrake
-        warnOil:    root.linkOk && !!root.vehicleState && root.vehicleState.warnOil
+        warnDoor: root.displayWarnDoor
+        warnCharge: root.displayWarnCharge
+        warnBrake: root.displayWarnBrake
+        warnOil: root.displayWarnOil
+        warnCheckEngine: root.displayWarnCheckEngine
+        warnAT: root.displayWarnAT
+        warnFuelLow: root.displayWarnFuelLow
 
-        // Not implemented on BBB yet in this step; keep false.
-        warnCheckEngine: root.linkOk && !!root.vehicleState && root.vehicleState.warnCheckEngine
-        warnAT:          root.linkOk && !!root.vehicleState && root.vehicleState.warnAT
-        warnFuelLow:     root.linkOk && !!root.vehicleState && root.vehicleState.warnFuelLow
-
-        drivetrainMode: root.linkOk && !!root.vehicleState
-            ? root.vehicleState.drivetrainMode
-            : "2wd"
-        transferLock: root.linkOk && !!root.vehicleState
-            ? root.vehicleState.transferLock
-            : false
+        drivetrainMode: root.displayDrivetrainMode
+        transferLock: root.displayTransferLock
     }
 
     HighBeamHalo {
-        id: highBeamHalo
         anchors.centerIn: vicCenter
         z: 140
-        visible: !root.lowEffectMode
         vicDiameter: vicCenter.width
         ringThickness: 16
         gapPx: 3
         holdMs: 1100
-        heartbeat: !root.lowEffectMode
-        active: root.linkOk && !!root.vehicleState && !!root.vehicleState.highBeam
-    }
-
-    Rectangle {
-        visible: root.lowEffectMode && root.linkOk && !!root.vehicleState && !!root.vehicleState.highBeam
-        z: 160
-        width: 90
-        height: 36
-        radius: 14
-        anchors.horizontalCenter: vicCenter.horizontalCenter
-        anchors.top: vicCenter.top
-        anchors.topMargin: 18
-        color: "#102033E8"
-        border.width: 1
-        border.color: "#63C9FF"
-
-        Text {
-            anchors.centerIn: parent
-            text: "HIGH"
-            color: "#63C9FF"
-            font.family: root.theme?.fontMono ?? "monospace"
-            font.pixelSize: 16
-            font.bold: true
-        }
+        heartbeat: root.effectLevel !== "off"
+        active: root.displayHighBeam
     }
 }
