@@ -184,6 +184,22 @@ VehicleStateClient::VehicleStateClient(QObject *parent)
                    << m_socket.errorString()
                    << "state=" << m_socket.state()
                    << "url=" << m_connectUrl;
+        if (m_socket.state() == QAbstractSocket::UnconnectedState) {
+            m_handshakeComplete = false;
+            m_socketBuffer.clear();
+            m_fragmentBuffer.clear();
+            m_fragmentIsText = false;
+            setConnected(false);
+            setLinkStale(true);
+            setGpsFixValid(false);
+            setGpsPoseValid(false);
+            setDiagnosticOk(false);
+            setDiagnosticSeverity(QStringLiteral("warning"));
+            setDiagnosticStatus(QStringLiteral("link_down"));
+            setDiagnosticSummary(QStringLiteral("VEHICLE DATA LINK DOWN"));
+            setDiagnosticFindingCount(0);
+            scheduleReconnect();
+        }
     });
     connect(&m_socket, &QTcpSocket::stateChanged, this, [this](QAbstractSocket::SocketState state) {
         qInfo() << "[VehicleStateClient] state" << state << "url=" << m_connectUrl;

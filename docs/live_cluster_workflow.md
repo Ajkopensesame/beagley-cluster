@@ -40,7 +40,30 @@ Use `--metrics` only while measuring FPS.
 
 ## BBB: Bench Vehicle Inputs With Real GPS
 
-Run this on the BBB:
+Install the BBB toggle once:
+
+```bash
+cd /home/debian/projects/beagley-cluster
+tools/bbb_hub/install_bbb_bench_sim_toggle.sh
+```
+
+After that, the source-of-truth switch is the BBB service mode:
+
+```bash
+sudo bbb-bench-sim status
+sudo bbb-bench-sim enable
+sudo bbb-bench-sim disable
+```
+
+From the Mac, the same commands can be run through the stable SSH alias:
+
+```bash
+ssh bbb 'sudo bbb-bench-sim status'
+ssh bbb 'sudo bbb-bench-sim enable'
+ssh bbb 'sudo bbb-bench-sim disable'
+```
+
+The direct repo script is also available on the BBB:
 
 ```bash
 cd /home/debian/projects/beagley-cluster
@@ -62,7 +85,7 @@ fields upstream of the BeagleY:
 Disable it when real UNO/CAN/serial inputs are ready:
 
 ```bash
-tools/bbb_hub/bbb_bench_vehicle_sim.sh disable
+sudo bbb-bench-sim disable
 ```
 
 ## UI Iteration
