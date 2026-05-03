@@ -17,6 +17,7 @@ from tools.bbb_hub.vehicle_baseline import (  # noqa: E402
     BaselineFeature,
     BaselineProfile,
     VehicleBaselineMonitor,
+    default_vehicle_baseline_profiles,
 )
 
 
@@ -69,6 +70,42 @@ class VehicleBaselineModelTest(unittest.TestCase):
             snapshot = reloaded.snapshot()
             self.assertEqual(snapshot["models"][0]["totalSamples"], 1)
 
+    def test_default_profiles_include_map_pressure(self) -> None:
+        profile_names = {profile.name for profile in default_vehicle_baseline_profiles()}
+
+        self.assertIn("intake_airflow", profile_names)
+        self.assertIn("map_pressure", profile_names)
+
+    def test_default_map_pressure_flags_repeated_high_map(self) -> None:
+        profile = _default_profile("map_pressure")
+        monitor = VehicleBaselineMonitor([profile], enabled=True)
+        timestamp = 1000.0
+
+        for index in range(75):
+            monitor.observe(
+                _map_state(rpm=2200.0, throttle=40.0, load=35.0, map_kpa=55.0),
+                timestamp=timestamp + index * 2,
+            )
+            monitor.observe(
+                _map_state(rpm=2600.0, throttle=50.0, load=45.0, map_kpa=65.0),
+                timestamp=timestamp + index * 2 + 1,
+            )
+
+        finding_health = None
+        for index in range(3):
+            finding_health = monitor.observe(
+                _map_state(rpm=2200.0, throttle=40.0, load=35.0, map_kpa=90.0),
+                timestamp=1200.0 + index * 2,
+            )
+            finding_health = monitor.observe(
+                _map_state(rpm=2600.0, throttle=50.0, load=45.0, map_kpa=100.0),
+                timestamp=1200.0 + index * 2 + 1,
+            )
+
+        self.assertIsNotNone(finding_health)
+        self.assertFalse(finding_health["ok"])
+        self.assertEqual(finding_health["findings"][0]["code"], "map_pressure_high")
+
 
 def _test_intake_profile() -> BaselineProfile:
     return BaselineProfile(
@@ -96,6 +133,13 @@ def _test_intake_profile() -> BaselineProfile:
     )
 
 
+def _default_profile(name: str) -> BaselineProfile:
+    for profile in default_vehicle_baseline_profiles():
+        if profile.name == name:
+            return profile
+    raise AssertionError(f"missing default profile {name}")
+
+
 def _state(maf: float, coolant: float = 88.0) -> dict:
     return {
         "rpm": 2200.0,
@@ -103,6 +147,18 @@ def _state(maf: float, coolant: float = 88.0) -> dict:
         "intakeAirTempC": 27.0,
         "coolantC": coolant,
         "mafGps": maf,
+        "_health": {},
+    }
+
+
+def _map_state(*, rpm: float, throttle: float, load: float, map_kpa: float) -> dict:
+    return {
+        "rpm": rpm,
+        "throttlePct": throttle,
+        "engineLoadPct": load,
+        "intakeAirTempC": 27.0,
+        "coolantC": 88.0,
+        "mapKpa": map_kpa,
         "_health": {},
     }
 

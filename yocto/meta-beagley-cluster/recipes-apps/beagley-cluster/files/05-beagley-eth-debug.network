@@ -8,6 +8,6 @@ RequiredForOnline=no
 [Network]
 # Keep the BBB/debug Ethernet leg reachable without installing a default route.
 # Wi-Fi is the intended internet path for map tiles and other outbound traffic.
-Address=192.168.0.46/24
+Address=10.24.0.46/24
 LLMNR=yes
 MulticastDNS=yes

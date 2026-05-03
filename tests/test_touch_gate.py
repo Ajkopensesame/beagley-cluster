@@ -4,7 +4,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / "yocto/meta-beagley-cluster/recipes-apps/beagley-cluster/files/beagley-touch-gate.sh"
+SYSTEMD_FILES = ROOT / "yocto/meta-beagley-cluster/recipes-apps/beagley-cluster/files"
+SCRIPT = SYSTEMD_FILES / "beagley-touch-gate.sh"
 
 
 def run_touch_gate(tmp_path: Path, *, timeout: int = 1) -> subprocess.CompletedProcess[str]:
@@ -63,3 +64,20 @@ def test_touch_gate_fails_without_touchscreen(tmp_path: Path) -> None:
 
     assert result.returncode == 1, result.stdout
     assert "status=fail" in (tmp_path / "run" / "touch.status").read_text()
+
+
+def test_packaged_touch_gate_is_advisory_by_default() -> None:
+    service = (SYSTEMD_FILES / "beagley_cluster.service").read_text()
+    defaults = (SYSTEMD_FILES / "beagley-cluster.default").read_text()
+    touch_probe = (SYSTEMD_FILES / "beagley-cluster-touch-probe.service").read_text()
+
+    assert "BEAGLEY_REQUIRE_TOUCH_GATE=0" in defaults
+    assert "Environment=BEAGLEY_REQUIRE_TOUCH_GATE=0" in service
+
+    unit_lines = [
+        line
+        for line in service.splitlines()
+        if line.startswith(("After=", "Wants="))
+    ]
+    assert all("beagley-cluster-touch-probe.service" not in line for line in unit_lines)
+    assert "Before=beagley_cluster.service" not in touch_probe

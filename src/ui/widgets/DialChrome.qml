@@ -29,8 +29,18 @@ Item {
     property int labelFontSize: 20
     readonly property bool lowEffectMode: effectLevel === "low" || effectLevel === "off"
     readonly property bool embeddedSafeMode: Qt.platform.os === "linux"
+    readonly property bool embeddedHighEffectBudgetMode: embeddedSafeMode && effectLevel === "high"
+    readonly property bool staticArcMode: true
+    readonly property bool lavaAnimationEnabled: !staticArcMode && !embeddedSafeMode && !lowEffectMode
     readonly property real lowEffectArcScale: 0.36
     readonly property real lowEffectArcTune: lowEffectArcScale / 0.42
+    readonly property real dynamicArcCanvasScale: embeddedHighEffectBudgetMode
+        ? 0.50
+        : ((root.lowEffectMode && !root.embeddedSafeMode) ? root.lowEffectArcScale : 1.0)
+    readonly property real dynamicArcTune: dynamicArcCanvasScale < 1.0 ? dynamicArcCanvasScale : 1.0
+    readonly property real progressRepaintThreshold: lowEffectMode
+        ? 0.004
+        : (embeddedHighEffectBudgetMode ? 0.012 : 0.0)
     readonly property real sweepRad: root.sweepAngleDeg * Math.PI / 180
     readonly property real clampedProgress: root.clamp(root.progress, 0, 1)
     readonly property real arcRadiusOnScreen: width * root.arcRadiusFactor
@@ -39,6 +49,7 @@ Item {
         ? ((7.0 * root.lowEffectArcTune) / root.lowEffectArcScale)
         : 11.5
     readonly property bool headVisible: root.clampedProgress > 0.002
+    property real lastPaintedProgress: -1.0
 
     function clamp(v, lo, hi) {
         return Math.max(lo, Math.min(hi, v));
@@ -76,24 +87,39 @@ Item {
     }
 
     function requestDynamicPaint() {
+        const force = arguments.length > 0 && arguments[0] === true;
+        if (!force
+                && root.progressRepaintThreshold > 0
+                && root.lastPaintedProgress >= 0
+                && Math.abs(root.clampedProgress - root.lastPaintedProgress) < root.progressRepaintThreshold) {
+            return;
+        }
         arcCanvas.requestPaint();
     }
 
-    onThemeChanged: requestStaticPaint()
-    onGaugeColorChanged: requestDynamicPaint()
-    onChromeColorChanged: requestStaticPaint()
+    onThemeChanged: {
+        requestStaticPaint()
+        requestDynamicPaint(true)
+    }
+    onGaugeColorChanged: {
+        requestDynamicPaint()
+    }
+    onChromeColorChanged: {
+        requestStaticPaint()
+        requestDynamicPaint(true)
+    }
     onProgressChanged: requestDynamicPaint()
     onMaxValueChanged: {
         requestStaticPaint()
-        requestDynamicPaint()
+        requestDynamicPaint(true)
     }
     onStartAngleDegChanged: {
         requestStaticPaint()
-        requestDynamicPaint()
+        requestDynamicPaint(true)
     }
     onSweepAngleDegChanged: {
         requestStaticPaint()
-        requestDynamicPaint()
+        requestDynamicPaint(true)
     }
     onMinorStepChanged: requestStaticPaint()
     onMajorStepChanged: requestStaticPaint()
@@ -102,25 +128,25 @@ Item {
     onLabelDivisorChanged: requestStaticPaint()
     onWidthChanged: {
         requestStaticPaint()
-        requestDynamicPaint()
+        requestDynamicPaint(true)
     }
     onHeightChanged: {
         requestStaticPaint()
-        requestDynamicPaint()
+        requestDynamicPaint(true)
     }
 
     Component.onCompleted: {
         requestStaticPaint()
-        requestDynamicPaint()
+        requestDynamicPaint(true)
     }
 
     Timer {
-        interval: root.lowEffectMode ? 120 : 33
-        running: root.effectLevel !== "off" && !root.lowEffectMode
+        interval: root.lowEffectMode ? 120 : (root.embeddedHighEffectBudgetMode ? 260 : 33)
+        running: root.effectLevel !== "off" && root.lavaAnimationEnabled
         repeat: true
         onTriggered: {
             root.lavaPhase += interval / 1000.0
-            arcCanvas.requestPaint()
+            root.requestDynamicPaint(true)
         }
     }
 
@@ -206,10 +232,10 @@ Item {
     Canvas {
         id: arcCanvas
         anchors.centerIn: parent
-        width: parent.width * ((root.lowEffectMode && !root.embeddedSafeMode) ? root.lowEffectArcScale : 1.0)
-        height: parent.height * ((root.lowEffectMode && !root.embeddedSafeMode) ? root.lowEffectArcScale : 1.0)
+        width: parent.width * root.dynamicArcCanvasScale
+        height: parent.height * root.dynamicArcCanvasScale
         z: 20
-        scale: (root.lowEffectMode && !root.embeddedSafeMode) ? (1.0 / root.lowEffectArcScale) : 1.0
+        scale: root.dynamicArcCanvasScale < 1.0 ? (1.0 / root.dynamicArcCanvasScale) : 1.0
         renderTarget: root.embeddedSafeMode ? Canvas.Image : Canvas.FramebufferObject
         antialiasing: !root.lowEffectMode && !root.embeddedSafeMode
         smooth: !root.lowEffectMode && !root.embeddedSafeMode
@@ -228,7 +254,9 @@ Item {
             const endRad = startRad + activeSweepRad;
             const fullEndRad = startRad + sweepRad;
             const base = root.gaugeColor;
+            const track = root.chromeColor;
             const bright = root.blendToward(base, Qt.color("#FFFFFF"), 0.34, 0.98);
+            const trackBright = root.blendToward(track, Qt.color("#FFFFFF"), 0.28, 0.98);
             const phase = root.lavaPhase;
 
             function rgba(color, alpha) {
@@ -237,6 +265,50 @@ Item {
                     + Math.round(color.g * 255) + ","
                     + Math.round(color.b * 255) + ","
                     + alpha + ")";
+            }
+
+            if (root.staticArcMode) {
+                ctx.save();
+                ctx.lineCap = "round";
+
+                ctx.beginPath();
+                ctx.strokeStyle = rgba(track, root.lowEffectMode ? 0.08 : 0.07);
+                ctx.lineWidth = root.lowEffectMode ? (13 * root.lowEffectArcTune) : (18 * root.dynamicArcTune);
+                ctx.arc(cx, cy, r, startRad, fullEndRad);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.strokeStyle = rgba(track, root.lowEffectMode ? 0.26 : 0.30);
+                ctx.lineWidth = root.lowEffectMode ? (5.5 * root.lowEffectArcTune) : (7.0 * root.dynamicArcTune);
+                ctx.arc(cx, cy, r, startRad, fullEndRad);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.strokeStyle = rgba(trackBright, root.lowEffectMode ? 0.10 : 0.12);
+                ctx.lineWidth = root.lowEffectMode ? (1.7 * root.lowEffectArcTune) : (2.2 * root.dynamicArcTune);
+                ctx.arc(cx, cy, r, startRad, fullEndRad);
+                ctx.stroke();
+
+                if (progress > 0.002) {
+                    ctx.beginPath();
+                    ctx.strokeStyle = rgba(base, root.lowEffectMode ? 0.78 : 0.84);
+                    ctx.lineWidth = root.lowEffectMode ? (7.5 * root.lowEffectArcTune) : (10.5 * root.dynamicArcTune);
+                    ctx.arc(cx, cy, r, startRad, endRad);
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.strokeStyle = rgba(bright, root.lowEffectMode ? 0.22 : 0.26);
+                    ctx.lineWidth = root.lowEffectMode ? (2.0 * root.lowEffectArcTune) : (2.8 * root.dynamicArcTune);
+                    ctx.arc(cx, cy, r, startRad, endRad);
+                    ctx.stroke();
+                }
+
+                ctx.restore();
+                root.lastPaintedProgress = progress;
+
+                if (typeof performanceMetrics !== "undefined" && performanceMetrics)
+                    performanceMetrics.recordPaint("gauge.dialArc")
+                return;
             }
 
             const neonCyan = Qt.color("#73F6FF");
@@ -343,7 +415,10 @@ Item {
                     const u = (phase * (0.11 + i * 0.015) + i * 0.23) % 1.0;
                     const angle = fromRad + sweep * u;
                     const wobble = Math.sin(phase * (1.1 + i * 0.2) + i * 1.7);
-                    const blobRadius = (root.lowEffectMode ? 5.0 : 9.0) + i * (root.lowEffectMode ? 1.0 : 1.35);
+                    const blobRadius = root.lowEffectMode
+                        ? (5.0 + i * 1.0)
+                        : ((root.embeddedHighEffectBudgetMode ? 7.0 : 9.0)
+                            + i * (root.embeddedHighEffectBudgetMode ? 1.0 : 1.35)) * root.dynamicArcTune;
                     drawBlob(
                         angle,
                         wobble * (root.lowEffectMode ? 1.1 : 2.1),
@@ -366,7 +441,7 @@ Item {
             ctx.beginPath();
             ctx.strokeStyle = rgba(base, 0.06);
             ctx.lineCap = "round";
-            ctx.lineWidth = root.lowEffectMode ? (16 * root.lowEffectArcTune) : 30;
+            ctx.lineWidth = root.lowEffectMode ? (16 * root.lowEffectArcTune) : (30 * root.dynamicArcTune);
             ctx.arc(cx, cy, r, startRad, fullEndRad);
             ctx.stroke();
 
@@ -381,9 +456,17 @@ Item {
                                     4.6 * root.lowEffectArcTune,
                                     bright, 0.26, 16, 0.22);
                 } else {
-                    drawLavaBand(startRad, endRad, 5.5, 22, base, bright, 128, 0.50, 4);
+                    drawLavaBand(startRad, endRad,
+                                 5.5 * root.dynamicArcTune,
+                                 22 * root.dynamicArcTune,
+                                 base, bright,
+                                 root.embeddedHighEffectBudgetMode ? 36 : 128,
+                                 0.50,
+                                 root.embeddedHighEffectBudgetMode ? 2 : 4);
                 }
             }
+
+            root.lastPaintedProgress = progress;
 
             if (typeof performanceMetrics !== "undefined" && performanceMetrics)
                 performanceMetrics.recordPaint("gauge.dialArc")

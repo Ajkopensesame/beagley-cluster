@@ -150,9 +150,12 @@ Window {
     W.MapCenter {
         anchors.fill: centerPanel
 
-        mode: (typeof BEAGLEY_NO_MAP !== "undefined" && BEAGLEY_NO_MAP)
+        mode: ((typeof BEAGLEY_NO_MAP !== "undefined" && BEAGLEY_NO_MAP)
+                && root.mapRenderer !== "maplibre-native")
             ? "placeholder"
-            : (root.mapRenderer === "web" ? "web" : "snapshot")
+            : (root.mapRenderer === "maplibre-native"
+                ? "maplibre-native"
+                : (root.mapRenderer === "web" ? "web" : "snapshot"))
 
         // Static OSM snapshot (centered by live GPS), cache-busted in MapCenterSnapshot.refresh().
         snapshotUrl: "https://staticmap.openstreetmap.de/staticmap.php?center="

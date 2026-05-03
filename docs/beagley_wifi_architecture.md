@@ -2,13 +2,13 @@
 
 ## Recommended topology
 
-- **Beagley (`192.168.0.46`)**
+- **Beagley (`10.24.0.46`)**
   - Runs UI cluster app
   - Keeps **USB recovery** on `usb0` (`192.168.7.2`)
   - Uses **Ethernet (`eth0`)** either for home-router/dev access or as the BBB gateway link
   - Uses **Wi-Fi (`wlan0`)** for internet/map tile access
   - Uses `VEHICLE_HUB_WS_URL` to read BBB state feed
-- **BBB (`192.168.0.7`)**
+- **BBB (`10.24.0.7`)**
   - Handles Arduino serial (`/dev/ttyACM0`)
   - Owns the production serial GPS receiver over direct NMEA on the BBB
   - Publishes `vehicle_state` WebSocket feed on `:8765`
@@ -26,7 +26,7 @@ This keeps map/network concerns on Beagley and IO/sensor concerns on BBB.
 ## Existing runtime hooks in code
 
 - `VehicleStateClient` reads:
-  - `VEHICLE_HUB_WS_URL` (default `ws://192.168.0.7:8765`)
+  - `VEHICLE_HUB_WS_URL` (default `ws://10.24.0.7:8765`)
 - Map behavior reads:
   - `BEAGLEY_NO_MAP`
   - `BEAGLEY_FORCE_SNAPSHOT_MAP`
@@ -39,8 +39,8 @@ On your dev machine:
 
 ```bash
 # Preferred when Ethernet is up:
-scp /Users/joshkomant/projects/beagley-cluster/tools/beagley_wifi/setup_wifi.sh debian@192.168.0.46:/tmp/
-ssh debian@192.168.0.46
+scp /Users/joshkomant/projects/beagley-cluster/tools/beagley_wifi/setup_wifi.sh debian@10.24.0.46:/tmp/
+ssh debian@10.24.0.46
 
 # Recovery path if Ethernet is broken:
 # scp /Users/joshkomant/projects/beagley-cluster/tools/beagley_wifi/setup_wifi.sh debian@192.168.7.2:/tmp/
@@ -51,7 +51,7 @@ sudo bash /tmp/setup_wifi.sh \
   --psk "<YOUR_PASSWORD>" \
   --profile-id "primary-hotspot" \
   --priority 100 \
-  --bbb-host 192.168.0.7 \
+  --bbb-host 10.24.0.7 \
   --host-name beagley
 ```
 
@@ -79,7 +79,7 @@ For multiple saved hotspots, provide a TSV file:
 ```bash
 sudo bash /tmp/setup_wifi.sh \
   --profiles-file /tmp/hotspot_profiles.tsv \
-  --bbb-host 192.168.0.7 \
+  --bbb-host 10.24.0.7 \
   --host-name beagley
 ```
 
@@ -107,8 +107,8 @@ sudo bash /tmp/setup_wifi.sh \
   --priority 100 \
   --fallback-address 172.20.10.6/28 \
   --bbb-gateway-enable \
-  --bbb-gateway-address 192.168.0.46/24 \
-  --bbb-host 192.168.0.7 \
+  --bbb-gateway-address 10.24.0.46/24 \
+  --bbb-host 10.24.0.7 \
   --host-name beagley
 ```
 
@@ -126,15 +126,15 @@ sudo bash /tmp/setup_wifi.sh \
   --gateway-watchdog-failures 3 \
   --gateway-watchdog-cooldown-sec 45 \
   --gateway-watchdog-target auto \
-  --bbb-host 192.168.0.7 \
+  --bbb-host 10.24.0.7 \
   --host-name beagley
 ```
 
 Gateway-mode contract:
 
-- Beagley `eth0` is static on `192.168.0.46/24`
-- BBB stays on `192.168.0.7/24`
-- BBB default gateway must be `192.168.0.46`
+- Beagley `eth0` is static on `10.24.0.46/24`
+- BBB stays on `10.24.0.7/24`
+- BBB default gateway must be `10.24.0.46`
 - `wlan0` keeps hotspot DHCP and enables IPv4 masquerade for BBB egress
 
 ## Production profile contract
@@ -156,7 +156,7 @@ Gateway-mode contract:
 From this repo on Beagley:
 
 ```bash
-VEHICLE_HUB_WS_URL=ws://192.168.0.7:8765 BEAGLEY_UI_VARIANT=v3 ./run_1920x720.sh
+VEHICLE_HUB_WS_URL=ws://10.24.0.7:8765 BEAGLEY_UI_VARIANT=v3 ./run_1920x720.sh
 ```
 
 Optional overrides:
@@ -164,7 +164,7 @@ Optional overrides:
 ```bash
 BEAGLEY_WIFI_INTERFACE=wlan0 \
 BEAGLEY_INTERNET_CHECK_URL=https://connectivitycheck.gstatic.com/generate_204 \
-VEHICLE_HUB_WS_URL=ws://192.168.0.7:8765 \
+VEHICLE_HUB_WS_URL=ws://10.24.0.7:8765 \
 BEAGLEY_UI_VARIANT=v3 \
 ./run_1920x720.sh
 ```
@@ -177,14 +177,14 @@ On Beagley:
 ip -br a
 networkctl status eth0
 iw dev wlan0 link
-ping -c 2 192.168.0.7
+ping -c 2 10.24.0.7
 ping -c 2 8.8.8.8
 ```
 
 Expected shape:
 
 - `usb0` remains reachable at `192.168.7.2/24`
-- `eth0` is either a DHCP dev uplink or the static BBB gateway link (`192.168.0.46/24`)
+- `eth0` is either a DHCP dev uplink or the static BBB gateway link (`10.24.0.46/24`)
 - `wlan0` uses DHCP with the hotspot route metric of `200`
 - `wpa_supplicant@wlan0.service` is `enabled` and `active`
 - `beagley-hotspot-watchdog.timer` is `enabled` and `active`
@@ -205,7 +205,7 @@ Recovery contract:
 
 In app logs:
 
-- `VehicleStateClient connecting to ws://192.168.0.7:8765`
+- `VehicleStateClient connecting to ws://10.24.0.7:8765`
 - map panel loads tiles (no dead center pod)
 
 ## BBB hardware GPS production path
@@ -252,7 +252,7 @@ Verification from Beagley:
 /home/debian/projects/beagley-cluster/tools/bbb_hub/.venv/bin/python - <<'PY'
 import asyncio, json, websockets
 async def main():
-    async with websockets.connect("ws://192.168.0.7:8765") as ws:
+    async with websockets.connect("ws://10.24.0.7:8765") as ws:
         msg = json.loads(await ws.recv())
         print(json.dumps({
             "gpsSource": msg.get("gpsSource"),

@@ -17,7 +17,7 @@ export BEAGLEY_WEBENGINE_MODE="${BEAGLEY_WEBENGINE_MODE:-swiftshader_driver}"
 export BEAGLEY_GPU_GATE_FILE="${BEAGLEY_GPU_GATE_FILE:-/tmp/beagley_gpu_gate.ok}"
 export BEAGLEY_REQUIRE_GPU_GATE="${BEAGLEY_REQUIRE_GPU_GATE:-0}"
 # Default BBB vehicle-state endpoint (override as needed per network)
-export VEHICLE_HUB_WS_URL="${VEHICLE_HUB_WS_URL:-ws://192.168.0.7:8765}"
+export VEHICLE_HUB_WS_URL="${VEHICLE_HUB_WS_URL:-ws://10.24.0.7:8765}"
 
 # Platform selection:
 # - macOS: cocoa (does NOT support geometry option)

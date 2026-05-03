@@ -61,6 +61,24 @@ void testAddressSearchRequestUsesBoundedNominatim()
     expectTrue(fallbackQuery.queryItemValue(QStringLiteral("bounded")).isEmpty(), "address fallback should broaden beyond the bounded first pass");
 }
 
+void testNearMeCategorySearchUsesLocalProviderHints()
+{
+    qputenv("BEAGLEY_NAV_SEARCH_COUNTRYCODE", "AU");
+    OpenNavigationProvider provider;
+    const QNetworkRequest request = provider.buildSearchRequest(QStringLiteral("servo near me"), -26.4597, 153.0);
+    const QUrlQuery query(request.url());
+
+    expectTrue(request.url().host().contains(QStringLiteral("photon"), Qt::CaseInsensitive), "category search should still use Photon first");
+    expectEqual(query.queryItemValue(QStringLiteral("q")), QStringLiteral("petrol station"), "servo near me should become a provider-friendly local fuel query");
+    expectEqual(query.queryItemValue(QStringLiteral("osm_tag")), QStringLiteral("amenity:fuel"), "fuel category should constrain Photon by OSM tag");
+
+    const QNetworkRequest fallback = provider.buildFallbackSearchRequest(QStringLiteral("chemist near me"), -26.4597, 153.0);
+    const QUrlQuery fallbackQuery(fallback.url());
+    expectEqual(fallbackQuery.queryItemValue(QStringLiteral("q")), QStringLiteral("pharmacy"), "chemist near me should become pharmacy for fallback search");
+    expectEqual(fallbackQuery.queryItemValue(QStringLiteral("bounded")), QStringLiteral("1"), "near-me category fallback should stay inside local viewbox");
+    expectEqual(fallbackQuery.queryItemValue(QStringLiteral("countrycodes")), QStringLiteral("au"), "near-me category fallback should keep local country hint");
+}
+
 void testPlaceRankingPrefersSettlementOverNearbyPoi()
 {
     qputenv("BEAGLEY_NAV_SEARCH_COUNTRYCODE", "AU");
@@ -144,13 +162,116 @@ void testPlaceRankingPrefersSettlementOverNearbyPoi()
     expectTrue(!results.first().label.contains(QStringLiteral("Airport"), Qt::CaseInsensitive), "top ranked Noosa result should not be the airport");
 }
 
+void testLocalCategoryRankingUnderstandsAustralianAliases()
+{
+    qputenv("BEAGLEY_NAV_SEARCH_COUNTRYCODE", "AU");
+    OpenNavigationProvider provider;
+    const QByteArray payload = R"JSON(
+{
+  "features": [
+    {
+      "properties": {
+        "name": "Servo",
+        "country": "Italy",
+        "countrycode": "IT",
+        "osm_key": "place",
+        "osm_value": "village",
+        "type": "city"
+      },
+      "geometry": { "type": "Point", "coordinates": [11.7876309, 46.0583563] }
+    },
+    {
+      "properties": {
+        "name": "Puma Petrol Station",
+        "street": "David Low Way",
+        "city": "Peregian Beach",
+        "state": "Queensland",
+        "country": "Australia",
+        "countrycode": "AU",
+        "osm_key": "amenity",
+        "osm_value": "fuel",
+        "type": "house"
+      },
+      "geometry": { "type": "Point", "coordinates": [153.0938557, -26.489616] }
+    }
+  ]
+}
+)JSON";
+
+    const QList<SearchResultData> results = provider.parseSearchResponse(payload, QStringLiteral("servo near me"), -26.4597, 153.0);
+    expectTrue(!results.isEmpty(), "servo alias results should not be empty");
+    if (results.isEmpty()) {
+        return;
+    }
+    expectEqual(results.first().primary, QStringLiteral("Puma Petrol Station"), "local fuel POI should outrank global places named Servo");
+}
+
+void testWeakCategorySearchRefinesWithFallbackMerge()
+{
+    qputenv("BEAGLEY_NAV_SEARCH_COUNTRYCODE", "AU");
+    OpenNavigationProvider provider;
+    const QByteArray photonPayload = R"JSON(
+{
+  "features": [
+    {
+      "properties": {
+        "name": "Supermarket",
+        "city": "Thiniscole/Siniscola",
+        "country": "Italy",
+        "countrycode": "IT",
+        "osm_key": "shop",
+        "osm_value": "supermarket",
+        "type": "house"
+      },
+      "geometry": { "type": "Point", "coordinates": [9.6969838, 40.5753426] }
+    }
+  ]
+}
+)JSON";
+    const QByteArray nominatimPayload = R"JSON(
+[
+  {
+    "display_name": "Woolworths, Poinciana Avenue, Tewantin, Queensland, 4565, Australia",
+    "lat": "-26.3911409",
+    "lon": "153.0382864",
+    "name": "Woolworths",
+    "category": "shop",
+    "type": "supermarket",
+    "addresstype": "shop",
+    "importance": 0.5,
+    "address": {
+      "road": "Poinciana Avenue",
+      "town": "Tewantin",
+      "state": "Queensland",
+      "country": "Australia",
+      "country_code": "au"
+    }
+  }
+]
+)JSON";
+
+    const QList<SearchResultData> primary = provider.parseSearchResponse(photonPayload, QStringLiteral("supermarket near me"), -26.4597, 153.0);
+    expectTrue(provider.shouldRunFallbackSearch(primary, QStringLiteral("supermarket near me")), "far generic category result should trigger fallback refinement");
+
+    const QList<SearchResultData> fallback = provider.parseSearchResponse(nominatimPayload, QStringLiteral("supermarket near me"), -26.4597, 153.0);
+    const QList<SearchResultData> merged = provider.mergeSearchResults(primary, fallback);
+    expectTrue(!merged.isEmpty(), "merged category results should not be empty");
+    if (merged.isEmpty()) {
+        return;
+    }
+    expectEqual(merged.first().primary, QStringLiteral("Woolworths"), "local fallback result should replace weak global category result at top");
+}
+
 } // namespace
 
 int main()
 {
     testPlaceSearchRequestUsesPhoton();
     testAddressSearchRequestUsesBoundedNominatim();
+    testNearMeCategorySearchUsesLocalProviderHints();
     testPlaceRankingPrefersSettlementOverNearbyPoi();
+    testLocalCategoryRankingUnderstandsAustralianAliases();
+    testWeakCategorySearchRefinesWithFallbackMerge();
 
     if (g_failures == 0) {
         std::cout << "navigation_search_ranking_test: PASS\n";

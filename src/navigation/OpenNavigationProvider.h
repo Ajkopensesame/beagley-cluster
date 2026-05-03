@@ -62,6 +62,8 @@ public:
     QNetworkRequest buildSearchRequest(const QString &query, double originLat, double originLng) const;
     QNetworkRequest buildFallbackSearchRequest(const QString &query, double originLat, double originLng) const;
     QList<SearchResultData> parseSearchResponse(const QByteArray &payload, const QString &query, double originLat, double originLng) const;
+    bool shouldRunFallbackSearch(const QList<SearchResultData> &primaryResults, const QString &query) const;
+    QList<SearchResultData> mergeSearchResults(const QList<SearchResultData> &primaryResults, const QList<SearchResultData> &fallbackResults) const;
 
     QNetworkRequest buildRouteRequest(double originLat, double originLng, double destLat, double destLng) const;
     QByteArray buildRouteBody(double originLat, double originLng, double destLat, double destLng) const;

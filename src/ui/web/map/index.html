@@ -837,7 +837,12 @@
         if (softwareMode || immediate || !firstFrameLogged) {
           map.jumpTo(options);
         } else {
-          map.easeTo(Object.assign({ duration: embeddedMode ? 420 : 650, essential: true }, options));
+          var camera = cameraHints();
+          var durationMs = Number(camera.zoomAnimationMs || 0);
+          if (!isFinite(durationMs) || durationMs <= 0) {
+            durationMs = embeddedMode ? 420 : 650;
+          }
+          map.easeTo(Object.assign({ duration: Math.max(120, Math.min(1800, durationMs)), essential: true }, options));
         }
         scheduleCachePersist();
       }

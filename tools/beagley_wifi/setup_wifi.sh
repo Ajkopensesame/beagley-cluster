@@ -39,8 +39,8 @@ Options:
                           DHCP route metric for ethernet (default: 100)
   --bbb-gateway-enable    Configure Beagley as the BBB hotspot gateway
   --bbb-gateway-address <cidr>
-                          Static Beagley address on the BBB link (default: 192.168.0.46/24)
-  --bbb-host <host>       BBB host/IP for reachability check (default: 192.168.0.7)
+                          Static Beagley address on the BBB link (default: 10.24.0.46/24)
+  --bbb-host <host>       BBB host/IP for reachability check (default: 10.24.0.7)
   --help                  Show this help
 
 What this script does:
@@ -688,8 +688,8 @@ ROUTE_METRIC="200"
 ETH_IFACE="eth0"
 ETH_ROUTE_METRIC="100"
 BBB_GATEWAY_ENABLE="0"
-BBB_GATEWAY_ADDRESS="192.168.0.46/24"
-BBB_HOST="192.168.0.7"
+BBB_GATEWAY_ADDRESS="10.24.0.46/24"
+BBB_HOST="10.24.0.7"
 WIFI_POWER_SAVE="off"
 GATEWAY_WATCHDOG_ENABLE="1"
 GATEWAY_WATCHDOG_INTERVAL_SEC="15"
@@ -840,6 +840,8 @@ BBB_GATEWAY_NFT_FILE="$BEAGLEY_DIR/bbb-gateway.nft"
 BBB_GATEWAY_SERVICE_FILE="$SYSTEMD_DIR/beagley-bbb-gateway.service"
 
 mkdir -p "$WPA_DIR" "$NET_DIR" "$DEFAULT_DIR" "$BEAGLEY_DIR" "$LIBEXEC_DIR" "$SYSCTL_DIR"
+mkdir -p /var/volatile/tmp
+chmod 1777 /var/volatile /var/volatile/tmp 2>/dev/null || true
 
 if [[ -f "$WPA_FILE" ]]; then
   cp "$WPA_FILE" "${WPA_FILE}.bak.$(timestamp)"

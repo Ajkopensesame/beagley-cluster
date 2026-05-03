@@ -78,6 +78,12 @@ def _collect_findings(health: dict[str, Any]) -> list[dict[str, Any]]:
             if isinstance(finding, dict):
                 _append_unique(findings, seen, normalize_diagnostic_finding(finding, default_source="vehicleBaseline"))
 
+    transition_monitor = health.get("transitionMonitor")
+    if isinstance(transition_monitor, dict):
+        for finding in transition_monitor.get("findings", []):
+            if isinstance(finding, dict):
+                _append_unique(findings, seen, normalize_diagnostic_finding(finding, default_source="transitionMonitor"))
+
     findings.sort(key=lambda item: (-SEVERITY_ORDER.get(item["severity"], 1), -float(item.get("confidence", 0.0))))
     return findings
 

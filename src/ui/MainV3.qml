@@ -1,5 +1,6 @@
 import QtQuick 2.15
 import QtQuick.Window 2.15
+import Qt.labs.settings
 
 import "./theme" as Theme
 import "widgets" as W
@@ -19,6 +20,12 @@ Window {
     visible: true
 
     Theme.PurplePearlTheme { id: appTheme }
+    Settings {
+        id: clusterUiSettings
+        category: "beagley_cluster_ui"
+        property string mapTheme: "roads"
+    }
+
     color: "#02060B"
     readonly property var cluster: clusterRenderModel
     readonly property real defaultMapLat: -27.4698
@@ -40,13 +47,19 @@ Window {
     readonly property int menuTextHintingPreference: embeddedSafeMode ? Font.PreferNoHinting : Font.PreferDefaultHinting
     readonly property bool stressScene: (typeof BEAGLEY_STRESS_SCENE !== "undefined" && BEAGLEY_STRESS_SCENE) ? true : false
     readonly property bool embeddedEffectBudgetMode: renderProfile === "embedded" && lowEffectMode
+    readonly property bool embeddedHighEffectBudgetMode: renderProfile === "embedded" && effectLevel === "high"
     readonly property bool embeddedDirectMapCamera: renderProfile === "embedded"
+    readonly property bool embeddedGaugeMatrixRainMode: renderProfile === "embedded"
+    readonly property bool gaugeMatrixRainEnabled: !effectsOff
+    readonly property real gaugeMatrixRainSharedPhase: (gaugeMatrixRainEnabled && !embeddedGaugeMatrixRainMode)
+        ? sharedEffectPhase
+        : NaN
     readonly property bool sharedEffectClockEnabled: !effectsOff && !embeddedEffectBudgetMode
     readonly property bool stressMapMotionEnabled: stressScene && !lowEffectMode && renderProfile !== "embedded"
     readonly property int gaugeShellSize: 840
     readonly property int gaugePodSize: 704
     readonly property int gaugeFaceSize: 724
-    readonly property int gaugeEdgeBleed: -96
+    readonly property int gaugeEdgeBleed: -48
     property real sharedEffectPhase: 0.0
     property real stressPhase: 0.0
 
@@ -85,12 +98,18 @@ Window {
     readonly property real displayRpmValue: stressScene ? (2400 + 1800 * (0.5 + 0.5 * Math.sin(stressPhase * 1.15 + 0.4))) : rpmValue
     readonly property real displayFuelValue: stressScene ? (18 + 11 * Math.sin(stressPhase * 0.30 - 1.2)) : fuelValue
     readonly property real displayCoolantValue: stressScene ? (70 + 42 * Math.sin(stressPhase * 0.42 + 1.3)) : coolantValue
-    readonly property bool displayLeftIndicator: stressScene
+    readonly property int indicatorVisualHoldMs: 1850
+    readonly property bool rawLeftIndicator: stressScene
         ? Math.sin(stressPhase * 1.35) > 0.68
         : truthOk && !!hub.leftIndicator
-    readonly property bool displayRightIndicator: stressScene
+    readonly property bool rawRightIndicator: stressScene
         ? Math.sin(stressPhase * 1.12 + 2.4) > 0.68
         : truthOk && !!hub.rightIndicator
+    property bool displayLeftIndicator: false
+    property bool displayRightIndicator: false
+    readonly property bool indicatorCascadeActive: displayLeftIndicator || displayRightIndicator
+    readonly property int indicatorCascadeCycleMs: lowEffectMode ? 2600 : 2200
+    property real indicatorCascadePhase: 0.0
     readonly property real displayMapLat: stressMapMotionEnabled
         ? (root.defaultMapLat + 0.0028 * Math.sin(stressPhase * 0.12))
         : (embeddedDirectMapCamera
@@ -167,6 +186,54 @@ Window {
     property var pendingDestination: ({})
     property int selectedRouteIndex: 0
     property bool awaitingRoutePreview: false
+    property bool departureCameraCloseInActive: false
+    readonly property var effectiveMapCameraHints: buildEffectiveMapCameraHints()
+    readonly property var mapThemeOptions: [
+        {
+            id: "roads",
+            label: "Roads",
+            detail: "OpenStreetMap",
+            tileUrlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+            styleUrl: "https://tiles.openfreemap.org/styles/liberty",
+            maxZoom: 19,
+            swatchA: "#F2EFE9",
+            swatchB: "#91B3C5"
+        },
+        {
+            id: "light",
+            label: "Light",
+            detail: "Positron",
+            tileUrlTemplate: "https://a.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}.png",
+            styleUrl: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+            maxZoom: 19,
+            swatchA: "#F7F8F3",
+            swatchB: "#ADBFD1"
+        },
+        {
+            id: "drive",
+            label: "Drive",
+            detail: "Voyager",
+            tileUrlTemplate: "https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png",
+            styleUrl: "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json",
+            maxZoom: 19,
+            swatchA: "#F2F0E8",
+            swatchB: "#77A0B8"
+        },
+        {
+            id: "terrain",
+            label: "Terrain",
+            detail: "Topo",
+            tileUrlTemplate: "https://a.tile.opentopomap.org/{z}/{x}/{y}.png",
+            styleUrl: "https://tiles.openfreemap.org/styles/liberty",
+            maxZoom: 17,
+            swatchA: "#C4D6A0",
+            swatchB: "#8A7A55"
+        }
+    ]
+    readonly property var activeMapThemeOption: mapThemeOption(clusterUiSettings.mapTheme)
+    readonly property string activeMapTileUrlTemplate: String(activeMapThemeOption.tileUrlTemplate || "")
+    readonly property string activeMapStyleUrl: String(activeMapThemeOption.styleUrl || "")
+    readonly property real activeMapMaxZoom: Number(activeMapThemeOption.maxZoom || 19)
     readonly property bool routeLookupInProgress: navigation
         && (navigation.state === "routing" || navigation.state === "rerouting")
     readonly property int activeWarnings: {
@@ -229,16 +296,70 @@ Window {
     function embeddedMapZoomForSpeed(speedKph) {
         const speed = Number(speedKph)
         if (!isFinite(speed))
-            return 14.8
+            return Math.min(14.8, root.activeMapMaxZoom)
         if (speed >= 110)
-            return 13.4
+            return Math.min(13.4, root.activeMapMaxZoom)
         if (speed >= 80)
-            return 13.8
+            return Math.min(13.8, root.activeMapMaxZoom)
         if (speed >= 45)
-            return 14.4
+            return Math.min(14.4, root.activeMapMaxZoom)
         if (speed >= 15)
-            return 15.0
-        return 15.5
+            return Math.min(15.0, root.activeMapMaxZoom)
+        return Math.min(15.5, root.activeMapMaxZoom)
+    }
+
+    function departureCloseInZoomForSpeed(speedKph) {
+        const speed = Number(speedKph)
+        if (!isFinite(speed) || speed < 15)
+            return 17.8
+        if (speed >= 80)
+            return 16.2
+        if (speed >= 45)
+            return 16.7
+        return 17.3
+    }
+
+    function buildEffectiveMapCameraHints() {
+        const source = navigation ? (navigation.mapCameraHints || ({})) : ({})
+        var hints = {}
+        for (var key in source)
+            hints[key] = source[key]
+
+        if (root.departureCameraCloseInActive) {
+            const hintedZoom = Number(hints.zoom)
+            const baseZoom = isFinite(hintedZoom) ? hintedZoom : root.embeddedMapZoomForSpeed(root.displayMapSpeed)
+            const hintedLookAhead = Number(hints.lookAheadMeters)
+            const hintedPitch = Number(hints.pitch)
+            hints.mode = "departure"
+            hints.overview = false
+            hints.zoom = Math.min(Math.max(baseZoom, root.departureCloseInZoomForSpeed(root.displayMapSpeed)), root.activeMapMaxZoom)
+            hints.lookAheadMeters = Math.min(isFinite(hintedLookAhead) ? hintedLookAhead : 42, 42)
+            hints.pitch = Math.min(isFinite(hintedPitch) ? hintedPitch : 48, 48)
+            hints.zoomAnimationMs = 1500
+            return hints
+        }
+
+        const zoomValue = Number(hints.zoom)
+        if (isFinite(zoomValue))
+            hints.zoom = Math.min(zoomValue, root.activeMapMaxZoom)
+        if (!isFinite(Number(hints.zoomAnimationMs)))
+            hints.zoomAnimationMs = 760
+        return hints
+    }
+
+    function mapThemeOption(themeId) {
+        const wanted = String(themeId || "roads") === "dark" ? "drive" : String(themeId || "roads")
+        for (var i = 0; i < root.mapThemeOptions.length; ++i) {
+            const option = root.mapThemeOptions[i]
+            if (option.id === wanted)
+                return option
+        }
+        return root.mapThemeOptions[0]
+    }
+
+    function selectMapTheme(themeId) {
+        const option = root.mapThemeOption(themeId)
+        clusterUiSettings.mapTheme = option.id
     }
 
     function suggestionOrigin() {
@@ -297,6 +418,24 @@ Window {
             pendingDestination = navigation.activeRoute.destination
         root.mapMenuStage = (root.availableRouteOptions().length > 0 && hasActiveRoute) ? "routes" : "search"
         root.syncSelectedRouteIndexFromNavigation()
+    }
+
+    function chooseMapMenuTab(stage) {
+        if (stage === "routes") {
+            if (root.availableRouteOptions().length > 0 || root.hasActiveRoute) {
+                stage = "routes"
+            } else if (root.awaitingRoutePreview || root.routeLookupInProgress || Object.keys(root.pendingDestination).length > 0) {
+                stage = "routing"
+            } else {
+                stage = "search"
+            }
+        }
+        root.mapMenuStage = stage
+        root.searchKeyboardOpen = false
+        if (stage === "routes")
+            root.syncSelectedRouteIndexFromNavigation()
+        if (stage === "search" && searchInput && String(searchInput.text || "").trim().length >= 2)
+            suggestionDebounce.restart()
     }
 
     function menuResultsModel() {
@@ -370,6 +509,8 @@ Window {
     }
 
     function startSelectedRoute() {
+        if (root.availableRouteOptions().length <= 0 && !root.hasActiveRoute)
+            return
         if (typeof navigation.selectRouteAlternative === "function" && root.availableRouteOptions().length > 0)
             navigation.selectRouteAlternative(selectedRouteIndex)
         if (typeof navigation.startGuidance === "function")
@@ -377,6 +518,8 @@ Window {
         else
             navigation.setFollowEnabled(true)
         navField.setFollowEnabled(true)
+        root.departureCameraCloseInActive = true
+        departureCameraCloseInTimer.restart()
         root.awaitingRoutePreview = false
         root.mapMenuOpen = false
         root.searchKeyboardOpen = false
@@ -395,6 +538,8 @@ Window {
         selectedRouteIndex = 0
         root.mapMenuStage = "search"
         root.awaitingRoutePreview = false
+        root.departureCameraCloseInActive = false
+        departureCameraCloseInTimer.stop()
         searchInput.text = ""
         navigation.search("")
         navigation.clearRoute()
@@ -458,6 +603,8 @@ Window {
         root.showNormal()
         root.raise()
         root.requestActivate()
+        updateLeftIndicatorVisual()
+        updateRightIndicatorVisual()
     }
 
     Connections {
@@ -476,7 +623,7 @@ Window {
             if (Object.keys(root.pendingDestination).length === 0 && navigation.activeRoute.destination)
                 root.pendingDestination = navigation.activeRoute.destination
             root.syncSelectedRouteIndexFromNavigation()
-            if (root.awaitingRoutePreview || root.mapMenuStage === "routes") {
+            if (root.awaitingRoutePreview || root.mapMenuStage === "routing" || root.mapMenuStage === "routes") {
                 root.mapMenuStage = "routes"
                 root.awaitingRoutePreview = false
             }
@@ -487,7 +634,10 @@ Window {
         }
 
         function onRouteChanged() {
-            if (root.mapMenuOpen && root.awaitingRoutePreview && hasActiveRoute && Object.keys(root.pendingDestination).length > 0) {
+            if (root.mapMenuOpen
+                    && (root.awaitingRoutePreview || root.mapMenuStage === "routing")
+                    && root.hasActiveRoute
+                    && Object.keys(root.pendingDestination).length > 0) {
                 root.mapMenuStage = "routes"
                 root.awaitingRoutePreview = false
             }
@@ -495,8 +645,15 @@ Window {
     }
 
     Timer {
+        id: departureCameraCloseInTimer
+        interval: 2200
+        repeat: false
+        onTriggered: root.departureCameraCloseInActive = false
+    }
+
+    Timer {
         id: effectClock
-        interval: root.lowEffectMode ? 140 : 90
+        interval: root.embeddedHighEffectBudgetMode ? 300 : (root.lowEffectMode ? 140 : 90)
         running: root.sharedEffectClockEnabled
         repeat: true
         onTriggered: root.sharedEffectPhase += interval / 1000.0
@@ -508,6 +665,63 @@ Window {
         running: root.stressScene
         repeat: true
         onTriggered: root.stressPhase += interval / 1000.0
+    }
+
+    function updateLeftIndicatorVisual() {
+        if (root.rawLeftIndicator) {
+            root.displayLeftIndicator = true
+            leftIndicatorHoldTimer.restart()
+        } else if (root.displayLeftIndicator) {
+            leftIndicatorHoldTimer.restart()
+        }
+    }
+
+    function updateRightIndicatorVisual() {
+        if (root.rawRightIndicator) {
+            root.displayRightIndicator = true
+            rightIndicatorHoldTimer.restart()
+        } else if (root.displayRightIndicator) {
+            rightIndicatorHoldTimer.restart()
+        }
+    }
+
+    Timer {
+        id: leftIndicatorHoldTimer
+        interval: root.indicatorVisualHoldMs
+        repeat: false
+        onTriggered: {
+            if (root.rawLeftIndicator) {
+                restart()
+            } else {
+                root.displayLeftIndicator = false
+            }
+        }
+    }
+
+    Timer {
+        id: rightIndicatorHoldTimer
+        interval: root.indicatorVisualHoldMs
+        repeat: false
+        onTriggered: {
+            if (root.rawRightIndicator) {
+                restart()
+            } else {
+                root.displayRightIndicator = false
+            }
+        }
+    }
+
+    onRawLeftIndicatorChanged: updateLeftIndicatorVisual()
+    onRawRightIndicatorChanged: updateRightIndicatorVisual()
+    onIndicatorCascadeActiveChanged: root.indicatorCascadePhase = 0.0
+
+    NumberAnimation on indicatorCascadePhase {
+        running: root.indicatorCascadeActive
+        loops: Animation.Infinite
+        from: 0.0
+        to: 1.0
+        duration: root.indicatorCascadeCycleMs
+        easing.type: Easing.Linear
     }
 
     Rectangle {
@@ -548,13 +762,13 @@ Window {
     Item {
         id: canopy
         anchors.fill: parent
-        anchors.margins: 18
+        anchors.margins: 0
 
         Rectangle {
             anchors.fill: parent
-            radius: 34
+            radius: 0
             color: "#09111A"
-            border.width: 1
+            border.width: 0
             border.color: "#21435B"
         }
 
@@ -597,19 +811,23 @@ Window {
             id: navField
             anchors.fill: parent
             mode: ((typeof BEAGLEY_NO_MAP !== "undefined" && BEAGLEY_NO_MAP)
-                && !(root.mapRenderer === "native" || root.mapRenderer === "native-online"))
+                && !(root.mapRenderer === "native"
+                    || root.mapRenderer === "native-online"
+                    || root.mapRenderer === "maplibre-native"))
                 ? "placeholder"
-                : ((root.mapRenderer === "web"
+                : ((root.mapRenderer === "maplibre-native")
+                    ? "maplibre-native"
+                    : ((root.mapRenderer === "web"
                     && !(typeof BEAGLEY_FORCE_SNAPSHOT_MAP !== "undefined" && BEAGLEY_FORCE_SNAPSHOT_MAP))
                     ? "web"
                     : ((root.mapRenderer === "native" || root.mapRenderer === "native-online")
                         ? "native"
-                        : "snapshot"))
+                        : "snapshot")))
             interactionEnabled: !((typeof BEAGLEY_EMBEDDED_DISPLAY !== "undefined" && BEAGLEY_EMBEDDED_DISPLAY) || false)
             lat: root.displayMapLat
             lng: root.displayMapLng
             bearing: root.displayMapBearing
-            zoom: root.displayMapZoom
+            zoom: NaN
             speedKph: root.displayMapSpeed
             fixedOriginEnabled: fallbackRouteOriginEnabled
             fixedOriginLat: fallbackRouteOriginLat
@@ -617,10 +835,12 @@ Window {
             fixedOriginLabel: fallbackRouteOriginLabel
             navigationState: (root.mapRenderer === "web") ? navigation.mapPayload : ({})
             mapVehiclePose: navigation.mapVehiclePose
-            mapCameraHints: navigation.mapCameraHints
+            mapCameraHints: root.effectiveMapCameraHints
             mapRouteOverlay: navigation.mapRouteOverlay
             mapGuidanceBanner: navigation.mapGuidanceBanner
             mapConnectivity: navigation.mapConnectivity
+            tileUrlTemplate: root.activeMapTileUrlTemplate
+            styleUrl: root.activeMapStyleUrl
             snapshotRefreshMs: 0
             videoEnabled: false
             videoUrl: ""
@@ -632,6 +852,7 @@ Window {
             theme: appTheme
             lat: root.displayMapLat
             lng: root.displayMapLng
+            livePositionValid: root.liveMapPoseValid
             effectLevel: root.effectLevel
             stressScene: root.stressScene
             phase: root.sharedEffectPhase
@@ -662,7 +883,7 @@ Window {
         Item {
             id: cornerMask
             anchors.fill: parent
-            visible: !root.lowEffectMode
+            visible: false
             readonly property int cornerRadius: 34
 
             Canvas {
@@ -754,100 +975,15 @@ Window {
             anchors.verticalCenter: parent.verticalCenter
             anchors.leftMargin: root.gaugeEdgeBleed
 
-            Canvas {
+            W.GaugeLensShell {
                 anchors.fill: parent
                 visible: !root.lowEffectMode
-                onPaint: {
-                    const ctx = getContext("2d")
-                    ctx.clearRect(0, 0, width, height)
-
-                    const cx = width / 2
-                    const cy = height / 2
-                    const innerR = width * 0.414
-                    const outerR = width * 0.50
-                    const fade = ctx.createRadialGradient(cx, cy, innerR, cx, cy, outerR)
-                    fade.addColorStop(0.00, "rgba(0,0,0,0.98)")
-                    fade.addColorStop(0.62, "rgba(0,0,0,0.98)")
-                    fade.addColorStop(0.82, "rgba(0,0,0,0.42)")
-                    fade.addColorStop(0.93, "rgba(0,0,0,0.10)")
-                    fade.addColorStop(1.00, "rgba(0,0,0,0.00)")
-
-                    ctx.fillStyle = fade
-                    ctx.beginPath()
-                    ctx.arc(cx, cy, outerR, 0, Math.PI * 2)
-                    ctx.arc(cx, cy, innerR, 0, Math.PI * 2, true)
-                    ctx.fill("evenodd")
-                }
-            }
-
-            Item {
-                id: speedPod
-                anchors.centerIn: parent
-                width: root.gaugePodSize
-                height: root.gaugePodSize
-
-                Canvas {
-                    anchors.fill: parent
-                    visible: !root.lowEffectMode
-                    onPaint: {
-                        const ctx = getContext("2d")
-                        ctx.clearRect(0, 0, width, height)
-
-                        const cx = width / 2
-                        const cy = height / 2
-                        const outerR = width * 0.50
-                        const innerR = width * 0.43
-
-                        const barrel = ctx.createRadialGradient(cx, cy, innerR, cx, cy, outerR)
-                        barrel.addColorStop(0.00, "rgba(3,4,6,0.94)")
-                        barrel.addColorStop(0.58, "rgba(2,3,4,0.98)")
-                        barrel.addColorStop(1.00, "rgba(0,0,0,1.00)")
-
-                        ctx.fillStyle = barrel
-                        ctx.beginPath()
-                        ctx.arc(cx, cy, outerR, 0, Math.PI * 2)
-                        ctx.arc(cx, cy, innerR, 0, Math.PI * 2, true)
-                        ctx.fill("evenodd")
-                    }
-                }
-
-                Canvas {
-                    anchors.fill: parent
-                    visible: !root.lowEffectMode
-                    onPaint: {
-                        const ctx = getContext("2d")
-                        ctx.clearRect(0, 0, width, height)
-
-                        const cx = width / 2
-                        const cy = height / 2
-                        const r = width * 0.465
-
-                        ctx.beginPath()
-                        ctx.strokeStyle = "rgba(0,0,0,0.72)"
-                        ctx.lineWidth = 18
-                        ctx.arc(cx, cy, r, 0, Math.PI * 2)
-                        ctx.stroke()
-
-                        const rim = ctx.createLinearGradient(0, 0, width, height)
-                        rim.addColorStop(0.00, "rgba(255,255,255,0.16)")
-                        rim.addColorStop(0.18, "rgba(160,220,255,0.06)")
-                        rim.addColorStop(0.55, "rgba(0,0,0,0.04)")
-                        rim.addColorStop(1.00, "rgba(0,0,0,0.18)")
-
-                        ctx.beginPath()
-                        ctx.strokeStyle = rim
-                        ctx.lineWidth = 6
-                        ctx.arc(cx, cy, r, 0, Math.PI * 2)
-                        ctx.stroke()
-
-                        ctx.beginPath()
-                        ctx.strokeStyle = "rgba(255,255,255,0.08)"
-                        ctx.lineWidth = 3
-                        ctx.lineCap = "round"
-                        ctx.arc(cx, cy, r - 7, Math.PI * 0.86, Math.PI * 1.56)
-                        ctx.stroke()
-                    }
-                }
+                theme: appTheme
+                effectLevel: root.effectLevel
+                gaugeColor: appTheme.speedColor(root.displaySpeedValue)
+                chromeColor: appTheme.pearlLow
+                podSize: root.gaugePodSize
+                faceSize: root.gaugeFaceSize
             }
 
             W.SpeedGauge {
@@ -863,8 +999,8 @@ Window {
                 effectLevel: root.effectLevel
                 stressScene: root.stressScene
                 stressPhase: root.stressPhase
-                matrixRainEnabled: !root.effectsOff && !root.embeddedEffectBudgetMode
-                matrixRainSharedPhase: root.sharedEffectPhase
+                matrixRainEnabled: root.gaugeMatrixRainEnabled
+                matrixRainSharedPhase: root.gaugeMatrixRainSharedPhase
             }
 
             W.GaugeChevronOrbit {
@@ -876,14 +1012,14 @@ Window {
                 active: root.displayLeftIndicator
                 side: "left"
                 simplified: root.lowEffectMode
-                chevrons: root.lowEffectMode ? 5 : 11
-                cycleMs: root.lowEffectMode ? 1440 : 1080
-                orbitRadius: width * 0.320
-                chevronSize: width * 0.030
-                strokeWidth: root.lowEffectMode ? 5.4 : 4.8
-                strokeBoost: 2.6
-                tailSpacingPhase: 0.030
-                gravityBiasDeg: 30
+                chevrons: root.lowEffectMode ? 4 : 7
+                cycleMs: root.indicatorCascadeCycleMs
+                phaseOverride: root.indicatorCascadePhase
+                orbitRadius: width * 0.315
+                chevronSize: root.lowEffectMode ? width * 0.038 : width * 0.044
+                strokeWidth: root.lowEffectMode ? 4.8 : 5.2
+                strokeBoost: 1.8
+                tailSpacingPhase: root.lowEffectMode ? 0.12 : 0.08
                 onColor: "#52FFE1"
             }
         }
@@ -896,100 +1032,15 @@ Window {
             anchors.verticalCenter: parent.verticalCenter
             anchors.rightMargin: root.gaugeEdgeBleed
 
-            Canvas {
+            W.GaugeLensShell {
                 anchors.fill: parent
                 visible: !root.lowEffectMode
-                onPaint: {
-                    const ctx = getContext("2d")
-                    ctx.clearRect(0, 0, width, height)
-
-                    const cx = width / 2
-                    const cy = height / 2
-                    const innerR = width * 0.414
-                    const outerR = width * 0.50
-                    const fade = ctx.createRadialGradient(cx, cy, innerR, cx, cy, outerR)
-                    fade.addColorStop(0.00, "rgba(0,0,0,0.98)")
-                    fade.addColorStop(0.62, "rgba(0,0,0,0.98)")
-                    fade.addColorStop(0.82, "rgba(0,0,0,0.42)")
-                    fade.addColorStop(0.93, "rgba(0,0,0,0.10)")
-                    fade.addColorStop(1.00, "rgba(0,0,0,0.00)")
-
-                    ctx.fillStyle = fade
-                    ctx.beginPath()
-                    ctx.arc(cx, cy, outerR, 0, Math.PI * 2)
-                    ctx.arc(cx, cy, innerR, 0, Math.PI * 2, true)
-                    ctx.fill("evenodd")
-                }
-            }
-
-            Item {
-                id: tachPod
-                anchors.centerIn: parent
-                width: root.gaugePodSize
-                height: root.gaugePodSize
-
-                Canvas {
-                    anchors.fill: parent
-                    visible: !root.lowEffectMode
-                    onPaint: {
-                        const ctx = getContext("2d")
-                        ctx.clearRect(0, 0, width, height)
-
-                        const cx = width / 2
-                        const cy = height / 2
-                        const outerR = width * 0.50
-                        const innerR = width * 0.43
-
-                        const barrel = ctx.createRadialGradient(cx, cy, innerR, cx, cy, outerR)
-                        barrel.addColorStop(0.00, "rgba(3,4,6,0.94)")
-                        barrel.addColorStop(0.58, "rgba(2,3,4,0.98)")
-                        barrel.addColorStop(1.00, "rgba(0,0,0,1.00)")
-
-                        ctx.fillStyle = barrel
-                        ctx.beginPath()
-                        ctx.arc(cx, cy, outerR, 0, Math.PI * 2)
-                        ctx.arc(cx, cy, innerR, 0, Math.PI * 2, true)
-                        ctx.fill("evenodd")
-                    }
-                }
-
-                Canvas {
-                    anchors.fill: parent
-                    visible: !root.lowEffectMode
-                    onPaint: {
-                        const ctx = getContext("2d")
-                        ctx.clearRect(0, 0, width, height)
-
-                        const cx = width / 2
-                        const cy = height / 2
-                        const r = width * 0.465
-
-                        ctx.beginPath()
-                        ctx.strokeStyle = "rgba(0,0,0,0.72)"
-                        ctx.lineWidth = 18
-                        ctx.arc(cx, cy, r, 0, Math.PI * 2)
-                        ctx.stroke()
-
-                        const rim = ctx.createLinearGradient(0, 0, width, height)
-                        rim.addColorStop(0.00, "rgba(255,255,255,0.16)")
-                        rim.addColorStop(0.18, "rgba(160,220,255,0.06)")
-                        rim.addColorStop(0.55, "rgba(0,0,0,0.04)")
-                        rim.addColorStop(1.00, "rgba(0,0,0,0.18)")
-
-                        ctx.beginPath()
-                        ctx.strokeStyle = rim
-                        ctx.lineWidth = 6
-                        ctx.arc(cx, cy, r, 0, Math.PI * 2)
-                        ctx.stroke()
-
-                        ctx.beginPath()
-                        ctx.strokeStyle = "rgba(255,255,255,0.08)"
-                        ctx.lineWidth = 3
-                        ctx.lineCap = "round"
-                        ctx.arc(cx, cy, r - 7, Math.PI * 0.86, Math.PI * 1.56)
-                        ctx.stroke()
-                    }
-                }
+                theme: appTheme
+                effectLevel: root.effectLevel
+                gaugeColor: appTheme.rpmColor(root.displayRpmValue)
+                chromeColor: appTheme.pearlLow
+                podSize: root.gaugePodSize
+                faceSize: root.gaugeFaceSize
             }
 
             W.TachGauge {
@@ -1004,8 +1055,8 @@ Window {
                 effectLevel: root.effectLevel
                 stressScene: root.stressScene
                 stressPhase: root.stressPhase
-                matrixRainEnabled: !root.effectsOff && !root.embeddedEffectBudgetMode
-                matrixRainSharedPhase: root.sharedEffectPhase
+                matrixRainEnabled: root.gaugeMatrixRainEnabled
+                matrixRainSharedPhase: root.gaugeMatrixRainSharedPhase
             }
 
             W.GaugeChevronOrbit {
@@ -1017,14 +1068,14 @@ Window {
                 active: root.displayRightIndicator
                 side: "right"
                 simplified: root.lowEffectMode
-                chevrons: root.lowEffectMode ? 5 : 11
-                cycleMs: root.lowEffectMode ? 1440 : 1080
-                orbitRadius: width * 0.320
-                chevronSize: width * 0.030
-                strokeWidth: root.lowEffectMode ? 5.4 : 4.8
-                strokeBoost: 2.6
-                tailSpacingPhase: 0.030
-                gravityBiasDeg: 30
+                chevrons: root.lowEffectMode ? 4 : 7
+                cycleMs: root.indicatorCascadeCycleMs
+                phaseOverride: root.indicatorCascadePhase
+                orbitRadius: width * 0.315
+                chevronSize: root.lowEffectMode ? width * 0.038 : width * 0.044
+                strokeWidth: root.lowEffectMode ? 4.8 : 5.2
+                strokeBoost: 1.8
+                tailSpacingPhase: root.lowEffectMode ? 0.12 : 0.08
                 onColor: "#52FFE1"
             }
         }
@@ -1036,7 +1087,8 @@ Window {
 
             Rectangle {
                 id: idlePrompt
-                visible: !root.mapMenuOpen && !root.navControlsOpen && !root.hasActiveRoute && gpsFixOk
+                // Keep the live map clear; destination search now lives in the maps sheet.
+                visible: false
                 width: Math.floor(parent.width / 3) - 72
                 height: 56
                 radius: 18
@@ -1272,7 +1324,7 @@ Window {
             Rectangle {
                 anchors.fill: parent
                 visible: root.navControlsOpen || root.mapMenuOpen
-                color: root.mapMenuOpen ? "#9601070D" : "#6201060C"
+                color: root.navControlsOpen ? "#6201060C" : "transparent"
 
                 MouseArea {
                     anchors.fill: parent
@@ -1330,13 +1382,14 @@ Window {
                             border.width: 1
                             border.color: "#456A7D"
 
-                            Text {
+                            W.OemIcon {
                                 anchors.centerIn: parent
-                                text: "X"
+                                width: 22
+                                height: 22
+                                icon: "close"
                                 color: "#EAF5FB"
-                                font.family: appTheme.fontMono
-                                font.pixelSize: 16
-                                font.weight: Font.Bold
+                                accentColor: "#EAF5FB"
+                                strokeWidth: 3.8
                             }
 
                             MouseArea {
@@ -1567,13 +1620,14 @@ Window {
                                 border.width: 1
                                 border.color: closeMouse.containsMouse ? "#86D5FF" : "#42657A"
 
-                                Text {
+                                W.OemIcon {
                                     anchors.centerIn: parent
-                                    text: "X"
+                                    width: 24
+                                    height: 24
+                                    icon: "close"
                                     color: "#EAF5FB"
-                                    font.family: appTheme.fontMono
-                                    font.pixelSize: 16
-                                    font.weight: Font.Bold
+                                    accentColor: "#EAF5FB"
+                                    strokeWidth: 4.0
                                 }
 
                                 MouseArea {
@@ -1588,7 +1642,102 @@ Window {
                             }
                         }
 
+                        Row {
+                            id: mapMenuTabs
+                            width: parent.width
+                            height: 42
+                            spacing: 10
+                            readonly property bool routeTabVisible: root.mapMenuStage === "routing"
+                                || root.awaitingRoutePreview
+                                || root.routeLookupInProgress
+                                || root.availableRouteOptions().length > 0
+                                || root.hasActiveRoute
+                            readonly property int tabCount: routeTabVisible ? 3 : 2
+                            readonly property real tabWidth: (width - spacing * (tabCount - 1)) / tabCount
+
+                            Rectangle {
+                                width: mapMenuTabs.tabWidth
+                                height: parent.height
+                                radius: 13
+                                color: root.mapMenuStage === "search" ? "#143B52" : "#0B1720"
+                                border.width: 1
+                                border.color: root.mapMenuStage === "search" ? "#86D5FF" : "#345468"
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "FIND"
+                                    color: root.mapMenuStage === "search" ? "#F7FBFF" : "#A8C8D8"
+                                    font.family: appTheme.fontMono
+                                    font.pixelSize: 13
+                                    font.weight: Font.Bold
+                                    font.letterSpacing: 1.0
+                                    font.hintingPreference: root.menuTextHintingPreference
+                                    renderType: root.menuTextRenderType
+                                }
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    onClicked: root.chooseMapMenuTab("search")
+                                }
+                            }
+
+                            Rectangle {
+                                id: routeTab
+                                visible: mapMenuTabs.routeTabVisible
+                                width: mapMenuTabs.tabWidth
+                                height: parent.height
+                                radius: 13
+                                color: (root.mapMenuStage === "routes" || root.mapMenuStage === "routing") ? "#143B52" : "#0B1720"
+                                border.width: 1
+                                border.color: (root.mapMenuStage === "routes" || root.mapMenuStage === "routing") ? "#86D5FF" : "#345468"
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "ROUTE"
+                                    color: (root.mapMenuStage === "routes" || root.mapMenuStage === "routing") ? "#F7FBFF" : "#A8C8D8"
+                                    font.family: appTheme.fontMono
+                                    font.pixelSize: 13
+                                    font.weight: Font.Bold
+                                    font.letterSpacing: 1.0
+                                    font.hintingPreference: root.menuTextHintingPreference
+                                    renderType: root.menuTextRenderType
+                                }
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    onClicked: root.chooseMapMenuTab("routes")
+                                }
+                            }
+
+                            Rectangle {
+                                width: mapMenuTabs.tabWidth
+                                height: parent.height
+                                radius: 13
+                                color: root.mapMenuStage === "settings" ? "#143B52" : "#0B1720"
+                                border.width: 1
+                                border.color: root.mapMenuStage === "settings" ? "#86D5FF" : "#345468"
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "SETTINGS"
+                                    color: root.mapMenuStage === "settings" ? "#F7FBFF" : "#A8C8D8"
+                                    font.family: appTheme.fontMono
+                                    font.pixelSize: 13
+                                    font.weight: Font.Bold
+                                    font.letterSpacing: 1.0
+                                    font.hintingPreference: root.menuTextHintingPreference
+                                    renderType: root.menuTextRenderType
+                                }
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    onClicked: root.chooseMapMenuTab("settings")
+                                }
+                            }
+                        }
+
                         Rectangle {
+                            visible: root.mapMenuStage === "search"
                             width: parent.width
                             height: 70
                             radius: 16
@@ -1610,33 +1759,14 @@ Window {
                                     border.width: 1
                                     border.color: "#35698A"
 
-                                    Canvas {
-                                        anchors.fill: parent
-                                        renderTarget: root.embeddedSafeMode ? Canvas.Image : Canvas.FramebufferObject
-                                        antialiasing: !root.embeddedSafeMode
-                                        smooth: !root.embeddedSafeMode
-
-                                        Component.onCompleted: requestPaint()
-                                        onWidthChanged: requestPaint()
-                                        onHeightChanged: requestPaint()
-
-                                        onPaint: {
-                                            const ctx = getContext("2d")
-                                            ctx.clearRect(0, 0, width, height)
-                                            ctx.strokeStyle = "#8DE8FF"
-                                            ctx.lineWidth = 3
-                                            ctx.lineCap = "round"
-                                            ctx.lineJoin = "round"
-                                            ctx.beginPath()
-                                            ctx.moveTo(width * 0.25, height * 0.68)
-                                            ctx.bezierCurveTo(width * 0.36, height * 0.44, width * 0.55, height * 0.58, width * 0.68, height * 0.28)
-                                            ctx.stroke()
-
-                                            ctx.fillStyle = "#F7FBFF"
-                                            ctx.beginPath()
-                                            ctx.arc(width * 0.68, height * 0.28, width * 0.09, 0, Math.PI * 2)
-                                            ctx.fill()
-                                        }
+                                    W.OemIcon {
+                                        anchors.centerIn: parent
+                                        width: 31
+                                        height: 31
+                                        icon: "route"
+                                        color: "#F7FBFF"
+                                        accentColor: "#8DE8FF"
+                                        strokeWidth: 3.2
                                     }
                                 }
 
@@ -1730,6 +1860,7 @@ Window {
                         }
 
                         Row {
+                            visible: root.mapMenuStage === "search"
                             width: parent.width
                             height: 42
                             spacing: 10
@@ -1818,7 +1949,11 @@ Window {
                             width: parent.width
                             height: root.mapMenuStage === "routes"
                                 ? 244
-                                : (root.mapMenuStage === "routing" ? 126 : (root.searchKeyboardOpen ? 110 : 218))
+                                : (root.mapMenuStage === "routing"
+                                    ? 126
+                                    : (root.mapMenuStage === "settings"
+                                        ? 372
+                                        : (root.searchKeyboardOpen ? 110 : 218)))
                             radius: 16
                             color: "#0A151F"
                             border.width: 1
@@ -1831,12 +1966,14 @@ Window {
 
                                 Text {
                                     text: root.mapMenuStage === "routes"
-                                        ? "Choose route"
+                                        ? "Route ready"
                                         : (root.mapMenuStage === "routing"
-                                            ? (root.routeLookupInProgress ? "Finding routes..." : "Route status")
-                                            : (searchInput.text.length < 2
-                                                ? (navigation.recents.length > 0 ? "Recent destinations" : "Tap the field to search")
-                                                : (root.menuResultsModel().length > 0 ? "Results" : "No matches")))
+                                            ? "Building route"
+                                            : (root.mapMenuStage === "settings"
+                                                ? "Map settings"
+                                                : (searchInput.text.length < 2
+                                                    ? (navigation.recents.length > 0 ? "Recent destinations" : "Tap the field to search")
+                                                    : (root.menuResultsModel().length > 0 ? "Results" : "No matches"))))
                                     color: (root.routeLookupInProgress || root.mapMenuStage === "routing") ? "#9FE7FF" : "#9FBFD2"
                                     font.family: appTheme.fontMono
                                     font.pixelSize: 14
@@ -1915,6 +2052,284 @@ Window {
                                                     anchors.fill: parent
                                                     hoverEnabled: true
                                                     onClicked: root.chooseSearchResult(itemData)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Column {
+                                    visible: root.mapMenuStage === "settings"
+                                    width: parent.width
+                                    spacing: 10
+
+                                    Row {
+                                        width: parent.width
+                                        height: 86
+                                        spacing: 10
+
+                                        Rectangle {
+                                            width: (parent.width - 10) / 2
+                                            height: parent.height
+                                            radius: 14
+                                            color: navigation.muted ? "#21151B" : "#0F202C"
+                                            border.width: 1
+                                            border.color: navigation.muted ? "#A35D74" : "#2F6A84"
+
+                                            Column {
+                                                anchors.fill: parent
+                                                anchors.margins: 12
+                                                spacing: 6
+
+                                                Text {
+                                                    width: parent.width
+                                                    text: "VOICE"
+                                                    color: "#7FAFC5"
+                                                    font.family: appTheme.fontMono
+                                                    font.pixelSize: 11
+                                                    font.weight: Font.Bold
+                                                    font.letterSpacing: 1.0
+                                                    font.hintingPreference: root.menuTextHintingPreference
+                                                    renderType: root.menuTextRenderType
+                                                }
+
+                                                Text {
+                                                    width: parent.width
+                                                    text: navigation.muted ? "Muted" : "Prompts on"
+                                                    color: "#F5FBFF"
+                                                    font.family: appTheme.fontDisplay
+                                                    font.pixelSize: 22
+                                                    font.weight: Font.DemiBold
+                                                    font.hintingPreference: root.menuTextHintingPreference
+                                                    renderType: root.menuTextRenderType
+                                                    elide: Text.ElideRight
+                                                }
+                                            }
+
+                                            MouseArea {
+                                                anchors.fill: parent
+                                                onClicked: navigation.setMuted(!navigation.muted)
+                                            }
+                                        }
+
+                                        Rectangle {
+                                            width: (parent.width - 10) / 2
+                                            height: parent.height
+                                            radius: 14
+                                            color: followUnlocked ? "#171D2A" : "#0F202C"
+                                            border.width: 1
+                                            border.color: followUnlocked ? "#7389FF" : "#2F6A84"
+
+                                            Column {
+                                                anchors.fill: parent
+                                                anchors.margins: 12
+                                                spacing: 6
+
+                                                Text {
+                                                    width: parent.width
+                                                    text: "CAMERA"
+                                                    color: "#7FAFC5"
+                                                    font.family: appTheme.fontMono
+                                                    font.pixelSize: 11
+                                                    font.weight: Font.Bold
+                                                    font.letterSpacing: 1.0
+                                                    font.hintingPreference: root.menuTextHintingPreference
+                                                    renderType: root.menuTextRenderType
+                                                }
+
+                                                Text {
+                                                    width: parent.width
+                                                    text: followUnlocked ? "Free pan" : "Following"
+                                                    color: "#F5FBFF"
+                                                    font.family: appTheme.fontDisplay
+                                                    font.pixelSize: 22
+                                                    font.weight: Font.DemiBold
+                                                    font.hintingPreference: root.menuTextHintingPreference
+                                                    renderType: root.menuTextRenderType
+                                                    elide: Text.ElideRight
+                                                }
+                                            }
+
+                                            MouseArea {
+                                                anchors.fill: parent
+                                                onClicked: {
+                                                    navigation.recenter()
+                                                    navField.setFollowEnabled(true)
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Row {
+                                        width: parent.width
+                                        height: 86
+                                        spacing: 10
+
+                                        Rectangle {
+                                            width: (parent.width - 10) / 2
+                                            height: parent.height
+                                            radius: 14
+                                            color: "#0F202C"
+                                            border.width: 1
+                                            border.color: root.gpsFixOk ? "#2D8F69" : "#806130"
+
+                                            Column {
+                                                anchors.fill: parent
+                                                anchors.margins: 12
+                                                spacing: 6
+
+                                                Text {
+                                                    width: parent.width
+                                                    text: "GPS"
+                                                    color: "#7FAFC5"
+                                                    font.family: appTheme.fontMono
+                                                    font.pixelSize: 11
+                                                    font.weight: Font.Bold
+                                                    font.letterSpacing: 1.0
+                                                    font.hintingPreference: root.menuTextHintingPreference
+                                                    renderType: root.menuTextRenderType
+                                                }
+
+                                                Text {
+                                                    width: parent.width
+                                                    text: root.gpsBadgeText()
+                                                    color: "#F5FBFF"
+                                                    font.family: appTheme.fontDisplay
+                                                    font.pixelSize: 22
+                                                    font.weight: Font.DemiBold
+                                                    font.hintingPreference: root.menuTextHintingPreference
+                                                    renderType: root.menuTextRenderType
+                                                    elide: Text.ElideRight
+                                                }
+                                            }
+                                        }
+
+                                        Rectangle {
+                                            width: (parent.width - 10) / 2
+                                            height: parent.height
+                                            radius: 14
+                                            color: "#0F202C"
+                                            border.width: 1
+                                            border.color: root.hotspotState === "online" ? "#2D8F69" : "#456A7D"
+
+                                            Column {
+                                                anchors.fill: parent
+                                                anchors.margins: 12
+                                                spacing: 6
+
+                                                Text {
+                                                    width: parent.width
+                                                    text: "NETWORK"
+                                                    color: "#7FAFC5"
+                                                    font.family: appTheme.fontMono
+                                                    font.pixelSize: 11
+                                                    font.weight: Font.Bold
+                                                    font.letterSpacing: 1.0
+                                                    font.hintingPreference: root.menuTextHintingPreference
+                                                    renderType: root.menuTextRenderType
+                                                }
+
+                                                Text {
+                                                    width: parent.width
+                                                    text: root.hotspotBadgeText()
+                                                    color: "#F5FBFF"
+                                                    font.family: appTheme.fontDisplay
+                                                    font.pixelSize: 22
+                                                    font.weight: Font.DemiBold
+                                                    font.hintingPreference: root.menuTextHintingPreference
+                                                    renderType: root.menuTextRenderType
+                                                    elide: Text.ElideRight
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Column {
+                                        width: parent.width
+                                        spacing: 8
+
+                                        Text {
+                                            width: parent.width
+                                            text: "MAP STYLE"
+                                            color: "#7FAFC5"
+                                            font.family: appTheme.fontMono
+                                            font.pixelSize: 11
+                                            font.weight: Font.Bold
+                                            font.letterSpacing: 1.0
+                                            font.hintingPreference: root.menuTextHintingPreference
+                                            renderType: root.menuTextRenderType
+                                        }
+
+                                        Row {
+                                            width: parent.width
+                                            height: 76
+                                            spacing: 8
+
+                                            Repeater {
+                                                model: root.mapThemeOptions
+
+                                                delegate: Rectangle {
+                                                    readonly property bool selected: String(modelData.id) === String(root.activeMapThemeOption.id)
+                                                    width: (parent.width - 24) / 4
+                                                    height: parent.height
+                                                    radius: 12
+                                                    color: selected ? "#143B52" : "#0F202C"
+                                                    border.width: 1
+                                                    border.color: selected ? "#86D5FF" : "#2F6A84"
+
+                                                    Column {
+                                                        anchors.fill: parent
+                                                        anchors.margins: 9
+                                                        spacing: 5
+
+                                                        Rectangle {
+                                                            width: parent.width
+                                                            height: 16
+                                                            radius: 4
+                                                            color: modelData.swatchA
+                                                            border.width: 1
+                                                            border.color: selected ? "#F7FBFF" : "#355B70"
+
+                                                            Rectangle {
+                                                                width: parent.width * 0.44
+                                                                height: parent.height
+                                                                anchors.right: parent.right
+                                                                radius: 4
+                                                                color: modelData.swatchB
+                                                            }
+                                                        }
+
+                                                        Text {
+                                                            width: parent.width
+                                                            text: modelData.label
+                                                            color: "#F5FBFF"
+                                                            font.family: appTheme.fontDisplay
+                                                            font.pixelSize: 18
+                                                            font.weight: Font.DemiBold
+                                                            font.hintingPreference: root.menuTextHintingPreference
+                                                            renderType: root.menuTextRenderType
+                                                            horizontalAlignment: Text.AlignHCenter
+                                                            elide: Text.ElideRight
+                                                        }
+
+                                                        Text {
+                                                            width: parent.width
+                                                            text: modelData.detail
+                                                            color: selected ? "#9FE7FF" : "#7FAFC5"
+                                                            font.family: appTheme.fontMono
+                                                            font.pixelSize: 10
+                                                            font.weight: Font.Bold
+                                                            font.hintingPreference: root.menuTextHintingPreference
+                                                            renderType: root.menuTextRenderType
+                                                            horizontalAlignment: Text.AlignHCenter
+                                                            elide: Text.ElideRight
+                                                        }
+                                                    }
+
+                                                    MouseArea {
+                                                        anchors.fill: parent
+                                                        onClicked: root.selectMapTheme(modelData.id)
+                                                    }
                                                 }
                                             }
                                         }
@@ -2195,15 +2610,28 @@ Window {
                                 width: 154
                                 height: 50
                                 radius: 15
-                                color: root.routeLookupInProgress ? "#113247" : (root.mapMenuStage === "routes" ? "#1A7E62" : "#1F6A97")
+                                readonly property bool blocked: root.mapMenuStage === "routing"
+                                    || (root.mapMenuStage === "routes"
+                                        && root.availableRouteOptions().length <= 0
+                                        && !root.hasActiveRoute)
+                                enabled: !blocked
+                                opacity: enabled ? 1.0 : 0.72
+                                color: blocked ? "#102635" : (root.mapMenuStage === "routes" ? "#1A7E62" : "#1F6A97")
                                 border.width: 1
-                                border.color: root.mapMenuStage === "routes" ? "#8DF0D0" : "#82C9F2"
+                                border.color: blocked ? "#345A70" : (root.mapMenuStage === "routes" ? "#8DF0D0" : "#82C9F2")
 
                                 function trigger() {
+                                    if (root.mapMenuStage === "settings") {
+                                        root.mapMenuOpen = false
+                                        root.searchKeyboardOpen = false
+                                        return
+                                    }
                                     if (root.mapMenuStage === "routes") {
                                         root.startSelectedRoute()
                                         return
                                     }
+                                    if (root.mapMenuStage === "routing")
+                                        return
                                     if (root.mapMenuStage === "search" && !root.routeLookupInProgress)
                                         root.routeSearchQuery(searchInput.text)
                                 }
@@ -2212,7 +2640,9 @@ Window {
                                     anchors.centerIn: parent
                                     text: root.mapMenuStage === "routes"
                                         ? "START"
-                                        : ((root.mapMenuStage === "routing" || root.routeLookupInProgress) ? "WAIT" : "SEARCH")
+                                        : (root.mapMenuStage === "settings"
+                                            ? "DONE"
+                                            : ((root.mapMenuStage === "routing" || root.routeLookupInProgress) ? "LOADING" : "FIND"))
                                     color: "#F7FBFF"
                                     font.family: appTheme.fontMono
                                     font.pixelSize: 17
@@ -2222,6 +2652,7 @@ Window {
 
                                 MouseArea {
                                     anchors.fill: parent
+                                    enabled: routeButton.enabled
                                     onClicked: routeButton.trigger()
                                 }
                             }
@@ -2236,12 +2667,14 @@ Window {
 
                                 Text {
                                     anchors.centerIn: parent
-                                    text: root.mapMenuStage === "search"
+                                    text: root.mapMenuStage === "settings"
                                         ? (root.followUnlocked ? "RECENTER" : "FOLLOW")
-                                        : "BACK"
+                                        : (root.mapMenuStage === "search"
+                                            ? (root.followUnlocked ? "RECENTER" : "FOLLOW")
+                                            : "BACK")
                                     color: "#F5FBFF"
                                     font.family: appTheme.fontMono
-                                    font.pixelSize: root.mapMenuStage === "search" && root.followUnlocked ? 14 : 17
+                                    font.pixelSize: (root.mapMenuStage === "search" || root.mapMenuStage === "settings") && root.followUnlocked ? 14 : 17
                                     font.weight: Font.Bold
                                     font.letterSpacing: 1.2
                                 }
@@ -2249,11 +2682,13 @@ Window {
                                 MouseArea {
                                     anchors.fill: parent
                                     onClicked: {
-                                        if (root.mapMenuStage === "search") {
+                                        if (root.mapMenuStage === "search" || root.mapMenuStage === "settings") {
                                             navigation.recenter()
                                             navField.setFollowEnabled(true)
-                                            root.mapMenuOpen = false
-                                            root.searchKeyboardOpen = false
+                                            if (root.mapMenuStage === "search") {
+                                                root.mapMenuOpen = false
+                                                root.searchKeyboardOpen = false
+                                            }
                                         } else {
                                             root.backToRouteSearch()
                                         }
@@ -2271,9 +2706,11 @@ Window {
 
                                 Text {
                                     anchors.centerIn: parent
-                                    text: root.mapMenuStage === "search"
-                                        ? (root.searchKeyboardOpen ? "HIDE" : "KEYS")
-                                        : "VIEW"
+                                    text: root.mapMenuStage === "settings"
+                                        ? (navigation.muted ? "UNMUTE" : "MUTE")
+                                        : (root.mapMenuStage === "search"
+                                            ? (root.searchKeyboardOpen ? "HIDE" : "KEYS")
+                                            : "CENTER")
                                     color: "#E6F1F8"
                                     font.family: appTheme.fontMono
                                     font.pixelSize: 16
@@ -2284,7 +2721,9 @@ Window {
                                 MouseArea {
                                     anchors.fill: parent
                                     onClicked: {
-                                        if (root.mapMenuStage === "search")
+                                        if (root.mapMenuStage === "settings")
+                                            navigation.setMuted(!navigation.muted)
+                                        else if (root.mapMenuStage === "search")
                                             root.searchKeyboardOpen = !root.searchKeyboardOpen
                                         else
                                             navigation.recenter()

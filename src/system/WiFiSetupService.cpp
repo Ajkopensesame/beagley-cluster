@@ -291,10 +291,8 @@ WiFiSetupService::WiFiSetupService(QObject *parent)
         scheduleReconcile();
     });
 
-    QTimer::singleShot(0, this, [this]() {
-        refreshStatusInternal(true);
-        scheduleReconcile();
-    });
+    refreshStatusInternal(true);
+    scheduleReconcile();
 }
 
 void WiFiSetupService::setInterfaceName(const QString &name)
@@ -684,6 +682,23 @@ bool WiFiSetupService::refreshStatusInternal(bool forceProbe)
                                        m_activeProfileId,
                                        m_activeFallbackAddress));
     updateSetupMessaging();
+
+    const QString connectivitySummary = QStringLiteral("%1|%2|%3|%4|%5")
+        .arg(m_connected ? QLatin1String("connected") : QLatin1String("disconnected"),
+             m_hasIpLease ? QLatin1String("ip") : QLatin1String("no_ip"),
+             m_internetReachable ? QLatin1String("internet") : QLatin1String("no_internet"),
+             m_networkState,
+             m_currentSsid);
+    if (connectivitySummary != m_lastConnectivitySummary) {
+        m_lastConnectivitySummary = connectivitySummary;
+        qInfo() << "[WiFiSetupService] state"
+                << "interface=" << m_interfaceName
+                << "connected=" << m_connected
+                << "ipLease=" << m_hasIpLease
+                << "internet=" << m_internetReachable
+                << "networkState=" << m_networkState
+                << "ssid=" << m_currentSsid;
+    }
 
     if (shouldAutoShowPrompt()) {
         if (!m_promptDismissed) {

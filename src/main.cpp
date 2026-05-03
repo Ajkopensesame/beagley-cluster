@@ -20,13 +20,17 @@
 #include <QVariantMap>
 #include <QJsonDocument>
 #include <QDateTime>
+#include <QImage>
 
 #include "data/VehicleStateClient.h"
 #include "navigation/NavigationService.h"
 #include "render/ClusterRenderModel.h"
 #include "render/NativeRasterMapItem.h"
 #include "render/PerformanceMetrics.h"
+#include "render/RadarFrameItem.h"
+#include "render/RasterFrameItem.h"
 #include "system/NowPlayingService.h"
+#include "system/RadarImageService.h"
 #include "system/WiFiSetupService.h"
 
 #ifdef WITH_WEBENGINE
@@ -260,9 +264,13 @@ int main(int argc, char *argv[])
     if (mapRenderer == QLatin1String("tile") || mapRenderer == QLatin1String("snapshot")) {
         mapRenderer = QStringLiteral("native-online");
     }
+    if (mapRenderer == QLatin1String("maplibre")) {
+        mapRenderer = QStringLiteral("maplibre-native");
+    }
     if (mapRenderer != QLatin1String("web")
         && mapRenderer != QLatin1String("native")
-        && mapRenderer != QLatin1String("native-online")) {
+        && mapRenderer != QLatin1String("native-online")
+        && mapRenderer != QLatin1String("maplibre-native")) {
         mapRenderer = renderProfile == QLatin1String("embedded")
             ? QStringLiteral("native-online")
             : QStringLiteral("web");
@@ -279,7 +287,16 @@ int main(int argc, char *argv[])
         qEnvironmentVariableIsSet("BEAGLEY_STRESS_SCENE") &&
         qEnvironmentVariableIntValue("BEAGLEY_STRESS_SCENE") != 0;
     const bool preferSnapshotMap = forceSnapshotMap || mapRenderer != QLatin1String("web");
+#ifdef WITH_MAPLIBRE_NATIVE
+    const bool mapLibreNativeAvailable = true;
+#else
+    const bool mapLibreNativeAvailable = false;
+#endif
 
+    if (mapRenderer == QLatin1String("maplibre-native")
+        && !qEnvironmentVariableIsSet("QSG_RHI_BACKEND")) {
+        qputenv("QSG_RHI_BACKEND", QByteArrayLiteral("opengl"));
+    }
     if (renderProfile == QLatin1String("embedded") && !qEnvironmentVariableIsSet("QSG_RENDER_LOOP")) {
         qputenv("QSG_RENDER_LOOP", QByteArrayLiteral("threaded"));
     }
@@ -313,6 +330,8 @@ int main(int argc, char *argv[])
 
     QGuiApplication app(argc, argv);
     qmlRegisterType<NativeRasterMapItem>("BeagleY", 1, 0, "NativeRasterMapItem");
+    qmlRegisterType<RadarFrameItem>("BeagleY", 1, 0, "RadarFrameItem");
+    qmlRegisterType<RasterFrameItem>("BeagleY", 1, 0, "RasterFrameItem");
     QCoreApplication::setApplicationName(QStringLiteral("BeagleyCluster"));
     QCoreApplication::setApplicationVersion(QStringLiteral("1.0"));
     QCoreApplication::setOrganizationName(QStringLiteral("Beagley"));
@@ -350,6 +369,7 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("BEAGLEY_MAP_STYLE_URL", mapStyleUrl);
     engine.rootContext()->setContextProperty("BEAGLEY_MAP_BOOT_MODE", mapBootMode);
     engine.rootContext()->setContextProperty("BEAGLEY_MAP_STYLE_MODE", mapStyleMode);
+    engine.rootContext()->setContextProperty("BEAGLEY_MAPLIBRE_NATIVE_AVAILABLE", mapLibreNativeAvailable);
     engine.rootContext()->setContextProperty("BEAGLEY_RENDER_PROFILE", renderProfile);
     engine.rootContext()->setContextProperty("BEAGLEY_EFFECT_LEVEL", effectLevel);
     engine.rootContext()->setContextProperty("BEAGLEY_MAP_RENDERER", mapRenderer);
@@ -371,6 +391,7 @@ int main(int argc, char *argv[])
             << "renderProfile =" << renderProfile
             << "effectLevel =" << effectLevel
             << "mapRenderer =" << mapRenderer
+            << "mapLibreNativeAvailable =" << mapLibreNativeAvailable
             << "mapBootMode =" << mapBootMode
             << "mapStyleMode =" << mapStyleMode
             << "webEngineMode =" << normalizedSetting(qgetenv("BEAGLEY_WEBENGINE_MODE"),
@@ -390,6 +411,8 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("clusterRenderModel", &clusterRenderModel);
     NowPlayingService nowPlaying;
     engine.rootContext()->setContextProperty("nowPlaying", &nowPlaying);
+    RadarImageService radarImage(mapUserAgent);
+    engine.rootContext()->setContextProperty("radarImage", &radarImage);
 
     const QString uiVariantOverride = QString::fromUtf8(qgetenv("BEAGLEY_UI_VARIANT")).trimmed().toLower();
     const bool uiVariantExplicit = !uiVariantOverride.isEmpty();
@@ -513,6 +536,28 @@ int main(int argc, char *argv[])
                     << "sceneGraphBackend =" << window->sceneGraphBackend()
                     << "persistentGraphics =" << window->isPersistentGraphics()
                     << "persistentSceneGraph =" << window->isPersistentSceneGraph();
+            const QString screenshotPath =
+                QString::fromUtf8(qgetenv("BEAGLEY_SCREENSHOT_PATH")).trimmed();
+            if (!screenshotPath.isEmpty()) {
+                bool ok = false;
+                const int delayMs = QString::fromUtf8(qgetenv("BEAGLEY_SCREENSHOT_DELAY_MS"))
+                                        .toInt(&ok);
+                const int captureDelayMs = ok ? qMax(0, delayMs) : 3000;
+                QTimer::singleShot(captureDelayMs, window, [window, screenshotPath, &app]() {
+                    const QImage image = window->grabWindow();
+                    const bool saved = !image.isNull() && image.save(screenshotPath);
+                    qInfo() << "[Screenshot] path =" << screenshotPath
+                            << "size =" << image.size()
+                            << "saved =" << saved;
+                    const QString exitValue =
+                        QString::fromUtf8(qgetenv("BEAGLEY_SCREENSHOT_EXIT")).trimmed().toLower();
+                    if (exitValue == QLatin1String("1")
+                        || exitValue == QLatin1String("true")
+                        || exitValue == QLatin1String("yes")) {
+                        app.quit();
+                    }
+                });
+            }
             break;
         }
     }

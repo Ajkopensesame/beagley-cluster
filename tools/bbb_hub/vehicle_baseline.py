@@ -546,7 +546,42 @@ def default_vehicle_baseline_profiles() -> list[BaselineProfile]:
                 "contaminated or failing MAF sensor",
                 "unmetered air or throttle/load signal mismatch",
             ),
-        )
+        ),
+        BaselineProfile(
+            name="map_pressure",
+            target="mapKpa",
+            unit="kPa",
+            features=(
+                BaselineFeature("rpm", 250.0, minimum=800.0, maximum=7000.0),
+                BaselineFeature("throttlePct", 10.0, minimum=2.0, maximum=100.0),
+                BaselineFeature("intakeAirTempC", 10.0, minimum=-20.0, maximum=90.0, required=False),
+                BaselineFeature("engineLoadPct", 10.0, minimum=0.0, maximum=100.0, required=False),
+            ),
+            conditions=(
+                BaselineCondition("coolantC", minimum=70.0, maximum=115.0),
+            ),
+            direction="both",
+            target_minimum=5.0,
+            target_maximum=250.0,
+            min_bucket_samples=30,
+            min_total_samples=150,
+            min_anomaly_samples=6,
+            min_anomaly_buckets=2,
+            anomaly_window_seconds=900.0,
+            drift_fraction=0.20,
+            drift_abs=8.0,
+            drift_stddev=2.0,
+            low_code="map_pressure_low",
+            high_code="map_pressure_high",
+            low_message="MAP pressure is consistently below this vehicle's learned baseline; inspect intake/vacuum/load evidence",
+            high_message="MAP pressure is consistently above this vehicle's learned baseline; inspect load/throttle/boost evidence",
+            suspected_causes=(
+                "vacuum leak or intake restriction",
+                "failing MAP sensor",
+                "throttle/load signal mismatch",
+                "unexpected boost or exhaust restriction",
+            ),
+        ),
     ]
 
 

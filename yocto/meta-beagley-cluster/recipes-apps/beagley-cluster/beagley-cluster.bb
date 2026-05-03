@@ -19,8 +19,10 @@ SRC_URI = " \
     file://05-beagley-eth-debug.network \
     file://55-beagley-usb-recovery.network \
     file://12-en.network \
+    file://gai.conf \
     file://journald-persistent.conf \
     file://beagley-cluster-journal.conf \
+    file://beagley-cluster-volatile.conf \
     file://beagley-cluster-launch.sh \
     file://beagley-cluster-gpu-probe.sh \
     file://beagley-touch-gate.sh \
@@ -48,6 +50,9 @@ RDEPENDS:${PN} += " \
     qtsvg \
     qtwebsockets \
 "
+
+PACKAGECONFIG ??= ""
+PACKAGECONFIG[maplibre-native] = "-DWITH_MAPLIBRE_NATIVE=ON,-DWITH_MAPLIBRE_NATIVE=OFF,maplibre-native-qt qtlocation qtpositioning,maplibre-native-qt qtlocation qtpositioning"
 
 EXTRA_OECMAKE += " \
     -DBEAGLEY_APPLIANCE_PRODUCTION=ON \
@@ -108,12 +113,14 @@ do_install:append() {
     install -m 0644 ${WORKDIR}/05-beagley-eth-debug.network ${D}${sysconfdir}/systemd/network/05-beagley-eth-debug.network
     install -m 0644 ${WORKDIR}/55-beagley-usb-recovery.network ${D}${sysconfdir}/systemd/network/55-beagley-usb-recovery.network
     install -m 0644 ${WORKDIR}/12-en.network ${D}${sysconfdir}/systemd/network/12-en.network
+    install -m 0644 ${WORKDIR}/gai.conf ${D}${sysconfdir}/gai.conf
 
     install -d ${D}${sysconfdir}/systemd/journald.conf.d
     install -m 0644 ${WORKDIR}/journald-persistent.conf ${D}${sysconfdir}/systemd/journald.conf.d/persistent.conf
 
     install -d ${D}${nonarch_libdir}/tmpfiles.d
     install -m 0644 ${WORKDIR}/beagley-cluster-journal.conf ${D}${nonarch_libdir}/tmpfiles.d/beagley-cluster-journal.conf
+    install -m 0644 ${WORKDIR}/beagley-cluster-volatile.conf ${D}${nonarch_libdir}/tmpfiles.d/beagley-cluster-volatile.conf
 }
 
 FILES:${PN} += " \
@@ -134,8 +141,10 @@ FILES:${PN} += " \
     ${sysconfdir}/systemd/network/05-beagley-eth-debug.network \
     ${sysconfdir}/systemd/network/55-beagley-usb-recovery.network \
     ${sysconfdir}/systemd/network/12-en.network \
+    ${sysconfdir}/gai.conf \
     ${sysconfdir}/systemd/journald.conf.d/persistent.conf \
     ${nonarch_libdir}/tmpfiles.d/beagley-cluster-journal.conf \
+    ${nonarch_libdir}/tmpfiles.d/beagley-cluster-volatile.conf \
     ${libdir}/qml/BeagleY/qmldir \
     ${libdir}/qml/BeagleY/beagley_cluster.qmltypes \
 "

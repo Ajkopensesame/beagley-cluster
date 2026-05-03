@@ -185,6 +185,31 @@ includes:
 This makes intermittent failures diagnosable after the fact instead of relying
 on someone watching a screen at exactly the right moment.
 
+## AI Health Verdict Contract
+
+The BBB/runtime health stack should separate:
+
+- deterministic evidence
+- display-safe `_diagnostic`
+- richer AI-issued health judgments
+
+`_diagnostic` remains the compact runtime status for the cluster. AI health
+judgments such as "appears healthy", "probably healthy", "capture limited", or
+"anomaly likely" should use the structured contract in
+`tools/schema/vehicle_health_verdict_v1.md`.
+
+That contract requires:
+
+- named evidence inputs
+- a coverage score
+- a confidence score
+- explicit abstain rules
+- restricted wording so the AI does not overclaim
+
+This keeps AI free to make useful health judgments while forcing those
+judgments to stay attached to observed evidence, captured conditions, and known
+limitations.
+
 ## Learned Vehicle Baselines
 
 Not every useful diagnostic is a raw CAN fault. Some faults are slow component
@@ -203,6 +228,12 @@ similar `rpm`, `throttlePct`, `intakeAirTempC`, and optional `engineLoadPct` /
 the learned normal range across trusted buckets, it emits `intake_airflow_low`
 with confidence and evidence.
 
+The second built-in profile is `map_pressure`. It learns `mapKpa` against
+similar `rpm`, `throttlePct`, optional `intakeAirTempC`, and optional
+`engineLoadPct` while the engine is warm. It can emit `map_pressure_low` or
+`map_pressure_high` only after repeated drift across trusted buckets, so one
+odd frame does not become a diagnosis.
+
 This does not require hand-writing every possible scenario. It does require a
 model definition that says which signals should be compared. The system learns
 normal values inside those operating buckets, but it should not invent fault
@@ -215,6 +246,43 @@ VEHICLE_BASELINE_ENABLED=1
 VEHICLE_BASELINE_PATH=/var/lib/beagley-cluster/baselines/vehicle_baseline.json
 VEHICLE_BASELINE_SAVE_EVERY_SAMPLES=25
 VEHICLE_BASELINE_MIN_SAVE_INTERVAL_SECONDS=30.0
+```
+
+## Learned Transition Baselines
+
+Some faults are invisible to normal range checks because the value stays
+plausible while the response shape is wrong. The transition monitor handles that
+case by learning this vehicle's normal response around events:
+
+```text
+event + target signal + reference signals -> learned response template
+```
+
+Shared event segmentation currently covers `key_on`, `crank_start`,
+`first_fire`, `idle_settle`, `stall`, `throttle_tip_in`, `shift`, `decel`, and
+`fan_on`. The first useful profiles are startup `mafGps` and `mapKpa` response
+checks. A MAF value can be electrically valid and still be abnormal if it stays
+flat while the vehicle transitions from crank to run and known-good starts for
+that vehicle show a clear response.
+
+The monitor emits reusable anomaly classes such as `no_response`,
+`too_small_delta`, `stuck_flat`, `delayed_response`, `wrong_sequence`, and
+`wrong_correlation`. It emits evidence, not repair commands.
+
+Replay reports also include a baseline coverage report. It marks scenarios such
+as startup response, cold start, hot restart, warm idle, road cruise, heavy load,
+throttle tip-in, shift response, and decel behavior as `strong`, `weak`, or
+`missing`. This tells the operator what known-good data still needs to be
+captured before the system should make stronger anomaly claims.
+
+Enable / persist transition baselines on the BBB with:
+
+```bash
+TRANSITION_MONITOR_ENABLED=1
+TRANSITION_MONITOR_LEARN_ENABLED=1
+VEHICLE_TRANSITION_BASELINE_PATH=/var/lib/beagley-cluster/baselines/vehicle_transition_baseline.json
+VEHICLE_TRANSITION_BASELINE_SAVE_EVERY_WINDOWS=5
+VEHICLE_TRANSITION_BASELINE_MIN_SAVE_INTERVAL_SECONDS=30.0
 ```
 
 ## Startup What-Changed Check

@@ -18,6 +18,7 @@ endif()
 # --------------------
 option(BEAGLEY_APPLIANCE_PRODUCTION "Enable the embedded appliance production profile" OFF)
 option(WITH_WEBENGINE "Enable Qt WebEngine map support" ON)
+option(WITH_MAPLIBRE_NATIVE "Enable the experimental MapLibre Native renderer path" OFF)
 
 if(BEAGLEY_APPLIANCE_PRODUCTION)
     set(WITH_WEBENGINE OFF CACHE BOOL "Enable Qt WebEngine map support" FORCE)
@@ -30,6 +31,11 @@ find_package(Qt6 REQUIRED COMPONENTS Core Network Quick Qml Svg WebSockets)
 
 if(WITH_WEBENGINE)
     find_package(Qt6 REQUIRED COMPONENTS WebEngineQuick)
+endif()
+
+if(WITH_MAPLIBRE_NATIVE)
+    find_package(Qt6 REQUIRED COMPONENTS Location Positioning)
+    find_package(QMapLibre 3.0.0 EXACT COMPONENTS Location REQUIRED)
 endif()
 
 include(CheckIPOSupported)
@@ -46,9 +52,15 @@ qt_add_executable(beagley_cluster
     src/navigation/NavigationService.cpp
     src/render/ClusterRenderModel.cpp
     src/render/NativeRasterMapItem.cpp
+    src/render/RasterFrameItem.cpp
+    src/render/RasterFrameItem.h
+    src/render/RadarFrameItem.cpp
+    src/render/RadarFrameItem.h
     src/render/PerformanceMetrics.cpp
     src/system/NowPlayingService.cpp
     src/system/NowPlayingService.h
+    src/system/RadarImageService.cpp
+    src/system/RadarImageService.h
     src/system/WiFiHotspotProfiles.cpp
     src/system/WiFiSetupService.cpp
     src/system/WiFiSsidUtils.cpp
@@ -91,25 +103,20 @@ qt_add_resources(beagley_cluster app_font_resources
 # --------------------
 set(BEAGLEY_QML_FILES
     src/ui/widgets/VehicleInfoCenter.qml
-    src/ui/widgets/vic/ATIcon.qml
     src/ui/widgets/vic/VicWarningColors.qml
     src/ui/widgets/vic/VicWarningHalo.qml
-    src/ui/widgets/vic/VicWarningIcon.qml
-    src/ui/widgets/vic/icons/AtIcon.qml
-    src/ui/widgets/vic/icons/BrakeIcon.qml
-    src/ui/widgets/vic/icons/ChargeIcon.qml
-    src/ui/widgets/vic/icons/CheckIcon.qml
+    src/ui/widgets/vic/OemTellTaleIcon.qml
+    src/ui/widgets/vic/telltales/AtTempTelltale.qml
+    src/ui/widgets/vic/telltales/BatteryTelltale.qml
+    src/ui/widgets/vic/telltales/BrakeTelltale.qml
+    src/ui/widgets/vic/telltales/CheckEngineTelltale.qml
+    src/ui/widgets/vic/telltales/DoorTelltale.qml
+    src/ui/widgets/vic/telltales/FuelTelltale.qml
+    src/ui/widgets/vic/telltales/HighBeamTelltale.qml
+    src/ui/widgets/vic/telltales/MdiPathIcon.qml
+    src/ui/widgets/vic/telltales/OilTelltale.qml
+    src/ui/widgets/vic/telltales/WarningTelltale.qml
     src/ui/widgets/vic/icons/DriveStateIcon.qml
-    src/ui/widgets/vic/icons/DoorIcon.qml
-    src/ui/widgets/vic/icons/FuelIcon.qml
-    src/ui/widgets/vic/icons/HighBeamIcon.qml
-    src/ui/widgets/vic/icons/OilIcon.qml
-    src/ui/widgets/vic/warnings/AtWarning.qml
-    src/ui/widgets/vic/warnings/BrakeWarning.qml
-    src/ui/widgets/vic/warnings/ChargeWarning.qml
-    src/ui/widgets/vic/warnings/CheckWarning.qml
-    src/ui/widgets/vic/warnings/DoorWarning.qml
-    src/ui/widgets/vic/warnings/FuelWarning.qml
     src/ui/widgets/TurnChevronFlow.qml
     src/ui/widgets/GaugeChevronOrbit.qml
     src/ui/theme/PurplePearlTheme.qml
@@ -127,8 +134,11 @@ set(BEAGLEY_QML_FILES
     src/ui/MainV3.qml
 
     # Widgets
+    src/ui/widgets/OemIcon.qml
+    src/ui/widgets/CornerCircleShell.qml
     src/ui/widgets/SpeedGauge.qml
     src/ui/widgets/DialChrome.qml
+    src/ui/widgets/GaugeLensShell.qml
     src/ui/widgets/GaugeArcHead.qml
     src/ui/widgets/FuelPumpIcon.qml
     src/ui/widgets/FuelGauge.qml
@@ -137,6 +147,7 @@ set(BEAGLEY_QML_FILES
     src/ui/widgets/MatrixRain.qml
     src/ui/widgets/MapCenter.qml
     src/ui/widgets/MapCenterBootShell.qml
+    src/ui/widgets/MapCenterMapLibreNative.qml
     src/ui/widgets/WeatherCorners.qml
     src/ui/widgets/BomCatalog.js
     src/ui/widgets/HighBeamHalo.qml
@@ -152,6 +163,12 @@ set(BEAGLEY_QML_FILES
 if(WITH_WEBENGINE)
     list(APPEND BEAGLEY_QML_FILES
         src/ui/widgets/MapCenterWeb.qml
+    )
+endif()
+
+if(WITH_MAPLIBRE_NATIVE)
+    list(APPEND BEAGLEY_QML_FILES
+        src/ui/widgets/MapCenterMapLibreNativeImpl.qml
     )
 endif()
 
@@ -179,6 +196,16 @@ target_link_libraries(beagley_cluster
 if(WITH_WEBENGINE)
     target_link_libraries(beagley_cluster PRIVATE Qt6::WebEngineQuick)
     target_compile_definitions(beagley_cluster PRIVATE WITH_WEBENGINE=1)
+endif()
+
+if(WITH_MAPLIBRE_NATIVE)
+    target_link_libraries(beagley_cluster PRIVATE
+        Qt6::Location
+        Qt6::Positioning
+        QMapLibre::Location
+    )
+    qmaplibre_location_setup_plugins(beagley_cluster)
+    target_compile_definitions(beagley_cluster PRIVATE WITH_MAPLIBRE_NATIVE=1)
 endif()
 
 if(BEAGLEY_APPLIANCE_PRODUCTION)

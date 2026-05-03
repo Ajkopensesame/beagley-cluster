@@ -138,6 +138,7 @@ private:
     bool m_forceProbeOnNextRefresh = true;
     qint64 m_lastProbeStartedMs = 0;
     QString m_lastProbeError;
+    QString m_lastConnectivitySummary;
     QString m_adminPasswordFile;
     QVector<WiFiHotspotProfiles::SavedProfile> m_savedProfiles;
     QString m_activeProfileId;

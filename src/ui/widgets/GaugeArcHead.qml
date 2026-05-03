@@ -13,9 +13,10 @@ Item {
 
     width: canvasExtent
     height: canvasExtent
-    visible: headRadius > 0.1 && !embeddedSafeMode
+    visible: headRadius > 0.1
 
-    layer.enabled: visible
+    // Keep the production Linux target visible, but avoid the extra FBO layer on EGLFS/KMS.
+    layer.enabled: visible && !embeddedSafeMode
     layer.smooth: true
 
     function requestHeadPaint() {
@@ -33,7 +34,7 @@ Item {
         anchors.fill: parent
         antialiasing: true
         smooth: true
-        renderTarget: Canvas.FramebufferObject
+        renderTarget: root.embeddedSafeMode ? Canvas.Image : Canvas.FramebufferObject
 
         onPaint: {
             const ctx = getContext("2d")

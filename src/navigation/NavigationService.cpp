@@ -100,6 +100,23 @@ bool envEnabled(const char *name, bool fallback)
         && value != QLatin1String("off")
         && value != QLatin1String("no");
 }
+
+QVariantList searchResultsToVariantList(const QList<SearchResultData> &parsed)
+{
+    QVariantList results;
+    for (const SearchResultData &result : parsed) {
+        results.append(QVariantMap{
+            {QStringLiteral("id"), result.id},
+            {QStringLiteral("label"), result.label},
+            {QStringLiteral("primary"), result.primary},
+            {QStringLiteral("secondary"), result.secondary},
+            {QStringLiteral("lat"), result.lat},
+            {QStringLiteral("lng"), result.lng},
+            {QStringLiteral("distanceMeters"), result.distanceMeters},
+        });
+    }
+    return results;
+}
 } // namespace
 
 NavigationService::NavigationService(VehicleStateClient *vehicleState, WiFiSetupService *wifiSetup, QObject *parent)
@@ -232,19 +249,16 @@ void NavigationService::search(const QString &query)
             runFallbackSearch(requestQuery, pose, requestSerial);
             return;
         }
-        QVariantList results;
-        for (const SearchResultData &result : parsed) {
-            results.append(QVariantMap{
-                {QStringLiteral("id"), result.id},
-                {QStringLiteral("label"), result.label},
-                {QStringLiteral("primary"), result.primary},
-                {QStringLiteral("secondary"), result.secondary},
-                {QStringLiteral("lat"), result.lat},
-                {QStringLiteral("lng"), result.lng},
-                {QStringLiteral("distanceMeters"), result.distanceMeters},
-            });
+        setSearchResults(searchResultsToVariantList(parsed));
+        if (m_provider.shouldRunFallbackSearch(parsed, requestQuery)) {
+            qInfo() << "[NavigationService] refining weak local search results with fallback" << reply->url();
+            setState(m_activeRoute.isEmpty() ? QStringLiteral("idle") : QStringLiteral("active"));
+            setNetworkStatus(QStringLiteral("online"));
+            setProviderStatus(QStringLiteral("search_refining"));
+            runFallbackSearch(requestQuery, pose, requestSerial, parsed);
+            return;
         }
-        setSearchResults(results);
+
         setState(m_activeRoute.isEmpty() ? QStringLiteral("idle") : QStringLiteral("active"));
         setNetworkStatus(QStringLiteral("online"));
         setProviderStatus(QStringLiteral("online"));
@@ -1166,7 +1180,7 @@ void NavigationService::updateMapPayload()
     }
 }
 
-void NavigationService::runFallbackSearch(const QString &query, const Pose &pose, quint64 requestSerial)
+void NavigationService::runFallbackSearch(const QString &query, const Pose &pose, quint64 requestSerial, const QList<SearchResultData> &primaryResults)
 {
     const QString trimmed = query.trimmed();
     if (trimmed.size() < 2) {
@@ -1177,7 +1191,7 @@ void NavigationService::runFallbackSearch(const QString &query, const Pose &pose
 
     QNetworkRequest request = m_provider.buildFallbackSearchRequest(trimmed, pose.lat, pose.lng);
     QNetworkReply *reply = m_network.get(request);
-    connect(reply, &QNetworkReply::finished, this, [this, reply, pose, requestSerial, trimmed]() {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, pose, requestSerial, trimmed, primaryResults]() {
         reply->deleteLater();
         if (!isCurrentSearchRequest(requestSerial, trimmed)) {
             return;
@@ -1185,29 +1199,27 @@ void NavigationService::runFallbackSearch(const QString &query, const Pose &pose
         if (reply->error() != QNetworkReply::NoError) {
             qWarning() << "[NavigationService] fallback search failed" << reply->url() << reply->errorString();
             const bool providerPathOk = providersAllowed();
-            setProviderStatus(providerPathOk ? QStringLiteral("search_degraded") : QStringLiteral("offline"));
-            setNetworkStatus(providerPathOk ? QStringLiteral("degraded") : QStringLiteral("connecting_hotspot"));
-            setSearchResults({});
-            setState(m_activeRoute.isEmpty() ? QStringLiteral("idle") : QStringLiteral("degraded"));
+            if (primaryResults.isEmpty()) {
+                setProviderStatus(providerPathOk ? QStringLiteral("search_degraded") : QStringLiteral("offline"));
+                setNetworkStatus(providerPathOk ? QStringLiteral("degraded") : QStringLiteral("connecting_hotspot"));
+                setSearchResults({});
+                setState(m_activeRoute.isEmpty() ? QStringLiteral("idle") : QStringLiteral("degraded"));
+            } else {
+                setProviderStatus(providerPathOk ? QStringLiteral("search_degraded") : QStringLiteral("offline"));
+                setNetworkStatus(providerPathOk ? QStringLiteral("degraded") : QStringLiteral("connecting_hotspot"));
+                setState(m_activeRoute.isEmpty() ? QStringLiteral("idle") : QStringLiteral("active"));
+            }
             return;
         }
 
         QList<SearchResultData> parsed = m_provider.parseSearchResponse(reply->readAll(), trimmed, pose.lat, pose.lng);
-        QVariantList results;
-        for (const SearchResultData &result : parsed) {
-            results.append(QVariantMap{
-                {QStringLiteral("id"), result.id},
-                {QStringLiteral("label"), result.label},
-                {QStringLiteral("primary"), result.primary},
-                {QStringLiteral("secondary"), result.secondary},
-                {QStringLiteral("lat"), result.lat},
-                {QStringLiteral("lng"), result.lng},
-                {QStringLiteral("distanceMeters"), result.distanceMeters},
-            });
+        if (!primaryResults.isEmpty()) {
+            parsed = m_provider.mergeSearchResults(primaryResults, parsed);
         }
-        setSearchResults(results);
+        setSearchResults(searchResultsToVariantList(parsed));
         setState(m_activeRoute.isEmpty() ? QStringLiteral("idle") : QStringLiteral("active"));
         setNetworkStatus(QStringLiteral("online"));
+        setProviderStatus(primaryResults.isEmpty() ? QStringLiteral("search_degraded") : QStringLiteral("online"));
     });
 }
 

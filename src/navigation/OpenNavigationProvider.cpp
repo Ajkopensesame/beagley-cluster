@@ -8,6 +8,7 @@
 #include <QtMath>
 
 #include <algorithm>
+#include <limits>
 
 namespace {
 constexpr int kSearchResultLimit = 8;
@@ -124,6 +125,205 @@ QStringList tokenizeWords(const QString &value)
     return normalized.isEmpty()
         ? QStringList()
         : normalized.split(QLatin1Char(' '), Qt::SkipEmptyParts);
+}
+
+void replaceTokenPhrase(QString *value, const QString &phrase, const QString &replacement)
+{
+    if (!value || value->isEmpty() || phrase.isEmpty()) {
+        return;
+    }
+
+    QString padded = QStringLiteral(" ") + value->simplified() + QStringLiteral(" ");
+    padded.replace(QStringLiteral(" ") + phrase + QStringLiteral(" "),
+        QStringLiteral(" ") + replacement + QStringLiteral(" "));
+    *value = padded.trimmed().simplified();
+}
+
+bool isSearchFillerToken(const QString &token)
+{
+    static const QStringList fillerTokens = {
+        QStringLiteral("near"),
+        QStringLiteral("nearby"),
+        QStringLiteral("nearest"),
+        QStringLiteral("closest"),
+        QStringLiteral("around"),
+        QStringLiteral("me"),
+        QStringLiteral("my"),
+        QStringLiteral("current"),
+        QStringLiteral("location"),
+        QStringLiteral("open"),
+        QStringLiteral("now"),
+    };
+    return fillerTokens.contains(token);
+}
+
+bool queryHasNearMeIntent(const QString &query)
+{
+    const QString normalized = normalizedText(query);
+    const QString padded = QStringLiteral(" ") + normalized + QStringLiteral(" ");
+    return padded.contains(QStringLiteral(" near me "))
+        || padded.contains(QStringLiteral(" nearby "))
+        || padded.contains(QStringLiteral(" nearest "))
+        || padded.contains(QStringLiteral(" closest "))
+        || padded.contains(QStringLiteral(" around me "))
+        || padded.contains(QStringLiteral(" current location "));
+}
+
+QString stripSearchIntentFillers(const QString &query)
+{
+    const QStringList tokens = tokenizeWords(query);
+    QStringList kept;
+    for (const QString &token : tokens) {
+        if (!isSearchFillerToken(token)) {
+            kept.append(token);
+        }
+    }
+    return kept.join(QLatin1Char(' ')).simplified();
+}
+
+QString canonicalSearchQuery(const QString &query)
+{
+    QString normalized = stripSearchIntentFillers(query);
+    if (normalized.isEmpty()) {
+        normalized = normalizedText(query);
+    }
+
+    replaceTokenPhrase(&normalized, QStringLiteral("petrol stations"), QStringLiteral("petrol station"));
+    replaceTokenPhrase(&normalized, QStringLiteral("service stations"), QStringLiteral("petrol station"));
+    replaceTokenPhrase(&normalized, QStringLiteral("service station"), QStringLiteral("petrol station"));
+    replaceTokenPhrase(&normalized, QStringLiteral("gas stations"), QStringLiteral("petrol station"));
+    replaceTokenPhrase(&normalized, QStringLiteral("gas station"), QStringLiteral("petrol station"));
+    replaceTokenPhrase(&normalized, QStringLiteral("fuel stations"), QStringLiteral("petrol station"));
+    replaceTokenPhrase(&normalized, QStringLiteral("fuel station"), QStringLiteral("petrol station"));
+    if (!normalized.contains(QStringLiteral("petrol station"))) {
+        replaceTokenPhrase(&normalized, QStringLiteral("petrol"), QStringLiteral("petrol station"));
+        replaceTokenPhrase(&normalized, QStringLiteral("fuel"), QStringLiteral("petrol station"));
+        replaceTokenPhrase(&normalized, QStringLiteral("gas"), QStringLiteral("petrol station"));
+    }
+    replaceTokenPhrase(&normalized, QStringLiteral("servos"), QStringLiteral("petrol station"));
+    replaceTokenPhrase(&normalized, QStringLiteral("servo"), QStringLiteral("petrol station"));
+
+    replaceTokenPhrase(&normalized, QStringLiteral("coffee shops"), QStringLiteral("cafe"));
+    replaceTokenPhrase(&normalized, QStringLiteral("coffee shop"), QStringLiteral("cafe"));
+    replaceTokenPhrase(&normalized, QStringLiteral("coffees"), QStringLiteral("cafe"));
+    replaceTokenPhrase(&normalized, QStringLiteral("coffee"), QStringLiteral("cafe"));
+    replaceTokenPhrase(&normalized, QStringLiteral("cafes"), QStringLiteral("cafe"));
+
+    replaceTokenPhrase(&normalized, QStringLiteral("chemists"), QStringLiteral("pharmacy"));
+    replaceTokenPhrase(&normalized, QStringLiteral("chemist"), QStringLiteral("pharmacy"));
+    replaceTokenPhrase(&normalized, QStringLiteral("drugstore"), QStringLiteral("pharmacy"));
+
+    replaceTokenPhrase(&normalized, QStringLiteral("groceries"), QStringLiteral("supermarket"));
+    replaceTokenPhrase(&normalized, QStringLiteral("grocery stores"), QStringLiteral("supermarket"));
+    replaceTokenPhrase(&normalized, QStringLiteral("grocery store"), QStringLiteral("supermarket"));
+    replaceTokenPhrase(&normalized, QStringLiteral("grocery"), QStringLiteral("supermarket"));
+    replaceTokenPhrase(&normalized, QStringLiteral("supermarkets"), QStringLiteral("supermarket"));
+
+    replaceTokenPhrase(&normalized, QStringLiteral("car parks"), QStringLiteral("parking"));
+    replaceTokenPhrase(&normalized, QStringLiteral("car park"), QStringLiteral("parking"));
+    replaceTokenPhrase(&normalized, QStringLiteral("parks"), QStringLiteral("park"));
+
+    replaceTokenPhrase(&normalized, QStringLiteral("toilets"), QStringLiteral("toilet"));
+    replaceTokenPhrase(&normalized, QStringLiteral("bathrooms"), QStringLiteral("toilet"));
+    replaceTokenPhrase(&normalized, QStringLiteral("bathroom"), QStringLiteral("toilet"));
+    replaceTokenPhrase(&normalized, QStringLiteral("restrooms"), QStringLiteral("toilet"));
+    replaceTokenPhrase(&normalized, QStringLiteral("restroom"), QStringLiteral("toilet"));
+
+    replaceTokenPhrase(&normalized, QStringLiteral("maccas"), QStringLiteral("mcdonalds"));
+    replaceTokenPhrase(&normalized, QStringLiteral("woolies"), QStringLiteral("woolworths"));
+
+    return normalized.simplified();
+}
+
+QString providerSearchQuery(const QString &query)
+{
+    const QString trimmed = query.trimmed();
+    const QString canonical = canonicalSearchQuery(trimmed);
+    if (canonical.isEmpty()) {
+        return trimmed;
+    }
+    return canonical == normalizedText(trimmed) ? trimmed : canonical;
+}
+
+QStringList categoryIntentTokens(const QString &query)
+{
+    QStringList tokens = tokenizeWords(canonicalSearchQuery(query));
+    const QString normalized = tokens.join(QLatin1Char(' '));
+    const QString padded = QStringLiteral(" ") + normalized + QStringLiteral(" ");
+
+    if (padded.contains(QStringLiteral(" petrol station "))) {
+        tokens << QStringLiteral("fuel") << QStringLiteral("petrol") << QStringLiteral("station")
+               << QStringLiteral("servo") << QStringLiteral("service") << QStringLiteral("gas");
+    }
+    if (padded.contains(QStringLiteral(" cafe "))) {
+        tokens << QStringLiteral("coffee") << QStringLiteral("cafe");
+    }
+    if (padded.contains(QStringLiteral(" pharmacy "))) {
+        tokens << QStringLiteral("chemist") << QStringLiteral("pharmacy") << QStringLiteral("drugstore");
+    }
+    if (padded.contains(QStringLiteral(" supermarket "))) {
+        tokens << QStringLiteral("supermarket") << QStringLiteral("grocery") << QStringLiteral("groceries")
+               << QStringLiteral("woolies") << QStringLiteral("woolworths") << QStringLiteral("coles");
+    }
+    if (padded.contains(QStringLiteral(" toilet "))) {
+        tokens << QStringLiteral("toilet") << QStringLiteral("toilets") << QStringLiteral("bathroom")
+               << QStringLiteral("restroom") << QStringLiteral("loo");
+    }
+    if (padded.contains(QStringLiteral(" parking "))) {
+        tokens << QStringLiteral("parking") << QStringLiteral("carpark") << QStringLiteral("car") << QStringLiteral("park");
+    }
+    if (padded.contains(QStringLiteral(" restaurant "))) {
+        tokens << QStringLiteral("restaurant") << QStringLiteral("food") << QStringLiteral("dining") << QStringLiteral("eat");
+    }
+    if (padded.contains(QStringLiteral(" hospital "))) {
+        tokens << QStringLiteral("hospital") << QStringLiteral("medical") << QStringLiteral("emergency");
+    }
+    if (padded.contains(QStringLiteral(" airport "))) {
+        tokens << QStringLiteral("airport") << QStringLiteral("aerodrome") << QStringLiteral("airfield");
+    }
+
+    tokens.removeDuplicates();
+    return tokens;
+}
+
+QString photonOsmTagForQuery(const QString &query)
+{
+    const QString normalized = categoryIntentTokens(query).join(QLatin1Char(' '));
+    const QString padded = QStringLiteral(" ") + normalized + QStringLiteral(" ");
+    if (padded.contains(QStringLiteral(" petrol ")) || padded.contains(QStringLiteral(" fuel ")) || padded.contains(QStringLiteral(" servo "))) {
+        return QStringLiteral("amenity:fuel");
+    }
+    if (padded.contains(QStringLiteral(" cafe ")) || padded.contains(QStringLiteral(" coffee "))) {
+        return QStringLiteral("amenity:cafe");
+    }
+    if (padded.contains(QStringLiteral(" pharmacy ")) || padded.contains(QStringLiteral(" chemist "))) {
+        return QStringLiteral("amenity:pharmacy");
+    }
+    if (padded.contains(QStringLiteral(" supermarket ")) || padded.contains(QStringLiteral(" grocery "))) {
+        return QStringLiteral("shop:supermarket");
+    }
+    if (padded.contains(QStringLiteral(" toilet "))) {
+        return QStringLiteral("amenity:toilets");
+    }
+    if (padded.contains(QStringLiteral(" parking "))) {
+        return QStringLiteral("amenity:parking");
+    }
+    if (padded.contains(QStringLiteral(" restaurant "))) {
+        return QStringLiteral("amenity:restaurant");
+    }
+    if (padded.contains(QStringLiteral(" hospital "))) {
+        return QStringLiteral("amenity:hospital");
+    }
+    return {};
+}
+
+bool queryLooksLocalCategoryLike(const QString &query)
+{
+    const QString canonical = canonicalSearchQuery(query);
+    if (queryHasNearMeIntent(query) && canonical != normalizedText(query)) {
+        return true;
+    }
+    return !photonOsmTagForQuery(query).isEmpty();
 }
 
 QString addressLine(const QString &houseNumber, const QString &street)
@@ -366,6 +566,36 @@ QStringList categoryTokens(const SearchResultData &result)
     if (osmKey == QLatin1String("aeroway") || osmValue == QLatin1String("aerodrome")) {
         tokens << QStringLiteral("airport") << QStringLiteral("airfield");
     }
+    if (osmKey == QLatin1String("amenity") && osmValue == QLatin1String("fuel")) {
+        tokens << QStringLiteral("fuel") << QStringLiteral("petrol") << QStringLiteral("station")
+               << QStringLiteral("servo") << QStringLiteral("service") << QStringLiteral("gas");
+    }
+    if (osmKey == QLatin1String("amenity") && osmValue == QLatin1String("cafe")) {
+        tokens << QStringLiteral("cafe") << QStringLiteral("coffee");
+    }
+    if (osmKey == QLatin1String("amenity") && osmValue == QLatin1String("pharmacy")) {
+        tokens << QStringLiteral("pharmacy") << QStringLiteral("chemist") << QStringLiteral("drugstore");
+    }
+    if (osmKey == QLatin1String("amenity") && osmValue == QLatin1String("restaurant")) {
+        tokens << QStringLiteral("restaurant") << QStringLiteral("food") << QStringLiteral("dining");
+    }
+    if (osmKey == QLatin1String("amenity") && osmValue == QLatin1String("fast food")) {
+        tokens << QStringLiteral("restaurant") << QStringLiteral("food") << QStringLiteral("takeaway") << QStringLiteral("fast");
+    }
+    if (osmKey == QLatin1String("amenity") && osmValue == QLatin1String("toilets")) {
+        tokens << QStringLiteral("toilet") << QStringLiteral("toilets") << QStringLiteral("bathroom")
+               << QStringLiteral("restroom") << QStringLiteral("loo");
+    }
+    if (osmKey == QLatin1String("amenity") && osmValue == QLatin1String("parking")) {
+        tokens << QStringLiteral("parking") << QStringLiteral("carpark") << QStringLiteral("car") << QStringLiteral("park");
+    }
+    if (osmKey == QLatin1String("amenity") && osmValue == QLatin1String("hospital")) {
+        tokens << QStringLiteral("hospital") << QStringLiteral("medical") << QStringLiteral("emergency");
+    }
+    if (osmKey == QLatin1String("shop") && osmValue == QLatin1String("supermarket")) {
+        tokens << QStringLiteral("supermarket") << QStringLiteral("grocery") << QStringLiteral("groceries")
+               << QStringLiteral("woolies") << QStringLiteral("woolworths") << QStringLiteral("coles");
+    }
     if (osmKey == QLatin1String("shop") && osmValue == QLatin1String("mall")) {
         tokens << QStringLiteral("mall") << QStringLiteral("shopping") << QStringLiteral("centre") << QStringLiteral("center");
     }
@@ -384,8 +614,12 @@ bool queryMatchesCategory(const QStringList &queryTokens, const SearchResultData
 {
     const QStringList categories = categoryTokens(result);
     for (const QString &queryToken : queryTokens) {
-        if (categories.contains(queryToken)) {
-            return true;
+        for (const QString &categoryToken : categories) {
+            if (categoryToken == queryToken
+                || (queryToken.size() >= 3 && categoryToken.startsWith(queryToken))
+                || (categoryToken.size() >= 3 && queryToken.startsWith(categoryToken))) {
+                return true;
+            }
         }
     }
     return false;
@@ -407,6 +641,23 @@ double distanceScore(double distanceMeters)
     }
     if (distanceMeters <= 150000.0) {
         return 4.0;
+    }
+    return 0.0;
+}
+
+double localIntentDistancePenalty(double distanceMeters)
+{
+    if (!qIsFinite(distanceMeters) || distanceMeters < 0.0) {
+        return 0.0;
+    }
+    if (distanceMeters > 1000000.0) {
+        return -280.0;
+    }
+    if (distanceMeters > 150000.0) {
+        return -80.0;
+    }
+    if (distanceMeters > 60000.0) {
+        return -30.0;
     }
     return 0.0;
 }
@@ -457,7 +708,28 @@ double textMatchScore(const QString &queryNormalized, const QStringList &queryTo
     return score;
 }
 
-double addressIntentScore(const SearchResultData &result, const QStringList &queryTokens)
+double categoryIntentScore(const SearchResultData &result, const QStringList &categoryQueryTokens)
+{
+    if (!queryMatchesCategory(categoryQueryTokens, result)) {
+        return 0.0;
+    }
+
+    if (resultLooksPoi(result)) {
+        return 38.0;
+    }
+    if (resultLooksStreet(result)) {
+        return 18.0;
+    }
+    if (resultLooksNatural(result)) {
+        return 14.0;
+    }
+    if (resultLooksSettlement(result)) {
+        return -14.0;
+    }
+    return 10.0;
+}
+
+double addressIntentScore(const SearchResultData &result, const QStringList &queryTokens, const QStringList &categoryQueryTokens)
 {
     double score = 0.0;
 
@@ -471,7 +743,7 @@ double addressIntentScore(const SearchResultData &result, const QStringList &que
         score -= 16.0;
     }
 
-    if (resultLooksPoi(result) && !queryMatchesCategory(queryTokens, result)) {
+    if (resultLooksPoi(result) && !queryMatchesCategory(categoryQueryTokens, result)) {
         score -= 32.0;
     }
 
@@ -494,7 +766,7 @@ double addressIntentScore(const SearchResultData &result, const QStringList &que
     return score;
 }
 
-double placeIntentScore(const SearchResultData &result, const QStringList &queryTokens)
+double placeIntentScore(const SearchResultData &result, const QStringList &categoryQueryTokens)
 {
     double score = 0.0;
 
@@ -508,7 +780,7 @@ double placeIntentScore(const SearchResultData &result, const QStringList &query
         score += 6.0;
     }
 
-    if (resultLooksPoi(result) && !queryMatchesCategory(queryTokens, result)) {
+    if (resultLooksPoi(result) && !queryMatchesCategory(categoryQueryTokens, result)) {
         score -= 24.0;
     }
 
@@ -517,13 +789,19 @@ double placeIntentScore(const SearchResultData &result, const QStringList &query
 
 double rankSearchResult(const SearchResultData &result, const QString &query, const QString &countryCodeHint)
 {
-    const QString queryNormalized = normalizedText(query);
-    const QStringList queryTokens = tokenizeWords(query);
-    const bool addressLike = queryLooksAddressLike(query);
+    const QString effectiveQuery = canonicalSearchQuery(query);
+    const QString queryNormalized = effectiveQuery.isEmpty() ? normalizedText(query) : effectiveQuery;
+    const QStringList queryTokens = tokenizeWords(queryNormalized);
+    const QStringList categoryQueryTokens = categoryIntentTokens(query);
+    const bool addressLike = queryLooksAddressLike(queryNormalized);
 
     double score = textMatchScore(queryNormalized, queryTokens, result);
-    score += addressLike ? addressIntentScore(result, queryTokens) : placeIntentScore(result, queryTokens);
+    score += categoryIntentScore(result, categoryQueryTokens);
+    score += addressLike ? addressIntentScore(result, queryTokens, categoryQueryTokens) : placeIntentScore(result, categoryQueryTokens);
     score += distanceScore(result.distanceMeters);
+    if (queryLooksLocalCategoryLike(query) || queryHasNearMeIntent(query)) {
+        score += localIntentDistancePenalty(result.distanceMeters);
+    }
     score += qMin(8.0, result.importance * 12.0);
     score += qMax(0, kSearchResultLimit - result.sourceOrder) * 0.35;
 
@@ -533,6 +811,58 @@ double rankSearchResult(const SearchResultData &result, const QString &query, co
     }
 
     return score;
+}
+
+void sortSearchResults(QList<SearchResultData> *results)
+{
+    if (!results) {
+        return;
+    }
+    std::stable_sort(results->begin(), results->end(), [](const SearchResultData &left, const SearchResultData &right) {
+        if (qAbs(left.rankScore - right.rankScore) > 0.01) {
+            return left.rankScore > right.rankScore;
+        }
+        if (qAbs(left.distanceMeters - right.distanceMeters) > 0.5) {
+            return left.distanceMeters < right.distanceMeters;
+        }
+        if (left.sourceOrder != right.sourceOrder) {
+            return left.sourceOrder < right.sourceOrder;
+        }
+        return left.primary < right.primary;
+    });
+}
+
+bool sameSearchResult(const SearchResultData &left, const SearchResultData &right)
+{
+    const QString leftPrimary = normalizedText(left.primary);
+    const QString rightPrimary = normalizedText(right.primary);
+    const QString leftLabel = normalizedText(left.label);
+    const QString rightLabel = normalizedText(right.label);
+    const double distance = resultDistance(left.lat, left.lng, right.lat, right.lng, std::numeric_limits<double>::infinity());
+
+    if (qIsFinite(distance) && distance <= 35.0) {
+        return true;
+    }
+    if (!leftPrimary.isEmpty()
+        && leftPrimary == rightPrimary
+        && qIsFinite(distance)
+        && distance <= 250.0) {
+        return true;
+    }
+    if (!leftLabel.isEmpty()
+        && leftLabel == rightLabel) {
+        return true;
+    }
+    return false;
+}
+
+QList<SearchResultData> limitedSearchResults(QList<SearchResultData> results)
+{
+    sortSearchResults(&results);
+    while (results.size() > kSearchResultLimit) {
+        results.removeLast();
+    }
+    return results;
 }
 } // namespace
 
@@ -553,7 +883,9 @@ OpenNavigationProvider::OpenNavigationProvider()
 
 QNetworkRequest OpenNavigationProvider::buildSearchRequest(const QString &query, double originLat, double originLng) const
 {
-    if (queryLooksAddressLike(query)) {
+    const QString effectiveQuery = providerSearchQuery(query);
+
+    if (queryLooksAddressLike(effectiveQuery)) {
         QUrl url(m_fallbackGeocoderUrl);
         QUrlQuery urlQuery(url);
         urlQuery.addQueryItem(QStringLiteral("format"), QStringLiteral("jsonv2"));
@@ -561,7 +893,7 @@ QNetworkRequest OpenNavigationProvider::buildSearchRequest(const QString &query,
         urlQuery.addQueryItem(QStringLiteral("addressdetails"), QStringLiteral("1"));
         urlQuery.addQueryItem(QStringLiteral("layer"), QStringLiteral("address"));
         urlQuery.addQueryItem(QStringLiteral("bounded"), QStringLiteral("1"));
-        urlQuery.addQueryItem(QStringLiteral("q"), query);
+        urlQuery.addQueryItem(QStringLiteral("q"), effectiveQuery);
         if (!m_searchCountryCode.isEmpty()) {
             urlQuery.addQueryItem(QStringLiteral("countrycodes"), m_searchCountryCode.toLower());
         }
@@ -583,12 +915,16 @@ QNetworkRequest OpenNavigationProvider::buildSearchRequest(const QString &query,
     QUrl url(m_geocoderUrl);
     QUrlQuery urlQuery(url);
     urlQuery.addQueryItem(QStringLiteral("limit"), QString::number(kSearchResultLimit));
-    urlQuery.addQueryItem(QStringLiteral("q"), query);
+    urlQuery.addQueryItem(QStringLiteral("q"), effectiveQuery);
     if (qIsFinite(originLat) && qIsFinite(originLng)) {
         urlQuery.addQueryItem(QStringLiteral("lat"), QString::number(originLat, 'f', 6));
         urlQuery.addQueryItem(QStringLiteral("lon"), QString::number(originLng, 'f', 6));
         urlQuery.addQueryItem(QStringLiteral("zoom"), QString::number(kPhotonBiasZoom));
         urlQuery.addQueryItem(QStringLiteral("location_bias_scale"), QString::number(kPhotonBiasScale, 'f', 2));
+    }
+    const QString osmTag = photonOsmTagForQuery(query);
+    if (!osmTag.isEmpty()) {
+        urlQuery.addQueryItem(QStringLiteral("osm_tag"), osmTag);
     }
     const QString languageCode = photonLanguageCode(m_searchLanguage);
     if (!languageCode.isEmpty()) {
@@ -604,22 +940,29 @@ QNetworkRequest OpenNavigationProvider::buildSearchRequest(const QString &query,
 
 QNetworkRequest OpenNavigationProvider::buildFallbackSearchRequest(const QString &query, double originLat, double originLng) const
 {
+    const QString effectiveQuery = providerSearchQuery(query);
     QUrl url(m_fallbackGeocoderUrl);
     QUrlQuery urlQuery(url);
-    const bool addressLike = queryLooksAddressLike(query);
+    const bool addressLike = queryLooksAddressLike(effectiveQuery);
+    const bool localIntent = queryLooksLocalCategoryLike(query);
     urlQuery.addQueryItem(QStringLiteral("format"), QStringLiteral("jsonv2"));
     urlQuery.addQueryItem(QStringLiteral("limit"), QString::number(kSearchResultLimit));
     urlQuery.addQueryItem(QStringLiteral("addressdetails"), QStringLiteral("1"));
-    urlQuery.addQueryItem(QStringLiteral("q"), query);
+    urlQuery.addQueryItem(QStringLiteral("q"), effectiveQuery);
     if (addressLike) {
         urlQuery.addQueryItem(QStringLiteral("layer"), QStringLiteral("address"));
         if (!m_searchCountryCode.isEmpty()) {
             urlQuery.addQueryItem(QStringLiteral("countrycodes"), m_searchCountryCode.toLower());
         }
+    } else if (localIntent && !m_searchCountryCode.isEmpty()) {
+        urlQuery.addQueryItem(QStringLiteral("countrycodes"), m_searchCountryCode.toLower());
     }
     const QString viewbox = searchViewbox(originLat, originLng, kNominatimViewboxRadiusKm);
     if (!viewbox.isEmpty()) {
         urlQuery.addQueryItem(QStringLiteral("viewbox"), viewbox);
+        if (localIntent) {
+            urlQuery.addQueryItem(QStringLiteral("bounded"), QStringLiteral("1"));
+        }
     }
     url.setQuery(urlQuery);
 
@@ -659,19 +1002,57 @@ QList<SearchResultData> OpenNavigationProvider::parseSearchResponse(const QByteA
         result.rankScore = rankSearchResult(result, query, m_searchCountryCode);
     }
 
-    std::stable_sort(results.begin(), results.end(), [](const SearchResultData &left, const SearchResultData &right) {
-        if (qAbs(left.rankScore - right.rankScore) > 0.01) {
-            return left.rankScore > right.rankScore;
+    return limitedSearchResults(results);
+}
+
+bool OpenNavigationProvider::shouldRunFallbackSearch(const QList<SearchResultData> &primaryResults, const QString &query) const
+{
+    if (primaryResults.isEmpty()) {
+        return true;
+    }
+    if (queryLooksAddressLike(canonicalSearchQuery(query))) {
+        return false;
+    }
+
+    const bool localIntent = queryLooksLocalCategoryLike(query) || queryHasNearMeIntent(query);
+    if (!localIntent) {
+        return false;
+    }
+
+    const SearchResultData &top = primaryResults.first();
+    if (!qIsFinite(top.distanceMeters) || top.distanceMeters < 0.0) {
+        return true;
+    }
+    if (top.distanceMeters > 20000.0) {
+        return true;
+    }
+    return top.rankScore < 90.0;
+}
+
+QList<SearchResultData> OpenNavigationProvider::mergeSearchResults(const QList<SearchResultData> &primaryResults, const QList<SearchResultData> &fallbackResults) const
+{
+    QList<SearchResultData> merged;
+    const auto appendOrReplace = [&merged](const SearchResultData &candidate) {
+        for (SearchResultData &existing : merged) {
+            if (!sameSearchResult(existing, candidate)) {
+                continue;
+            }
+            if (candidate.rankScore > existing.rankScore
+                || (qAbs(candidate.rankScore - existing.rankScore) <= 0.01 && candidate.distanceMeters < existing.distanceMeters)) {
+                existing = candidate;
+            }
+            return;
         }
-        if (qAbs(left.distanceMeters - right.distanceMeters) > 0.5) {
-            return left.distanceMeters < right.distanceMeters;
-        }
-        if (left.sourceOrder != right.sourceOrder) {
-            return left.sourceOrder < right.sourceOrder;
-        }
-        return left.primary < right.primary;
-    });
-    return results;
+        merged.append(candidate);
+    };
+
+    for (const SearchResultData &result : primaryResults) {
+        appendOrReplace(result);
+    }
+    for (const SearchResultData &result : fallbackResults) {
+        appendOrReplace(result);
+    }
+    return limitedSearchResults(merged);
 }
 
 QNetworkRequest OpenNavigationProvider::buildRouteRequest(double originLat, double originLng, double destLat, double destLng) const

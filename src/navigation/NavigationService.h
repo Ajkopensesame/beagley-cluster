@@ -164,7 +164,7 @@ private:
     void updateFromVehicle();
     void updateGuidance();
     void updateMapPayload();
-    void runFallbackSearch(const QString &query, const Pose &pose, quint64 requestSerial);
+    void runFallbackSearch(const QString &query, const Pose &pose, quint64 requestSerial, const QList<SearchResultData> &primaryResults = {});
     void maybeTriggerPrompts();
     void maybeRefreshRoute();
     void persistCache() const;

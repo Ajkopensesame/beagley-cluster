@@ -7,8 +7,9 @@ Item {
     id: root
 
     property var theme
-    property real lat: -27.4698
-    property real lng: 153.0251
+    property real lat: NaN
+    property real lng: NaN
+    property bool livePositionValid: false
     property string effectLevel: "low"
     property bool active: true
     property bool stressScene: false
@@ -20,17 +21,29 @@ Item {
     readonly property string displayFont: theme && theme.fontDisplay ? theme.fontDisplay : "Oxanium"
     readonly property string monoFont: theme && theme.fontMono ? theme.fontMono : "Oxanium"
     readonly property bool embeddedSafeMode: Qt.platform.os === "linux"
-    readonly property bool linuxBomRadarInlineSupported: false
-    readonly property int podSize: Math.floor(Math.min(142, Math.max(118, height * 0.185)))
-    readonly property int cornerInset: 0
-    readonly property real safeLat: coordValid(lat, -90, 90) ? Number(lat) : -27.4698
-    readonly property real safeLng: coordValid(lng, -180, 180) ? Number(lng) : 153.0251
+    readonly property bool tallDetailMode: expandedMode === "temp" || expandedMode === "radar"
+    readonly property int podSize: Math.floor(Math.min(156, Math.max(130, height * 0.205)))
+    readonly property int cornerBleed: Math.round(podSize * 0.18)
+    readonly property int cornerInset: -cornerBleed
+    readonly property real podBleedFraction: cornerBleed / podSize
+    readonly property int podFaceInset: Math.round(podSize * 0.190)
+    readonly property int podContentDiameter: Math.round(podSize * 0.56)
+    readonly property int podLabelWidth: Math.round(podSize * 0.58)
+    readonly property int podIconSize: Math.round(podSize * 0.31)
+    readonly property real stressLat: -27.4698
+    readonly property real stressLng: 153.0251
+    readonly property bool liveWeatherPositionReady: livePositionValid
+        && coordValid(lat, -90, 90)
+        && coordValid(lng, -180, 180)
+    readonly property bool weatherPositionReady: liveWeatherPositionReady || stressScene
+    readonly property real safeLat: liveWeatherPositionReady ? Number(lat) : (stressScene ? stressLat : NaN)
+    readonly property real safeLng: liveWeatherPositionReady ? Number(lng) : (stressScene ? stressLng : NaN)
     readonly property real displayTempC: isFinite(Number(airTempC))
         ? Number(airTempC)
-        : (24.0 + 3.5 * (0.5 + 0.5 * Math.sin(phase * 0.18)))
+        : (stressScene ? (24.0 + 3.5 * (0.5 + 0.5 * Math.sin(phase * 0.18))) : NaN)
     readonly property real displayFeelsC: isFinite(Number(feelsLikeC))
         ? Number(feelsLikeC)
-        : displayTempC + 0.8
+        : (stressScene && isFinite(Number(displayTempC)) ? displayTempC + 0.8 : NaN)
     readonly property bool musicAvailable: !!(nowPlayingService && nowPlayingService.available)
     readonly property bool musicPlaying: !!(nowPlayingService && nowPlayingService.playing)
     readonly property string musicTitle: nowPlayingService && nowPlayingService.title
@@ -51,9 +64,11 @@ Item {
     readonly property int weatherRefreshIntervalMs: expandedMode === "temp"
         ? (lowEffectMode ? 12 * 60 * 1000 : 8 * 60 * 1000)
         : 30 * 60 * 1000
-    readonly property int radarRefreshIntervalMs: expandedMode === "radar"
-        ? (lowEffectMode ? 7 * 60 * 1000 : 5 * 60 * 1000)
-        : 25 * 60 * 1000
+    readonly property int forecastRefreshIntervalMs: expandedMode === "temp"
+        ? 45 * 60 * 1000
+        : 2 * 60 * 60 * 1000
+    readonly property int radarRefreshIntervalMs: 60 * 1000
+    readonly property real radarMapZoom: 7.0
 
     property real airTempC: NaN
     property real feelsLikeC: NaN
@@ -69,19 +84,25 @@ Item {
     property string weatherStationProduct: ""
     property real weatherStationDistanceKm: NaN
     property string weatherStatus: "SYNC"
+    property var forecastRows: []
+    property string forecastStatus: "SYNC"
+    property string forecastUpdatedText: ""
     property string radarStatus: "SYNC"
     property string locationName: ""
     property real locationAnchorLat: NaN
     property real locationAnchorLng: NaN
-    property string radarImageSource: ""
     property string radarFrameTime: ""
     property string radarSiteName: ""
     property string radarProduct: ""
     property real radarSiteDistanceKm: NaN
-    property int radarRetryCount: 0
+    property string radarFrameLabel: ""
     property string expandedMode: ""
 
     signal mapMenuRequested()
+
+    readonly property bool radarServiceAvailable: typeof radarImage !== "undefined" && radarImage !== null
+    readonly property bool radarServiceReady: radarServiceAvailable && radarImage.ready && String(radarImage.imageUrl).length > 0
+    readonly property url radarFrameUrl: radarServiceReady ? radarImage.imageUrl : ""
 
     opacity: active ? 1 : 0
     visible: opacity > 0.01
@@ -172,13 +193,9 @@ Item {
     }
 
     function radarCompactLabel() {
-        if (locationName.length > 0)
-            return locationName
-        if (radarSiteName.length > 0)
-            return radarSiteName.split(" ")[0].toUpperCase()
-        if (radarStatus === "LIVE" || radarStatus === "SITE")
+        if (radarStatus === "LIVE")
             return "RADAR"
-        return radarStatus
+        return radarStatus.length > 0 ? radarStatus : "SYNC"
     }
 
     function weatherSourceLabel() {
@@ -193,11 +210,28 @@ Item {
         return radarSiteName + "  " + formatDistanceKm(radarSiteDistanceKm)
     }
 
+    function radarFrameDisplayLabel() {
+        const label = cleanText(radarFrameLabel)
+        const time = cleanText(radarFrameTime)
+        if (label.length > 0 && time.length > 0)
+            return label + "  " + time
+        if (label.length > 0)
+            return label
+        return time.length > 0 ? time : radarStatus
+    }
+
     function weatherLabel() {
         const summary = cleanText(weatherSummary)
         if (summary.length > 0)
             return summary.toUpperCase()
         return weatherStatus === "LIVE" ? "OBSERVED" : weatherStatus
+    }
+
+    function currentConditionLabel() {
+        const label = weatherLabel()
+        if ((label === "OBSERVED" || label === "LIVE") && forecastRows.length > 0)
+            return cleanText(forecastRows[0].label).length > 0 ? forecastRows[0].label : label
+        return label
     }
 
     function parseBomDate(value) {
@@ -224,6 +258,110 @@ Item {
     function formatBomStamp(value) {
         const date = parseBomDate(value)
         return date ? Qt.formatDateTime(date, "ddd HH:mm").toUpperCase() : "--"
+    }
+
+    function parseIsoDay(value) {
+        const text = cleanText(value)
+        if (text.length < 10)
+            return null
+        const date = new Date(text + "T12:00:00")
+        return isNaN(date.getTime()) ? null : date
+    }
+
+    function forecastDayLabel(value, index) {
+        if (index === 0)
+            return "TODAY"
+        if (index === 1)
+            return "TOMORROW"
+        const date = parseIsoDay(value)
+        return date ? Qt.formatDate(date, "ddd").toUpperCase() : "--"
+    }
+
+    function forecastConditionLabel(codeValue) {
+        const code = Math.round(Number(codeValue))
+        if (!isFinite(code))
+            return "FORECAST"
+        if (code === 0)
+            return "CLEAR"
+        if (code === 1)
+            return "MOSTLY CLEAR"
+        if (code === 2)
+            return "PARTLY CLOUDY"
+        if (code === 3)
+            return "CLOUDY"
+        if (code === 45 || code === 48)
+            return "FOG"
+        if (code >= 51 && code <= 57)
+            return "DRIZZLE"
+        if (code >= 61 && code <= 67)
+            return "RAIN"
+        if (code >= 71 && code <= 77)
+            return "SNOW"
+        if (code >= 80 && code <= 82)
+            return "SHOWERS"
+        if (code >= 85 && code <= 86)
+            return "SNOW SHOWERS"
+        if (code >= 95)
+            return "STORM"
+        return "FORECAST"
+    }
+
+    function weatherKind(labelValue) {
+        const label = uppercaseLabel(labelValue)
+        if (label.indexOf("STORM") >= 0)
+            return "storm"
+        if (label.indexOf("RAIN") >= 0 || label.indexOf("SHOWER") >= 0 || label.indexOf("DRIZZLE") >= 0)
+            return "rain"
+        if (label.indexOf("SNOW") >= 0)
+            return "snow"
+        if (label.indexOf("FOG") >= 0)
+            return "fog"
+        if (label.indexOf("CLOUD") >= 0)
+            return "cloud"
+        if (label.indexOf("CLEAR") >= 0 || label.indexOf("SUN") >= 0 || label.indexOf("OBSERVED") >= 0)
+            return "clear"
+        return "clear"
+    }
+
+    function weatherMoodLine(labelValue) {
+        const label = uppercaseLabel(labelValue)
+        if (label.indexOf("STORM") >= 0)
+            return "Stormy"
+        if (label.indexOf("RAIN") >= 0 || label.indexOf("SHOWER") >= 0 || label.indexOf("DRIZZLE") >= 0)
+            return "Rainy"
+        if (label.indexOf("FOG") >= 0)
+            return "Foggy"
+        if (label.indexOf("CLOUD") >= 0)
+            return "Cloudy"
+        if (label.indexOf("CLEAR") >= 0 || label.indexOf("SUN") >= 0 || label.indexOf("OBSERVED") >= 0)
+            return "Sunny"
+        return "Today"
+    }
+
+    function weatherMoodSubLine(labelValue) {
+        const kind = weatherKind(labelValue)
+        if (kind === "storm")
+            return "stay inside weather"
+        if (kind === "rain")
+            return "take an umbrella"
+        if (kind === "fog")
+            return "low visibility"
+        if (kind === "cloud")
+            return "soft clouds today"
+        return "sunglasses weather"
+    }
+
+    function rainShortLine(value) {
+        const chance = Number(value)
+        if (!isFinite(chance))
+            return "--"
+        if (chance >= 70)
+            return "high"
+        if (chance >= 35)
+            return "maybe"
+        if (chance > 0)
+            return "low"
+        return "none"
     }
 
     function distanceKm(latA, lngA, latB, lngB) {
@@ -302,6 +440,57 @@ Item {
         return true
     }
 
+    function clearWeatherData(statusText) {
+        airTempC = NaN
+        feelsLikeC = NaN
+        humidityPct = -1
+        windKph = NaN
+        precipitationMm = NaN
+        pressureHpa = NaN
+        weatherSummary = ""
+        weatherWindDir = ""
+        weatherTime = ""
+        weatherUpdatedText = ""
+        weatherStationName = ""
+        weatherStationProduct = ""
+        weatherStationDistanceKm = NaN
+        weatherStatus = statusText
+    }
+
+    function clearForecastData(statusText) {
+        forecastRows = []
+        forecastUpdatedText = ""
+        forecastStatus = statusText
+    }
+
+    function clearRadarData(statusText) {
+        radarStatus = statusText
+        radarFrameTime = ""
+        radarFrameLabel = ""
+        radarSiteName = ""
+        radarProduct = ""
+        radarSiteDistanceKm = NaN
+        if (radarServiceAvailable)
+            radarImage.setPosition(0, 0, false)
+    }
+
+    function clearLocationData() {
+        locationName = ""
+        locationAnchorLat = NaN
+        locationAnchorLng = NaN
+    }
+
+    function clearLiveWeatherState(statusText) {
+        clearLocationData()
+        clearWeatherData(statusText)
+        clearForecastData(statusText)
+        clearRadarData(statusText)
+    }
+
+    function coordinateStatusText() {
+        return livePositionValid || stressScene ? "SYNC" : "GPS WAIT"
+    }
+
     function requestLocationFallback(latValue, lngValue) {
         const xhr = new XMLHttpRequest()
         xhr.onreadystatechange = function() {
@@ -322,8 +511,13 @@ Item {
     }
 
     function refreshLocationName() {
-        if (!active || !coordValid(safeLat, -90, 90) || !coordValid(safeLng, -180, 180))
+        if (!active)
             return
+
+        if (!weatherPositionReady || !coordValid(safeLat, -90, 90) || !coordValid(safeLng, -180, 180)) {
+            clearLocationData()
+            return
+        }
 
         const latValue = Number(safeLat)
         const lngValue = Number(safeLng)
@@ -418,14 +612,14 @@ Item {
         return "https://www.bom.gov.au" + path + "?" + query
     }
 
-    function bomRadarUrl(site) {
-        if (Qt.platform.os === "linux" && !linuxBomRadarInlineSupported)
-            return ""
-        const path = "/radar/"
-            + encodeURIComponent(site.product)
-            + ".gif"
-        const query = "beagley=" + cacheBucket(radarRefreshIntervalMs)
-        return "https://www.bom.gov.au" + path + "?" + query
+    function forecastUrl(latValue, lngValue) {
+        return "https://api.open-meteo.com/v1/forecast"
+            + "?latitude=" + Number(latValue).toFixed(5)
+            + "&longitude=" + Number(lngValue).toFixed(5)
+            + "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max"
+            + "&timezone=auto"
+            + "&forecast_days=5"
+            + "&beagley=" + cacheBucket(forecastRefreshIntervalMs)
     }
 
     function applyWeatherRow(candidate, payload, row) {
@@ -500,12 +694,79 @@ Item {
         xhr.send()
     }
 
-    function refreshWeather() {
-        if (!active || !coordValid(safeLat, -90, 90) || !coordValid(safeLng, -180, 180))
+    function applyForecast(payload) {
+        const daily = payload && payload.daily ? payload.daily : ({})
+        const times = daily.time || []
+        const codes = daily.weather_code || []
+        const highs = daily.temperature_2m_max || []
+        const lows = daily.temperature_2m_min || []
+        const rain = daily.precipitation_probability_max || []
+        const rows = []
+        const count = Math.min(5, times.length)
+
+        for (var i = 0; i < count; ++i) {
+            const high = Number(highs[i])
+            const low = Number(lows[i])
+            if (!isFinite(high) && !isFinite(low))
+                continue
+            const rainPct = Number(rain[i])
+            rows.push({
+                day: forecastDayLabel(times[i], i),
+                label: forecastConditionLabel(codes[i]),
+                high: isFinite(high) ? Math.round(high) : null,
+                low: isFinite(low) ? Math.round(low) : null,
+                rain: isFinite(rainPct) ? Math.round(rainPct) : null
+            })
+        }
+
+        forecastRows = rows
+        forecastUpdatedText = Qt.formatDateTime(new Date(), "ddd HH:mm").toUpperCase()
+        forecastStatus = rows.length > 0 ? "LIVE" : "NO DATA"
+    }
+
+    function refreshForecast() {
+        if (!active)
             return
+
+        if (!weatherPositionReady || !coordValid(safeLat, -90, 90) || !coordValid(safeLng, -180, 180)) {
+            clearForecastData(coordinateStatusText())
+            return
+        }
+
+        forecastStatus = "SYNC"
+        const xhr = new XMLHttpRequest()
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState !== 4)
+                return
+
+            if (xhr.status < 200 || xhr.status >= 300) {
+                clearForecastData("OFFLINE")
+                return
+            }
+
+            try {
+                applyForecast(JSON.parse(xhr.responseText))
+            } catch (err) {
+                console.warn("[WeatherCorners] forecast parse failed:", err)
+                clearForecastData("OFFLINE")
+            }
+        }
+        xhr.open("GET", forecastUrl(Number(safeLat), Number(safeLng)), true)
+        xhr.send()
+    }
+
+    function refreshWeather() {
+        if (!active)
+            return
+
+        if (!weatherPositionReady || !coordValid(safeLat, -90, 90) || !coordValid(safeLng, -180, 180)) {
+            clearWeatherData(coordinateStatusText())
+            return
+        }
 
         const candidates = nearestWeatherCandidates(8)
         if (candidates.length === 0) {
+            clearWeatherData("NO DATA")
             weatherStatus = "NO DATA"
             return
         }
@@ -515,28 +776,49 @@ Item {
     }
 
     function refreshRadar() {
-        if (!active || !coordValid(safeLat, -90, 90) || !coordValid(safeLng, -180, 180))
+        if (!active)
             return
+
+        if (!weatherPositionReady || !coordValid(safeLat, -90, 90) || !coordValid(safeLng, -180, 180)) {
+            clearRadarData(coordinateStatusText())
+            return
+        }
 
         const site = nearestRadarSite()
         if (!site) {
-            radarStatus = "NO RADAR"
-            radarImageSource = ""
-            radarSiteName = ""
-            radarProduct = ""
-            radarSiteDistanceKm = NaN
+            clearRadarData("NO RADAR")
             return
         }
 
         radarSiteName = cleanText(site.name).toUpperCase()
         radarProduct = cleanText(site.product)
         radarSiteDistanceKm = Number(site.distanceKm)
-        radarFrameTime = Qt.formatTime(new Date(), "HH:mm")
-        radarRetryCount = 0
-        radarImageSource = bomRadarUrl(site)
-        radarStatus = root.embeddedSafeMode
-            ? "SITE"
-            : (radarImageSource.length > 0 ? "LIVE" : "UNAVAILABLE")
+        if (radarServiceAvailable) {
+            radarImage.setPosition(Number(safeLat), Number(safeLng), true)
+            radarImage.refresh()
+            radarStatus = radarImage.status
+            radarFrameTime = radarImage.frameTime
+            radarFrameLabel = radarImage.frameLabel
+        } else {
+            radarStatus = "UNAVAILABLE"
+            radarFrameTime = ""
+            radarFrameLabel = ""
+        }
+    }
+
+    function handlePositionChanged() {
+        if (!root.active)
+            return
+
+        if (!root.weatherPositionReady) {
+            root.clearLiveWeatherState(root.coordinateStatusText())
+            coordinateDebounce.stop()
+            return
+        }
+
+        if (!root.sameLocationAnchor(Number(root.safeLat), Number(root.safeLng)))
+            root.clearLiveWeatherState("SYNC")
+        coordinateDebounce.restart()
     }
 
     Timer {
@@ -544,7 +826,18 @@ Item {
         repeat: true
         running: root.active
         triggeredOnStart: false
-        onTriggered: root.refreshWeather()
+        onTriggered: {
+            root.refreshWeather()
+            root.refreshForecast()
+        }
+    }
+
+    Timer {
+        interval: root.forecastRefreshIntervalMs
+        repeat: true
+        running: root.active
+        triggeredOnStart: false
+        onTriggered: root.refreshForecast()
     }
 
     Timer {
@@ -563,18 +856,7 @@ Item {
         onTriggered: {
             root.refreshLocationName()
             root.refreshWeather()
-            root.refreshRadar()
-        }
-    }
-
-    Timer {
-        id: radarRetryTimer
-        interval: 1500
-        repeat: false
-        onTriggered: {
-            if (!root.active || root.radarRetryCount >= 3)
-                return
-            root.radarRetryCount += 1
+            root.refreshForecast()
             root.refreshRadar()
         }
     }
@@ -588,18 +870,43 @@ Item {
                 return
             root.refreshLocationName()
             root.refreshWeather()
+            root.refreshForecast()
             root.refreshRadar()
         }
     }
 
-    onSafeLatChanged: if (root.active) coordinateDebounce.restart()
-    onSafeLngChanged: if (root.active) coordinateDebounce.restart()
+    Connections {
+        target: root.radarServiceAvailable ? radarImage : null
+
+        function onImageChanged() {
+            root.radarStatus = radarImage.status
+            root.radarFrameTime = radarImage.frameTime
+            root.radarFrameLabel = radarImage.frameLabel
+        }
+
+        function onStatusChanged() {
+            root.radarStatus = radarImage.status
+        }
+
+        function onFrameTimeChanged() {
+            root.radarFrameTime = radarImage.frameTime
+        }
+
+        function onFrameLabelChanged() {
+            root.radarFrameLabel = radarImage.frameLabel
+        }
+    }
+
+    onSafeLatChanged: handlePositionChanged()
+    onSafeLngChanged: handlePositionChanged()
+    onLivePositionValidChanged: handlePositionChanged()
     onExpandedModeChanged: {
         if (!root.active)
             return
         if (root.expandedMode === "temp" || root.expandedMode === "radar") {
             root.refreshLocationName()
             root.refreshWeather()
+            root.refreshForecast()
             root.refreshRadar()
         }
     }
@@ -613,15 +920,18 @@ Item {
         anchors.leftMargin: root.cornerInset
         anchors.topMargin: root.cornerInset
 
-        Rectangle {
+        CornerCircleShell {
             anchors.fill: parent
-            radius: width / 2
-            color: "#000000"
-            border.width: 1
-            border.color: "#3C325E"
+            corner: "topLeft"
+            bleedFraction: root.podBleedFraction
+            effectLevel: root.effectLevel
+            accentColor: root.weatherStatus === "LIVE" ? "#C568FF" : "#FFD36B"
+            secondaryAccentColor: "#58FFE1"
+            active: root.weatherStatus === "LIVE"
         }
 
         Column {
+            width: root.podContentDiameter
             anchors.centerIn: parent
             spacing: 1
 
@@ -651,7 +961,7 @@ Item {
             }
 
             Text {
-                width: root.podSize * 0.72
+                width: root.podLabelWidth
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: root.weatherStatus === "LIVE" ? root.weatherCompactLabel() : root.weatherStatus
                 color: root.weatherStatus === "LIVE" ? "#58FFE1" : "#FFD36B"
@@ -679,98 +989,85 @@ Item {
         anchors.rightMargin: root.cornerInset
         anchors.topMargin: root.cornerInset
 
-        Rectangle {
+        CornerCircleShell {
             anchors.fill: parent
-            radius: width / 2
-            color: "#000000"
-            border.width: 1
-            border.color: "#3C325E"
+            corner: "topRight"
+            bleedFraction: root.podBleedFraction
+            effectLevel: root.effectLevel
+            accentColor: root.radarStatus === "LIVE" ? "#58FFE1" : "#3C325E"
+            secondaryAccentColor: "#C568FF"
+            active: root.radarStatus === "LIVE"
         }
 
-        Loader {
+        Rectangle {
+            id: radarPreviewMask
             anchors.fill: parent
-            active: !root.embeddedSafeMode
+            anchors.margins: root.podFaceInset
+            radius: width / 2
+            color: "#010307"
 
-            sourceComponent: Component {
-                Item {
-                    Rectangle {
-                        id: radarPreviewMask
-                        anchors.fill: parent
-                        anchors.margins: 3
-                        radius: width / 2
-                        color: "#05060A"
-                        clip: true
-                    }
+            RasterFrameItem {
+                id: radarPreviewFrame
+                anchors.fill: parent
+                source: root.radarFrameUrl
+                circular: true
+                visible: ready
+            }
 
-                    Image {
-                        id: radarPreviewImage
-                        anchors.fill: radarPreviewMask
-                        source: root.radarImageSource
-                        asynchronous: true
-                        cache: true
-                        fillMode: Image.PreserveAspectCrop
-                        smooth: true
-                        opacity: status === Image.Ready ? 0.90 : 0.0
+            Rectangle {
+                anchors.fill: parent
+                radius: width / 2
+                color: "#060712"
+                opacity: radarPreviewFrame.ready ? 0.0 : 0.18
+            }
 
-                        onStatusChanged: {
-                            if (status === Image.Error && root.radarImageSource.length > 0) {
-                                root.radarStatus = "OFFLINE"
-                                radarRetryTimer.restart()
-                            } else if (status === Image.Ready && root.radarSiteName.length > 0) {
-                                root.radarRetryCount = 0
-                                root.radarStatus = "LIVE"
-                            }
-                        }
-                    }
+        }
 
-                    Item {
-                        anchors.fill: radarPreviewMask
-                        visible: radarPreviewImage.status !== Image.Ready
+        Rectangle {
+            width: Math.min(parent.width * 0.72, 92)
+            height: 20
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: root.cornerBleed + 10
+            radius: 4
+            color: Qt.rgba(2 / 255, 5 / 255, 12 / 255, 0.68)
+            border.width: 1
+            border.color: Qt.rgba(88 / 255, 255 / 255, 225 / 255, 0.24)
+            visible: radarPreviewFrame.ready
 
-                        Repeater {
-                            model: 5
-
-                            Rectangle {
-                                width: root.podSize * (0.22 + index * 0.05)
-                                height: width
-                                radius: width / 2
-                                x: radarPreviewMask.width * (0.12 + (index % 3) * 0.20)
-                                y: radarPreviewMask.height * (0.22 + (index % 2) * 0.20)
-                                color: index % 3 === 0 ? "#52FFE1" : (index % 3 === 1 ? "#C568FF" : "#7AA2FF")
-                                opacity: 0.14 + 0.04 * (index % 2)
-                            }
-                        }
-                    }
-
-                    Rectangle {
-                        anchors.left: radarPreviewMask.left
-                        anchors.right: radarPreviewMask.right
-                        anchors.top: radarPreviewMask.top
-                        height: 38
-                        radius: height / 2
-                        color: "#000000C8"
-                    }
-                }
+            Text {
+                anchors.fill: parent
+                anchors.leftMargin: 5
+                anchors.rightMargin: 5
+                text: root.radarFrameDisplayLabel()
+                color: "#F7FBFF"
+                font.family: root.monoFont
+                font.pixelSize: 9
+                font.weight: Font.Bold
+                font.letterSpacing: 0
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+                elide: Text.ElideRight
             }
         }
 
         Column {
             anchors.centerIn: parent
-            spacing: 2
-            visible: root.embeddedSafeMode
+            spacing: 1
+            visible: !radarPreviewFrame.ready
 
-            Text {
+            OemIcon {
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: "RADAR"
+                width: root.podIconSize
+                height: width
+                icon: "radar"
                 color: "#58FFE1"
-                font.family: root.monoFont
-                font.pixelSize: 12
-                font.weight: Font.Bold
-                font.letterSpacing: 0
+                accentColor: "#F7FBFF"
+                strokeWidth: Math.max(3, root.podSize * 0.035)
             }
 
             Text {
-                width: root.podSize * 0.72
+                width: root.podLabelWidth
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: root.radarCompactLabel()
                 color: "#F7FBFF"
@@ -784,7 +1081,7 @@ Item {
 
             Text {
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: root.radarFrameTime.length > 0 ? root.radarFrameTime : root.radarStatus
+                text: root.radarFrameDisplayLabel()
                 color: "#9DB4FF"
                 font.family: root.monoFont
                 font.pixelSize: 10
@@ -797,8 +1094,9 @@ Item {
             width: parent.width * 0.68
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.top: parent.top
-            anchors.topMargin: 9
+            anchors.topMargin: root.cornerBleed + 10
             spacing: 0
+            visible: !radarPreviewFrame.ready
 
             Text {
                 width: parent.width
@@ -813,7 +1111,7 @@ Item {
 
             Text {
                 width: parent.width
-                text: root.radarStatus === "LIVE" ? root.radarFrameTime : root.radarStatus
+                text: root.radarStatus === "LIVE" ? root.radarFrameDisplayLabel() : root.radarStatus
                 color: root.radarStatus === "LIVE" ? "#F7FBFF" : "#FFD36B"
                 font.family: root.monoFont
                 font.pixelSize: 10
@@ -839,44 +1137,33 @@ Item {
         anchors.leftMargin: root.cornerInset
         anchors.bottomMargin: root.cornerInset
 
-        Rectangle {
+        CornerCircleShell {
             anchors.fill: parent
-            radius: width / 2
-            color: "#000000"
-            border.width: 1
-            border.color: root.musicPlaying ? "#58FFE1" : "#3C325E"
-        }
-
-        Row {
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.top: parent.top
-            anchors.topMargin: 17
-            spacing: 3
-
-            Repeater {
-                model: [
-                    { "h": 11, "c": "#58FFE1" },
-                    { "h": 17, "c": "#C568FF" },
-                    { "h": 13, "c": "#7AA2FF" }
-                ]
-
-                Rectangle {
-                    width: 4
-                    height: modelData.h
-                    radius: 2
-                    anchors.bottom: parent.bottom
-                    color: modelData.c
-                    opacity: root.musicPlaying ? 0.95 : 0.34
-                }
-            }
+            corner: "bottomLeft"
+            bleedFraction: root.podBleedFraction
+            effectLevel: root.effectLevel
+            accentColor: root.musicPlaying ? "#58FFE1" : "#C568FF"
+            secondaryAccentColor: "#C568FF"
+            active: root.musicAvailable
         }
 
         Column {
-            width: parent.width * 0.76
+            width: root.podLabelWidth
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.verticalCenter: parent.verticalCenter
-            anchors.verticalCenterOffset: 14
-            spacing: 2
+            anchors.verticalCenterOffset: 2
+            spacing: 3
+
+            OemIcon {
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: root.podIconSize
+                height: width
+                icon: "audio"
+                active: root.musicPlaying
+                color: "#F7FBFF"
+                accentColor: "#58FFE1"
+                strokeWidth: Math.max(3, root.podSize * 0.034)
+            }
 
             Text {
                 width: parent.width
@@ -920,125 +1207,43 @@ Item {
         anchors.rightMargin: root.cornerInset
         anchors.bottomMargin: root.cornerInset
 
-        Rectangle {
+        CornerCircleShell {
             anchors.fill: parent
-            radius: width / 2
-            color: "#000000"
-            border.width: 1
-            border.color: "#3C325E"
+            corner: "bottomRight"
+            bleedFraction: root.podBleedFraction
+            effectLevel: root.effectLevel
+            accentColor: "#58FFE1"
+            secondaryAccentColor: "#C568FF"
+            active: true
         }
 
-        Loader {
-            anchors.fill: parent
-            active: !root.embeddedSafeMode
-
-            sourceComponent: Component {
-                Canvas {
-                    id: mapGlyph
-                    width: parent.width * 0.56
-                    height: parent.height * 0.54
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.verticalCenter: parent.verticalCenter
-                    anchors.verticalCenterOffset: -7
-                    renderTarget: Canvas.FramebufferObject
-                    antialiasing: true
-                    smooth: true
-
-                    Component.onCompleted: requestPaint()
-                    onWidthChanged: requestPaint()
-                    onHeightChanged: requestPaint()
-
-                    onPaint: {
-                        const ctx = getContext("2d")
-                        ctx.clearRect(0, 0, width, height)
-
-                        const route = ctx.createLinearGradient(0, 0, width, height)
-                        route.addColorStop(0.0, "#58FFE1")
-                        route.addColorStop(0.55, "#9DB4FF")
-                        route.addColorStop(1.0, "#C568FF")
-
-                        ctx.lineCap = "round"
-                        ctx.lineJoin = "round"
-                        ctx.strokeStyle = route
-                        ctx.lineWidth = Math.max(4, width * 0.07)
-                        ctx.beginPath()
-                        ctx.moveTo(width * 0.16, height * 0.78)
-                        ctx.bezierCurveTo(width * 0.24, height * 0.54, width * 0.44, height * 0.62, width * 0.54, height * 0.44)
-                        ctx.bezierCurveTo(width * 0.64, height * 0.27, width * 0.74, height * 0.30, width * 0.82, height * 0.18)
-                        ctx.stroke()
-
-                        ctx.fillStyle = "#58FFE1"
-                        ctx.beginPath()
-                        ctx.arc(width * 0.18, height * 0.78, width * 0.09, 0, Math.PI * 2)
-                        ctx.fill()
-
-                        ctx.fillStyle = "#F7FBFF"
-                        ctx.beginPath()
-                        ctx.moveTo(width * 0.74, height * 0.10)
-                        ctx.bezierCurveTo(width * 0.64, height * 0.10, width * 0.57, height * 0.18, width * 0.57, height * 0.28)
-                        ctx.bezierCurveTo(width * 0.57, height * 0.40, width * 0.68, height * 0.50, width * 0.74, height * 0.64)
-                        ctx.bezierCurveTo(width * 0.80, height * 0.50, width * 0.91, height * 0.40, width * 0.91, height * 0.28)
-                        ctx.bezierCurveTo(width * 0.91, height * 0.18, width * 0.84, height * 0.10, width * 0.74, height * 0.10)
-                        ctx.fill()
-
-                        ctx.fillStyle = "#05060A"
-                        ctx.beginPath()
-                        ctx.arc(width * 0.74, height * 0.28, width * 0.08, 0, Math.PI * 2)
-                        ctx.fill()
-                    }
-                }
-            }
-        }
-
-        Item {
-            anchors.fill: parent
-            visible: root.embeddedSafeMode
-
-            Column {
-                anchors.centerIn: parent
-                anchors.verticalCenterOffset: -6
-                spacing: 6
-
-                Row {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    spacing: 6
-
-                    Rectangle {
-                        width: 12
-                        height: 12
-                        radius: 6
-                        color: "#58FFE1"
-                    }
-
-                    Rectangle {
-                        width: 28
-                        height: 4
-                        radius: 2
-                        anchors.verticalCenter: parent.verticalCenter
-                        color: "#9DB4FF"
-                        rotation: -18
-                    }
-
-                    Rectangle {
-                        width: 16
-                        height: 16
-                        radius: 8
-                        color: "#C568FF"
-                    }
-                }
-            }
-        }
-
-        Text {
+        Column {
+            width: root.podLabelWidth
             anchors.horizontalCenter: parent.horizontalCenter
-            anchors.bottom: parent.bottom
-            anchors.bottomMargin: 21
-            text: "MAP"
-            color: "#F7FBFF"
-            font.family: root.monoFont
-            font.pixelSize: 12
-            font.weight: Font.Bold
-            font.letterSpacing: 0
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.verticalCenterOffset: -2
+            spacing: 4
+
+            OemIcon {
+                width: Math.round(root.podIconSize * 1.26)
+                height: Math.round(root.podIconSize * 1.10)
+                anchors.horizontalCenter: parent.horizontalCenter
+                icon: "menu"
+                color: "#F7FBFF"
+                accentColor: "#58FFE1"
+                strokeWidth: Math.max(5, root.podSize * 0.055)
+            }
+
+            Text {
+                width: parent.width
+                text: "MENU"
+                color: "#F7FBFF"
+                font.family: root.monoFont
+                font.pixelSize: 12
+                font.weight: Font.Bold
+                font.letterSpacing: 0
+                horizontalAlignment: Text.AlignHCenter
+            }
         }
 
         MouseArea {
@@ -1057,6 +1262,13 @@ Item {
         visible: root.expandedMode !== ""
         opacity: visible ? 1 : 0
 
+        Rectangle {
+            anchors.fill: parent
+            color: root.expandedMode === "temp" || root.expandedMode === "radar"
+                ? Qt.rgba(0.0, 0.0, 0.0, 0.0)
+                : Qt.rgba(0.0, 0.0, 0.0, root.tallDetailMode ? 0.66 : 0.54)
+        }
+
         MouseArea {
             anchors.fill: parent
             onClicked: root.expandedMode = ""
@@ -1064,36 +1276,52 @@ Item {
 
         Rectangle {
             id: detailCard
-            width: Math.floor(Math.min(452, Math.max(332, parent.width * 0.35)))
-            height: root.expandedMode === "radar"
-                ? Math.floor(Math.min(390, Math.max(292, parent.height * 0.52)))
+            width: root.tallDetailMode
+                ? Math.floor(Math.min(620, Math.max(500, parent.width * 0.38)))
+                : Math.floor(Math.min(452, Math.max(332, parent.width * 0.35)))
+            height: root.tallDetailMode
+                ? Math.floor(Math.min(parent.height - 44, Math.max(560, parent.height * 0.92)))
                 : Math.floor(Math.min(360, Math.max(272, parent.height * 0.46)))
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.verticalCenter: parent.verticalCenter
-            radius: 8
-            color: root.expandedMode === "music" ? "#010208" : "#04050CF0"
+            radius: root.tallDetailMode ? 4 : 8
+            color: root.expandedMode === "temp"
+                ? Qt.rgba(0.020, 0.018, 0.034, 0.97)
+                : root.expandedMode === "music"
+                ? Qt.rgba(0.004, 0.008, 0.031, 0.98)
+                : Qt.rgba(0.016, 0.020, 0.047, 0.96)
             border.width: 1
-            border.color: root.expandedMode === "music" ? "#58FFE1" : "#5C4B90"
+            border.color: root.expandedMode === "temp"
+                ? "#FF7AD9"
+                : root.tallDetailMode
+                ? "#58FFE1"
+                : (root.expandedMode === "music" ? "#58FFE1" : "#5C4B90")
 
             MouseArea {
                 anchors.fill: parent
                 onClicked: mouse.accepted = true
             }
 
-            Text {
+            Item {
                 anchors.right: parent.right
                 anchors.top: parent.top
-                anchors.rightMargin: 14
-                anchors.topMargin: 10
-                text: "X"
-                color: "#9DB4FF"
-                font.family: root.monoFont
-                font.pixelSize: 14
-                font.weight: Font.Bold
+                anchors.rightMargin: 10
+                anchors.topMargin: 8
+                width: 32
+                height: 32
+
+                OemIcon {
+                    anchors.centerIn: parent
+                    width: 18
+                    height: 18
+                    icon: "close"
+                    color: "#9DB4FF"
+                    accentColor: "#9DB4FF"
+                    strokeWidth: 3.2
+                }
 
                 MouseArea {
                     anchors.fill: parent
-                    anchors.margins: -12
                     onClicked: root.expandedMode = ""
                 }
             }
@@ -1140,26 +1368,15 @@ Item {
                                 border.width: 1
                                 border.color: root.musicPlaying ? "#58FFE1" : "#5C4B90"
 
-                                Row {
+                                OemIcon {
                                     anchors.centerIn: parent
-                                    spacing: 5
-
-                                    Repeater {
-                                        model: [
-                                            { "h": 30, "c": "#58FFE1" },
-                                            { "h": 48, "c": "#C568FF" },
-                                            { "h": 36, "c": "#7AA2FF" }
-                                        ]
-
-                                        Rectangle {
-                                            width: 8
-                                            height: modelData.h
-                                            radius: 4
-                                            anchors.bottom: parent.bottom
-                                            color: modelData.c
-                                            opacity: root.musicPlaying ? 0.95 : 0.36
-                                        }
-                                    }
+                                    width: 62
+                                    height: 62
+                                    icon: "audio"
+                                    active: root.musicPlaying
+                                    color: "#F7FBFF"
+                                    accentColor: "#58FFE1"
+                                    strokeWidth: 5.0
                                 }
                             }
 
@@ -1229,146 +1446,344 @@ Item {
 
                 Column {
                     anchors.fill: parent
-                    spacing: 10
-
-                    Text {
-                        width: parent.width
-                        text: "CURRENT BOM"
-                        color: "#58FFE1"
-                        font.family: root.monoFont
-                        font.pixelSize: 13
-                        font.weight: Font.Bold
-                        font.letterSpacing: 0
-                        horizontalAlignment: Text.AlignHCenter
-                    }
-
-                    Text {
-                        width: parent.width
-                        visible: root.locationName.length > 0
-                        text: root.locationName
-                        color: "#F7FBFF"
-                        font.family: root.displayFont
-                        font.pixelSize: 18
-                        font.weight: Font.Bold
-                        font.letterSpacing: 0
-                        horizontalAlignment: Text.AlignHCenter
-                        elide: Text.ElideRight
-                    }
-
-                    Text {
-                        width: parent.width
-                        text: root.weatherSourceLabel()
-                        color: "#9DB4FF"
-                        font.family: root.monoFont
-                        font.pixelSize: 12
-                        font.weight: Font.Bold
-                        font.letterSpacing: 0
-                        horizontalAlignment: Text.AlignHCenter
-                        elide: Text.ElideRight
-                    }
+                    spacing: 9
 
                     Row {
-                        anchors.horizontalCenter: parent.horizontalCenter
+                        width: parent.width
+                        height: 34
                         spacing: 10
 
                         Text {
-                            text: root.formatTemp(root.displayTempC)
-                            color: "#F9FBFF"
-                            font.family: root.displayFont
-                            font.pixelSize: 86
+                            width: parent.width * 0.58
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "TODAY"
+                            color: "#F7FBFF"
+                            font.family: root.monoFont
+                            font.pixelSize: 14
                             font.weight: Font.Bold
                             font.letterSpacing: 0
-                            lineHeight: 0.82
+                            elide: Text.ElideRight
                         }
 
-                        Column {
+                        Text {
+                            width: parent.width * 0.42 - 10
                             anchors.verticalCenter: parent.verticalCenter
-                            spacing: 4
-
-                            Text {
-                                text: "\u00B0C"
-                                color: "#C568FF"
-                                font.family: root.displayFont
-                                font.pixelSize: 30
-                                font.weight: Font.Bold
-                                font.letterSpacing: 0
-                            }
-
-                            Text {
-                                text: root.weatherTime
-                                color: "#9DB4FF"
-                                font.family: root.monoFont
-                                font.pixelSize: 13
-                                font.weight: Font.Bold
-                                font.letterSpacing: 0
-                            }
+                            text: root.locationName.length > 0 ? root.locationName : root.weatherStatus
+                            color: "#9DB4FF"
+                            font.family: root.monoFont
+                            font.pixelSize: 11
+                            font.weight: Font.Bold
+                            font.letterSpacing: 0
+                            horizontalAlignment: Text.AlignRight
+                            elide: Text.ElideRight
                         }
                     }
 
-                    Text {
+                    Rectangle {
                         width: parent.width
-                        text: root.weatherLabel()
-                        color: "#F7FBFF"
-                        font.family: root.monoFont
-                        font.pixelSize: 16
-                        font.weight: Font.Bold
-                        font.letterSpacing: 0
-                        horizontalAlignment: Text.AlignHCenter
-                        elide: Text.ElideRight
+                        height: 156
+                        radius: 8
+                        color: Qt.rgba(0.018, 0.020, 0.030, 0.94)
+                        border.width: 1
+                        border.color: Qt.rgba(0.36, 1.0, 0.88, 0.28)
+
+                        Row {
+                            anchors.fill: parent
+                            anchors.margins: 16
+                            spacing: 18
+
+                            WeatherMoodIcon {
+                                width: 116
+                                height: 116
+                                anchors.verticalCenter: parent.verticalCenter
+                                kind: root.weatherKind(root.currentConditionLabel())
+                                primaryColor: "#FFD36B"
+                                secondaryColor: "#58FFE1"
+                            }
+
+                            Column {
+                                width: parent.width - 134
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 5
+
+                                Row {
+                                    width: parent.width
+                                    spacing: 10
+
+                                    Text {
+                                        width: 128
+                                        text: root.formatTemp(root.displayTempC)
+                                        color: "#F9FBFF"
+                                        font.family: root.displayFont
+                                        font.pixelSize: 82
+                                        font.weight: Font.Bold
+                                        font.letterSpacing: 0
+                                        lineHeight: 0.82
+                                        horizontalAlignment: Text.AlignRight
+                                    }
+
+                                    Column {
+                                        width: parent.width - 138
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        spacing: 5
+
+                                        Text {
+                                            width: parent.width
+                                            text: "\u00B0C"
+                                            color: "#58FFE1"
+                                            font.family: root.monoFont
+                                            font.pixelSize: 18
+                                            font.weight: Font.Bold
+                                            font.letterSpacing: 0
+                                            elide: Text.ElideRight
+                                        }
+
+                                        Text {
+                                            width: parent.width
+                                            text: root.weatherMoodLine(root.currentConditionLabel())
+                                            color: "#FFD36B"
+                                            font.family: root.displayFont
+                                            font.pixelSize: 30
+                                            font.weight: Font.Bold
+                                            font.letterSpacing: 0
+                                            elide: Text.ElideRight
+                                        }
+                                    }
+                                }
+
+                                Text {
+                                    width: parent.width
+                                    text: root.weatherMoodSubLine(root.currentConditionLabel())
+                                    color: "#F7FBFF"
+                                    font.family: root.displayFont
+                                    font.pixelSize: 18
+                                    font.weight: Font.Bold
+                                    font.letterSpacing: 0
+                                    elide: Text.ElideRight
+                                }
+
+                                Text {
+                                    width: parent.width
+                                    text: root.currentConditionLabel() + "  /  updated " + root.weatherUpdatedText
+                                    color: "#9DB4FF"
+                                    font.family: root.monoFont
+                                    font.pixelSize: 11
+                                    font.weight: Font.Bold
+                                    font.letterSpacing: 0
+                                    elide: Text.ElideRight
+                                }
+                            }
+                        }
                     }
 
                     Grid {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        columns: 2
-                        columnSpacing: 38
-                        rowSpacing: 8
+                        id: metricsGrid
+                        width: parent.width
+                        columns: 3
+                        columnSpacing: 10
+                        rowSpacing: 6
+
+                        Repeater {
+                            model: [
+                                { "k": "FEELS", "v": root.formatTemp(root.displayFeelsC) + "\u00B0", "s": "outside" },
+                                { "k": "RAIN", "v": root.formatRain(root.precipitationMm) + " MM", "s": root.rainShortLine(root.precipitationMm) },
+                                { "k": "WIND", "v": (root.weatherWindDir.length > 0 ? root.weatherWindDir + " " : "") + root.formatWind(root.windKph), "s": "km/h" }
+                            ]
+
+                            Rectangle {
+                                width: (metricsGrid.width - 20) / 3
+                                height: 54
+                                radius: 8
+                                color: Qt.rgba(0.030, 0.034, 0.052, 0.80)
+                                border.width: 1
+                                border.color: Qt.rgba(0.36, 1.0, 0.88, 0.18)
+
+                                Column {
+                                    anchors.fill: parent
+                                    anchors.margins: 7
+                                    spacing: 1
+
+                                    Text {
+                                        width: parent.width
+                                        text: modelData.k
+                                        color: "#9DB4FF"
+                                        font.family: root.monoFont
+                                        font.pixelSize: 10
+                                        font.weight: Font.Bold
+                                        font.letterSpacing: 0
+                                        horizontalAlignment: Text.AlignHCenter
+                                        elide: Text.ElideRight
+                                    }
+
+                                    Text {
+                                        width: parent.width
+                                        text: modelData.v
+                                        color: "#F7FBFF"
+                                        font.family: root.monoFont
+                                        font.pixelSize: 14
+                                        font.weight: Font.Bold
+                                        font.letterSpacing: 0
+                                        horizontalAlignment: Text.AlignHCenter
+                                        elide: Text.ElideRight
+                                    }
+
+                                    Text {
+                                        width: parent.width
+                                        text: modelData.s
+                                        color: "#58FFE1"
+                                        font.family: root.monoFont
+                                        font.pixelSize: 9
+                                        font.weight: Font.Bold
+                                        font.letterSpacing: 0
+                                        horizontalAlignment: Text.AlignHCenter
+                                        elide: Text.ElideRight
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Row {
+                        width: parent.width
+                        height: 22
 
                         Text {
-                            text: "FEELS " + root.formatTemp(root.displayFeelsC) + "\u00B0"
-                            color: "#9DB4FF"
+                            width: parent.width * 0.54
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "THIS WEEK"
+                            color: "#F7FBFF"
                             font.family: root.monoFont
-                            font.pixelSize: 13
+                            font.pixelSize: 14
                             font.weight: Font.Bold
+                            font.letterSpacing: 0
                         }
 
                         Text {
-                            text: "HUM " + (root.humidityPct >= 0 ? root.humidityPct : "--") + "%"
+                            width: parent.width * 0.46
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: root.forecastStatus === "LIVE" ? root.forecastUpdatedText : root.forecastStatus
                             color: "#9DB4FF"
                             font.family: root.monoFont
-                            font.pixelSize: 13
+                            font.pixelSize: 11
                             font.weight: Font.Bold
+                            font.letterSpacing: 0
+                            horizontalAlignment: Text.AlignRight
+                            elide: Text.ElideRight
+                        }
+                    }
+
+                    Column {
+                        id: forecastList
+                        width: parent.width
+                        spacing: 0
+
+                        Repeater {
+                            model: root.forecastRows
+
+                            Rectangle {
+                                width: forecastList.width
+                                height: 43
+                                radius: 6
+                                color: index === 0
+                                    ? Qt.rgba(0.050, 0.056, 0.080, 0.86)
+                                    : Qt.rgba(0.028, 0.032, 0.050, 0.74)
+                                border.width: 1
+                                border.color: index === 0
+                                    ? Qt.rgba(0.36, 1.0, 0.88, 0.24)
+                                    : Qt.rgba(0.36, 1.0, 0.88, 0.12)
+
+                                Row {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 8
+                                    anchors.rightMargin: 8
+                                    spacing: 8
+
+                                    WeatherMoodIcon {
+                                        width: 30
+                                        height: 30
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        kind: root.weatherKind(modelData.label)
+                                        primaryColor: "#FFD36B"
+                                        secondaryColor: "#58FFE1"
+                                    }
+
+                                    Text {
+                                        width: 68
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: modelData.day
+                                        color: index === 0 ? "#58FFE1" : "#F7FBFF"
+                                        font.family: root.monoFont
+                                        font.pixelSize: 13
+                                        font.weight: Font.Bold
+                                        font.letterSpacing: 0
+                                        elide: Text.ElideRight
+                                    }
+
+                                    Column {
+                                        width: parent.width - 224
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        spacing: 1
+
+                                        Text {
+                                            width: parent.width
+                                            text: modelData.label
+                                            color: "#F7FBFF"
+                                            font.family: root.monoFont
+                                            font.pixelSize: 13
+                                            font.weight: Font.Bold
+                                            font.letterSpacing: 0
+                                            elide: Text.ElideRight
+                                        }
+
+                                        Text {
+                                            width: parent.width
+                                            text: root.rainShortLine(modelData.rain) + " rain"
+                                            color: "#9DB4FF"
+                                            font.family: root.monoFont
+                                            font.pixelSize: 10
+                                            font.weight: Font.Bold
+                                            font.letterSpacing: 0
+                                            elide: Text.ElideRight
+                                        }
+                                    }
+
+                                    Text {
+                                        width: 62
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: (modelData.high !== null ? modelData.high : "--") + "\u00B0/" + (modelData.low !== null ? modelData.low : "--") + "\u00B0"
+                                        color: "#F7FBFF"
+                                        font.family: root.displayFont
+                                        font.pixelSize: 17
+                                        font.weight: Font.Bold
+                                        font.letterSpacing: 0
+                                        horizontalAlignment: Text.AlignRight
+                                    }
+
+                                    Text {
+                                        width: 40
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: modelData.rain !== null ? modelData.rain + "%" : "--%"
+                                        color: "#FFD36B"
+                                        font.family: root.monoFont
+                                        font.pixelSize: 12
+                                        font.weight: Font.Bold
+                                        font.letterSpacing: 0
+                                        horizontalAlignment: Text.AlignRight
+                                    }
+                                }
+                            }
                         }
 
                         Text {
-                            text: "WIND " + (root.weatherWindDir.length > 0 ? root.weatherWindDir + " " : "") + root.formatWind(root.windKph) + " KM/H"
-                            color: "#9DB4FF"
+                            width: parent.width
+                            visible: root.forecastRows.length === 0
+                            text: root.forecastStatus
+                            color: "#FFD36B"
                             font.family: root.monoFont
-                            font.pixelSize: 13
+                            font.pixelSize: 14
                             font.weight: Font.Bold
-                        }
-
-                        Text {
-                            text: "PRESS " + root.formatPressure(root.pressureHpa) + " HPA"
-                            color: "#9DB4FF"
-                            font.family: root.monoFont
-                            font.pixelSize: 13
-                            font.weight: Font.Bold
-                        }
-
-                        Text {
-                            text: "RAIN " + root.formatRain(root.precipitationMm) + " MM"
-                            color: "#9DB4FF"
-                            font.family: root.monoFont
-                            font.pixelSize: 13
-                            font.weight: Font.Bold
-                        }
-
-                        Text {
-                            text: "UPDATED " + root.weatherUpdatedText
-                            color: "#9DB4FF"
-                            font.family: root.monoFont
-                            font.pixelSize: 13
-                            font.weight: Font.Bold
+                            font.letterSpacing: 0
+                            horizontalAlignment: Text.AlignHCenter
                         }
                     }
                 }
@@ -1376,197 +1791,173 @@ Item {
 
             Item {
                 anchors.fill: parent
-                anchors.margins: 18
+                anchors.margins: 20
                 visible: root.expandedMode === "radar"
 
                 Column {
                     anchors.fill: parent
-                    spacing: 10
+                    spacing: 9
 
-                    Text {
+                    Row {
                         width: parent.width
-                        text: "BOM RADAR"
-                        color: "#58FFE1"
-                        font.family: root.monoFont
-                        font.pixelSize: 13
-                        font.weight: Font.Bold
-                        font.letterSpacing: 0
-                        horizontalAlignment: Text.AlignHCenter
-                    }
+                        height: 34
+                        spacing: 10
 
-                    Text {
-                        width: parent.width
-                        visible: root.locationName.length > 0
-                        text: root.locationName
-                        color: "#F7FBFF"
-                        font.family: root.displayFont
-                        font.pixelSize: 18
-                        font.weight: Font.Bold
-                        font.letterSpacing: 0
-                        horizontalAlignment: Text.AlignHCenter
-                        elide: Text.ElideRight
-                    }
+                        Text {
+                            width: parent.width * 0.58
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "RADAR"
+                            color: "#F7FBFF"
+                            font.family: root.monoFont
+                            font.pixelSize: 14
+                            font.weight: Font.Bold
+                            font.letterSpacing: 0
+                            elide: Text.ElideRight
+                        }
 
-                    Text {
-                        width: parent.width
-                        text: root.radarSourceLabel()
-                        color: "#9DB4FF"
-                        font.family: root.monoFont
-                        font.pixelSize: 12
-                        font.weight: Font.Bold
-                        font.letterSpacing: 0
-                        horizontalAlignment: Text.AlignHCenter
-                        elide: Text.ElideRight
-                    }
-
-                    Text {
-                        width: parent.width
-                        text: root.radarStatus === "LIVE"
-                            ? "CURRENT FRAME " + root.radarFrameTime
-                            : root.radarStatus
-                        color: root.radarStatus === "LIVE" ? "#F7FBFF" : "#FFD36B"
-                        font.family: root.monoFont
-                        font.pixelSize: 11
-                        font.weight: Font.Bold
-                        font.letterSpacing: 0
-                        horizontalAlignment: Text.AlignHCenter
-                    }
-
-                    Loader {
-                        width: parent.width
-                        height: parent.height - 74
-                        active: !root.embeddedSafeMode
-
-                        sourceComponent: Component {
-                            Rectangle {
-                                id: detailRadarViewport
-                                width: parent.width
-                                height: parent.height - 74
-                                radius: 8
-                                color: "#000000"
-                                border.width: 1
-                                border.color: "#2E2A43"
-                                clip: true
-
-                                Image {
-                                    id: detailRadarImage
-                                    anchors.fill: parent
-                                    anchors.margins: 1
-                                    source: root.expandedMode === "radar" ? root.radarImageSource : ""
-                                    asynchronous: true
-                                    cache: true
-                                    fillMode: Image.PreserveAspectCrop
-                                    opacity: status === Image.Ready ? 0.92 : 0.0
-                                    smooth: true
-                                }
-
-                                Rectangle {
-                                    anchors.fill: parent
-                                    color: "#080913"
-                                    opacity: detailRadarImage.status === Image.Ready ? 0.18 : 0.90
-                                }
-
-                                Item {
-                                    anchors.fill: parent
-                                    visible: detailRadarImage.status !== Image.Ready
-
-                                    Repeater {
-                                        model: 7
-
-                                        Rectangle {
-                                            width: 52 + index * 9
-                                            height: width
-                                            radius: width / 2
-                                            x: detailRadarViewport.width * (0.10 + (index % 4) * 0.18)
-                                            y: detailRadarViewport.height * (0.16 + (index % 3) * 0.20)
-                                            color: index % 3 === 0 ? "#52FFE1" : (index % 3 === 1 ? "#C568FF" : "#6E7BFF")
-                                            opacity: 0.12 + 0.05 * (index % 2)
-                                        }
-                                    }
-                                }
-
-                                Canvas {
-                                    anchors.fill: parent
-                                    renderTarget: Canvas.FramebufferObject
-                                    antialiasing: true
-                                    smooth: true
-
-                                    Component.onCompleted: requestPaint()
-                                    onWidthChanged: requestPaint()
-                                    onHeightChanged: requestPaint()
-
-                                    onPaint: {
-                                        const ctx = getContext("2d")
-                                        ctx.clearRect(0, 0, width, height)
-                                        ctx.fillStyle = "rgba(0,0,0,0.16)"
-                                        ctx.fillRect(0, 0, width, height)
-
-                                        ctx.strokeStyle = "rgba(82,255,225,0.16)"
-                                        ctx.lineWidth = 1
-                                        for (var ring = 1; ring <= 4; ++ring) {
-                                            ctx.beginPath()
-                                            ctx.arc(width / 2, height / 2, Math.min(width, height) * ring / 9, 0, Math.PI * 2)
-                                            ctx.stroke()
-                                        }
-                                    }
-                                }
-                            }
+                        Text {
+                            width: parent.width * 0.42 - 10
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: root.radarStatus === "LIVE" ? root.radarFrameDisplayLabel() : root.radarStatus
+                            color: root.radarStatus === "LIVE" ? "#9DB4FF" : "#FFD36B"
+                            font.family: root.monoFont
+                            font.pixelSize: 11
+                            font.weight: Font.Bold
+                            font.letterSpacing: 0
+                            horizontalAlignment: Text.AlignRight
+                            elide: Text.ElideRight
                         }
                     }
 
                     Rectangle {
                         width: parent.width
-                        height: parent.height - 74
+                        height: Math.max(360, parent.height - 122)
                         radius: 8
-                        color: "#05060A"
+                        color: Qt.rgba(0.018, 0.020, 0.030, 0.94)
                         border.width: 1
-                        border.color: "#2E2A43"
-                        visible: root.embeddedSafeMode
+                        border.color: Qt.rgba(0.36, 1.0, 0.88, 0.28)
 
-                        Column {
-                            anchors.centerIn: parent
-                            spacing: 12
+                        RasterFrameItem {
+                            id: detailRadarFrame
+                            anchors.fill: parent
+                            anchors.margins: 8
+                            source: root.expandedMode === "radar" ? root.radarFrameUrl : ""
+                            circular: false
+                            visible: ready
+                        }
 
-                            Text {
-                                anchors.horizontalCenter: parent.horizontalCenter
-                                text: "RADAR IMAGE"
-                                color: "#58FFE1"
-                                font.family: root.monoFont
-                                font.pixelSize: 14
-                                font.weight: Font.Bold
-                                font.letterSpacing: 0
+                        Rectangle {
+                            anchors.fill: parent
+                            anchors.margins: 8
+                            radius: 5
+                            color: "#080913"
+                            opacity: detailRadarFrame.ready ? 0.0 : 1.0
+
+                            Column {
+                                anchors.centerIn: parent
+                                spacing: 10
+                                visible: !detailRadarFrame.ready
+
+                                OemIcon {
+                                    width: 78
+                                    height: 78
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    icon: "radar"
+                                    color: "#F7FBFF"
+                                    accentColor: "#58FFE1"
+                                    strokeWidth: 5.0
+                                }
+
+                                Text {
+                                    width: parent.width
+                                    text: "RADAR"
+                                    color: "#F7FBFF"
+                                    font.family: root.displayFont
+                                    font.pixelSize: 26
+                                    font.weight: Font.Bold
+                                    font.letterSpacing: 0
+                                    horizontalAlignment: Text.AlignHCenter
+                                    elide: Text.ElideRight
+                                }
+
+                                Text {
+                                    width: Math.min(320, detailRadarFrame.width * 0.70)
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    text: root.radarStatus
+                                    color: root.radarStatus === "LIVE" ? "#58FFE1" : "#FFD36B"
+                                    font.family: root.monoFont
+                                    font.pixelSize: 13
+                                    font.weight: Font.Bold
+                                    font.letterSpacing: 0
+                                    horizontalAlignment: Text.AlignHCenter
+                                    elide: Text.ElideRight
+                                }
                             }
+                        }
 
-                            Text {
-                                anchors.horizontalCenter: parent.horizontalCenter
-                                text: root.radarSiteName.length > 0 ? root.radarSiteName : "NO SITE"
-                                color: "#F7FBFF"
-                                font.family: root.displayFont
-                                font.pixelSize: 22
-                                font.weight: Font.Bold
-                                font.letterSpacing: 0
-                            }
+                    }
 
-                            Text {
-                                anchors.horizontalCenter: parent.horizontalCenter
-                                text: root.radarFrameTime.length > 0
-                                    ? "UPDATED " + root.radarFrameTime
-                                    : root.radarStatus
-                                color: "#9DB4FF"
-                                font.family: root.monoFont
-                                font.pixelSize: 12
-                                font.weight: Font.Bold
-                                font.letterSpacing: 0
-                            }
+                    Row {
+                        width: parent.width
+                        height: 54
+                        spacing: 10
 
-                            Text {
-                                anchors.horizontalCenter: parent.horizontalCenter
-                                text: "INLINE IMAGE DISABLED ON DEVICE"
-                                color: "#C568FF"
-                                font.family: root.monoFont
-                                font.pixelSize: 12
-                                font.weight: Font.Bold
-                                font.letterSpacing: 0
+                        Repeater {
+                            model: [
+                                { "k": "FRAME", "v": root.radarFrameDisplayLabel(), "s": "time" },
+                                { "k": "SOURCE", "v": root.radarSiteName.length > 0 ? root.radarSiteName : "GPS", "s": root.formatDistanceKm(root.radarSiteDistanceKm) },
+                                { "k": "STATUS", "v": root.radarStatus === "LIVE" ? "LIVE NOW" : root.radarStatus, "s": root.radarProduct.length > 0 ? root.radarProduct : root.radarSourceLabel() }
+                            ]
+
+                            Rectangle {
+                                width: (parent.width - 20) / 3
+                                height: parent.height
+                                radius: 8
+                                color: Qt.rgba(0.030, 0.034, 0.052, 0.80)
+                                border.width: 1
+                                border.color: Qt.rgba(0.36, 1.0, 0.88, 0.18)
+
+                                Column {
+                                    anchors.fill: parent
+                                    anchors.margins: 7
+                                    spacing: 1
+
+                                    Text {
+                                        width: parent.width
+                                        text: modelData.k
+                                        color: "#9DB4FF"
+                                        font.family: root.monoFont
+                                        font.pixelSize: 10
+                                        font.weight: Font.Bold
+                                        font.letterSpacing: 0
+                                        horizontalAlignment: Text.AlignHCenter
+                                        elide: Text.ElideRight
+                                    }
+
+                                    Text {
+                                        width: parent.width
+                                        text: modelData.v
+                                        color: "#F7FBFF"
+                                        font.family: root.monoFont
+                                        font.pixelSize: 14
+                                        font.weight: Font.Bold
+                                        font.letterSpacing: 0
+                                        horizontalAlignment: Text.AlignHCenter
+                                        elide: Text.ElideRight
+                                    }
+
+                                    Text {
+                                        width: parent.width
+                                        text: modelData.s
+                                        color: "#58FFE1"
+                                        font.family: root.monoFont
+                                        font.pixelSize: 9
+                                        font.weight: Font.Bold
+                                        font.letterSpacing: 0
+                                        horizontalAlignment: Text.AlignHCenter
+                                        elide: Text.ElideRight
+                                    }
+                                }
                             }
                         }
                     }

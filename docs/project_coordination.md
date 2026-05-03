@@ -32,6 +32,9 @@ may already exist, check `docs/open_source_landscape.md`.
   `vehicle_state`; BeagleY consumes that contract.
 - AI can explain, summarize, rank, and guide based on evidence. AI should not be
   the source of truth for detecting abnormal data.
+- AI health judgments must use the `vehicle_health_verdict` evidence contract or
+  a future equivalent, including coverage, confidence, abstain rules, and
+  wording limits.
 - Legal use requires owner consent, purpose-limited data capture, and clear
   separation between trusted known-good data and customer fault captures.
 - Runtime health diagnosis for the BeagleY service follows the local skill
@@ -42,6 +45,15 @@ may already exist, check `docs/open_source_landscape.md`.
 - `tools/schema/vehicle_state_v1.md`: live BBB to BeagleY state contract.
 - `tools/schema/can_signals_v1.md`: deployed CAN signal dictionary contract.
 - `tools/schema/can_health_baseline_v1.md`: offline known-good health baseline.
+- `tools/schema/obd_raw_can_capture_session_v1.md`: synchronized OBD/GPS anchor
+  plus raw CAN capture database.
+- `tools/schema/vehicle_health_verdict_v1.md`: structured evidence contract for
+  AI-issued health judgments, confidence, abstain rules, and wording limits.
+- `tools/schema/vehicle_transition_baseline_v1.md`: per-vehicle learned
+  transition templates for startup, throttle, shift, decel, and similar event
+  response checks.
+- `tools/schema/baseline_coverage_report_v1.md`: report that marks known-good
+  scenarios as strong, weak, or missing for a vehicle.
 - Fault recorder event JSON: rolling evidence packet produced by BBB when signal
   faults appear.
 
@@ -91,6 +103,7 @@ Current pieces:
 - CAN diagnostics: `tools/bbb_hub/can_diagnostics.py`
 - Fault recorder: `tools/bbb_hub/fault_recorder.py`
 - Learned baseline monitor: `tools/bbb_hub/vehicle_baseline.py`
+- Learned transition monitor: `tools/bbb_hub/transition_monitor.py`
 
 Rules:
 
@@ -108,6 +121,7 @@ Current pieces:
 - Workbench package: `tools/can_reverse_workbench`
 - Shared bit extraction: `tools/can_reverse_workbench/bitfield.py`
 - OBD anchor adapter: `tools/can_reverse_workbench/obd_anchors.py`
+- OBD + raw CAN capture sessions: `tools/can_reverse_workbench/capture_session.py`
 - Planned virtual anchor generator: derives acceleration, load proxies, VE,
   fuel-flow estimates, gear-ratio proxies, warmup rates, and confidence metadata
   from OBD anchors plus vehicle constants.
@@ -134,11 +148,14 @@ Current pieces:
 - Health baseline utilities: `tools/can_reverse_workbench/baseline.py`
 - Startup diff: `tools/can_reverse_workbench/startup_diff.py`
 - Runtime learned baseline: `tools/bbb_hub/vehicle_baseline.py`
+- Runtime transition baseline: `tools/bbb_hub/transition_monitor.py`
 
 Rules:
 
 - "Car A vs Car B" comparisons should match make, model, year, engine, trim, and
   decoder version before being treated as strong evidence.
+- V1 transition anomaly detection is per-vehicle. Fleet priors can be added
+  later, but they are not the first source of truth.
 - Reports should say "most likely based on captured evidence", not guaranteed
   repair instructions.
 
@@ -161,6 +178,8 @@ Rules:
 - UI text should be short and display-ready.
 - Detailed repair reasoning belongs in reports or guided workflows, not the
   main gauge loop.
+- AI verdicts such as "probably healthy" belong in `vehicle_health_verdict`,
+  not directly in `_diagnostic`.
 
 ## Near-Term Priorities
 

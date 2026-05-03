@@ -1,8 +1,14 @@
 SpeedGauge    1.0 SpeedGauge.qml
 TachGauge     1.0 TachGauge.qml
+CornerCircleShell 1.0 CornerCircleShell.qml
+GaugeArcHead 1.0 GaugeArcHead.qml
+GaugeLensShell 1.0 GaugeLensShell.qml
 MatrixRain    1.0 MatrixRain.qml
 SpeedoPearl   1.0 SpeedoPearl.qml
 FuelGauge    1.0 FuelGauge.qml
 WeatherCorners 1.0 WeatherCorners.qml
+WeatherMoodIcon 1.0 WeatherMoodIcon.qml
+MapCenterMapLibreNative 1.0 MapCenterMapLibreNative.qml
 
+OemIcon 1.0 OemIcon.qml
 FuelPumpIcon 1.0 FuelPumpIcon.qml

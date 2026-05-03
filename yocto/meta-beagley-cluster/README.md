@@ -29,7 +29,7 @@ device tree instead of falling back to the generic `j722s-evm` tree.
 
 For remote diagnosis, the appliance layer also installs:
 
-- a deterministic wired debug address on the BeagleY CPSW interface at `192.168.0.46/24`
+- a deterministic wired debug address on the BeagleY CPSW interface at `10.24.0.46/24`
 - a deterministic USB recovery address on `usb0` at `192.168.7.2/24` when the gadget interface is present
 - persistent systemd journal storage under `/var/log/journal`
 - diagnostic stage markers and boot snapshots under `/var/lib/beagley-cluster/diagnostic`

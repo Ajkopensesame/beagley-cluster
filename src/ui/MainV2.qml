@@ -250,12 +250,15 @@ Window {
         W.MapCenter {
             anchors.fill: mapShell
             anchors.margins: 10
-            mode: (typeof BEAGLEY_NO_MAP !== "undefined" && BEAGLEY_NO_MAP)
+            mode: ((typeof BEAGLEY_NO_MAP !== "undefined" && BEAGLEY_NO_MAP)
+                    && root.mapRenderer !== "maplibre-native")
                 ? "placeholder"
-                : ((root.mapRenderer === "web"
+                : (root.mapRenderer === "maplibre-native"
+                    ? "maplibre-native"
+                    : ((root.mapRenderer === "web"
                     && !(typeof BEAGLEY_FORCE_SNAPSHOT_MAP !== "undefined" && BEAGLEY_FORCE_SNAPSHOT_MAP))
                     ? "web"
-                    : "snapshot")
+                    : "snapshot"))
             lat: truthOk && hub.gpsLat !== undefined ? hub.gpsLat : -27.4698
             lng: truthOk && hub.gpsLng !== undefined ? hub.gpsLng : 153.0251
             bearing: truthOk && hub.gpsBearing !== undefined ? hub.gpsBearing : 0

@@ -82,22 +82,36 @@ Item {
     }
     readonly property bool lowEffectMode: effectLevel === "low" || effectLevel === "off"
     readonly property bool embeddedSafeMode: Qt.platform.os === "linux"
+    readonly property bool embeddedHighEffectBudgetMode: embeddedSafeMode && effectLevel === "high"
+    readonly property bool cheapAuxArcMode: true
+    readonly property bool auxArcAnimationEnabled: !cheapAuxArcMode && !embeddedSafeMode && !lowEffectMode
     readonly property color chromeColor: theme?.pearlLow ?? Qt.color("#C7B7FF")
-    readonly property real auxArcCanvasScale: lowEffectMode ? 0.44 : 1.0
-    readonly property real sideArcHeadRadius: lowEffectMode ? 10.5 : 15.5
-    readonly property real rpmRepaintThreshold: lowEffectMode ? 35.0 : 1e-4
-    readonly property real fuelRepaintThreshold: lowEffectMode ? 0.30 : 1e-4
+    readonly property real auxArcCanvasScale: embeddedHighEffectBudgetMode
+        ? 1.0
+        : ((lowEffectMode && !embeddedSafeMode) ? 0.44 : 1.0)
+    readonly property real auxArcStrokeTune: auxArcCanvasScale < 1.0 ? auxArcCanvasScale : 1.0
+    readonly property real sideArcHeadRadius: lowEffectMode ? 10.5 : (embeddedHighEffectBudgetMode ? 12.0 : 15.5)
+    readonly property real rpmRepaintThreshold: lowEffectMode ? 35.0 : (embeddedHighEffectBudgetMode ? 260.0 : 1e-4)
+    readonly property real fuelRepaintThreshold: lowEffectMode ? 0.30 : (embeddedHighEffectBudgetMode ? 2.0 : 1e-4)
     property real lastPaintedRpm: 0
     property real lastPaintedFuel: 100
 
     function requestGaugeStaticPaint() {
         dialChrome.requestStaticPaint();
     }
-    function requestGaugeDynamicPaint() {
-        dialChrome.requestDynamicPaint();
-        fuelArcCanvas.requestPaint();
+    function requestRpmPaint() {
+        const force = arguments.length > 0 && arguments[0] === true;
+        dialChrome.requestDynamicPaint(force);
         root.lastPaintedRpm = root.displayRpm;
+    }
+    function requestFuelPaint() {
+        fuelArcCanvas.requestPaint();
         root.lastPaintedFuel = root.displayFuel;
+    }
+    function requestGaugeDynamicPaint() {
+        const force = arguments.length > 0 && arguments[0] === true;
+        requestRpmPaint(force);
+        requestFuelPaint();
     }
     function kickSmoother() {
         if (!smoothingTimer.running) smoothingTimer.start();
@@ -115,7 +129,7 @@ Item {
     // Keep the dial geometry stable so the speed and tach arcs stay optically matched.
     readonly property real faceScale: 1.0
     readonly property real faceYOffset: 0
-    readonly property real rainFaceRadius: width * 0.438
+    readonly property real rainFaceRadius: width * 0.496
     property real flashLevel: 0.0
     property real fuelLavaPhase: 0.0
 
@@ -198,22 +212,22 @@ Item {
 
             const rpmSettled = Math.abs(target - root.displayRpm) < 0.2;
             const fuelSettled = Math.abs(fuelTarget - root.displayFuel) < 0.02;
-            const changed = Math.abs(root.displayRpm - prevRpm) > 1e-4
-                         || Math.abs(root.displayFuel - prevFuel) > 1e-4;
-            const needsRepaint = Math.abs(root.displayRpm - root.lastPaintedRpm) >= root.rpmRepaintThreshold
-                              || Math.abs(root.displayFuel - root.lastPaintedFuel) >= root.fuelRepaintThreshold;
-            const settledFlush = rpmSettled && fuelSettled
-                              && (Math.abs(root.displayRpm - root.lastPaintedRpm) > 1e-4
-                               || Math.abs(root.displayFuel - root.lastPaintedFuel) > 1e-4);
+            const rpmChanged = Math.abs(root.displayRpm - prevRpm) > 1e-4;
+            const fuelChanged = Math.abs(root.displayFuel - prevFuel) > 1e-4;
+            const rpmNeedsRepaint = Math.abs(root.displayRpm - root.lastPaintedRpm) >= root.rpmRepaintThreshold;
+            const fuelNeedsRepaint = Math.abs(root.displayFuel - root.lastPaintedFuel) >= root.fuelRepaintThreshold;
+            const rpmSettledFlush = rpmSettled && Math.abs(root.displayRpm - root.lastPaintedRpm) > 1e-4;
+            const fuelSettledFlush = fuelSettled && Math.abs(root.displayFuel - root.lastPaintedFuel) > 1e-4;
 
-            if (changed && (needsRepaint || settledFlush)) requestGaugeDynamicPaint();
+            if (rpmChanged && (rpmNeedsRepaint || rpmSettledFlush)) requestRpmPaint();
+            if (fuelChanged && (fuelNeedsRepaint || fuelSettledFlush)) requestFuelPaint();
             if (rpmSettled && fuelSettled) running = false;
         }
     }
 
     Timer {
-        interval: root.lowEffectMode ? 120 : 42
-        running: root.effectLevel !== "off" && !root.lowEffectMode
+        interval: root.lowEffectMode ? 120 : (root.embeddedHighEffectBudgetMode ? 300 : 42)
+        running: root.effectLevel !== "off" && root.auxArcAnimationEnabled
         repeat: true
         onTriggered: {
             root.fuelLavaPhase += interval / 1000.0
@@ -224,22 +238,21 @@ Item {
     onRpmChanged: kickSmoother()
     onFuelPctChanged: kickSmoother()
     onMaxRpmChanged: kickSmoother()
-    onGaugeColorChanged: requestGaugeDynamicPaint()
-    onHighRpmChanged: requestGaugeDynamicPaint()
+    onHighRpmChanged: requestGaugeDynamicPaint(true)
     onThemeChanged: {
         requestGaugeStaticPaint()
-        requestGaugeDynamicPaint()
+        requestGaugeDynamicPaint(true)
     }
     onWidthChanged: {
         requestGaugeStaticPaint()
-        requestGaugeDynamicPaint()
+        requestGaugeDynamicPaint(true)
     }
     onHeightChanged: {
         requestGaugeStaticPaint()
-        requestGaugeDynamicPaint()
+        requestGaugeDynamicPaint(true)
     }
     onLowEffectModeChanged: {
-        requestGaugeDynamicPaint()
+        requestGaugeDynamicPaint(true)
         kickSmoother()
     }
 
@@ -247,7 +260,7 @@ Item {
         displayRpm = clamp(rpm, 0, maxRpm)
         displayFuel = clamp(fuelPct, 0, 100)
         requestGaugeStaticPaint()
-        requestGaugeDynamicPaint()
+        requestGaugeDynamicPaint(true)
         kickSmoother()
     }
 
@@ -274,16 +287,47 @@ Item {
             id: rainFaceBg
             anchors.fill: parent
             z: 1
+            renderTarget: root.embeddedSafeMode ? Canvas.Image : Canvas.FramebufferObject
+            antialiasing: !root.lowEffectMode
+            smooth: !root.lowEffectMode
+
+            onWidthChanged: requestPaint()
+            onHeightChanged: requestPaint()
 
             onPaint: {
-                const ctx = getContext("2d");
-                ctx.clearRect(0, 0, width, height);
-                const cx = width / 2;
-                const cy = height / 2;
-                ctx.fillStyle = "#07080E";
-                ctx.beginPath();
-                ctx.arc(cx, cy, root.rainFaceRadius, 0, Math.PI * 2);
-                ctx.fill();
+                const ctx = getContext("2d")
+                ctx.clearRect(0, 0, width, height)
+                const cx = width / 2
+                const cy = height / 2
+                const r = root.rainFaceRadius
+                const pearl = root.theme?.pearlLow ?? Qt.color("#C7B7FF")
+                const deep = root.theme?.pearlHigh ?? Qt.color("#5E35B1")
+
+                function rgba(c, alpha) {
+                    return "rgba("
+                        + Math.round(c.r * 255) + ","
+                        + Math.round(c.g * 255) + ","
+                        + Math.round(c.b * 255) + ","
+                        + alpha + ")"
+                }
+
+                const face = ctx.createRadialGradient(cx, cy, r * 0.08, cx, cy, r)
+                face.addColorStop(0.00, "rgba(4,5,10,1.00)")
+                face.addColorStop(0.58, "rgba(4,5,11,0.99)")
+                face.addColorStop(0.86, "rgba(2,3,8,1.00)")
+                face.addColorStop(0.96, rgba(pearl, 0.035))
+                face.addColorStop(1.00, "rgba(0,0,0,1.00)")
+
+                ctx.fillStyle = face
+                ctx.beginPath()
+                ctx.arc(cx, cy, r, 0, Math.PI * 2)
+                ctx.fill()
+
+                ctx.beginPath()
+                ctx.strokeStyle = rgba(pearl, 0.16)
+                ctx.lineWidth = Math.max(2, width * 0.004)
+                ctx.arc(cx, cy, r - ctx.lineWidth, 0, Math.PI * 2)
+                ctx.stroke()
             }
         }
 
@@ -299,21 +343,28 @@ Item {
             rainColor: root.blendToward(
                 root.gaugeColor,
                 root.theme?.pearlLow ?? Qt.color("#C7B7FF"),
-                0.72,
+                0.42,
+                0.98
+            )
+            glowColor: root.blendToward(
+                root.theme?.pearlLow ?? Qt.color("#C7B7FF"),
+                Qt.color("#FFFFFF"),
+                0.34,
                 0.96
             )
-            fps: root.lowEffectMode ? 7 : 12
-            speedMultiplier: root.lowEffectMode ? 0.11 : 0.20
-            density: root.lowEffectMode ? 0.15 : 0.30
-            glowSpeed: root.lowEffectMode ? 0.58 : 0.72
-            glowFloor: root.lowEffectMode ? 0.22 : 0.28
-            driftScale: 0.90
-            charChangeChance: root.lowEffectMode ? 0.032 : 0.026
-            fontPx: root.lowEffectMode ? 18 : 12
-            fadeAlpha: root.lowEffectMode ? 0.075 : 0.024
-            tailLength: root.lowEffectMode ? 12 : 48
-            headAlpha: root.lowEffectMode ? 0.74 : 0.92
-            tailMinAlpha: root.lowEffectMode ? 0.025 : 0.12
+            fps: root.embeddedSafeMode ? 2.0 : (root.lowEffectMode ? 7 : 12)
+            speedMultiplier: root.embeddedSafeMode ? 0.18 : (root.lowEffectMode ? 0.11 : 0.20)
+            density: root.embeddedSafeMode ? 0.76 : (root.lowEffectMode ? 0.15 : 0.30)
+            glowSpeed: root.embeddedSafeMode ? 0.82 : (root.lowEffectMode ? 0.58 : 0.72)
+            glowFloor: root.embeddedSafeMode ? 0.18 : (root.lowEffectMode ? 0.22 : 0.28)
+            glowBlur: root.embeddedSafeMode ? 6.5 : 7.0
+            driftScale: root.embeddedSafeMode ? 0.86 : 0.90
+            charChangeChance: root.embeddedSafeMode ? 0.014 : (root.lowEffectMode ? 0.032 : 0.026)
+            fontPx: root.embeddedSafeMode ? 14 : (root.lowEffectMode ? 18 : 12)
+            fadeAlpha: root.embeddedSafeMode ? 0.030 : (root.lowEffectMode ? 0.075 : 0.024)
+            tailLength: root.embeddedSafeMode ? 34 : (root.lowEffectMode ? 12 : 48)
+            headAlpha: root.embeddedSafeMode ? 0.90 : (root.lowEffectMode ? 0.74 : 0.92)
+            tailMinAlpha: root.embeddedSafeMode ? 0.070 : (root.lowEffectMode ? 0.025 : 0.12)
         }
 
         DialChrome {
@@ -336,7 +387,7 @@ Item {
             labelDivisor: 1000
         }
 
-        // ---- Fuel arc (tapered lava band, opposite tach) ----
+        // ---- Fuel arc (cheap static band, opposite tach) ----
         Item {
             id: fuelArcLayer
             anchors.fill: parent
@@ -375,12 +426,12 @@ Item {
             Canvas {
                 id: fuelArcCanvas
                 anchors.centerIn: parent
-                width: parent.width * (root.embeddedSafeMode ? 1.0 : root.auxArcCanvasScale)
-                height: parent.height * (root.embeddedSafeMode ? 1.0 : root.auxArcCanvasScale)
-                scale: root.embeddedSafeMode ? 1.0 : (1.0 / root.auxArcCanvasScale)
+                width: parent.width * root.auxArcCanvasScale
+                height: parent.height * root.auxArcCanvasScale
+                scale: root.auxArcCanvasScale < 1.0 ? (1.0 / root.auxArcCanvasScale) : 1.0
                 renderTarget: root.embeddedSafeMode ? Canvas.Image : Canvas.FramebufferObject
-                antialiasing: !root.lowEffectMode && !root.embeddedSafeMode
-                smooth: !root.lowEffectMode && !root.embeddedSafeMode
+                antialiasing: !root.lowEffectMode
+                smooth: !root.lowEffectMode
 
                 onWidthChanged: requestPaint()
                 onHeightChanged: requestPaint()
@@ -425,7 +476,7 @@ Item {
                     function buildBandPath(fromT, toT, tailWidth, headWidth) {
                         const outer = []
                         const inner = []
-                        const steps = Math.max(10, Math.ceil(Math.abs(toT - fromT) * 56))
+                        const steps = Math.max(10, Math.ceil(Math.abs(toT - fromT) * (root.embeddedHighEffectBudgetMode ? 24 : 56)))
                         for (let i = 0; i <= steps; i++) {
                             const u = i / steps
                             const eased = 1 - Math.pow(1 - u, 1.45)
@@ -470,15 +521,44 @@ Item {
                     ctx.save()
                     ctx.beginPath()
                     ctx.strokeStyle = rgba(fuelArcLayer.baseDark, root.lowEffectMode ? 0.10 : 0.08)
-                    ctx.lineWidth = root.lowEffectMode ? (10 * root.auxArcCanvasScale) : 22
+                    ctx.lineWidth = root.lowEffectMode ? (10 * root.auxArcCanvasScale) : (22 * root.auxArcStrokeTune)
                     ctx.lineCap = "round"
                     ctx.arc(cx, cy, r, startRad, startRad + sweepRad)
                     ctx.stroke()
                     ctx.restore()
 
+                    if (root.cheapAuxArcMode) {
+                        if (fuelArcLayer.fuelNorm > 0.002) {
+                            const activeStart = startRad + sweepRad * headT
+                            const activeEnd = startRad + sweepRad * tailT
+
+                            ctx.save()
+                            ctx.beginPath()
+                            ctx.strokeStyle = rgba(fuel, root.lowEffectMode ? 0.76 : 0.82)
+                            ctx.lineWidth = root.lowEffectMode ? (7 * root.auxArcCanvasScale) : (12 * root.auxArcStrokeTune)
+                            ctx.lineCap = "round"
+                            ctx.arc(cx, cy, r, activeStart, activeEnd)
+                            ctx.stroke()
+                            ctx.restore()
+
+                            ctx.save()
+                            ctx.beginPath()
+                            ctx.strokeStyle = rgba(bright, root.lowEffectMode ? 0.22 : 0.26)
+                            ctx.lineWidth = root.lowEffectMode ? (2.0 * root.auxArcCanvasScale) : (2.8 * root.auxArcStrokeTune)
+                            ctx.lineCap = "round"
+                            ctx.arc(cx, cy, r, activeStart, activeEnd)
+                            ctx.stroke()
+                            ctx.restore()
+                        }
+
+                        if (typeof performanceMetrics !== "undefined" && performanceMetrics)
+                            performanceMetrics.recordPaint("tachGauge.fuelArc")
+                        return
+                    }
+
                     if (fuelArcLayer.fuelNorm > 0.002) {
-                        const tailWidth = root.lowEffectMode ? (3.5 * root.auxArcCanvasScale) : 5.5
-                        const headWidth = root.lowEffectMode ? (10 * root.auxArcCanvasScale) : 22
+                        const tailWidth = root.lowEffectMode ? (3.5 * root.auxArcCanvasScale) : (5.5 * root.auxArcStrokeTune)
+                        const headWidth = root.lowEffectMode ? (10 * root.auxArcCanvasScale) : (22 * root.auxArcStrokeTune)
                         const phase = root.fuelLavaPhase
 
                         if (root.lowEffectMode) {
@@ -514,12 +594,13 @@ Item {
                             ctx.fillStyle = fill
                             ctx.fillRect(0, 0, width, height)
 
-                            for (let i = 0; i < 5; i++) {
+                            const blobCount = root.embeddedHighEffectBudgetMode ? 2 : 5
+                            for (let i = 0; i < blobCount; i++) {
                                 const blobColor = [neonLime, neonCyan, neonPink, neonOrange, neonYellow][i % 5]
                                 const u = (phase * (0.10 + i * 0.014) + i * 0.21) % 1.0
                                 const t = tailT + (headT - tailT) * u
                                 const wobble = Math.sin(phase * (1.0 + i * 0.2) + i * 1.9)
-                                const blobR = 11 + i * 1.7
+                                const blobR = (root.embeddedHighEffectBudgetMode ? (7 + i * 1.1) : (11 + i * 1.7)) * root.auxArcStrokeTune
                                 drawBlob(t, wobble * 2.4, blobR, blobColor, 0.56, 1.55, phase + i)
                             }
                             ctx.restore()

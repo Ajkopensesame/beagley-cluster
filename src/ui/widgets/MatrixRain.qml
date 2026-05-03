@@ -5,13 +5,14 @@ Item {
     anchors.fill: parent
 
     // ===== Public API (Main.qml expects THESE) =====
-    property color rainColor: "#5E35B1"
+    property color rainColor: "#C7B7FF"
+    property color glowColor: "#EAD7FF"
     property bool effectEnabled: true
     property string effectLevel: "high"
     property real sharedPhase: NaN
 
     property real fadeAlpha: 0.025
-    property int  fps: 10
+    property real fps: 10
     property int  columns: 0   // 0 = auto; >0 forces column count
 
     property real speedMultiplier: 0.10
@@ -19,6 +20,7 @@ Item {
     property int  fontPx: 13
     property real density: 0.35
     property real glowSpeed: 1.2
+    property real glowBlur: 7.0
     property real glowFloor: 0.22
     property real driftScale: 0.18
     property real charChangeChance: 0.035
@@ -40,11 +42,23 @@ Item {
     readonly property bool effectDisabled: !effectEnabled || effectLevel === "off"
     readonly property bool lowEffectMode: effectLevel === "low"
     readonly property bool embeddedSafeMode: Qt.platform.os === "linux"
+    readonly property bool embeddedHighEffectBudgetMode: embeddedSafeMode && effectLevel === "high"
     readonly property bool useSharedPhase: !isNaN(sharedPhase)
     readonly property real renderScale: 1.0
+    readonly property real effectiveDensity: embeddedHighEffectBudgetMode ? Math.min(density, 0.80) : density
+    readonly property int effectiveTailLength: embeddedHighEffectBudgetMode ? Math.min(tailLength, 36) : tailLength
+    readonly property real effectiveCharChangeChance: embeddedHighEffectBudgetMode ? Math.min(charChangeChance, 0.016) : charChangeChance
+    readonly property real effectiveGlowBlur: embeddedHighEffectBudgetMode ? Math.min(glowBlur, 7.0) : glowBlur
+    readonly property real effectiveFps: lowEffectMode
+        ? Math.min(fps, embeddedHighEffectBudgetMode ? 2.0 : 8.0)
+        : (embeddedHighEffectBudgetMode ? Math.min(fps, 2.0) : fps)
     property var greekGlyphs: [
-        "Α", "Β", "Γ", "Δ", "Ε", "Ζ", "Η", "Θ", "Ι", "Κ", "Λ", "Μ",
-        "Ν", "Ξ", "Ο", "Π", "Ρ", "Σ", "Τ", "Υ", "Φ", "Χ", "Ψ", "Ω"
+        "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
+        "ｱ", "ｲ", "ｳ", "ｴ", "ｵ", "ｶ", "ｷ", "ｸ", "ｹ", "ｺ",
+        "ｻ", "ｼ", "ｽ", "ｾ", "ｿ", "ﾀ", "ﾁ", "ﾂ", "ﾃ", "ﾄ",
+        "ﾅ", "ﾆ", "ﾇ", "ﾈ", "ﾉ", "ﾊ", "ﾋ", "ﾌ", "ﾍ", "ﾎ",
+        "ﾏ", "ﾐ", "ﾑ", "ﾒ", "ﾓ", "ﾔ", "ﾕ", "ﾖ", "ﾗ", "ﾘ",
+        "ﾙ", "ﾚ", "ﾛ", "ﾜ", "ﾝ"
     ]
     property var verses: [
         "ΕΝ ΑΡΧΗ ΗΝ Ο ΛΟΓΟΣ",
@@ -108,7 +122,7 @@ Item {
         verseOffsets = []
         for (var i = 0; i < count; i++) {
             drops.push(Math.random() * (height / Math.max(1, fontPx)))
-            activeColumns.push(Math.random() < density)
+            activeColumns.push(Math.random() < root.effectiveDensity)
             assignVerse(i)
         }
         canvas.requestPaint()
@@ -176,22 +190,26 @@ Item {
                     var glyph = root.glyphFor(i, headStep)
 
                     // head
+                    ctx.shadowColor = root.glowColor
+                    ctx.shadowBlur = root.effectiveGlowBlur * pulse
                     ctx.globalAlpha = root.headAlpha * pulse
                     ctx.fillStyle = root.rainColor
                     ctx.fillText(glyph, x, headY)
 
                     // tail (fades)
-                    for (var t = 1; t <= root.tailLength; t++) {
+                    for (var t = 1; t <= root.effectiveTailLength; t++) {
                         var tailY = (headRow - t) * scaledFontPx
                         if (tailY < 0) break
 
-                        var k = t / root.tailLength
+                        var k = t / root.effectiveTailLength
                         var a = (root.headAlpha * (1.0 - k) + root.tailMinAlpha * k) * pulse
                         var tailGlyph = root.glyphFor(i, headStep - t)
                         ctx.globalAlpha = a
+                        ctx.shadowBlur = root.effectiveGlowBlur * pulse * (1.0 - k) * 0.55
                         ctx.fillStyle = root.rainColor
                         ctx.fillText(tailGlyph, x, tailY)
                     }
+                    ctx.shadowBlur = 0
                 }
 
                 var step = root.speedMultiplier * (0.35 + 0.65 * pulse) * root.driftScale
@@ -199,7 +217,7 @@ Item {
                     step = Math.max(step, 0.10 + Math.random() * 0.045)
                 root.drops[i] += step
 
-                var churnChance = Math.max(root.charChangeChance * pulse, root.lowEffectMode ? 0.030 : 0.0)
+                var churnChance = Math.max(root.effectiveCharChangeChance * pulse, root.lowEffectMode ? 0.030 : 0.0)
                 if (isActive && Math.random() < churnChance) {
                     if (Math.random() < 0.18) {
                         root.assignVerse(i)
@@ -210,12 +228,12 @@ Item {
                     }
                 }
 
-                if (root.drops[i] * scaledFontPx > drawHeight + (root.tailLength * scaledFontPx)) {
-                    root.drops[i] = -Math.random() * root.tailLength
+                if (root.drops[i] * scaledFontPx > drawHeight + (root.effectiveTailLength * scaledFontPx)) {
+                    root.drops[i] = -Math.random() * root.effectiveTailLength
                     root.assignVerse(i)
-                    root.activeColumns[i] = Math.random() < root.density
-                } else if (!isActive && Math.random() < root.density * (root.lowEffectMode ? 0.045 : 0.015)) {
-                    root.drops[i] = -Math.random() * root.tailLength
+                    root.activeColumns[i] = Math.random() < root.effectiveDensity
+                } else if (!isActive && Math.random() < root.effectiveDensity * (root.lowEffectMode ? 0.045 : 0.015)) {
+                    root.drops[i] = -Math.random() * root.effectiveTailLength
                     root.assignVerse(i)
                     root.activeColumns[i] = true
                 }
@@ -233,7 +251,7 @@ Item {
     }
 
     Timer {
-        interval: Math.round(1000 / Math.max(1, root.lowEffectMode ? Math.min(root.fps, 8) : root.fps))
+        interval: Math.round(1000 / Math.max(0.25, root.effectiveFps))
         running: !root.effectDisabled && !root.useSharedPhase
         repeat: true
         onTriggered: {
@@ -245,12 +263,13 @@ Item {
     onWidthChanged: resetDrops()
     onHeightChanged: resetDrops()
     onDensityChanged: resetDrops()
+    onEffectiveDensityChanged: resetDrops()
     onColumnsChanged: resetDrops()
     onFontPxChanged: resetDrops()
     onEffectEnabledChanged: resetDrops()
     onEffectLevelChanged: resetDrops()
     onSharedPhaseChanged: {
-        if (root.useSharedPhase) {
+        if (root.useSharedPhase && !root.effectDisabled) {
             root.timePhase = root.sharedPhase
             canvas.requestPaint()
         }

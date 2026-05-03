@@ -22,6 +22,59 @@ The tool must not assume that a packet is `rpm`, `speedKph`, or any other human
 signal just because it looks interesting. Candidates are always reported with
 confidence, but `can_signals.json` only exports verified mappings.
 
+## OBD + Raw CAN Capture Sessions
+
+The preferred source artifact is a single SQLite capture session that contains:
+
+- timestamped raw CAN frames
+- timestamped OBD Mode 01 anchor samples
+- optional GPS anchor samples
+- vehicle profile, purpose, and import warnings
+
+Build one from synchronized raw CAN and OBD/GPS logs:
+
+```bash
+python3 -m tools.can_reverse_workbench capture-session \
+  --db /tmp/can_workbench/capture.sqlite \
+  --can-log /path/to/candump.log \
+  --obd-log /path/to/obd_mode01.jsonl \
+  --out /tmp/can_workbench/session_001 \
+  --vehicle-profile "make model year engine trim ecu-calibration" \
+  --purpose "owner-authorized raw CAN discovery" \
+  --thermal-start-class cold \
+  --session-label known_good \
+  --decoder-version can_signals_v1
+```
+
+The export directory contains:
+
+- `raw_can.candump`: analyzer-ready raw CAN log
+- `guided_session.json`: analyzer-ready OBD/GPS anchors
+- `obd_anchors.jsonl`: normalized anchor samples
+- `capture_manifest.json`: counts and file paths
+
+Capture metadata can include `thermalStartClass`, `offTimeSec`,
+`sessionLabels`, and `decoderVersion`. Transition baselines use this metadata to
+avoid treating unlike captures as the same truth source.
+
+Then decode/name raw CAN candidates from the same capture:
+
+```bash
+python3 -m tools.can_reverse_workbench analyze \
+  --log /tmp/can_workbench/session_001/raw_can.candump \
+  --labels /tmp/can_workbench/session_001/guided_session.json \
+  --target rpm \
+  --target speedKph \
+  --target mafGps \
+  --target throttlePct \
+  --target mapKpa \
+  --out /tmp/can_workbench/session_001/analysis
+```
+
+This is the "OBD teaches raw CAN" path. OBD/GPS anchors help name and scale raw
+signals; the exported raw CAN dictionary is what the BBB can use later for fast
+live monitoring.
+
 ## Inputs
 
 Supported raw log formats:
@@ -108,8 +161,9 @@ Implemented standard anchors include common emissions/diagnostic values such as
 `throttlePct`, `intakeAirTempC`, fuel trims, module voltage, oil temperature,
 and fuel rate when the vehicle reports those PIDs.
 
-This is not a live OBD scanner yet. It is an offline/log adapter that preserves
-the same anchor contract as manually guided sessions.
+This is not a live OBD scanner yet. The durable capture artifact is now the
+SQLite capture session; the current command imports synchronized logs into that
+session and exports the same anchor contract as manually guided sessions.
 
 ## Analyze
 
@@ -152,6 +206,22 @@ python3 -m tools.can_reverse_workbench decode \
 
 The JSONL output contains decoded signal snapshots that can be replayed into the
 existing vehicle state pipeline.
+
+Run the shared transition anomaly monitor over decoded replay output:
+
+```bash
+python3 -m tools.can_reverse_workbench transition-replay \
+  --decoded /tmp/can_workbench/vehicle_state_overlay.jsonl \
+  --out /tmp/can_workbench/transition_replay_report.json
+```
+
+This uses the same event segmentation and transition scoring as the BBB runtime.
+Raw-byte `startup_diff.py` remains the fallback when a signal has not been
+decoded yet.
+
+Replay reports include `baselineCoverage`, which marks known-good scenarios as
+`strong`, `weak`, or `missing` so the next capture can target the gaps instead
+of collecting random mileage.
 
 ## Known-Good Baseline Diagnostics
 

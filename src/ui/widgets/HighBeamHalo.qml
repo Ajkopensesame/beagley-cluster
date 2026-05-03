@@ -1,5 +1,5 @@
 import QtQuick 2.15
-import "vic/icons" as VicIcons
+import "vic" as Vic
 
 Item {
     id: root
@@ -33,12 +33,12 @@ Item {
     readonly property color neonPearl: "#EAD7FF"
     readonly property color panelInk: "#060C18"
     // Gap size at the top of the halo where the high-beam icon sits.
-    property real topBreakDeg: 44
+    property real topBreakDeg: 58
 
     readonly property real haloDiameter: Math.max(0, vicDiameter - trimPx) + (gapPx * 2) + (ringThickness * 2)
     readonly property real _outerR: Math.min(width, height) / 2 - 1
-    readonly property real _iconPlateSize: Math.max(22, ringThickness * 2.15)
-    readonly property real _iconCenterY: (height / 2) - _outerR + (ringThickness * 0.55)
+    readonly property real _iconPlateSize: Math.max(38, ringThickness * 3.15)
+    readonly property real _iconCenterY: Math.max(_iconPlateSize / 2, (height / 2) - _outerR + (ringThickness * 0.70))
     readonly property bool embeddedSafeMode: Qt.platform.os === "linux"
 
     width: haloDiameter
@@ -184,10 +184,14 @@ Item {
         border.color: Qt.rgba(root.neonCyan.r, root.neonCyan.g, root.neonCyan.b, 0.70)
     }
 
-    VicIcons.HighBeamIcon {
+    Vic.OemTellTaleIcon {
         anchors.centerIn: iconPlate
-        width: iconPlate.width * 0.76
+        width: iconPlate.width * 0.86
         height: width
+        icon: "highBeam"
         color: Qt.rgba(root.neonCyan.r, root.neonCyan.g, root.neonCyan.b, 0.98)
+        accentColor: Qt.rgba(root.neonPearl.r, root.neonPearl.g, root.neonPearl.b, 0.92)
+        cutoutColor: root.panelInk
+        strokeWidth: Math.max(4, width * 0.08)
     }
 }

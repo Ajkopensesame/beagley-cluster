@@ -1,5 +1,4 @@
 import QtQuick 2.15
-import "icons" as Icons
 
 Item {
     id: root
@@ -10,27 +9,10 @@ Item {
     property string warningKey: ""
     property color color: "red"
 
-    Loader {
+    OemTellTaleIcon {
         anchors.fill: parent
-        sourceComponent: {
-            switch (root.warningKey) {
-            case "brake":  return brakeComp
-            case "charge": return chargeComp
-            case "check":  return checkComp
-            case "fuel":   return fuelComp
-            case "door":   return doorComp
-            case "at":     return atComp
-            case "oil":    return oilComp
-            default:       return null
-            }
-        }
+        icon: root.warningKey
+        color: root.color
+        accentColor: root.color
     }
-
-    Component { id: brakeComp;  Icons.BrakeIcon  { color: root.color } }
-    Component { id: chargeComp; Icons.ChargeIcon { color: root.color } }
-    Component { id: checkComp;  Icons.CheckIcon  { color: root.color } }
-    Component { id: fuelComp;   Icons.FuelIcon   { color: root.color } }
-    Component { id: oilComp;    Icons.OilIcon    { color: root.color } }
-    Component { id: doorComp;   Icons.DoorIcon   { color: root.color } }
-    Component { id: atComp;     Icons.AtIcon     { color: root.color } }
 }

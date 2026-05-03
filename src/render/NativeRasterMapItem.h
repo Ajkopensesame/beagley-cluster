@@ -2,6 +2,7 @@
 
 #include <QHash>
 #include <QImage>
+#include <QList>
 #include <QMutex>
 #include <QPointer>
 #include <QPointF>
@@ -20,7 +21,10 @@ class NativeRasterMapItem : public QQuickItem
 
     Q_PROPERTY(double centerLat READ centerLat WRITE setCenterLat NOTIFY viewChanged)
     Q_PROPERTY(double centerLng READ centerLng WRITE setCenterLng NOTIFY viewChanged)
+    Q_PROPERTY(double mapBearing READ mapBearing WRITE setMapBearing NOTIFY viewChanged)
     Q_PROPERTY(double zoom READ zoom WRITE setZoom NOTIFY viewChanged)
+    Q_PROPERTY(double vehicleLat READ vehicleLat WRITE setVehicleLat NOTIFY viewChanged)
+    Q_PROPERTY(double vehicleLng READ vehicleLng WRITE setVehicleLng NOTIFY viewChanged)
     Q_PROPERTY(double vehicleBearing READ vehicleBearing WRITE setVehicleBearing NOTIFY viewChanged)
     Q_PROPERTY(bool vehicleVisible READ vehicleVisible WRITE setVehicleVisible NOTIFY viewChanged)
     Q_PROPERTY(QVariantList routePath READ routePath WRITE setRoutePath NOTIFY routePathChanged)
@@ -35,7 +39,10 @@ public:
 
     double centerLat() const { return m_centerLat; }
     double centerLng() const { return m_centerLng; }
+    double mapBearing() const { return m_mapBearing; }
     double zoom() const { return m_zoom; }
+    double vehicleLat() const { return m_vehicleLat; }
+    double vehicleLng() const { return m_vehicleLng; }
     double vehicleBearing() const { return m_vehicleBearing; }
     bool vehicleVisible() const { return m_vehicleVisible; }
     QVariantList routePath() const { return m_routePath; }
@@ -46,7 +53,10 @@ public:
 
     void setCenterLat(double value);
     void setCenterLng(double value);
+    void setMapBearing(double value);
     void setZoom(double value);
+    void setVehicleLat(double value);
+    void setVehicleLng(double value);
     void setVehicleBearing(double value);
     void setVehicleVisible(bool value);
     void setRoutePath(const QVariantList &path);
@@ -82,15 +92,19 @@ private:
     void updateVisibleTiles();
     QList<VisibleTile> visibleTiles() const;
     QPointF projectToWorld(double lat, double lng, double zoomLevel) const;
-    QPointF projectToScreen(double lat, double lng, double zoomLevel, const QPointF &topLeftWorld) const;
+    QPointF projectToScreen(double lat, double lng, double zoomLevel, const QPointF &centerWorld) const;
     QString tileKey(int z, int x, int y) const;
     void requestTile(int z, int x, int y);
+    void invalidateTileState();
     void scheduleTileRefresh();
     void recordCounter(const QString &bucket, int amount = 1);
 
     double m_centerLat = -27.4698;
     double m_centerLng = 153.0251;
+    double m_mapBearing = 0.0;
     double m_zoom = 14.0;
+    double m_vehicleLat = -27.4698;
+    double m_vehicleLng = 153.0251;
     double m_vehicleBearing = 0.0;
     bool m_vehicleVisible = true;
     QVariantList m_routePath;
@@ -107,13 +121,16 @@ private:
     QNetworkAccessManager *m_network = nullptr;
 
     QHash<QString, QSGTexture *> m_textures;
+    QList<VisibleTile> m_visibleTiles;
     QSize m_lastCompositeSize;
     QPointF m_lastCompositeTopLeftWorld;
     int m_lastCompositeZoom = -1;
+    double m_lastCompositeBearing = 0.0;
     bool m_haveCompositeState = false;
     QSize m_lastTileRefreshSize;
     QPointF m_lastTileRefreshTopLeftWorld;
     int m_lastTileRefreshZoom = -1;
+    double m_lastTileRefreshBearing = 0.0;
     bool m_haveTileRefreshState = false;
     bool m_tileRefreshPending = false;
 };

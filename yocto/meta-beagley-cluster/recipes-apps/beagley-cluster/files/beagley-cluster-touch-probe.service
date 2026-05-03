@@ -2,7 +2,6 @@
 Description=Beagley Touch Input Probe
 After=local-fs.target systemd-udev-settle.service
 Wants=systemd-udev-settle.service
-Before=beagley_cluster.service
 
 [Service]
 Type=oneshot

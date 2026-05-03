@@ -84,28 +84,15 @@ Item {
             warningIndex = 0
     }
 
-    function warningTitle(key) {
+    function warningLabel(key) {
         switch (key) {
         case "brake": return "BRAKE"
-        case "charge": return "CHARGE"
-        case "check": return "CHECK"
-        case "at": return "A/T"
-        case "fuel": return "LOW"
-        case "oil": return "OIL"
+        case "charge": return "BATTERY"
+        case "check": return "CHECK ENG"
+        case "at": return "A/T TEMP"
+        case "fuel": return "LOW FUEL"
+        case "oil": return "OIL PRESS"
         case "door": return "DOOR"
-        default: return ""
-        }
-    }
-
-    function warningSubtitle(key) {
-        switch (key) {
-        case "brake": return "SYSTEM"
-        case "charge": return "VOLTAGE"
-        case "check": return "ENGINE"
-        case "at": return "TRANS"
-        case "fuel": return "FUEL"
-        case "oil": return "PRESSURE"
-        case "door": return "OPEN"
         default: return ""
         }
     }
@@ -295,37 +282,33 @@ Item {
             layer.smooth: !root.embeddedSafeMode
             Behavior on opacity { NumberAnimation { duration: root.fast } }
 
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                anchors.top: parent.top
-                anchors.topMargin: 22
-                text: root.warningTitle(root.currentWarningKey)
-                color: root.activeColor
-                font.family: root.fontUi
-                font.pixelSize: 13
-                font.bold: true
-                font.letterSpacing: 4
-            }
-
-            VicWarningIcon {
-                id: warnIcon
+            Column {
+                id: warningStack
+                width: parent.width
                 anchors.centerIn: parent
-                width: 84
-                height: 84
-                warningKey: root.currentWarningKey
-                color: root.activeColor
-            }
+                spacing: 6
 
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                anchors.bottom: parent.bottom
-                anchors.bottomMargin: 28
-                text: root.warningSubtitle(root.currentWarningKey)
-                color: root.activeColor
-                font.family: root.fontUi
-                font.pixelSize: 20
-                font.bold: true
-                font.letterSpacing: 4
+                OemTellTaleIcon {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: Math.min(root.s * 0.44, warningLayer.width * 0.68)
+                    height: width
+                    icon: root.currentWarningKey
+                    color: root.activeColor
+                    accentColor: root.activeColor
+                    cutoutColor: "#070A12"
+                    strokeWidth: Math.max(4, width * 0.055)
+                }
+
+                Text {
+                    width: parent.width
+                    text: root.warningLabel(root.currentWarningKey)
+                    color: root.activeColor
+                    font.family: root.fontUi
+                    font.pixelSize: 18
+                    font.bold: true
+                    font.letterSpacing: 2
+                    horizontalAlignment: Text.AlignHCenter
+                }
             }
 
         }

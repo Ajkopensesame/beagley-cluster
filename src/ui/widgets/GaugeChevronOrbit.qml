@@ -5,23 +5,25 @@ Item {
     id: root
 
     property bool active: false
-    property string side: "left" // "left" spins CCW, "right" spins CW
-    property int chevrons: 10
-    property int cycleMs: 1200
+    property string side: "left"
+    property int chevrons: 7
+    property int cycleMs: 1900
 
     property real centerX: width / 2
     property real centerY: height / 2
     property real orbitRadius: Math.min(width, height) * 0.47
     property real startAngleDeg: -90
-    property real gravityBiasDeg: 42
+    property real travelSweepDeg: 360
 
     property real chevronSize: 22
     property real strokeWidth: 4.5
     property real strokeBoost: 2.0
-    property real tailSpacingPhase: 0.024
-    property real tailGamma: 1.35
+    property real tailSpacingPhase: 0.08
+    property real tailGamma: 1.20
+    property real gravityWarp: 0.42
     property color onColor: "#52FFE1"
     property bool simplified: false
+    property real phaseOverride: NaN
 
     property real headPhase: 0.0
 
@@ -30,30 +32,52 @@ Item {
         return wrapped < 0 ? wrapped + 1.0 : wrapped
     }
 
+    function clamp01(v) {
+        return Math.max(0.0, Math.min(1.0, v))
+    }
+
     function directionSign() {
         return root.side === "left" ? -1.0 : 1.0
     }
 
+    function cyclePhase() {
+        var external = Number(root.phaseOverride)
+        return clamp01(isFinite(external) ? external : root.headPhase)
+    }
+
+    function cascadeSpread() {
+        return Math.sin(cyclePhase() * Math.PI)
+    }
+
     function phaseForIndex(index) {
-        return wrap01(root.headPhase - index * root.tailSpacingPhase)
+        return clamp01(cyclePhase() - index * root.tailSpacingPhase * cascadeSpread())
+    }
+
+    function gravityPhase(phase) {
+        var p = wrap01(phase)
+        return wrap01(p + (root.gravityWarp / (2.0 * Math.PI)) * (1.0 - Math.cos(p * Math.PI * 2.0)))
     }
 
     function angleDegForPhase(phase) {
-        var wrapped = wrap01(phase)
-        var travelDeg = wrapped * 360.0 - root.gravityBiasDeg * Math.sin(wrapped * Math.PI * 2.0)
-        return root.startAngleDeg + directionSign() * travelDeg
+        return root.startAngleDeg + root.directionSign() * root.travelSweepDeg * gravityPhase(phase)
+    }
+
+    function tangentDegForAngle(angleDeg) {
+        return angleDeg + (root.directionSign() > 0 ? 90.0 : -90.0)
     }
 
     function alphaForIndex(index) {
         if (!root.active)
             return 0.0
 
-        var tailT = (root.chevrons <= 1) ? 0.0 : (index / (root.chevrons - 1.0))
-        return Math.pow(Math.max(0.0, 1.0 - tailT), root.tailGamma)
+        var tailT = root.chevrons <= 1 ? 0.0 : index / (root.chevrons - 1.0)
+        var trailAlpha = Math.pow(1.0 - tailT, root.tailGamma)
+        var mergeAlpha = index === 0 ? 1.0 : clamp01(cascadeSpread() * 1.35)
+        return clamp01((0.16 + trailAlpha * 0.84) * mergeAlpha)
     }
 
     NumberAnimation on headPhase {
-        running: root.active
+        running: root.active && !isFinite(Number(root.phaseOverride))
         loops: Animation.Infinite
         from: 0.0
         to: 1.0
@@ -73,41 +97,42 @@ Item {
             readonly property real phase: root.phaseForIndex(index)
             readonly property real angleDeg: root.angleDegForPhase(phase)
             readonly property real angleRad: angleDeg * Math.PI / 180.0
-            readonly property real tangentDeg: angleDeg + (root.directionSign() > 0 ? 90 : -90)
-            readonly property real sizeScale: 0.84 + chevronAlpha * 0.32
+            readonly property real tailT: root.chevrons <= 1 ? 0.0 : index / (root.chevrons - 1.0)
+            readonly property real sizeScale: 1.02 - tailT * 0.12 + chevronAlpha * 0.08
             readonly property real lineWidth: root.strokeWidth + chevronAlpha * root.strokeBoost
             readonly property real centerPosX: root.centerX + Math.cos(angleRad) * root.orbitRadius
             readonly property real centerPosY: root.centerY + Math.sin(angleRad) * root.orbitRadius
 
             visible: root.active && chevronAlpha > 0.01
-            opacity: 0.12 + chevronAlpha * 0.88
-            width: root.chevronSize * 1.5
-            height: root.chevronSize * 1.5
+            opacity: chevronAlpha
+            width: root.chevronSize * 1.72
+            height: root.chevronSize * 1.26
             x: centerPosX - width / 2
             y: centerPosY - height / 2
-            rotation: tangentDeg
+            rotation: root.tangentDegForAngle(angleDeg)
             scale: sizeScale
             antialiasing: true
-            layer.enabled: true
-            layer.smooth: true
 
             Shape {
                 anchors.fill: parent
                 antialiasing: true
                 visible: !root.simplified
-                opacity: chevron.chevronAlpha * 0.26
+                scale: 1.22
+                opacity: 0.20 + chevron.chevronAlpha * 0.36
 
                 ShapePath {
-                    strokeColor: root.onColor
-                    strokeWidth: chevron.lineWidth + 3.0
-                    fillColor: "transparent"
-                    capStyle: ShapePath.RoundCap
-                    joinStyle: ShapePath.RoundJoin
-                    startX: width * 0.26
-                    startY: height * 0.26
+                    strokeColor: "transparent"
+                    strokeWidth: 0
+                    fillColor: Qt.rgba(root.onColor.r, root.onColor.g, root.onColor.b, 0.38)
+                    startX: width * 0.16
+                    startY: height * 0.10
 
-                    PathLine { x: width * 0.58; y: height * 0.50 }
-                    PathLine { x: width * 0.26; y: height * 0.74 }
+                    PathLine { x: width * 0.42; y: height * 0.10 }
+                    PathLine { x: width * 0.86; y: height * 0.50 }
+                    PathLine { x: width * 0.42; y: height * 0.90 }
+                    PathLine { x: width * 0.16; y: height * 0.90 }
+                    PathLine { x: width * 0.54; y: height * 0.50 }
+                    PathLine { x: width * 0.16; y: height * 0.10 }
                 }
             }
 
@@ -116,16 +141,20 @@ Item {
                 antialiasing: true
 
                 ShapePath {
-                    strokeColor: Qt.rgba(root.onColor.r, root.onColor.g, root.onColor.b, 0.28 + chevron.chevronAlpha * 0.72)
-                    strokeWidth: chevron.lineWidth
-                    fillColor: "transparent"
+                    strokeColor: Qt.rgba(1, 1, 1, 0.10 + chevron.chevronAlpha * 0.24)
+                    strokeWidth: Math.max(0.8, chevron.lineWidth * 0.16)
+                    fillColor: Qt.rgba(root.onColor.r, root.onColor.g, root.onColor.b, 0.34 + chevron.chevronAlpha * 0.62)
                     capStyle: ShapePath.RoundCap
                     joinStyle: ShapePath.RoundJoin
-                    startX: width * 0.26
-                    startY: height * 0.26
+                    startX: width * 0.18
+                    startY: height * 0.14
 
-                    PathLine { x: width * 0.58; y: height * 0.50 }
-                    PathLine { x: width * 0.26; y: height * 0.74 }
+                    PathLine { x: width * 0.41; y: height * 0.14 }
+                    PathLine { x: width * 0.82; y: height * 0.50 }
+                    PathLine { x: width * 0.41; y: height * 0.86 }
+                    PathLine { x: width * 0.18; y: height * 0.86 }
+                    PathLine { x: width * 0.56; y: height * 0.50 }
+                    PathLine { x: width * 0.18; y: height * 0.14 }
                 }
             }
         }

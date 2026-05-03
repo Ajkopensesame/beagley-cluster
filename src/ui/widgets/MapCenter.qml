@@ -4,16 +4,20 @@ Item {
     id: root
     anchors.fill: parent
 
-    // "placeholder" | "native" | "snapshot" | "video" | "web"
+    // "placeholder" | "native" | "maplibre-native" | "snapshot" | "video" | "web"
     property string mode: "placeholder"
     property bool webFallbackActive: false
     property string webFallbackReason: ""
     property string webRenderMode: "web-vector"
     readonly property string mapRenderMode: effectiveMode === "web"
         ? webRenderMode
-        : (effectiveMode === "native"
-            ? "native-online"
-            : (effectiveMode === "snapshot" ? "snapshot" : "placeholder"))
+        : (effectiveMode === "maplibre-native"
+            ? (typeof BEAGLEY_MAPLIBRE_NATIVE_AVAILABLE !== "undefined" && BEAGLEY_MAPLIBRE_NATIVE_AVAILABLE
+                ? "maplibre-native"
+                : "maplibre-native-fallback")
+            : (effectiveMode === "native"
+                ? "native-online"
+                : (effectiveMode === "snapshot" ? "snapshot" : "placeholder")))
 
     property real lat: 0
     property real lng: 0
@@ -30,6 +34,8 @@ Item {
     property var mapRouteOverlay: ({})
     property var mapGuidanceBanner: ({})
     property var mapConnectivity: ({})
+    property string tileUrlTemplate: ""
+    property string styleUrl: ""
     property bool interactionEnabled: true
 
     // Snapshot mode (BBB will serve a periodic map image later)
@@ -69,7 +75,7 @@ Item {
     }
 
     readonly property string effectiveMode: {
-        if (forceSnapshotMode && (mode === "native" || mode === "web")) {
+        if (forceSnapshotMode && (mode === "native" || mode === "maplibre-native" || mode === "web")) {
             return "snapshot"
         }
         if (mode === "web") {
@@ -81,6 +87,9 @@ Item {
         }
         if (mode === "native") {
             return "native"
+        }
+        if (mode === "maplibre-native") {
+            return "maplibre-native"
         }
         if (mode === "snapshot") {
             return "snapshot"
@@ -94,7 +103,9 @@ Item {
         active: effectiveMode !== "web"
         sourceComponent: effectiveMode === "native"
             ? nativeComp
-            : (effectiveMode === "snapshot" ? snapshotComp : placeholderComp)
+            : (effectiveMode === "maplibre-native"
+                ? mapLibreNativeComp
+                : (effectiveMode === "snapshot" ? snapshotComp : placeholderComp))
     }
 
     Loader {
@@ -119,6 +130,7 @@ Item {
             item.mapRouteOverlay = Qt.binding(function() { return root.mapRouteOverlay })
             item.mapGuidanceBanner = Qt.binding(function() { return root.mapGuidanceBanner })
             item.mapConnectivity = Qt.binding(function() { return root.mapConnectivity })
+            item.styleUrlOverride = Qt.binding(function() { return root.styleUrl })
             item.interactionEnabled = Qt.binding(function() { return root.interactionEnabled })
             item.demoMotion = false
         }
@@ -159,6 +171,32 @@ Item {
             mapRouteOverlay: root.mapRouteOverlay
             mapGuidanceBanner: root.mapGuidanceBanner
             mapConnectivity: root.mapConnectivity
+            tileUrlTemplate: root.tileUrlTemplate
+            interactionEnabled: root.interactionEnabled
+        }
+    }
+
+    Component {
+        id: mapLibreNativeComp
+        MapCenterMapLibreNative {
+            anchors.fill: parent
+            lat: root.lat
+            lng: root.lng
+            bearing: root.bearing
+            zoom: root.zoom
+            speedKph: root.speedKph
+            fixedOriginEnabled: root.fixedOriginEnabled
+            fixedOriginLat: root.fixedOriginLat
+            fixedOriginLng: root.fixedOriginLng
+            fixedOriginLabel: root.fixedOriginLabel
+            navigationState: root.navigationState
+            mapVehiclePose: root.mapVehiclePose
+            mapCameraHints: root.mapCameraHints
+            mapRouteOverlay: root.mapRouteOverlay
+            mapGuidanceBanner: root.mapGuidanceBanner
+            mapConnectivity: root.mapConnectivity
+            tileUrlTemplate: root.tileUrlTemplate
+            styleUrl: root.styleUrl
             interactionEnabled: root.interactionEnabled
         }
     }

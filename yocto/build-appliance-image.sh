@@ -18,6 +18,8 @@ YOCTO_NINJAJOBS="${YOCTO_NINJAJOBS:-}"
 YOCTO_BITBAKE_RETRIES="${YOCTO_BITBAKE_RETRIES:-3}"
 YOCTO_GIT_FETCH_RETRIES="${YOCTO_GIT_FETCH_RETRIES:-6}"
 YOCTO_BITBAKE_REPLY_WAIT_SEC="${YOCTO_BITBAKE_REPLY_WAIT_SEC:-300}"
+BEAGLEY_CLUSTER_GIT_BRANCH="${BEAGLEY_CLUSTER_GIT_BRANCH:-main}"
+BEAGLEY_CLUSTER_PACKAGECONFIG_APPEND="${BEAGLEY_CLUSTER_PACKAGECONFIG_APPEND:-}"
 
 fail() {
   echo "[yocto-build] FAIL: $*" >&2
@@ -728,8 +730,14 @@ replace_managed_block conf/local.conf "beagley-cluster appliance defaults" <<EOF
 MACHINE ?= "${MACHINE_NAME}"
 IMAGE_FSTYPES += "wic wic.bmap"
 BEAGLEY_MACHINE_POLICY ?= "${MACHINE_POLICY}"
-BEAGLEY_CLUSTER_GIT_BRANCH ?= "main"
+BEAGLEY_CLUSTER_GIT_BRANCH ?= "${BEAGLEY_CLUSTER_GIT_BRANCH}"
 EOF
+
+if [[ -n "$BEAGLEY_CLUSTER_PACKAGECONFIG_APPEND" ]]; then
+  replace_managed_block conf/local.conf "beagley-cluster packageconfig overrides" <<EOF
+PACKAGECONFIG:append:pn-beagley-cluster = " ${BEAGLEY_CLUSTER_PACKAGECONFIG_APPEND# }"
+EOF
+fi
 
 if [[ -n "$YOCTO_DL_DIR" ]]; then
   replace_managed_block conf/local.conf "beagley-cluster download cache" <<EOF

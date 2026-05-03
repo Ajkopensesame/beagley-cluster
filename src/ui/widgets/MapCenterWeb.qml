@@ -40,7 +40,8 @@ Item {
     property string lastRouteOverlayJson: ""
     property string lastGuidanceBannerJson: ""
     property string lastConnectivityJson: ""
-    property string styleUrl: resolvedStyleUrl()
+    property string styleUrlOverride: ""
+    property string styleUrl: styleUrlOverride.length > 0 ? styleUrlOverride : resolvedStyleUrl()
 
     readonly property bool embeddedDisplay: ((typeof BEAGLEY_EMBEDDED_DISPLAY !== "undefined") && BEAGLEY_EMBEDDED_DISPLAY) || false
     readonly property string bootMode: (typeof BEAGLEY_MAP_BOOT_MODE !== "undefined" && BEAGLEY_MAP_BOOT_MODE)

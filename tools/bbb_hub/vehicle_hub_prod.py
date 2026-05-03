@@ -26,6 +26,7 @@ try:
     from tools.bbb_hub.diagnostic_status import build_diagnostic_status
     from tools.bbb_hub.fault_recorder import FaultRecorder
     from tools.bbb_hub.signal_health import SignalHealthMonitor
+    from tools.bbb_hub.transition_monitor import VehicleTransitionMonitor, default_transition_profiles
     from tools.bbb_hub.vehicle_baseline import VehicleBaselineMonitor, default_vehicle_baseline_profiles
     from tools.can_reverse_workbench.bbb_decoder import CanLogSignalReplay
 
@@ -37,7 +38,9 @@ except Exception as exc:
     SerialVehicleInputSource = None
     SignalHealthMonitor = None
     SocketCanSignalSource = None
+    VehicleTransitionMonitor = None
     VehicleBaselineMonitor = None
+    default_transition_profiles = None
     default_vehicle_baseline_profiles = None
     merge_vehicle_overlay = None
     _CAN_DECODER_IMPORT_ERROR = exc
@@ -69,12 +72,47 @@ VEHICLE_BASELINE_PATH = os.getenv(
 ).strip()
 VEHICLE_BASELINE_SAVE_EVERY_SAMPLES = int(os.getenv("VEHICLE_BASELINE_SAVE_EVERY_SAMPLES", "25"))
 VEHICLE_BASELINE_MIN_SAVE_INTERVAL_SECONDS = float(os.getenv("VEHICLE_BASELINE_MIN_SAVE_INTERVAL_SECONDS", "30.0"))
+TRANSITION_MONITOR_ENABLED = os.getenv("TRANSITION_MONITOR_ENABLED", "1").strip().lower() not in {"0", "false", "no"}
+TRANSITION_MONITOR_LEARN_ENABLED = os.getenv("TRANSITION_MONITOR_LEARN_ENABLED", "1").strip().lower() not in {"0", "false", "no"}
+VEHICLE_TRANSITION_BASELINE_PATH = os.getenv(
+    "VEHICLE_TRANSITION_BASELINE_PATH",
+    "/var/lib/beagley-cluster/baselines/vehicle_transition_baseline.json",
+).strip()
+VEHICLE_TRANSITION_BASELINE_SAVE_EVERY_WINDOWS = int(os.getenv("VEHICLE_TRANSITION_BASELINE_SAVE_EVERY_WINDOWS", "5"))
+VEHICLE_TRANSITION_BASELINE_MIN_SAVE_INTERVAL_SECONDS = float(
+    os.getenv("VEHICLE_TRANSITION_BASELINE_MIN_SAVE_INTERVAL_SECONDS", "30.0")
+)
 FAULT_RECORDER_ENABLED = os.getenv("FAULT_RECORDER_ENABLED", "1").strip().lower() not in {"0", "false", "no"}
 FAULT_RECORDER_DIR = os.getenv("FAULT_RECORDER_DIR", "/var/log/beagley-cluster/faults").strip()
 FAULT_RECORDER_BUFFER_SECONDS = float(os.getenv("FAULT_RECORDER_BUFFER_SECONDS", "20.0"))
 FAULT_RECORDER_MAX_BUFFER_FRAMES = int(os.getenv("FAULT_RECORDER_MAX_BUFFER_FRAMES", "300"))
 FAULT_RECORDER_MIN_INTERVAL_SECONDS = float(os.getenv("FAULT_RECORDER_MIN_INTERVAL_SECONDS", "10.0"))
 DIAGNOSTIC_MODE = os.getenv("DIAGNOSTIC_MODE", "normal").strip().lower()
+VEHICLE_BENCH_SIM_ENABLED = os.getenv("BBB_VEHICLE_BENCH_SIM", "0").strip().lower() not in {
+    "0",
+    "false",
+    "off",
+    "no",
+}
+BENCH_PROFILE_ALIASES = {
+    "busy": "busy-demo",
+    "busy_demo": "busy-demo",
+    "demo": "busy-demo",
+    "park": "parked",
+    "stationary": "parked",
+    "steady": "cruise",
+}
+VALID_BENCH_PROFILES = {"parked", "cruise", "busy-demo"}
+REQUESTED_BENCH_PROFILE = os.getenv("BBB_VEHICLE_BENCH_PROFILE", "busy-demo").strip().lower()
+BENCH_PROFILE = BENCH_PROFILE_ALIASES.get(REQUESTED_BENCH_PROFILE, REQUESTED_BENCH_PROFILE)
+if BENCH_PROFILE not in VALID_BENCH_PROFILES:
+    print(f"[bbb_hub] unknown BBB_VEHICLE_BENCH_PROFILE={REQUESTED_BENCH_PROFILE!r}; using busy-demo")
+    BENCH_PROFILE = "busy-demo"
+BENCH_CRUISE_SPEED_KPH = float(os.getenv("BBB_BENCH_CRUISE_SPEED_KPH", "72.0"))
+BENCH_CRUISE_RPM = float(os.getenv("BBB_BENCH_CRUISE_RPM", "2250.0"))
+BENCH_CRUISE_ROUTE_RADIUS_M = float(os.getenv("BBB_BENCH_CRUISE_ROUTE_RADIUS_M", "420.0"))
+BENCH_SIM_FALLBACK_LAT = float(os.getenv("BBB_BENCH_SIM_BASE_LAT", "-27.4698"))
+BENCH_SIM_FALLBACK_LNG = float(os.getenv("BBB_BENCH_SIM_BASE_LNG", "153.0251"))
 
 VIC_SEQUENCE = [
     {"warning": "brake"},
@@ -108,6 +146,7 @@ class VehicleHub:
         self._serial_inputs = self._build_serial_inputs()
         self._signal_health = self._build_signal_health()
         self._vehicle_baseline = self._build_vehicle_baseline()
+        self._transition_monitor = self._build_transition_monitor()
         self._fault_recorder = self._build_fault_recorder()
 
     async def add_client(self, ws: websockets.WebSocketServerProtocol) -> None:
@@ -129,7 +168,102 @@ class VehicleHub:
         if self._serial_inputs is not None:
             await self._serial_inputs.run()
 
-    def _build_base_state(self, t: float) -> dict:
+    def _build_empty_vehicle_state(self) -> dict:
+        return {
+            "type": "vehicle_state",
+            "version": 1,
+            "speedKph": 0.0,
+            "rpm": 0.0,
+            "fuelPct": 0.0,
+            "coolantC": 0.0,
+            "gear": "P",
+            "overdrive": False,
+            "drivetrain": {
+                "mode": "2wd",
+                "transfer_lock": False,
+            },
+            "indicators": {
+                "left": False,
+                "right": False,
+                "high_beam": False,
+            },
+            "warnings": {
+                "brake": False,
+                "oil": False,
+                "charge": False,
+                "door": False,
+                "check_engine": False,
+                "at": False,
+                "fuel_low": False,
+            },
+            "_health": {
+                "stale": True,
+                "vehicleSource": "none",
+                "benchVehicleSim": False,
+            },
+        }
+
+    def _build_base_bench_vehicle_state(self) -> dict:
+        return {
+            "type": "vehicle_state",
+            "version": 1,
+            "speedKph": 0.0,
+            "rpm": 0.0,
+            "fuelPct": 72.0,
+            "coolantC": 84.0,
+            "gear": "P",
+            "overdrive": False,
+            "drivetrain": {
+                "mode": "2wd",
+                "transfer_lock": False,
+            },
+            "indicators": {
+                "left": False,
+                "right": False,
+                "high_beam": False,
+            },
+            "warnings": {
+                "brake": False,
+                "oil": False,
+                "charge": False,
+                "door": False,
+                "check_engine": False,
+                "at": False,
+                "fuel_low": False,
+            },
+            "_health": {
+                "stale": False,
+                "vehicleSource": "bench_sim",
+                "benchVehicleSim": True,
+                "benchProfile": BENCH_PROFILE,
+            },
+        }
+
+    def _build_parked_vehicle_state(self, t: float) -> dict:
+        state = self._build_base_bench_vehicle_state()
+        state.update({
+            "rpm": 760.0 + 12.0 * math.sin(t * 0.18),
+            "fuelPct": 74.0,
+            "coolantC": 82.0 + 0.4 * math.sin(t * 0.035),
+            "gear": "P",
+        })
+        return state
+
+    def _build_cruise_vehicle_state(self, t: float) -> dict:
+        state = self._build_base_bench_vehicle_state()
+        speed = max(0.0, BENCH_CRUISE_SPEED_KPH)
+        rpm = max(0.0, BENCH_CRUISE_RPM)
+        state.update({
+            "speedKph": speed,
+            "rpm": rpm + 18.0 * math.sin(t * 0.16),
+            "fuelPct": 68.0 + 0.8 * math.sin(t * 0.025),
+            "coolantC": 86.0 + 0.5 * math.sin(t * 0.040),
+            "gear": "D",
+            "overdrive": True,
+        })
+        return state
+
+    def _build_busy_demo_vehicle_state(self, t: float) -> dict:
         speed = max(0.0, min(130.0, 65.0 + 65.0 * math.sin(t * 0.22)))
         left = (t % 2.0) < 1.0
         right = ((t + 1.0) % 2.0) < 1.0
@@ -178,7 +312,49 @@ class VehicleHub:
             },
             "_health": {
                 "stale": False,
+                "vehicleSource": "bench_sim",
+                "benchVehicleSim": True,
+                "benchProfile": BENCH_PROFILE,
             },
+        }
+
+    def _build_bench_vehicle_state(self, t: float) -> dict:
+        if BENCH_PROFILE == "parked":
+            return self._build_parked_vehicle_state(t)
+        if BENCH_PROFILE == "cruise":
+            return self._build_cruise_vehicle_state(t)
+        return self._build_busy_demo_vehicle_state(t)
+
+    def _build_cruise_gps_payload(self, t: float, hardware_gps: dict) -> dict:
+        base_lat = hardware_gps.get("lat", BENCH_SIM_FALLBACK_LAT)
+        base_lng = hardware_gps.get("lng", BENCH_SIM_FALLBACK_LNG)
+        try:
+            base_lat = float(base_lat)
+            base_lng = float(base_lng)
+        except (TypeError, ValueError):
+            base_lat = BENCH_SIM_FALLBACK_LAT
+            base_lng = BENCH_SIM_FALLBACK_LNG
+
+        radius_m = max(25.0, BENCH_CRUISE_ROUTE_RADIUS_M)
+        speed_mps = max(0.0, BENCH_CRUISE_SPEED_KPH) / 3.6
+        phase = (t * speed_mps / radius_m) % (math.pi * 2.0)
+        lat_m = math.sin(phase) * radius_m
+        lng_m = math.cos(phase) * radius_m
+        meters_per_lng_degree = max(1.0, 111111.0 * math.cos(math.radians(base_lat)))
+        lat = base_lat + lat_m / 111111.0
+        lng = base_lng + lng_m / meters_per_lng_degree
+        bearing = (math.degrees(phase) + 90.0) % 360.0
+
+        return {
+            "lat": float(lat),
+            "lng": float(lng),
+            "bearing": float(bearing),
+            "accuracyM": 3.0,
+            "timestampMs": int(time.time() * 1000),
+            "fixValid": True,
+            "satellites": int(max(8, hardware_gps.get("satellites", 10) or 10)),
+            "speedKph": float(max(0.0, BENCH_CRUISE_SPEED_KPH)),
+            "headingReliable": True,
         }
 
     def _build_can_replay(self):
@@ -266,6 +442,19 @@ class VehicleHub:
             min_save_interval_seconds=VEHICLE_BASELINE_MIN_SAVE_INTERVAL_SECONDS,
         )
 
+    def _build_transition_monitor(self):
+        if VehicleTransitionMonitor is None or default_transition_profiles is None:
+            print(f"[bbb_hub] transition monitor unavailable: {_CAN_DECODER_IMPORT_ERROR}")
+            return None
+        return VehicleTransitionMonitor(
+            default_transition_profiles(),
+            storage_path=VEHICLE_TRANSITION_BASELINE_PATH,
+            enabled=TRANSITION_MONITOR_ENABLED,
+            learn_enabled=TRANSITION_MONITOR_LEARN_ENABLED,
+            save_every_windows=VEHICLE_TRANSITION_BASELINE_SAVE_EVERY_WINDOWS,
+            min_save_interval_seconds=VEHICLE_TRANSITION_BASELINE_MIN_SAVE_INTERVAL_SECONDS,
+        )
+
     def _build_fault_recorder(self):
         if FaultRecorder is None:
             print(f"[bbb_hub] fault recorder unavailable: {_CAN_DECODER_IMPORT_ERROR}")
@@ -284,14 +473,22 @@ class VehicleHub:
             decoded = self._can_replay.snapshot()
             merge_vehicle_overlay(state, decoded)
             decoded_signals.update(decoded)
-            state["_health"]["canReplay"] = self._can_replay.health()
+            health = self._can_replay.health()
+            state["_health"]["canReplay"] = health
             state["_health"]["canReplayDiagnostics"] = self._can_replay.diagnostics()
+            if decoded and not health.get("stale", True):
+                state["_health"]["stale"] = False
+                state["_health"]["vehicleSource"] = "can_replay"
         if self._can_live is not None:
             decoded = self._can_live.snapshot()
             merge_vehicle_overlay(state, decoded)
             decoded_signals.update(decoded)
-            state["_health"]["canLive"] = self._can_live.health()
+            health = self._can_live.health()
+            state["_health"]["canLive"] = health
             state["_health"]["canLiveDiagnostics"] = self._can_live.diagnostics()
+            if decoded and not health.get("stale", True):
+                state["_health"]["stale"] = False
+                state["_health"]["vehicleSource"] = "can_live"
         if decoded_signals:
             state["_health"]["canDecodedSignals"] = sorted(decoded_signals)
         elif (CAN_RAW_LOG or CAN_LIVE_INTERFACE) and self._can_replay is None and self._can_live is None:
@@ -311,7 +508,11 @@ class VehicleHub:
             return
         overlay = self._serial_inputs.snapshot()
         merge_vehicle_overlay(state, overlay)
-        state["_health"]["serialVehicleInputs"] = self._serial_inputs.health()
+        health = self._serial_inputs.health()
+        state["_health"]["serialVehicleInputs"] = health
+        if overlay and not health.get("stale", True):
+            state["_health"]["stale"] = False
+            state["_health"]["vehicleSource"] = "serial"
 
     def _apply_fault_recording(self, state: dict) -> None:
         if self._fault_recorder is None:
@@ -353,6 +554,17 @@ class VehicleHub:
             return
         state["_health"]["vehicleBaseline"] = self._vehicle_baseline.observe(state)
 
+    def _apply_transition_monitor(self, state: dict) -> None:
+        if self._transition_monitor is None:
+            if TRANSITION_MONITOR_ENABLED:
+                state["_health"]["transitionMonitor"] = {
+                    "enabled": False,
+                    "ok": False,
+                    "reason": "failed to initialize",
+                }
+            return
+        state["_health"]["transitionMonitor"] = self._transition_monitor.observe(state)
+
     def _fault_evidence(self) -> dict:
         evidence = {}
         if self._can_replay is not None:
@@ -365,17 +577,28 @@ class VehicleHub:
             evidence["serialVehicleInputsLatest"] = self._serial_inputs.snapshot()
         if self._vehicle_baseline is not None:
             evidence["vehicleBaseline"] = self._vehicle_baseline.snapshot()
+        if self._transition_monitor is not None:
+            evidence["transitionMonitor"] = self._transition_monitor.snapshot()
         return evidence
 
     async def next_state(self) -> dict:
         t = time.time() - self._started_at
-        state = self._build_base_state(t)
+        state = (
+            self._build_bench_vehicle_state(t)
+            if VEHICLE_BENCH_SIM_ENABLED
+            else self._build_empty_vehicle_state()
+        )
         self._apply_can_overlay(state)
         self._apply_serial_overlay(state)
         sample, health = self._gps.snapshot()
         state["gps"] = build_hardware_gps_payload(sample, stale=health.stale)
         state["gpsSource"] = "hardware"
+        if VEHICLE_BENCH_SIM_ENABLED and BENCH_PROFILE == "cruise":
+            state["gps"] = self._build_cruise_gps_payload(t, state["gps"])
+            state["gpsSource"] = "bench_cruise"
         state["_health"]["gpsSourcePolicy"] = "hardware_only"
+        if VEHICLE_BENCH_SIM_ENABLED:
+            state["_health"]["benchProfile"] = BENCH_PROFILE
         state["_health"]["gpsStale"] = health.stale
         state["_health"]["gpsSerialOk"] = health.serial_ok
         state["_health"]["gpsAgeMs"] = health.age_ms
@@ -399,6 +622,7 @@ class VehicleHub:
                 "ok": False,
                 "reason": "failed to initialize",
             }
+        self._apply_transition_monitor(state)
         self._apply_diagnostic_status(state)
         self._apply_fault_recording(state)
         return state
@@ -435,6 +659,9 @@ async def main() -> None:
 
     print(f"[bbb_hub] vehicle_state ws://{WS_HOST}:{WS_PORT}")
     print(f"[bbb_hub] gps source policy: hardware_only")
+    print(f"[bbb_hub] bench vehicle sim: {'enabled' if VEHICLE_BENCH_SIM_ENABLED else 'disabled'}")
+    if VEHICLE_BENCH_SIM_ENABLED:
+        print(f"[bbb_hub] bench profile: {BENCH_PROFILE}")
     print(f"[bbb_hub] GPS device: {GPS_DEVICE} @ {GPS_BAUD}")
     print(f"[bbb_hub] GPS read timeout: {GPS_READ_TIMEOUT_MS} ms | stale: {GPS_STALE_MS} ms")
 

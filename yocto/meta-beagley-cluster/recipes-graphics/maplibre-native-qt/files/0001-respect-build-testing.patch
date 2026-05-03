@@ -1,0 +1,53 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: BeagleY Cluster <beagley-cluster@example.invalid>
+Date: Sun, 3 May 2026 00:00:00 +1000
+Subject: [PATCH] cmake: respect BUILD_TESTING for embedded builds
+
+Yocto image builds need the runtime libraries and QML/geoservices plugins, not
+the upstream test targets. Keep upstream's default test behavior intact while
+allowing embedded builds to pass -DBUILD_TESTING=OFF.
+---
+ CMakeLists.txt                        | 8 +++++---
+ vendor/maplibre-native/CMakeLists.txt | 8 +++++---
+ 2 files changed, 10 insertions(+), 6 deletions(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 4a67c2c..7e3d0c8 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -125,12 +125,14 @@ target_link_libraries(
+         $<$<BOOL:${MLN_QT_WITH_COVERAGE}>:--coverage>
+ )
+ 
+-# Enable testing
+-enable_testing()
++# Enable testing when requested by the parent build.
++include(CTest)
+ 
+ # Add subdirectories
+ add_subdirectory(src)
+-add_subdirectory(test)
++if(BUILD_TESTING)
++    add_subdirectory(test)
++endif()
+ 
+ # Coverage
+ if(MLN_QT_WITH_COVERAGE)
+diff --git a/vendor/maplibre-native/CMakeLists.txt b/vendor/maplibre-native/CMakeLists.txt
+index 30c0847..8146571 100644
+--- a/vendor/maplibre-native/CMakeLists.txt
++++ b/vendor/maplibre-native/CMakeLists.txt
+@@ -1141,6 +1141,8 @@
+     message(FATAL_ERROR "Unsupported target platform: " ${CMAKE_SYSTEM_NAME})
+ endif()
+ 
+-add_subdirectory(${PROJECT_SOURCE_DIR}/test)
+-add_subdirectory(${PROJECT_SOURCE_DIR}/benchmark)
+-add_subdirectory(${PROJECT_SOURCE_DIR}/render-test)
++if(BUILD_TESTING)
++    add_subdirectory(${PROJECT_SOURCE_DIR}/test)
++    add_subdirectory(${PROJECT_SOURCE_DIR}/benchmark)
++    add_subdirectory(${PROJECT_SOURCE_DIR}/render-test)
++endif()
+-- 
+2.42.0

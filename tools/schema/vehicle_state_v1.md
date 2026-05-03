@@ -131,10 +131,30 @@ Top-level required fields:
   - `_health.vehicleBaseline.findings` (array of learned-baseline findings)
   - Baseline findings always include `confidence`, `model`, `signal`, `code`,
     `message`, and evidence details.
-  - The first built-in profile is `intake_airflow`, which compares `mafGps`
+  - Built-in profiles include `intake_airflow`, which compares `mafGps`
     against learned normal behavior for similar `rpm`, `throttlePct`,
     `intakeAirTempC`, and optional `engineLoadPct` / `mapKpa` when the engine
-    is warm.
+    is warm, and `map_pressure`, which compares `mapKpa` against similar
+    `rpm`, `throttlePct`, optional `intakeAirTempC`, and optional
+    `engineLoadPct` when the engine is warm.
+- Optional learned transition monitor diagnostics:
+  - `_health.transitionMonitor.enabled` (bool)
+  - `_health.transitionMonitor.ok` (bool)
+  - `_health.transitionMonitor.storagePath` (string or null)
+  - `_health.transitionMonitor.activeEvent` (object or null)
+  - `_health.transitionMonitor.coverage.eventsSeen` (object keyed by event type)
+  - `_health.transitionMonitor.coverage.windowsScored` (int)
+  - `_health.transitionMonitor.coverage.windowsLearned` (int)
+  - `_health.transitionMonitor.coverage.readyModels` (array of model names)
+  - `_health.transitionMonitor.models` (array of transition model snapshots)
+  - `_health.transitionMonitor.findings` (array of transition findings)
+  - Transition findings use standardized anomaly classes such as
+    `no_response`, `delayed_response`, `too_small_delta`, `too_large_delta`,
+    `stuck_flat`, `wrong_sequence`, `wrong_correlation`,
+    `unexpected_noise`, and `persistent_offset`.
+  - Built-in profiles include startup airflow and pressure response checks that
+    learn this vehicle's normal `first_fire` behavior before flagging a flat or
+    weak `mafGps` / `mapKpa` response.
 - Optional fault recorder diagnostics:
   - `_health.faultRecorder.enabled` (bool)
   - `_health.faultRecorder.outputDir` (string)
@@ -156,6 +176,9 @@ Top-level required fields:
   - `_diagnostic.captureQuality.canOk` (bool or null when CAN is not configured)
   - `_diagnostic.captureQuality.serialOk` (bool or null when serial input is not configured)
   - `_diagnostic.captureQuality.linkStale` (bool)
+- AI-issued health verdicts should use the separate contract in
+  `tools/schema/vehicle_health_verdict_v1.md`. `_diagnostic` stays deterministic
+  and display-safe; it should not become a free-form AI conclusion surface.
 - Raw CAN reverse engineering stays upstream of this schema. The BBB decoder may
   load `can_signals.json` and populate existing `rpm` and `speedKph` fields, but
   BeagleY gauges, maps, and navigation should not consume raw CAN fields.

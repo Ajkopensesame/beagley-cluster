@@ -8,9 +8,11 @@ dictionary that can be consumed upstream of the existing cluster UI contract.
 __all__ = [
     "baseline",
     "bitfield",
+    "capture_session",
     "discovery",
     "export",
     "labels",
     "obd_anchors",
     "parser",
+    "startup_diff",
 ]
