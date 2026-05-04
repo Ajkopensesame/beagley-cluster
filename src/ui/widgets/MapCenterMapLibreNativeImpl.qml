@@ -1,6 +1,7 @@
 import QtQuick 2.15
 import QtLocation 6.5
 import QtPositioning 6.5
+import QtQuick.Shapes 1.15
 
 import MapLibre 3.0
 
@@ -45,11 +46,23 @@ Item {
         : firstFinite([resolvedVehicleBucket.lng, lng, 153.0251])
     readonly property real resolvedBearing: firstFinite([resolvedVehicleBucket.bearing, bearing, 0])
     readonly property real resolvedSpeedKph: Math.max(0, firstFinite([resolvedVehicleBucket.speedKph, speedKph, 0]))
+    readonly property real rendererMaxZoom: {
+        const configured = (typeof BEAGLEY_MAPLIBRE_NATIVE_MAX_ZOOM !== "undefined")
+            ? Number(BEAGLEY_MAPLIBRE_NATIVE_MAX_ZOOM)
+            : 14.0
+        return isFinite(configured) ? clamp(configured, 1.0, 22.0) : 14.0
+    }
     readonly property real resolvedZoom: isFinite(Number(zoom))
-        ? clamp(Number(zoom), 3, 19)
+        ? clamp(Number(zoom), 3, rendererMaxZoom)
         : computeZoom()
     readonly property var resolvedRoutePath: buildRoutePath()
     readonly property bool vehiclePoseValid: isFinite(Number(resolvedLat)) && isFinite(Number(resolvedLng))
+    readonly property bool vehicleBucketHasPose: hasKeys(resolvedVehicleBucket)
+        && isFinite(Number(resolvedVehicleBucket.lat))
+        && isFinite(Number(resolvedVehicleBucket.lng))
+    readonly property bool externalVehiclePoseValid: !hasKeys(resolvedVehicleBucket)
+        && isFinite(Number(lat))
+        && isFinite(Number(lng))
     readonly property bool guidanceCameraActive: !fixedOriginEnabled
         && vehiclePoseValid
         && !!resolvedRouteBucket.guidanceStarted
@@ -69,16 +82,12 @@ Item {
         const value = Number(center.lng)
         return isFinite(value) ? value : resolvedLng
     }
-    readonly property bool vehicleVisibleResolved: {
-        if (!vehiclePoseValid)
-            return false
-        if (resolvedVehicleBucket.gpsReady === undefined && resolvedVehicleBucket.usingLastKnown === undefined)
-            return true
-        return !!resolvedVehicleBucket.gpsReady || !!resolvedVehicleBucket.usingLastKnown
-    }
+    readonly property bool vehicleVisibleResolved: vehiclePoseValid
+        && !fixedOriginEnabled
+        && (vehicleBucketHasPose || externalVehiclePoseValid)
     readonly property string resolvedStyleUrl: styleUrl.length > 0
         ? styleUrl
-        : "https://tiles.openfreemap.org/styles/liberty"
+        : "https://demotiles.maplibre.org/style.json"
 
     property real nativeCenterLat: resolvedCameraLat
     property real nativeCenterLng: resolvedCameraLng
@@ -182,17 +191,18 @@ Item {
     function computeZoom() {
         const hintedZoom = Number(resolvedCameraBucket.zoom)
         if (isFinite(hintedZoom))
-            return clamp(hintedZoom, 3, 19)
+            return clamp(hintedZoom, 3, rendererMaxZoom)
 
+        var targetZoom = 17.2
         if (resolvedSpeedKph >= 100)
-            return 14.4
-        if (resolvedSpeedKph >= 70)
-            return 15.1
-        if (resolvedSpeedKph >= 40)
-            return 15.8
-        if (resolvedSpeedKph >= 20)
-            return 16.5
-        return 17.2
+            targetZoom = 14.4
+        else if (resolvedSpeedKph >= 70)
+            targetZoom = 15.1
+        else if (resolvedSpeedKph >= 40)
+            targetZoom = 15.8
+        else if (resolvedSpeedKph >= 20)
+            targetZoom = 16.5
+        return clamp(targetZoom, 3, rendererMaxZoom)
     }
 
     function buildRoutePath() {
@@ -338,7 +348,6 @@ Item {
     onResolvedRoutePathChanged: nativeRoutePath = resolvedRoutePath
     onResolvedStyleUrlChanged: {
         nativeStyleUrl = resolvedStyleUrl
-        mapViewReloadTimer.restart()
     }
 
     Behavior on nativeZoom {
@@ -362,133 +371,135 @@ Item {
         onTriggered: root.syncNativeView(false)
     }
 
-    Timer {
-        id: mapViewReloadTimer
-        interval: 30
-        repeat: false
-        onTriggered: {
-            mapViewLoader.active = false
-            mapViewRestartTimer.restart()
-        }
-    }
-
-    Timer {
-        id: mapViewRestartTimer
-        interval: 30
-        repeat: false
-        onTriggered: mapViewLoader.active = true
-    }
-
     Rectangle {
         anchors.fill: parent
         color: "#06111D"
     }
 
-    Loader {
-        id: mapViewLoader
+    Map {
+        id: mapView
         anchors.fill: parent
-        active: true
-        sourceComponent: mapLibreViewComponent
+
+        plugin: Plugin {
+            id: mapPlugin
+            name: "maplibre"
+
+            PluginParameter {
+                name: "maplibre.map.styles"
+                value: root.nativeStyleUrl
+            }
+            PluginParameter {
+                name: "maplibre.client.name"
+                value: "BeagleyCluster"
+            }
+            PluginParameter {
+                name: "maplibre.client.version"
+                value: "1.0"
+            }
+        }
+
+        center: QtPositioning.coordinate(root.nativeCenterLat, root.nativeCenterLng)
+        zoomLevel: root.nativeZoom
+        bearing: root.nativeMapBearing
+
+        function selectFirstMapType() {
+            const types = supportedMapTypes
+            if (!types || types.length < 1)
+                return
+            activeMapType = types[0]
+            console.info("[MapCenterMapLibreNative] active type",
+                         types[0].name,
+                         "url",
+                         types[0].metadata ? types[0].metadata.url : "")
+        }
+
+        Component.onCompleted: {
+            selectFirstMapType()
+            console.info("[MapCenterMapLibreNative] style",
+                         root.nativeStyleUrl,
+                         "center",
+                         root.nativeCenterLat,
+                         root.nativeCenterLng,
+                         "zoom",
+                         root.nativeZoom)
+        }
+
+        MapLibre.style: Style {}
     }
 
-    Component {
-        id: mapLibreViewComponent
+    Connections {
+        target: mapView
+        ignoreUnknownSignals: true
 
-        MapView {
-            id: mapView
-            anchors.fill: parent
+        function onSupportedMapTypesChanged() {
+            mapView.selectFirstMapType()
+        }
 
-            map.plugin: Plugin {
-                id: mapPlugin
-                name: "maplibre"
-
-                PluginParameter {
-                    name: "maplibre.map.styles"
-                    value: root.nativeStyleUrl
-                }
-            }
-
-            map.center: QtPositioning.coordinate(root.nativeCenterLat, root.nativeCenterLng)
-            map.zoomLevel: root.nativeZoom
-            map.bearing: root.nativeMapBearing
-
-            MapLibre.style: Style {
-                SourceParameter {
-                    id: routeSourceParam
-                    styleId: "beagley-route"
-                    type: "geojson"
-                    property var data: root.routeFeatureCollection
-                }
-
-                LayerParameter {
-                    id: routeLineParam
-                    styleId: "beagley-route-line"
-                    type: "line"
-                    property string source: "beagley-route"
-                    layout: {
-                        "line-cap": "round",
-                        "line-join": "round"
-                    }
-                    paint: {
-                        "line-color": "#4CD9FF",
-                        "line-width": 5.0,
-                        "line-opacity": 0.92
-                    }
-                }
-            }
+        function onMapReadyChanged() {
+            console.info("[MapCenterMapLibreNative] mapReady", mapView.mapReady)
         }
     }
 
     Item {
         id: vehicleMarker
-        width: 44
-        height: 52
+        width: 54
+        height: 64
+        z: 40
         visible: root.nativeVehicleVisible
         x: Math.round(parent.width * 0.5 - width * 0.5)
         y: Math.round(parent.height * root.vehicleAnchorY - height * 0.54)
         rotation: root.nativeVehicleBearing
         transformOrigin: Item.Center
+        layer.enabled: true
+        layer.smooth: true
 
-        Canvas {
+        Rectangle {
+            anchors.centerIn: parent
+            width: parent.width
+            height: width
+            radius: width / 2
+            color: "#FFE45C"
+            opacity: 0.18
+        }
+
+        Shape {
+            id: vehicleShape
             anchors.fill: parent
             antialiasing: true
+            preferredRendererType: Shape.CurveRenderer
 
-            onPaint: {
-                const ctx = getContext("2d")
-                ctx.reset()
-                ctx.clearRect(0, 0, width, height)
-                ctx.save()
-                ctx.translate(width / 2, height / 2)
-
-                const glow = ctx.createRadialGradient(0, 4, 4, 0, 4, 30)
-                glow.addColorStop(0.0, "rgba(255, 222, 74, 0.56)")
-                glow.addColorStop(1.0, "rgba(255, 222, 74, 0.00)")
-                ctx.fillStyle = glow
-                ctx.beginPath()
-                ctx.arc(0, 4, 30, 0, Math.PI * 2)
-                ctx.fill()
-
-                ctx.beginPath()
-                ctx.moveTo(0, -22)
-                ctx.lineTo(15, 18)
-                ctx.quadraticCurveTo(0, 10, -15, 18)
-                ctx.closePath()
-                ctx.fillStyle = "#FFE45C"
-                ctx.shadowColor = "rgba(38, 231, 255, 0.65)"
-                ctx.shadowBlur = 14
-                ctx.fill()
-                ctx.lineWidth = 2
-                ctx.strokeStyle = "#06212C"
-                ctx.shadowBlur = 0
-                ctx.stroke()
-
-                ctx.beginPath()
-                ctx.arc(0, 6, 4, 0, Math.PI * 2)
-                ctx.fillStyle = "#06212C"
-                ctx.fill()
-
-                ctx.restore()
+            ShapePath {
+                fillColor: "#FFE45C"
+                strokeColor: "#061D29"
+                strokeWidth: 2.4
+                joinStyle: ShapePath.RoundJoin
+                startX: vehicleShape.width * 0.5
+                startY: vehicleShape.height * 0.08
+                PathLine { x: vehicleShape.width * 0.80; y: vehicleShape.height * 0.78 }
+                PathQuad {
+                    x: vehicleShape.width * 0.50
+                    y: vehicleShape.height * 0.66
+                    controlX: vehicleShape.width * 0.62
+                    controlY: vehicleShape.height * 0.72
+                }
+                PathQuad {
+                    x: vehicleShape.width * 0.20
+                    y: vehicleShape.height * 0.78
+                    controlX: vehicleShape.width * 0.38
+                    controlY: vehicleShape.height * 0.72
+                }
+                PathLine { x: vehicleShape.width * 0.5; y: vehicleShape.height * 0.08 }
             }
+        }
+
+        Rectangle {
+            width: 8
+            height: 8
+            radius: 4
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.verticalCenterOffset: 8
+            color: "#061D29"
         }
     }
 }

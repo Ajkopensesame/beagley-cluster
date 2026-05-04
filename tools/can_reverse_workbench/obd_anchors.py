@@ -164,6 +164,12 @@ def load_obd_anchor_log(path: str | Path) -> tuple[dict[str, list[AnchorPoint]],
 
 def _parse_jsonl_item(item: dict[str, Any]) -> list[ObdDecodeResult]:
     timestamp = float(item.get("timestamp", item.get("time", 0.0)))
+    if "response" in item:
+        return [decode_mode01_response(item["response"], timestamp=timestamp)]
+    if "pid" in item and "data" in item:
+        pid = _parse_pid(item["pid"])
+        data = _normalize_payload(item["data"])
+        return [decode_mode01_response(bytes([0x41, pid]) + data, timestamp=timestamp)]
     if "signals" in item and isinstance(item["signals"], dict):
         return [
             ObdDecodeResult(
@@ -182,12 +188,6 @@ def _parse_jsonl_item(item: dict[str, Any]) -> list[ObdDecodeResult]:
                 values={str(item["signal"]): float(item["value"])},
             )
         ]
-    if "response" in item:
-        return [decode_mode01_response(item["response"], timestamp=timestamp)]
-    if "pid" in item and "data" in item:
-        pid = _parse_pid(item["pid"])
-        data = _normalize_payload(item["data"])
-        return [decode_mode01_response(bytes([0x41, pid]) + data, timestamp=timestamp)]
     raise ValueError("expected response, pid+data, signal+value, or signals object")
 
 

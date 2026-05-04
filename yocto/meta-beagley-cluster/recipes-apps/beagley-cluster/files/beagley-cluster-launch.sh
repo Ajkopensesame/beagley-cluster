@@ -3,7 +3,8 @@ set -euo pipefail
 
 export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-eglfs}"
 export QT_QPA_EGLFS_INTEGRATION="${QT_QPA_EGLFS_INTEGRATION:-eglfs_kms}"
-export QSG_RENDER_LOOP="${QSG_RENDER_LOOP:-basic}"
+# Leave QSG_RENDER_LOOP unset by default. main.cpp selects threaded for the
+# native embedded renderer and basic/OpenGL for the experimental MapLibre path.
 # The appliance defaults to the embedded UI, but explicit systemd/default-file
 # overrides must win. The BeagleY development display workflow relies on
 # /etc/default/beagley-cluster.local being able to select the V3 shell.

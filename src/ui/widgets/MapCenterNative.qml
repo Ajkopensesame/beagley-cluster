@@ -48,6 +48,12 @@ Item {
         : computeZoom()
     readonly property var resolvedRoutePath: buildRoutePath()
     readonly property bool vehiclePoseValid: isFinite(Number(resolvedLat)) && isFinite(Number(resolvedLng))
+    readonly property bool vehicleBucketHasPose: hasKeys(resolvedVehicleBucket)
+        && isFinite(Number(resolvedVehicleBucket.lat))
+        && isFinite(Number(resolvedVehicleBucket.lng))
+    readonly property bool externalVehiclePoseValid: !hasKeys(resolvedVehicleBucket)
+        && isFinite(Number(lat))
+        && isFinite(Number(lng))
     readonly property bool guidanceCameraActive: !fixedOriginEnabled
         && vehiclePoseValid
         && !!resolvedRouteBucket.guidanceStarted
@@ -67,13 +73,9 @@ Item {
         const value = Number(center.lng)
         return isFinite(value) ? value : resolvedLng
     }
-    readonly property bool vehicleVisibleResolved: {
-        if (!vehiclePoseValid)
-            return false
-        if (resolvedVehicleBucket.gpsReady === undefined && resolvedVehicleBucket.usingLastKnown === undefined)
-            return true
-        return !!resolvedVehicleBucket.gpsReady || !!resolvedVehicleBucket.usingLastKnown
-    }
+    readonly property bool vehicleVisibleResolved: vehiclePoseValid
+        && !fixedOriginEnabled
+        && (vehicleBucketHasPose || externalVehiclePoseValid)
 
     property real nativeCenterLat: resolvedCameraLat
     property real nativeCenterLng: resolvedCameraLng

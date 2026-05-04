@@ -19,7 +19,9 @@ from .baseline import (
 from .bbb_decoder import CanSignalDictionary
 from .capture_session import build_capture_session_from_logs, export_capture_session, summarize_capture_session
 from .discovery import analyze_frames
+from .elm327 import capture_elm327_obd_log, parse_pid_selection
 from .export import DEFAULT_MIN_CONFIDENCE, build_signal_dictionary, validate_signal_dictionary, write_json
+from .identity import build_diagnostic_candidate_signals, build_signal_identity_report
 from .labels import load_guided_session
 from .obd_anchors import build_guided_session_payload_from_obd_log
 from .parser import parse_can_log
@@ -44,6 +46,27 @@ def main(argv: list[str] | None = None) -> int:
     obd_anchors.add_argument("--out", required=True, help="guided session JSON output path")
     obd_anchors.add_argument("--vehicle-profile", help="exact make/model/year/engine/trim/ECU calibration label")
     obd_anchors.set_defaults(func=_cmd_obd_anchors)
+
+    elm327_capture = subparsers.add_parser(
+        "elm327-capture",
+        help="poll a live ELM327 adapter for read-only OBD Mode 01 anchors",
+    )
+    elm327_capture.add_argument("--device", required=True, help="serial device, e.g. /dev/ttyUSB0 or /dev/rfcomm0")
+    elm327_capture.add_argument("--out", required=True, help="output OBD anchor JSONL path")
+    elm327_capture.add_argument("--guided-out", help="optional guided session JSON output path")
+    elm327_capture.add_argument("--baud", type=int, default=38400)
+    elm327_capture.add_argument("--duration-sec", type=float, default=60.0)
+    elm327_capture.add_argument("--sample-interval-sec", type=float, default=0.25)
+    elm327_capture.add_argument("--timeout-sec", type=float, default=2.0)
+    elm327_capture.add_argument("--pid", action="append", dest="pids", help="PID/name to poll; repeat or comma-separate")
+    elm327_capture.add_argument("--no-init", action="store_true", help="skip standard ELM327 AT initialization")
+    elm327_capture.add_argument("--no-supported-filter", action="store_true", help="poll requested PIDs even if 0100 support query excludes them")
+    elm327_capture.add_argument("--drop-errors", action="store_true", help="do not write NO DATA/error rows to JSONL")
+    elm327_capture.add_argument("--print-jsonl", action="store_true", help="also print each captured JSONL row")
+    elm327_capture.add_argument("--vehicle-profile", help="exact make/model/year/engine/trim/ECU calibration label")
+    elm327_capture.add_argument("--purpose", required=True, help="recorded owner-authorized testing/capture purpose")
+    elm327_capture.add_argument("--owner-consent", action="store_true", help="confirm owner authorization for this live vehicle capture")
+    elm327_capture.set_defaults(func=_cmd_elm327_capture)
 
     capture_session = subparsers.add_parser(
         "capture-session",
@@ -125,6 +148,22 @@ def main(argv: list[str] | None = None) -> int:
     transition_replay.add_argument("--frame-period-sec", type=float, default=0.1)
     transition_replay.set_defaults(func=_cmd_transition_replay)
 
+    identity_report = subparsers.add_parser(
+        "identity-report",
+        help="rank unknown CAN candidates and export low-trust diagnostic signal hypotheses",
+    )
+    identity_report.add_argument("--log", help="candump or CSV raw CAN log")
+    identity_report.add_argument("--labels", help="guided OBD/GPS anchor JSON")
+    identity_report.add_argument("--decoded", help="optional decoded vehicle_state JSONL")
+    identity_report.add_argument("--out", required=True, help="output signal_identity_hypothesis_report.json path")
+    identity_report.add_argument("--candidate-export", help="optional diagnostic_candidate_signals.json output path")
+    identity_report.add_argument("--max-candidates", type=int, default=50)
+    identity_report.add_argument(
+        "--ai-command",
+        help="optional external command that reads compact evidence JSON on stdin and returns JSON suggestions",
+    )
+    identity_report.set_defaults(func=_cmd_identity_report)
+
     args = parser.parse_args(argv)
     return args.func(args)
 
@@ -179,6 +218,53 @@ def _cmd_obd_anchors(args: argparse.Namespace) -> int:
     if warning_count:
         print(f"[can-workbench] OBD parse warnings: {warning_count}")
     print(f"[can-workbench] wrote {output}")
+    return 0
+
+
+def _cmd_elm327_capture(args: argparse.Namespace) -> int:
+    if not args.owner_consent:
+        print("[can-workbench] elm327 capture refused: --owner-consent is required for live vehicle polling")
+        return 2
+    if not args.purpose.strip():
+        print("[can-workbench] elm327 capture refused: --purpose must describe the authorized capture")
+        return 2
+    try:
+        summary = capture_elm327_obd_log(
+            device=args.device,
+            out_path=args.out,
+            baud=args.baud,
+            pids=parse_pid_selection(args.pids),
+            duration_sec=args.duration_sec,
+            sample_interval_sec=args.sample_interval_sec,
+            timeout_sec=args.timeout_sec,
+            initialize=not args.no_init,
+            supported_filter=not args.no_supported_filter,
+            include_errors=not args.drop_errors,
+            print_rows=args.print_jsonl,
+        )
+        if args.guided_out:
+            guided_payload = build_guided_session_payload_from_obd_log(
+                args.out,
+                vehicle_profile=args.vehicle_profile,
+            )
+            guided_payload["source"]["purpose"] = args.purpose
+            guided_payload["source"]["ownerConsentConfirmed"] = True
+            guided_payload["source"]["elm327Device"] = args.device
+            guided_path = Path(args.guided_out)
+            guided_path.parent.mkdir(parents=True, exist_ok=True)
+            write_json(guided_path, guided_payload)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        print(f"[can-workbench] elm327 capture failed: {exc}")
+        return 2
+    except KeyboardInterrupt:
+        print("\n[can-workbench] elm327 capture stopped")
+        return 130
+
+    print(f"[can-workbench] ELM327 rows: {summary['rows']} (errors {summary['errors']})")
+    print(f"[can-workbench] decoded signals: {', '.join(summary['decodedSignals']) or 'none'}")
+    print(f"[can-workbench] wrote {args.out}")
+    if args.guided_out:
+        print(f"[can-workbench] wrote guided session: {args.guided_out}")
     return 0
 
 
@@ -352,6 +438,46 @@ def _cmd_transition_replay(args: argparse.Namespace) -> int:
     print(f"[can-workbench] transition baseline ready: {report.get('transitionBaselineReady')}")
     print(f"[can-workbench] transition findings: {len(report.get('transitionFindings', []))}")
     print(f"[can-workbench] wrote {output}")
+    return 0
+
+
+def _cmd_identity_report(args: argparse.Namespace) -> int:
+    if not args.log and not args.decoded:
+        print("[can-workbench] identity-report needs --log, --decoded, or both")
+        return 2
+    try:
+        frames = []
+        stats = None
+        if args.log:
+            frames, stats = parse_can_log(args.log)
+        session = load_guided_session(args.labels)
+        decoded_rows = load_state_jsonl(args.decoded) if args.decoded else []
+        report = build_signal_identity_report(
+            frames,
+            session=session,
+            decoded_rows=decoded_rows,
+            parse_stats=stats,
+            source={"log": args.log, "labels": args.labels, "decoded": args.decoded},
+            max_candidates=args.max_candidates,
+            ai_command=args.ai_command,
+        )
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        print(f"[can-workbench] identity report failed: {exc}")
+        return 2
+
+    output = Path(args.out)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    write_json(output, report)
+    print(f"[can-workbench] hypotheses: {report['summary']['hypothesisCount']}")
+    print(f"[can-workbench] probable low-trust candidates: {report['summary']['probableCount']}")
+    print(f"[can-workbench] wrote {output}")
+    if args.candidate_export:
+        candidate_export = build_diagnostic_candidate_signals(report)
+        export_path = Path(args.candidate_export)
+        export_path.parent.mkdir(parents=True, exist_ok=True)
+        write_json(export_path, candidate_export)
+        print(f"[can-workbench] exported low-trust candidates: {len(candidate_export['candidates'])}")
+        print(f"[can-workbench] wrote {export_path}")
     return 0
 
 

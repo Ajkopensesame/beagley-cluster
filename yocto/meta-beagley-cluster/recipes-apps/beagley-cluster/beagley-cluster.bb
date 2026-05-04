@@ -16,6 +16,8 @@ SRC_URI = " \
     file://beagley-diagnostic-local-fs.service \
     file://beagley-diagnostic-collect.service \
     file://beagley-diagnostic-network-online.service \
+    file://systemd-resolved-tmpfiles-order.conf \
+    file://systemd-timesyncd-tmpfiles-order.conf \
     file://05-beagley-eth-debug.network \
     file://55-beagley-usb-recovery.network \
     file://12-en.network \
@@ -52,7 +54,7 @@ RDEPENDS:${PN} += " \
 "
 
 PACKAGECONFIG ??= ""
-PACKAGECONFIG[maplibre-native] = "-DWITH_MAPLIBRE_NATIVE=ON,-DWITH_MAPLIBRE_NATIVE=OFF,maplibre-native-qt qtlocation qtpositioning,maplibre-native-qt qtlocation qtpositioning"
+PACKAGECONFIG[maplibre-native] = "-DWITH_MAPLIBRE_NATIVE=ON,-DWITH_MAPLIBRE_NATIVE=OFF,maplibre-native-qt qtlocation qtpositioning,maplibre-native-qt qtlocation qtpositioning qtbase-plugins libsqlite3"
 
 EXTRA_OECMAKE += " \
     -DBEAGLEY_APPLIANCE_PRODUCTION=ON \
@@ -78,6 +80,10 @@ do_install:append() {
     install -m 0644 ${WORKDIR}/beagley-diagnostic-local-fs.service ${D}${systemd_system_unitdir}/beagley-diagnostic-local-fs.service
     install -m 0644 ${WORKDIR}/beagley-diagnostic-collect.service ${D}${systemd_system_unitdir}/beagley-diagnostic-collect.service
     install -m 0644 ${WORKDIR}/beagley-diagnostic-network-online.service ${D}${systemd_system_unitdir}/beagley-diagnostic-network-online.service
+    install -d ${D}${sysconfdir}/systemd/system/systemd-resolved.service.d
+    install -m 0644 ${WORKDIR}/systemd-resolved-tmpfiles-order.conf ${D}${sysconfdir}/systemd/system/systemd-resolved.service.d/10-beagley-tmpfiles-order.conf
+    install -d ${D}${sysconfdir}/systemd/system/systemd-timesyncd.service.d
+    install -m 0644 ${WORKDIR}/systemd-timesyncd-tmpfiles-order.conf ${D}${sysconfdir}/systemd/system/systemd-timesyncd.service.d/10-beagley-tmpfiles-order.conf
 
     install -d ${D}${bindir}
     if [ ! -x ${D}${bindir}/beagley_cluster ]; then
@@ -131,6 +137,8 @@ FILES:${PN} += " \
     ${systemd_system_unitdir}/beagley-diagnostic-local-fs.service \
     ${systemd_system_unitdir}/beagley-diagnostic-collect.service \
     ${systemd_system_unitdir}/beagley-diagnostic-network-online.service \
+    ${sysconfdir}/systemd/system/systemd-resolved.service.d/10-beagley-tmpfiles-order.conf \
+    ${sysconfdir}/systemd/system/systemd-timesyncd.service.d/10-beagley-tmpfiles-order.conf \
     ${bindir}/beagley-cluster-launch.sh \
     ${bindir}/beagley-gpu-gate \
     ${libexecdir}/beagley-cluster/beagley-cluster-gpu-probe.sh \

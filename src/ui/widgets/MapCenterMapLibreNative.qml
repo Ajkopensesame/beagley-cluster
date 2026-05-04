@@ -25,11 +25,45 @@ Item {
 
     readonly property bool mapLibreNativeAvailable: (typeof BEAGLEY_MAPLIBRE_NATIVE_AVAILABLE !== "undefined")
         && BEAGLEY_MAPLIBRE_NATIVE_AVAILABLE
+    readonly property bool allowUntestedStyles: (typeof BEAGLEY_MAPLIBRE_NATIVE_ALLOW_UNTESTED_STYLES !== "undefined")
+        && BEAGLEY_MAPLIBRE_NATIVE_ALLOW_UNTESTED_STYLES
+    readonly property string trustedStyleUrls: (typeof BEAGLEY_MAPLIBRE_NATIVE_TRUSTED_STYLES !== "undefined"
+        && BEAGLEY_MAPLIBRE_NATIVE_TRUSTED_STYLES)
+        ? String(BEAGLEY_MAPLIBRE_NATIVE_TRUSTED_STYLES)
+        : "https://demotiles.maplibre.org/style.json"
+    readonly property bool styleTrusted: mapLibreStyleTrusted(styleUrl)
+    readonly property bool shouldUseMapLibre: mapLibreNativeAvailable && styleTrusted
     readonly property bool nativeImplFailed: mapLibreLoader.status === Loader.Error
-    readonly property bool usingRasterFallback: !mapLibreNativeAvailable || nativeImplFailed
+    readonly property bool usingRasterFallback: !shouldUseMapLibre || nativeImplFailed
+    property bool mapLibreReloadGate: true
 
     function currentItem() {
         return mapLibreLoader.item || fallbackLoader.item
+    }
+
+    function mapLibreStyleTrusted(url) {
+        if (root.allowUntestedStyles)
+            return true
+
+        const style = String(url || "").trim().toLowerCase()
+        const trusted = String(root.trustedStyleUrls || "").split(/[\s,]+/)
+        for (var i = 0; i < trusted.length; ++i) {
+            const candidate = String(trusted[i] || "").trim().toLowerCase()
+            if (candidate.length > 0 && candidate === style)
+                return true
+        }
+        return false
+    }
+
+    function logFallbackReason() {
+        if (!root.mapLibreNativeAvailable) {
+            console.warn("[MapCenterMapLibreNative] MapLibre Native is not built into this binary; using native raster fallback")
+        } else if (!root.styleTrusted) {
+            console.warn("[MapCenterMapLibreNative] MapLibre style is not allowlisted; using native raster fallback",
+                         root.styleUrl)
+        } else if (root.nativeImplFailed) {
+            console.warn("[MapCenterMapLibreNative] native implementation failed to load; using native raster fallback")
+        }
     }
 
     function searchAddress(query) {
@@ -50,42 +84,57 @@ Item {
             item.setFollowEnabled(enabled)
     }
 
-    Component.onCompleted: {
-        if (!root.mapLibreNativeAvailable)
-            console.warn("[MapCenterMapLibreNative] MapLibre Native is not built into this binary; using native raster fallback")
+    function reloadNativeMap() {
+        if (!root.shouldUseMapLibre)
+            return
+        root.mapLibreReloadGate = false
+        Qt.callLater(function() {
+            root.mapLibreReloadGate = true
+        })
     }
+
+    Component.onCompleted: {
+        root.logFallbackReason()
+    }
+
+    onStyleTrustedChanged: root.logFallbackReason()
+    onNativeImplFailedChanged: root.logFallbackReason()
+    onStyleUrlChanged: root.reloadNativeMap()
 
     Loader {
         id: mapLibreLoader
         anchors.fill: parent
-        active: root.mapLibreNativeAvailable
-        source: "MapCenterMapLibreNativeImpl.qml"
-
-        onLoaded: {
-            if (!item)
-                return
-            item.lat = Qt.binding(function() { return root.lat })
-            item.lng = Qt.binding(function() { return root.lng })
-            item.bearing = Qt.binding(function() { return root.bearing })
-            item.zoom = Qt.binding(function() { return root.zoom })
-            item.speedKph = Qt.binding(function() { return root.speedKph })
-            item.fixedOriginEnabled = Qt.binding(function() { return root.fixedOriginEnabled })
-            item.fixedOriginLat = Qt.binding(function() { return root.fixedOriginLat })
-            item.fixedOriginLng = Qt.binding(function() { return root.fixedOriginLng })
-            item.fixedOriginLabel = Qt.binding(function() { return root.fixedOriginLabel })
-            item.navigationState = Qt.binding(function() { return root.navigationState })
-            item.mapVehiclePose = Qt.binding(function() { return root.mapVehiclePose })
-            item.mapCameraHints = Qt.binding(function() { return root.mapCameraHints })
-            item.mapRouteOverlay = Qt.binding(function() { return root.mapRouteOverlay })
-            item.mapGuidanceBanner = Qt.binding(function() { return root.mapGuidanceBanner })
-            item.mapConnectivity = Qt.binding(function() { return root.mapConnectivity })
-            item.styleUrl = Qt.binding(function() { return root.styleUrl })
-            item.interactionEnabled = Qt.binding(function() { return root.interactionEnabled })
-        }
+        active: root.shouldUseMapLibre && root.mapLibreReloadGate
+        sourceComponent: mapLibreNativeComponent
 
         onStatusChanged: {
             if (status === Loader.Error)
-                console.warn("[MapCenterMapLibreNative] native implementation failed to load; using native raster fallback")
+                root.logFallbackReason()
+        }
+    }
+
+    Component {
+        id: mapLibreNativeComponent
+
+        MapCenterMapLibreNativeImpl {
+            anchors.fill: parent
+            lat: root.lat
+            lng: root.lng
+            bearing: root.bearing
+            zoom: root.zoom
+            speedKph: root.speedKph
+            fixedOriginEnabled: root.fixedOriginEnabled
+            fixedOriginLat: root.fixedOriginLat
+            fixedOriginLng: root.fixedOriginLng
+            fixedOriginLabel: root.fixedOriginLabel
+            navigationState: root.navigationState
+            mapVehiclePose: root.mapVehiclePose
+            mapCameraHints: root.mapCameraHints
+            mapRouteOverlay: root.mapRouteOverlay
+            mapGuidanceBanner: root.mapGuidanceBanner
+            mapConnectivity: root.mapConnectivity
+            styleUrl: root.styleUrl
+            interactionEnabled: root.interactionEnabled
         }
     }
 

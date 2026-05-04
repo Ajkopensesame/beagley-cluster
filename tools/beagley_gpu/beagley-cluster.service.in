@@ -12,7 +12,6 @@ EnvironmentFile=-/etc/default/beagley-cluster
 Environment=HOME=/home/__PROJECT_USER__
 Environment=QT_QPA_PLATFORM=eglfs
 Environment=QT_QPA_EGLFS_INTEGRATION=eglfs_kms
-Environment=QSG_RENDER_LOOP=basic
 Environment=BEAGLEY_REQUIRE_GPU_GATE=1
 Environment=BEAGLEY_UI_VARIANT=embedded
 Environment=BEAGLEY_MAP_RENDERER=native-online

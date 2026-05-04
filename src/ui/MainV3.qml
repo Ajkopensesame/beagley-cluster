@@ -39,6 +39,36 @@ Window {
     readonly property string mapRenderer: (typeof BEAGLEY_MAP_RENDERER !== "undefined" && BEAGLEY_MAP_RENDERER)
         ? String(BEAGLEY_MAP_RENDERER)
         : "native"
+    readonly property string defaultMapLibreNativeTrustedStyles: "https://demotiles.maplibre.org/style.json"
+    readonly property string mapLibreNativeStyleOverride: (typeof BEAGLEY_MAPLIBRE_NATIVE_STYLE_URL !== "undefined"
+        && BEAGLEY_MAPLIBRE_NATIVE_STYLE_URL)
+        ? String(BEAGLEY_MAPLIBRE_NATIVE_STYLE_URL).trim()
+        : ""
+    readonly property string mapLibreNativeTrustedStyles: (typeof BEAGLEY_MAPLIBRE_NATIVE_TRUSTED_STYLES !== "undefined"
+        && BEAGLEY_MAPLIBRE_NATIVE_TRUSTED_STYLES)
+        ? String(BEAGLEY_MAPLIBRE_NATIVE_TRUSTED_STYLES)
+        : defaultMapLibreNativeTrustedStyles
+    readonly property real mapLibreNativeMaxZoom: {
+        const configured = (typeof BEAGLEY_MAPLIBRE_NATIVE_MAX_ZOOM !== "undefined")
+            ? Number(BEAGLEY_MAPLIBRE_NATIVE_MAX_ZOOM)
+            : 14.0
+        return isFinite(configured) ? Math.max(1.0, Math.min(22.0, configured)) : 14.0
+    }
+    readonly property bool mapLibreNativeRequested: mapRenderer === "maplibre-native"
+    readonly property bool mapLibreNativeAllowUntestedStyles: (typeof BEAGLEY_MAPLIBRE_NATIVE_ALLOW_UNTESTED_STYLES !== "undefined")
+        && BEAGLEY_MAPLIBRE_NATIVE_ALLOW_UNTESTED_STYLES
+    readonly property bool mapLibreNativeStyleTrusted: mapLibreStyleTrusted(activeMapStyleUrl)
+    readonly property string effectiveMapRenderer: mapLibreNativeRequested && !mapLibreNativeStyleTrusted
+        ? "native-online"
+        : mapRenderer
+    readonly property bool mapLibreNativeActive: effectiveMapRenderer === "maplibre-native"
+    readonly property bool mapLibreNativeFullUnderlay: (typeof BEAGLEY_MAPLIBRE_NATIVE_FULL_UNDERLAY !== "undefined")
+        && BEAGLEY_MAPLIBRE_NATIVE_FULL_UNDERLAY
+    readonly property bool mapLibreSafeCompositor: mapLibreNativeActive && !mapLibreNativeFullUnderlay
+    readonly property int mapLibreSafeSideInset: mapLibreSafeCompositor
+        ? Math.round(gaugeFaceSize * 0.54)
+        : 0
+    readonly property int mapLibreSafeVerticalInset: mapLibreSafeCompositor ? 18 : 0
     readonly property bool lowEffectMode: effectLevel === "low" || effectLevel === "off"
     readonly property bool effectsOff: effectLevel === "off"
     readonly property bool embeddedSafeMode: Qt.platform.os === "linux"
@@ -83,6 +113,13 @@ Window {
     readonly property string gpsSourceText: hub && hub.gpsSource ? String(hub.gpsSource).toUpperCase() : "UNKNOWN"
     readonly property var navConnectivity: navigation ? (navigation.mapConnectivity || ({})) : ({})
     readonly property var navVehiclePose: navigation ? (navigation.mapVehiclePose || ({})) : ({})
+    readonly property bool navVehiclePoseFinite: isFinite(Number(navVehiclePose.lat))
+        && isFinite(Number(navVehiclePose.lng))
+    readonly property bool mapVehicleMarkerVisible: mapLibreNativeActive
+        && (liveMapPoseValid || navVehiclePoseFinite)
+    readonly property bool mapVehicleMarkerGuidanceAnchor: hasActiveRoute
+        && navigation
+        && navigation.guidanceStarted
     readonly property var navBanner: navigation && navigation.mapGuidanceBanner
         ? (navigation.mapGuidanceBanner.banner || ({}))
         : ({})
@@ -232,8 +269,12 @@ Window {
     ]
     readonly property var activeMapThemeOption: mapThemeOption(clusterUiSettings.mapTheme)
     readonly property string activeMapTileUrlTemplate: String(activeMapThemeOption.tileUrlTemplate || "")
-    readonly property string activeMapStyleUrl: String(activeMapThemeOption.styleUrl || "")
-    readonly property real activeMapMaxZoom: Number(activeMapThemeOption.maxZoom || 19)
+    readonly property string activeMapStyleUrl: mapLibreNativeStyleOverride.length > 0
+        ? mapLibreNativeStyleOverride
+        : String(activeMapThemeOption.styleUrl || "")
+    readonly property real activeMapMaxZoom: mapLibreNativeRequested
+        ? Math.min(Number(activeMapThemeOption.maxZoom || 19), mapLibreNativeMaxZoom)
+        : Number(activeMapThemeOption.maxZoom || 19)
     readonly property bool routeLookupInProgress: navigation
         && (navigation.state === "routing" || navigation.state === "rerouting")
     readonly property int activeWarnings: {
@@ -360,6 +401,32 @@ Window {
     function selectMapTheme(themeId) {
         const option = root.mapThemeOption(themeId)
         clusterUiSettings.mapTheme = option.id
+    }
+
+    function mapLibreStyleTrusted(styleUrl) {
+        if (!root.mapLibreNativeRequested)
+            return false
+        if (root.mapLibreNativeAllowUntestedStyles)
+            return true
+
+        const url = String(styleUrl || "").trim().toLowerCase()
+        const trusted = String(root.mapLibreNativeTrustedStyles || "")
+            .split(/[\s,]+/)
+        for (var i = 0; i < trusted.length; ++i) {
+            const candidate = String(trusted[i] || "").trim().toLowerCase()
+            if (candidate.length > 0 && candidate === url)
+                return true
+        }
+        return false
+    }
+
+    function logMapLibreFallbackIfNeeded() {
+        if (root.mapLibreNativeAllowUntestedStyles)
+            return
+        if (root.mapLibreNativeRequested && root.effectiveMapRenderer !== "maplibre-native") {
+            console.warn("[MainV3] MapLibre Native requested but style is not allowlisted; using native raster map",
+                         root.activeMapStyleUrl)
+        }
     }
 
     function suggestionOrigin() {
@@ -605,7 +672,11 @@ Window {
         root.requestActivate()
         updateLeftIndicatorVisual()
         updateRightIndicatorVisual()
+        Qt.callLater(logMapLibreFallbackIfNeeded)
     }
+
+    onActiveMapStyleUrlChanged: Qt.callLater(logMapLibreFallbackIfNeeded)
+    onMapLibreNativeStyleTrustedChanged: Qt.callLater(logMapLibreFallbackIfNeeded)
 
     Connections {
         target: navigation
@@ -810,17 +881,22 @@ Window {
         W.MapCenter {
             id: navField
             anchors.fill: parent
+            anchors.leftMargin: root.mapLibreSafeSideInset
+            anchors.rightMargin: root.mapLibreSafeSideInset
+            anchors.topMargin: root.mapLibreSafeVerticalInset
+            anchors.bottomMargin: root.mapLibreSafeVerticalInset
+            clip: false
             mode: ((typeof BEAGLEY_NO_MAP !== "undefined" && BEAGLEY_NO_MAP)
-                && !(root.mapRenderer === "native"
-                    || root.mapRenderer === "native-online"
-                    || root.mapRenderer === "maplibre-native"))
+                && !(root.effectiveMapRenderer === "native"
+                    || root.effectiveMapRenderer === "native-online"
+                    || root.effectiveMapRenderer === "maplibre-native"))
                 ? "placeholder"
-                : ((root.mapRenderer === "maplibre-native")
+                : ((root.effectiveMapRenderer === "maplibre-native")
                     ? "maplibre-native"
-                    : ((root.mapRenderer === "web"
+                    : ((root.effectiveMapRenderer === "web"
                     && !(typeof BEAGLEY_FORCE_SNAPSHOT_MAP !== "undefined" && BEAGLEY_FORCE_SNAPSHOT_MAP))
                     ? "web"
-                    : ((root.mapRenderer === "native" || root.mapRenderer === "native-online")
+                    : ((root.effectiveMapRenderer === "native" || root.effectiveMapRenderer === "native-online")
                         ? "native"
                         : "snapshot")))
             interactionEnabled: !((typeof BEAGLEY_EMBEDDED_DISPLAY !== "undefined" && BEAGLEY_EMBEDDED_DISPLAY) || false)
@@ -833,7 +909,7 @@ Window {
             fixedOriginLat: fallbackRouteOriginLat
             fixedOriginLng: fallbackRouteOriginLng
             fixedOriginLabel: fallbackRouteOriginLabel
-            navigationState: (root.mapRenderer === "web") ? navigation.mapPayload : ({})
+            navigationState: (root.effectiveMapRenderer === "web") ? navigation.mapPayload : ({})
             mapVehiclePose: navigation.mapVehiclePose
             mapCameraHints: root.effectiveMapCameraHints
             mapRouteOverlay: navigation.mapRouteOverlay
@@ -844,6 +920,56 @@ Window {
             snapshotRefreshMs: 0
             videoEnabled: false
             videoUrl: ""
+        }
+
+        Item {
+            id: mapLibreCompositorFence
+            anchors.fill: parent
+            visible: root.mapLibreSafeCompositor
+            z: 8
+
+            Rectangle {
+                anchors.left: parent.left
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                width: root.mapLibreSafeSideInset
+                color: root.color
+            }
+
+            Rectangle {
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                width: root.mapLibreSafeSideInset
+                color: root.color
+            }
+
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                height: root.mapLibreSafeVerticalInset
+                color: root.color
+            }
+
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: root.mapLibreSafeVerticalInset
+                color: root.color
+            }
+        }
+
+        W.MapVehicleMarker {
+            id: mapVehicleMarker
+            width: 54
+            height: 64
+            z: 180
+            visible: root.mapVehicleMarkerVisible
+            x: Math.round(parent.width * 0.5 - width * 0.5)
+            y: Math.round(parent.height * (root.mapVehicleMarkerGuidanceAnchor ? 0.84 : 0.5) - height * 0.54)
+            bearing: root.displayMapBearing
         }
 
         W.WeatherCorners {
@@ -857,6 +983,9 @@ Window {
             stressScene: root.stressScene
             phase: root.sharedEffectPhase
             nowPlayingService: (typeof nowPlaying !== "undefined") ? nowPlaying : null
+            expandedMode: (typeof BEAGLEY_INITIAL_WEATHER_EXPANDED_MODE !== "undefined")
+                ? String(BEAGLEY_INITIAL_WEATHER_EXPANDED_MODE)
+                : ""
             active: !root.mapMenuOpen && !root.navControlsOpen
 
             onMapMenuRequested: {
@@ -971,9 +1100,19 @@ Window {
             id: leftGaugeShell
             width: root.gaugeShellSize
             height: root.gaugeShellSize
+            z: 220
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
             anchors.leftMargin: root.gaugeEdgeBleed
+
+            Rectangle {
+                anchors.centerIn: parent
+                width: root.gaugeFaceSize + 18
+                height: width
+                radius: width / 2
+                visible: root.mapLibreSafeCompositor
+                color: "#010309"
+            }
 
             W.GaugeLensShell {
                 anchors.fill: parent
@@ -984,6 +1123,27 @@ Window {
                 chromeColor: appTheme.pearlLow
                 podSize: root.gaugePodSize
                 faceSize: root.gaugeFaceSize
+            }
+
+            W.MapLibreGaugeBackplate {
+                anchors.centerIn: parent
+                width: root.gaugeFaceSize
+                height: root.gaugeFaceSize
+                z: -1
+                visible: root.mapLibreNativeActive
+                theme: appTheme
+                primaryColor: appTheme.speedColor(root.displaySpeedValue)
+                auxColor: root.displayCoolantValue >= 100 ? appTheme.danger : (root.displayCoolantValue < 40 ? "#63C9FF" : appTheme.pearlLow)
+                primaryProgress: Math.max(0, Math.min(1, root.displaySpeedValue / 140))
+                auxProgress: Math.max(0.14, Math.min(1, (root.displayCoolantValue - 40) / 70))
+                maxValue: 140
+                minorStep: 10
+                majorStep: 20
+                labelStep: 20
+                labelStart: 20
+                labelDivisor: 1
+                auxStartLabel: "H"
+                auxEndLabel: "C"
             }
 
             W.SpeedGauge {
@@ -1028,9 +1188,19 @@ Window {
             id: rightGaugeShell
             width: root.gaugeShellSize
             height: root.gaugeShellSize
+            z: 220
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             anchors.rightMargin: root.gaugeEdgeBleed
+
+            Rectangle {
+                anchors.centerIn: parent
+                width: root.gaugeFaceSize + 18
+                height: width
+                radius: width / 2
+                visible: root.mapLibreSafeCompositor
+                color: "#010309"
+            }
 
             W.GaugeLensShell {
                 anchors.fill: parent
@@ -1041,6 +1211,27 @@ Window {
                 chromeColor: appTheme.pearlLow
                 podSize: root.gaugePodSize
                 faceSize: root.gaugeFaceSize
+            }
+
+            W.MapLibreGaugeBackplate {
+                anchors.centerIn: parent
+                width: root.gaugeFaceSize
+                height: root.gaugeFaceSize
+                z: -1
+                visible: root.mapLibreNativeActive
+                theme: appTheme
+                primaryColor: appTheme.rpmColor(root.displayRpmValue)
+                auxColor: root.displayFuelValue <= 12 ? appTheme.danger : appTheme.pearlLow
+                primaryProgress: Math.max(0, Math.min(1, root.displayRpmValue / 8000))
+                auxProgress: Math.max(0, Math.min(1, root.displayFuelValue / 100))
+                maxValue: 8
+                minorStep: 0.5
+                majorStep: 1
+                labelStep: 1
+                labelStart: 1
+                labelDivisor: 1
+                auxStartLabel: "F"
+                auxEndLabel: "E"
             }
 
             W.TachGauge {

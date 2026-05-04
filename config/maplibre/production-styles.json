@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "userAgent": "BeagleyCluster/1.0 (MapLibre probe)",
+  "styles": [
+    {
+      "id": "maplibre-demo",
+      "label": "MapLibre Demo",
+      "role": "compatibility-baseline",
+      "url": "https://demotiles.maplibre.org/style.json",
+      "notes": "Known MapLibre Native compatibility baseline. Not the final production map source."
+    },
+    {
+      "id": "openfreemap-positron",
+      "label": "OpenFreeMap Positron",
+      "role": "production-candidate",
+      "url": "https://tiles.openfreemap.org/styles/positron",
+      "notes": "Light road-map candidate for the embedded cluster."
+    },
+    {
+      "id": "openfreemap-liberty",
+      "label": "OpenFreeMap Liberty",
+      "role": "production-candidate",
+      "url": "https://tiles.openfreemap.org/styles/liberty",
+      "notes": "Richer road-map candidate. Heavier than Positron."
+    },
+    {
+      "id": "carto-voyager",
+      "label": "CARTO Voyager",
+      "role": "compatibility-candidate",
+      "url": "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json",
+      "notes": "Validate before promotion; prior direct testing produced blank output."
+    }
+  ]
+}

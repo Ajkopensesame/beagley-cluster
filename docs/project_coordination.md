@@ -54,6 +54,8 @@ may already exist, check `docs/open_source_landscape.md`.
   response checks.
 - `tools/schema/baseline_coverage_report_v1.md`: report that marks known-good
   scenarios as strong, weak, or missing for a vehicle.
+- `tools/schema/signal_identity_hypothesis_report_v1.md`: unknown CAN candidate
+  identity report and low-trust diagnostic candidate export policy.
 - Fault recorder event JSON: rolling evidence packet produced by BBB when signal
   faults appear.
 
@@ -121,11 +123,13 @@ Current pieces:
 - Workbench package: `tools/can_reverse_workbench`
 - Shared bit extraction: `tools/can_reverse_workbench/bitfield.py`
 - OBD anchor adapter: `tools/can_reverse_workbench/obd_anchors.py`
+- Live ELM327 OBD anchor capture: `tools/can_reverse_workbench/elm327.py`
 - OBD + raw CAN capture sessions: `tools/can_reverse_workbench/capture_session.py`
 - Planned virtual anchor generator: derives acceleration, load proxies, VE,
   fuel-flow estimates, gear-ratio proxies, warmup rates, and confidence metadata
   from OBD anchors plus vehicle constants.
 - Discovery/ranking: `tools/can_reverse_workbench/discovery.py`
+- Unknown signal identity hypotheses: `tools/can_reverse_workbench/identity.py`
 - BBB decoder: `tools/can_reverse_workbench/bbb_decoder.py`
 - Export: `tools/can_reverse_workbench/export.py`
 
@@ -133,9 +137,13 @@ Rules:
 
 - Standards-exposed OBD data should be treated as anchor evidence, not as proof
   that every manufacturer/private CAN signal is known.
+- ELM327 polling is allowed only for read-only standard OBD requests and should
+  be recorded as anchor evidence, not as direct raw CAN discovery.
 - Derived OBD virtual sensors are weighted anchors, not directly measured truth.
   Each derived value needs source inputs, assumptions, and a confidence tier.
 - Candidate discovery happens offline first.
+- Identity hypotheses stay separate from `can_signals.json`; probable
+  hypotheses can only become low-trust diagnostic inputs.
 - Deployed dictionaries should be tested against replay before live vehicle use.
 
 ### 4. Known-Good Baselines and Fault Comparison

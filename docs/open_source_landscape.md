@@ -65,7 +65,7 @@ benchmarks. Some cover adjacent product shapes.
 | [SavvyCAN](https://github.com/collin80/SavvyCAN) | Cross-platform desktop CAN analysis, reverse-engineering, DBC workflows, replay, filtering, and visual exploration. | Study and use manually | Use during reverse-engineering sessions to inspect logs and validate candidate signals. | It is a desktop analyst tool, not the BeagleY cluster runtime or BBB hub. |
 | [opendbc](https://github.com/commaai/opendbc) | Large open vehicle CAN knowledge base and Python API, with examples that can read vehicle state and also support control-focused ADAS work. | Study and selectively reuse | Check for vehicle/platform overlap, learn DBC conventions, and use compatible definitions where license and vehicle fit. | Our product remains read-only. Do not import control assumptions or actuator workflows into the cluster/hub path. |
 | [OVMS](https://github.com/openvehicles/Open-Vehicle-Monitoring-System-3) | Open-source vehicle monitoring module with CAN logging, OBD2 translation, DBC decoding, reverse-engineering tools, WebSocket streaming, plugins, GPS/cellular, and vehicle modules. | Study as closest cousin | Study module boundaries, logging formats, plugin patterns, OBD/DBC translation, and user-facing telemetry flows. | Not a drop-in for our hardware/product shape: our split is BeagleY display plus BBB vehicle hub, with a display-first local cluster and known-good baseline comparison. |
-| [python-OBD](https://github.com/brendan-w/python-OBD) | ELM327-style OBD-II serial access for reading engine data. | Evaluate | Possible starter for a live Mode 01 anchor source when using ELM327-compatible adapters. | It does not replace SocketCAN ISO-TP, proprietary CAN discovery, or the baseline/anomaly workflow. |
+| [python-OBD](https://github.com/brendan-w/python-OBD) | ELM327-style OBD-II serial access for reading engine data. | Optional fallback | We now have a small stdlib ELM327 Mode 01 capture path for anchor JSONL; evaluate python-OBD later only if adapter compatibility becomes a problem. | It does not replace SocketCAN ISO-TP, proprietary CAN discovery, or the baseline/anomaly workflow. |
 | [CSS Electronics CANedge/CANcloud](https://www.csselectronics.com/products/can-bus-data-logger-wifi-canedge2) | Commercial CAN/LIN logger hardware, raw data capture, SD/WiFi/LTE upload paths, open file/API tooling, DBC workflows, dashboards, and S3-style data pipelines. | Compare | Benchmark logging reliability, deployment simplicity, data handling, and customer-facing docs. | Do not compete as a generic logger first. Our stronger angle is live in-vehicle cluster flow, BBB hub control over local inputs, OBD-anchored discovery, and known-good fault comparison. |
 
 ## What We Should Not Rebuild
@@ -74,7 +74,7 @@ benchmarks. Some cover adjacent product shapes.
 - Basic DBC parsing.
 - Desktop log browsing and one-off reverse-engineering UI.
 - Generic cloud object storage or fleet file management.
-- Basic ELM327 OBD polling unless we need a small adapter around a known library.
+- Broader ELM327 scanner features beyond read-only Mode 01 anchor capture.
 
 ## What Remains Custom
 
@@ -89,8 +89,8 @@ benchmarks. Some cover adjacent product shapes.
 
 ## Next Integration Decisions
 
-- Add a live OBD anchor source that records standard Mode 01 data into the JSONL
-  format accepted by `tools/can_reverse_workbench/obd_anchors.py`.
+- Test the live ELM327 Mode 01 capture path across cheap clone adapters and
+  document adapter-specific baud/protocol quirks.
 - Add a DBC compatibility test using `cantools` so exported signals can be
   validated against common CAN workflows.
 - Add a small "import from opendbc" research task only after a target vehicle

@@ -7,7 +7,6 @@ Wants=beagley-cluster-provision.service beagley-cluster-gpu-probe.service
 Type=simple
 Environment=QT_QPA_PLATFORM=eglfs
 Environment=QT_QPA_EGLFS_INTEGRATION=eglfs_kms
-Environment=QSG_RENDER_LOOP=basic
 Environment=BEAGLEY_UI_VARIANT=embedded
 Environment=BEAGLEY_RENDER_PROFILE=embedded
 Environment=BEAGLEY_EFFECT_LEVEL=low

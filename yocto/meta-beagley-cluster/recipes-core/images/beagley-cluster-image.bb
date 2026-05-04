@@ -24,6 +24,16 @@ IMAGE_INSTALL:append = " \
     beagley-cluster \
 "
 
+ROOTFS_POSTPROCESS_COMMAND += "beagley_fix_rootfs_top_level_ownership; "
+
+beagley_fix_rootfs_top_level_ownership() {
+    # systemd-tmpfiles refuses to operate when a path transition starts at a
+    # non-root-owned /. That leaves /var/volatile/tmp missing, which prevents
+    # systemd-resolved and systemd-timesyncd from starting on cold boot.
+    chown root:root "${IMAGE_ROOTFS}" "${IMAGE_ROOTFS}/usr"
+    chmod 0755 "${IMAGE_ROOTFS}" "${IMAGE_ROOTFS}/usr"
+}
+
 # BeagleY's companion R5 boot artifacts currently land in the generic J722S
 # deploy directory. Stage them into the BeagleY deploy directory before WIC
 # assembles the image so clean workspaces still produce a flashable SD image.

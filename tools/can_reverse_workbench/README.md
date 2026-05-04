@@ -165,6 +165,49 @@ This is not a live OBD scanner yet. The durable capture artifact is now the
 SQLite capture session; the current command imports synchronized logs into that
 session and exports the same anchor contract as manually guided sessions.
 
+## Live ELM327 Capture
+
+For a live vehicle with an ELM327-compatible USB or Bluetooth serial adapter,
+capture read-only standard OBD Mode 01 anchors directly:
+
+```bash
+python3 -m tools.can_reverse_workbench elm327-capture \
+  --device /dev/ttyUSB0 \
+  --out /tmp/can_workbench/elm327_obd.jsonl \
+  --guided-out /tmp/can_workbench/elm327_guided_session.json \
+  --duration-sec 60 \
+  --pid rpm \
+  --pid speed \
+  --pid maf \
+  --pid throttle \
+  --purpose "owner-authorized live OBD anchor capture" \
+  --owner-consent
+```
+
+Common device paths:
+
+- Linux USB: `/dev/ttyUSB0`
+- Linux Bluetooth RFCOMM: `/dev/rfcomm0`
+- macOS USB/Bluetooth serial: `/dev/tty.*`
+
+Default polling is conservative and read-only. The command initializes the
+adapter with standard `AT` setup commands, asks for supported PIDs, then polls
+Mode 01 requests such as RPM, speed, load, coolant, MAP, IAT, MAF, throttle, and
+module voltage. It writes the same JSONL accepted by `obd-anchors` and
+`capture-session`.
+
+If a clone adapter behaves poorly, useful fallback flags are:
+
+```bash
+--baud 9600
+--no-supported-filter
+--timeout-sec 4
+--sample-interval-sec 0.5
+```
+
+This path is for OBD anchor capture, not proprietary CAN control. It does not
+clear codes, write ECU settings, or transmit control commands.
+
 ## Analyze
 
 ```bash
@@ -181,6 +224,50 @@ Outputs:
 
 If a candidate is not verified, the export keeps it under `rejectedSignals` with
 its confidence and reason instead of attaching it to a human signal name.
+
+## Signal Identity Hypothesis Report
+
+Use `identity-report` when you want to rank unknown CAN candidates without
+turning them into verified decoder fields:
+
+```bash
+python3 -m tools.can_reverse_workbench identity-report \
+  --log /tmp/can_workbench/session_001/raw_can.candump \
+  --labels /tmp/can_workbench/session_001/guided_session.json \
+  --decoded /tmp/can_workbench/session_001/vehicle_state_overlay.jsonl \
+  --out /tmp/can_workbench/session_001/signal_identity_hypothesis_report.json \
+  --candidate-export /tmp/can_workbench/session_001/diagnostic_candidate_signals.json
+```
+
+The report classifies candidates as `switch`, `state_enum`,
+`continuous_sensor`, `speed_like`, `rpm_like`, `pressure_like`,
+`temperature_like`, `percentage_like`, `voltage_like`, `airflow_like`,
+`gear_or_ratio`, `warning_lamp`, `counter`, `checksum_or_crc`, or `unknown`.
+
+Promotion policy is separate from `can_signals.json`:
+
+- `candidate`: useful for human review only.
+- `probable`: can be exported as low-trust diagnostic evidence.
+- `rejected`: counter/checksum/noise/wrong behavior.
+- `verified`: reserved for the normal `analyze` -> `can_signals.json` path.
+
+`diagnostic_candidate_signals.json` is intentionally low-trust. It can support
+diagnostic experiments and anomaly investigation, but it must not drive cluster
+display fields and must not be sole evidence for a health verdict.
+
+Optional AI naming is command-based, not tied to a cloud SDK:
+
+```bash
+python3 -m tools.can_reverse_workbench identity-report \
+  --log /path/to/candump.log \
+  --labels /path/to/guided_session.json \
+  --out /tmp/signal_identity_hypothesis_report.json \
+  --ai-command "/path/to/ai_namer"
+```
+
+The command receives compact evidence JSON on stdin and may return name/class
+suggestions. AI can rename or explain a non-rejected hypothesis, but it cannot
+promote a signal and cannot override deterministic rejection.
 
 ## Browser Workbench
 

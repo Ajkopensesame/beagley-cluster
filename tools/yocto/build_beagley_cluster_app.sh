@@ -5,7 +5,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 BUILD_DIR="${YOCTO_BUILD_DIR:-/home/pneumaion/ti-sdk-11.00/yocto-build/build}"
 TARGET="beagley-cluster"
 CLEAN=1
-FAIL_DIRTY=0
+FAIL_DIRTY=1
 
 usage() {
   cat <<'EOF'
@@ -20,8 +20,10 @@ Options:
   --build-dir DIR      Yocto build dir. Default: YOCTO_BUILD_DIR or
                        /home/pneumaion/ti-sdk-11.00/yocto-build/build
   --no-clean           Skip `bitbake beagley-cluster -c clean`.
-  --fail-dirty         Fail when the configured source checkout has uncommitted
-                       changes.
+  --allow-dirty        Allow a dirty source checkout. Avoid this for production
+                       deploys because Yocto builds committed HEAD only.
+  --fail-dirty         Kept for compatibility; dirty source is already fatal by
+                       default.
 EOF
 }
 
@@ -38,6 +40,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --no-clean)
       CLEAN=0
+      shift
+      ;;
+    --allow-dirty)
+      FAIL_DIRTY=0
       shift
       ;;
     --fail-dirty)

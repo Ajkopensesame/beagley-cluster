@@ -5,7 +5,6 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-eglfs}"
 export QT_QPA_EGLFS_INTEGRATION="${QT_QPA_EGLFS_INTEGRATION:-eglfs_kms}"
-export QSG_RENDER_LOOP="${QSG_RENDER_LOOP:-basic}"
 export BEAGLEY_UI_VARIANT="${BEAGLEY_UI_VARIANT:-embedded}"
 export BEAGLEY_RENDER_PROFILE="${BEAGLEY_RENDER_PROFILE:-embedded}"
 export BEAGLEY_EFFECT_LEVEL="${BEAGLEY_EFFECT_LEVEL:-low}"

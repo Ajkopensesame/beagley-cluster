@@ -8,7 +8,7 @@ WARMUP_SECONDS=20
 OUT_DIR="$ROOT/build/perf"
 HUB_URL="${VEHICLE_HUB_WS_URL:-ws://10.24.0.7:8765}"
 EFFECT_LEVEL="${BEAGLEY_EFFECT_LEVEL:-high}"
-RENDER_LOOP="${QSG_RENDER_LOOP:-basic}"
+RENDER_LOOP="${QSG_RENDER_LOOP:-auto}"
 MIN_FPS=45
 MAX_P95=35
 MAX_P99=60
@@ -30,7 +30,7 @@ Options:
   --out-dir DIR           Local output directory. Default: build/perf
   --hub-url URL           Vehicle hub WebSocket URL. Default: ws://10.24.0.7:8765
   --effect-level LEVEL    off, low, or high. Default: high
-  --render-loop LOOP      Qt scenegraph render loop. Default: basic
+  --render-loop LOOP      Qt scenegraph render loop. Default: auto
   --min-fps N             Perf check minimum FPS. Default: 45
   --max-p95 MS            Perf check maximum p95 frame time. Default: 35
   --max-p99 MS            Perf check maximum p99 frame time. Default: 60
@@ -160,9 +160,11 @@ BEAGLEY_MAP_STYLE_MODE=embedded
 BEAGLEY_PROFILE_METRICS=1
 BEAGLEY_REPLAY_LOOP=0
 BEAGLEY_STRESS_SCENE=0
-QSG_RENDER_LOOP=$RENDER_LOOP
 VEHICLE_HUB_WS_URL=$HUB_URL
 REMOTE_ENV
+    if [ "$RENDER_LOOP" != "auto" ]; then
+      printf 'QSG_RENDER_LOOP=%s\n' "$RENDER_LOOP" >>"\$local_env.tmp"
+    fi
     cp \"\$local_env.tmp\" \"\$local_env\"
     chmod 0644 \"\$local_env\"
     rm -f \"\$local_env.tmp\"

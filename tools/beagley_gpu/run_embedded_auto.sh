@@ -5,7 +5,6 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 GPU_GATE_FILE="${BEAGLEY_GPU_GATE_FILE:-/tmp/beagley_gpu_gate.ok}"
 
 export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-eglfs}"
-export QSG_RENDER_LOOP="${QSG_RENDER_LOOP:-basic}"
 export BEAGLEY_UI_VARIANT="${BEAGLEY_UI_VARIANT:-v3}"
 export BEAGLEY_RENDER_PROFILE="${BEAGLEY_RENDER_PROFILE:-embedded}"
 export BEAGLEY_MAP_RENDERER="${BEAGLEY_MAP_RENDERER:-native}"
