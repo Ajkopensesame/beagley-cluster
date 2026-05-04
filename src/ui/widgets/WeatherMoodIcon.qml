@@ -9,6 +9,7 @@ Item {
     property color cloudColor: "#EEF4FF"
     property color faceColor: "#FFD36B"
     property color darkColor: "#05070D"
+    readonly property bool embeddedSafeMode: Qt.platform.os === "linux"
 
     function normalizedKind() {
         const value = String(kind).toLowerCase()
@@ -37,18 +38,213 @@ Item {
             + clamp(alpha, 0, 1) + ")"
     }
 
-    onKindChanged: moodCanvas.requestPaint()
-    onPrimaryColorChanged: moodCanvas.requestPaint()
-    onSecondaryColorChanged: moodCanvas.requestPaint()
-    onCloudColorChanged: moodCanvas.requestPaint()
-    onFaceColorChanged: moodCanvas.requestPaint()
-    onDarkColorChanged: moodCanvas.requestPaint()
-    Component.onCompleted: moodCanvas.requestPaint()
+    function requestCanvasPaint() {
+        if (!embeddedSafeMode)
+            moodCanvas.requestPaint()
+    }
+
+    onKindChanged: requestCanvasPaint()
+    onPrimaryColorChanged: requestCanvasPaint()
+    onSecondaryColorChanged: requestCanvasPaint()
+    onCloudColorChanged: requestCanvasPaint()
+    onFaceColorChanged: requestCanvasPaint()
+    onDarkColorChanged: requestCanvasPaint()
+    Component.onCompleted: requestCanvasPaint()
+
+    Item {
+        id: embeddedIcon
+        anchors.fill: parent
+        visible: root.embeddedSafeMode
+
+        readonly property string weatherKind: root.normalizedKind()
+        readonly property real side: Math.min(width, height)
+
+        Item {
+            id: embeddedSun
+            width: embeddedIcon.side * 0.72
+            height: width
+            anchors.centerIn: parent
+            anchors.horizontalCenterOffset: embeddedIcon.weatherKind === "cloud" ? -embeddedIcon.side * 0.10 : 0
+            anchors.verticalCenterOffset: embeddedIcon.weatherKind === "cloud" ? -embeddedIcon.side * 0.10 : 0
+            visible: embeddedIcon.weatherKind === "clear" || embeddedIcon.weatherKind === "cloud"
+            opacity: embeddedIcon.weatherKind === "cloud" ? 0.72 : 1.0
+
+            Repeater {
+                model: 12
+                Rectangle {
+                    width: Math.max(3, embeddedSun.width * 0.045)
+                    height: embeddedSun.height * 0.18
+                    radius: width / 2
+                    x: embeddedSun.width / 2 - width / 2
+                    y: embeddedSun.height * 0.02
+                    color: root.primaryColor
+                    opacity: 0.82
+                    antialiasing: true
+                    transform: Rotation {
+                        origin.x: width / 2
+                        origin.y: embeddedSun.height * 0.48
+                        angle: index * 30
+                    }
+                }
+            }
+
+            Rectangle {
+                width: embeddedSun.width * 0.58
+                height: width
+                radius: width / 2
+                anchors.centerIn: parent
+                color: root.faceColor
+                border.width: Math.max(1, embeddedSun.width * 0.022)
+                border.color: Qt.rgba(1.0, 0.72, 0.18, 0.92)
+                antialiasing: true
+            }
+
+            Rectangle {
+                width: embeddedSun.width * 0.17
+                height: embeddedSun.height * 0.10
+                radius: height * 0.28
+                x: embeddedSun.width * 0.29
+                y: embeddedSun.height * 0.43
+                color: root.darkColor
+                antialiasing: true
+            }
+
+            Rectangle {
+                width: embeddedSun.width * 0.17
+                height: embeddedSun.height * 0.10
+                radius: height * 0.28
+                x: embeddedSun.width * 0.54
+                y: embeddedSun.height * 0.43
+                color: root.darkColor
+                antialiasing: true
+            }
+
+            Rectangle {
+                width: embeddedSun.width * 0.14
+                height: Math.max(2, embeddedSun.height * 0.025)
+                radius: height / 2
+                anchors.horizontalCenter: parent.horizontalCenter
+                y: embeddedSun.height * 0.47
+                color: root.darkColor
+                antialiasing: true
+            }
+        }
+
+        Item {
+            id: embeddedCloud
+            width: embeddedIcon.side * 0.78
+            height: embeddedIcon.side * 0.54
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.verticalCenterOffset: embeddedIcon.weatherKind === "cloud" ? embeddedIcon.side * 0.08 : -embeddedIcon.side * 0.02
+            visible: embeddedIcon.weatherKind !== "clear"
+
+            Rectangle {
+                width: parent.width * 0.98
+                height: parent.height * 0.45
+                radius: height * 0.42
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.bottom: parent.bottom
+                color: root.cloudColor
+                antialiasing: true
+            }
+
+            Rectangle {
+                width: parent.width * 0.40
+                height: width
+                radius: width / 2
+                x: parent.width * 0.10
+                y: parent.height * 0.24
+                color: root.cloudColor
+                antialiasing: true
+            }
+
+            Rectangle {
+                width: parent.width * 0.48
+                height: width
+                radius: width / 2
+                anchors.horizontalCenter: parent.horizontalCenter
+                y: parent.height * 0.03
+                color: root.cloudColor
+                antialiasing: true
+            }
+
+            Rectangle {
+                width: parent.width * 0.40
+                height: width
+                radius: width / 2
+                x: parent.width * 0.50
+                y: parent.height * 0.20
+                color: root.cloudColor
+                antialiasing: true
+            }
+        }
+
+        Item {
+            id: embeddedDrops
+            width: embeddedIcon.side * 0.58
+            height: embeddedIcon.side * 0.28
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.top: embeddedCloud.bottom
+            anchors.topMargin: -embeddedIcon.side * 0.02
+            visible: embeddedIcon.weatherKind === "rain" || embeddedIcon.weatherKind === "storm"
+
+            Repeater {
+                model: 4
+                Rectangle {
+                    width: Math.max(3, embeddedDrops.width * 0.055)
+                    height: embeddedDrops.height * 0.62
+                    radius: width / 2
+                    x: embeddedDrops.width * (0.18 + index * 0.21)
+                    y: (index % 2) * embeddedDrops.height * 0.16
+                    rotation: 18
+                    color: root.secondaryColor
+                    opacity: 0.92
+                    antialiasing: true
+                }
+            }
+        }
+
+        Rectangle {
+            width: embeddedIcon.side * 0.16
+            height: embeddedIcon.side * 0.46
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.verticalCenterOffset: embeddedIcon.side * 0.25
+            visible: embeddedIcon.weatherKind === "storm"
+            color: root.primaryColor
+            rotation: 24
+            radius: width * 0.12
+            antialiasing: true
+        }
+
+        Column {
+            width: embeddedIcon.side * 0.62
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.verticalCenterOffset: embeddedIcon.side * 0.22
+            spacing: embeddedIcon.side * 0.08
+            visible: embeddedIcon.weatherKind === "fog" || embeddedIcon.weatherKind === "snow"
+
+            Repeater {
+                model: embeddedIcon.weatherKind === "fog" ? 3 : 2
+                Rectangle {
+                    width: parent.width
+                    height: Math.max(2, embeddedIcon.side * 0.035)
+                    radius: height / 2
+                    color: root.secondaryColor
+                    opacity: embeddedIcon.weatherKind === "fog" ? 0.62 : 0.92
+                    antialiasing: true
+                }
+            }
+        }
+    }
 
     Canvas {
         id: moodCanvas
         anchors.fill: parent
-        renderTarget: Qt.platform.os === "linux" ? Canvas.Image : Canvas.FramebufferObject
+        visible: !root.embeddedSafeMode
+        renderTarget: Canvas.FramebufferObject
         antialiasing: true
         smooth: true
 

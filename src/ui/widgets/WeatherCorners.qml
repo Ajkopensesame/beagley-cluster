@@ -1,6 +1,7 @@
 import QtQuick 2.15
 
 import BeagleY 1.0
+import "." as WidgetLocal
 import "BomCatalog.js" as BomCatalog
 
 Item {
@@ -22,8 +23,8 @@ Item {
     readonly property string monoFont: theme && theme.fontMono ? theme.fontMono : "Oxanium"
     readonly property bool embeddedSafeMode: Qt.platform.os === "linux"
     readonly property bool tallDetailMode: expandedMode === "temp" || expandedMode === "radar"
-    readonly property int podSize: Math.floor(Math.min(156, Math.max(130, height * 0.205)))
-    readonly property int cornerBleed: Math.round(podSize * 0.18)
+    readonly property int podSize: Math.floor(Math.min(164, Math.max(142, height * 0.228)))
+    readonly property int cornerBleed: Math.round(podSize * 0.17)
     readonly property int cornerInset: -cornerBleed
     readonly property real podBleedFraction: cornerBleed / podSize
     readonly property int podFaceInset: Math.round(podSize * 0.190)
@@ -911,347 +912,78 @@ Item {
         }
     }
 
-    Item {
-        id: tempPanel
+    WeatherCornerWidget {
+        id: weatherCorner
         width: root.podSize
         height: root.podSize
         anchors.left: parent.left
         anchors.top: parent.top
         anchors.leftMargin: root.cornerInset
         anchors.topMargin: root.cornerInset
-
-        CornerCircleShell {
-            anchors.fill: parent
-            corner: "topLeft"
-            bleedFraction: root.podBleedFraction
-            effectLevel: root.effectLevel
-            accentColor: root.weatherStatus === "LIVE" ? "#C568FF" : "#FFD36B"
-            secondaryAccentColor: "#58FFE1"
-            active: root.weatherStatus === "LIVE"
-        }
-
-        Column {
-            width: root.podContentDiameter
-            anchors.centerIn: parent
-            spacing: 1
-
-            Row {
-                anchors.horizontalCenter: parent.horizontalCenter
-                spacing: 3
-
-                Text {
-                    text: root.formatTemp(root.displayTempC)
-                    color: "#F9FBFF"
-                    font.family: root.displayFont
-                    font.pixelSize: Math.floor(root.podSize * 0.44)
-                    font.weight: Font.Bold
-                    font.letterSpacing: 0
-                    lineHeight: 0.82
-                }
-
-                Text {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "\u00B0"
-                    color: "#C568FF"
-                    font.family: root.displayFont
-                    font.pixelSize: Math.floor(root.podSize * 0.20)
-                    font.weight: Font.Bold
-                    font.letterSpacing: 0
-                }
-            }
-
-            Text {
-                width: root.podLabelWidth
-                anchors.horizontalCenter: parent.horizontalCenter
-                text: root.weatherStatus === "LIVE" ? root.weatherCompactLabel() : root.weatherStatus
-                color: root.weatherStatus === "LIVE" ? "#58FFE1" : "#FFD36B"
-                font.family: root.monoFont
-                font.pixelSize: 11
-                font.weight: Font.Bold
-                font.letterSpacing: 0
-                horizontalAlignment: Text.AlignHCenter
-                elide: Text.ElideRight
-            }
-        }
-
-        MouseArea {
-            anchors.fill: parent
-            onClicked: root.expandedMode = root.expandedMode === "temp" ? "" : "temp"
-        }
+        theme: root.theme
+        corner: "topLeft"
+        effectLevel: root.effectLevel
+        bleedFraction: root.podBleedFraction
+        live: root.weatherStatus === "LIVE"
+        tempText: root.formatTemp(root.displayTempC)
+        locationText: root.weatherCompactLabel()
+        conditionKind: root.weatherKind(root.currentConditionLabel())
+        conditionText: root.weatherStatus
+        onClicked: root.expandedMode = root.expandedMode === "temp" ? "" : "temp"
     }
 
-    Item {
-        id: radarPanel
+    WidgetLocal.RadarCornerWidget {
+        id: radarCorner
         width: root.podSize
         height: root.podSize
         anchors.right: parent.right
         anchors.top: parent.top
         anchors.rightMargin: root.cornerInset
         anchors.topMargin: root.cornerInset
-
-        CornerCircleShell {
-            anchors.fill: parent
-            corner: "topRight"
-            bleedFraction: root.podBleedFraction
-            effectLevel: root.effectLevel
-            accentColor: root.radarStatus === "LIVE" ? "#58FFE1" : "#3C325E"
-            secondaryAccentColor: "#C568FF"
-            active: root.radarStatus === "LIVE"
-        }
-
-        Rectangle {
-            id: radarPreviewMask
-            anchors.fill: parent
-            anchors.margins: root.podFaceInset
-            radius: width / 2
-            color: "#010307"
-
-            RasterFrameItem {
-                id: radarPreviewFrame
-                anchors.fill: parent
-                source: root.radarFrameUrl
-                circular: true
-                visible: ready
-            }
-
-            Rectangle {
-                anchors.fill: parent
-                radius: width / 2
-                color: "#060712"
-                opacity: radarPreviewFrame.ready ? 0.0 : 0.18
-            }
-
-        }
-
-        Rectangle {
-            width: Math.min(parent.width * 0.72, 92)
-            height: 20
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.bottom: parent.bottom
-            anchors.bottomMargin: root.cornerBleed + 10
-            radius: 4
-            color: Qt.rgba(2 / 255, 5 / 255, 12 / 255, 0.68)
-            border.width: 1
-            border.color: Qt.rgba(88 / 255, 255 / 255, 225 / 255, 0.24)
-            visible: radarPreviewFrame.ready
-
-            Text {
-                anchors.fill: parent
-                anchors.leftMargin: 5
-                anchors.rightMargin: 5
-                text: root.radarFrameDisplayLabel()
-                color: "#F7FBFF"
-                font.family: root.monoFont
-                font.pixelSize: 9
-                font.weight: Font.Bold
-                font.letterSpacing: 0
-                horizontalAlignment: Text.AlignHCenter
-                verticalAlignment: Text.AlignVCenter
-                elide: Text.ElideRight
-            }
-        }
-
-        Column {
-            anchors.centerIn: parent
-            spacing: 1
-            visible: !radarPreviewFrame.ready
-
-            OemIcon {
-                anchors.horizontalCenter: parent.horizontalCenter
-                width: root.podIconSize
-                height: width
-                icon: "radar"
-                color: "#58FFE1"
-                accentColor: "#F7FBFF"
-                strokeWidth: Math.max(3, root.podSize * 0.035)
-            }
-
-            Text {
-                width: root.podLabelWidth
-                anchors.horizontalCenter: parent.horizontalCenter
-                text: root.radarCompactLabel()
-                color: "#F7FBFF"
-                font.family: root.displayFont
-                font.pixelSize: 20
-                font.weight: Font.Bold
-                font.letterSpacing: 0
-                horizontalAlignment: Text.AlignHCenter
-                elide: Text.ElideRight
-            }
-
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                text: root.radarFrameDisplayLabel()
-                color: "#9DB4FF"
-                font.family: root.monoFont
-                font.pixelSize: 10
-                font.weight: Font.Bold
-                font.letterSpacing: 0
-            }
-        }
-
-        Column {
-            width: parent.width * 0.68
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.top: parent.top
-            anchors.topMargin: root.cornerBleed + 10
-            spacing: 0
-            visible: !radarPreviewFrame.ready
-
-            Text {
-                width: parent.width
-                text: "RADAR"
-                color: "#58FFE1"
-                font.family: root.monoFont
-                font.pixelSize: 10
-                font.weight: Font.Bold
-                font.letterSpacing: 0
-                horizontalAlignment: Text.AlignHCenter
-            }
-
-            Text {
-                width: parent.width
-                text: root.radarStatus === "LIVE" ? root.radarFrameDisplayLabel() : root.radarStatus
-                color: root.radarStatus === "LIVE" ? "#F7FBFF" : "#FFD36B"
-                font.family: root.monoFont
-                font.pixelSize: 10
-                font.weight: Font.Bold
-                font.letterSpacing: 0
-                horizontalAlignment: Text.AlignHCenter
-                elide: Text.ElideRight
-            }
-        }
-
-        MouseArea {
-            anchors.fill: parent
-            onClicked: root.expandedMode = root.expandedMode === "radar" ? "" : "radar"
-        }
+        theme: root.theme
+        corner: "topRight"
+        effectLevel: root.effectLevel
+        bleedFraction: root.podBleedFraction
+        frameUrl: root.radarFrameUrl
+        status: root.radarStatus
+        frameLabel: root.radarFrameDisplayLabel()
+        onClicked: root.expandedMode = root.expandedMode === "radar" ? "" : "radar"
     }
 
-    Item {
-        id: musicPanel
+    MediaCornerWidget {
+        id: mediaCorner
         width: root.podSize
         height: root.podSize
         anchors.left: parent.left
         anchors.bottom: parent.bottom
         anchors.leftMargin: root.cornerInset
         anchors.bottomMargin: root.cornerInset
-
-        CornerCircleShell {
-            anchors.fill: parent
-            corner: "bottomLeft"
-            bleedFraction: root.podBleedFraction
-            effectLevel: root.effectLevel
-            accentColor: root.musicPlaying ? "#58FFE1" : "#C568FF"
-            secondaryAccentColor: "#C568FF"
-            active: root.musicAvailable
-        }
-
-        Column {
-            width: root.podLabelWidth
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.verticalCenter: parent.verticalCenter
-            anchors.verticalCenterOffset: 2
-            spacing: 3
-
-            OemIcon {
-                anchors.horizontalCenter: parent.horizontalCenter
-                width: root.podIconSize
-                height: width
-                icon: "audio"
-                active: root.musicPlaying
-                color: "#F7FBFF"
-                accentColor: "#58FFE1"
-                strokeWidth: Math.max(3, root.podSize * 0.034)
-            }
-
-            Text {
-                width: parent.width
-                text: root.musicPrimaryLine()
-                color: root.musicAvailable ? "#F7FBFF" : "#9DB4FF"
-                font.family: root.displayFont
-                font.pixelSize: 14
-                font.weight: Font.Bold
-                font.letterSpacing: 0
-                horizontalAlignment: Text.AlignHCenter
-                elide: Text.ElideRight
-                maximumLineCount: 1
-            }
-
-            Text {
-                width: parent.width
-                text: root.musicSecondaryLine()
-                color: root.musicPlaying ? "#58FFE1" : "#C568FF"
-                font.family: root.monoFont
-                font.pixelSize: 9
-                font.weight: Font.Bold
-                font.letterSpacing: 0
-                horizontalAlignment: Text.AlignHCenter
-                elide: Text.ElideRight
-                maximumLineCount: 1
-            }
-        }
-
-        MouseArea {
-            anchors.fill: parent
-            onClicked: root.expandedMode = root.expandedMode === "music" ? "" : "music"
-        }
+        theme: root.theme
+        corner: "bottomLeft"
+        effectLevel: root.effectLevel
+        bleedFraction: root.podBleedFraction
+        available: root.musicAvailable
+        playing: root.musicPlaying
+        primaryText: root.musicPrimaryLine()
+        secondaryText: root.musicSecondaryLine()
+        onClicked: root.expandedMode = root.expandedMode === "music" ? "" : "music"
     }
 
-    Item {
-        id: mapPanel
+    MapMenuCornerWidget {
+        id: mapMenuCorner
         width: root.podSize
         height: root.podSize
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         anchors.rightMargin: root.cornerInset
         anchors.bottomMargin: root.cornerInset
-
-        CornerCircleShell {
-            anchors.fill: parent
-            corner: "bottomRight"
-            bleedFraction: root.podBleedFraction
-            effectLevel: root.effectLevel
-            accentColor: "#58FFE1"
-            secondaryAccentColor: "#C568FF"
-            active: true
-        }
-
-        Column {
-            width: root.podLabelWidth
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.verticalCenter: parent.verticalCenter
-            anchors.verticalCenterOffset: -2
-            spacing: 4
-
-            OemIcon {
-                width: Math.round(root.podIconSize * 1.26)
-                height: Math.round(root.podIconSize * 1.10)
-                anchors.horizontalCenter: parent.horizontalCenter
-                icon: "menu"
-                color: "#F7FBFF"
-                accentColor: "#58FFE1"
-                strokeWidth: Math.max(5, root.podSize * 0.055)
-            }
-
-            Text {
-                width: parent.width
-                text: "MENU"
-                color: "#F7FBFF"
-                font.family: root.monoFont
-                font.pixelSize: 12
-                font.weight: Font.Bold
-                font.letterSpacing: 0
-                horizontalAlignment: Text.AlignHCenter
-            }
-        }
-
-        MouseArea {
-            anchors.fill: parent
-            onClicked: {
-                root.expandedMode = ""
-                root.mapMenuRequested()
-            }
+        theme: root.theme
+        corner: "bottomRight"
+        effectLevel: root.effectLevel
+        bleedFraction: root.podBleedFraction
+        onClicked: {
+            root.expandedMode = ""
+            root.mapMenuRequested()
         }
     }
 
@@ -1296,6 +1028,7 @@ Item {
                 : root.tallDetailMode
                 ? "#58FFE1"
                 : (root.expandedMode === "music" ? "#58FFE1" : "#5C4B90")
+            clip: true
 
             MouseArea {
                 anchors.fill: parent
@@ -1836,14 +1569,18 @@ Item {
                         color: Qt.rgba(0.018, 0.020, 0.030, 0.94)
                         border.width: 1
                         border.color: Qt.rgba(0.36, 1.0, 0.88, 0.28)
+                        clip: true
 
-                        RasterFrameItem {
+                        Image {
                             id: detailRadarFrame
                             anchors.fill: parent
                             anchors.margins: 8
                             source: root.expandedMode === "radar" ? root.radarFrameUrl : ""
-                            circular: false
-                            visible: ready
+                            fillMode: Image.PreserveAspectCrop
+                            asynchronous: false
+                            cache: false
+                            smooth: true
+                            visible: status === Image.Ready
                         }
 
                         Rectangle {
@@ -1851,21 +1588,20 @@ Item {
                             anchors.margins: 8
                             radius: 5
                             color: "#080913"
-                            opacity: detailRadarFrame.ready ? 0.0 : 1.0
+                            opacity: detailRadarFrame.status === Image.Ready ? 0.0 : 1.0
 
                             Column {
                                 anchors.centerIn: parent
                                 spacing: 10
-                                visible: !detailRadarFrame.ready
+                                visible: detailRadarFrame.status !== Image.Ready
 
-                                OemIcon {
+                                WidgetLocal.RadarGlyph {
                                     width: 78
                                     height: 78
                                     anchors.horizontalCenter: parent.horizontalCenter
-                                    icon: "radar"
-                                    color: "#F7FBFF"
+                                    primaryColor: "#F7FBFF"
                                     accentColor: "#58FFE1"
-                                    strokeWidth: 5.0
+                                    active: root.radarStatus === "LIVE"
                                 }
 
                                 Text {
@@ -1883,7 +1619,7 @@ Item {
                                 Text {
                                     width: Math.min(320, detailRadarFrame.width * 0.70)
                                     anchors.horizontalCenter: parent.horizontalCenter
-                                    text: root.radarStatus
+                                    text: root.radarStatus === "LIVE" ? "RADAR LOADING" : root.radarStatus
                                     color: root.radarStatus === "LIVE" ? "#58FFE1" : "#FFD36B"
                                     font.family: root.monoFont
                                     font.pixelSize: 13

@@ -55,9 +55,57 @@ Item {
     onBleedFractionChanged: faceCanvas.requestPaint()
     Component.onCompleted: faceCanvas.requestPaint()
 
+    Item {
+        id: embeddedShell
+        anchors.fill: parent
+        visible: root.embeddedSafeMode
+
+        readonly property real side: Math.min(width, height)
+        readonly property real outerMargin: Math.max(1.5, side * 0.012)
+        readonly property real rimMargin: Math.max(4, side * 0.034)
+        readonly property real innerMargin: root.faceInset
+
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: embeddedShell.outerMargin
+            radius: width / 2
+            color: "#020409"
+            border.width: Math.max(2, embeddedShell.side * 0.018)
+            border.color: Qt.rgba(0.0, 0.0, 0.0, 0.96)
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: embeddedShell.rimMargin
+            radius: width / 2
+            color: "transparent"
+            border.width: Math.max(3, embeddedShell.side * 0.030)
+            border.color: Qt.rgba(0.80, 0.84, 0.94, root.active ? 0.18 : 0.12)
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: embeddedShell.innerMargin
+            radius: width / 2
+            color: "#010308"
+            border.width: Math.max(2, embeddedShell.side * 0.016)
+            border.color: Qt.rgba(0.0, 0.0, 0.0, 0.88)
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: Math.max(2, embeddedShell.side * 0.018)
+            radius: width / 2
+            color: "transparent"
+            border.width: 1
+            border.color: Qt.rgba(0.86, 0.90, 0.98, root.active ? 0.24 : 0.16)
+        }
+    }
+
     Canvas {
         id: faceCanvas
         anchors.fill: parent
+        visible: !root.embeddedSafeMode
         renderTarget: root.embeddedSafeMode ? Canvas.Image : Canvas.FramebufferObject
         antialiasing: true
         smooth: true

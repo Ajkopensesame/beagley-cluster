@@ -1,6 +1,5 @@
 QT_QPA_PLATFORM=eglfs
 QT_QPA_EGLFS_INTEGRATION=eglfs_kms
-QSG_RENDER_LOOP=basic
 BEAGLEY_UI_VARIANT=embedded
 BEAGLEY_RENDER_PROFILE=embedded
 BEAGLEY_EFFECT_LEVEL=low
@@ -11,6 +10,18 @@ BEAGLEY_MAP_RENDERER=native-online
 #   PACKAGECONFIG:append:pn-beagley-cluster = " maplibre-native"
 # MapLibre Native requires OpenGL scene graph rendering.
 #   QSG_RHI_BACKEND=opengl
+# Safe compositor is the production default on BeagleY. Full underlay can let
+# MapLibre leak through QML widgets on the EGLFS display and should only be
+# enabled for deliberate renderer testing.
+BEAGLEY_MAPLIBRE_NATIVE_FULL_UNDERLAY=0
+# Keep MapLibre from blanking the cluster with untested production styles.
+# Set to 1 only for deliberate renderer/style compatibility testing.
+BEAGLEY_MAPLIBRE_NATIVE_ALLOW_UNTESTED_STYLES=0
+# Production MapLibre styles must be promoted by the real-display probe before
+# adding them to this allowlist. Leave blank to use the built-in demo baseline.
+# BEAGLEY_MAPLIBRE_NATIVE_STYLE_URL=https://tiles.openfreemap.org/styles/positron
+# BEAGLEY_MAPLIBRE_NATIVE_TRUSTED_STYLES=https://tiles.openfreemap.org/styles/positron
+# BEAGLEY_MAPLIBRE_NATIVE_MAX_ZOOM=14
 BEAGLEY_MAP_BOOT_MODE=staged
 BEAGLEY_MAP_STYLE_MODE=embedded
 BEAGLEY_REQUIRE_GPU_GATE=1

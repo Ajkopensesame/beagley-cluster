@@ -136,6 +136,12 @@ set(BEAGLEY_QML_FILES
     # Widgets
     src/ui/widgets/OemIcon.qml
     src/ui/widgets/CornerCircleShell.qml
+    src/ui/widgets/CornerPodFrame.qml
+    src/ui/widgets/WeatherCornerWidget.qml
+    src/ui/widgets/RadarCornerWidget.qml
+    src/ui/widgets/RadarGlyph.qml
+    src/ui/widgets/MediaCornerWidget.qml
+    src/ui/widgets/MapMenuCornerWidget.qml
     src/ui/widgets/SpeedGauge.qml
     src/ui/widgets/DialChrome.qml
     src/ui/widgets/GaugeLensShell.qml
@@ -148,7 +154,10 @@ set(BEAGLEY_QML_FILES
     src/ui/widgets/MapCenter.qml
     src/ui/widgets/MapCenterBootShell.qml
     src/ui/widgets/MapCenterMapLibreNative.qml
+    src/ui/widgets/MapLibreGaugeBackplate.qml
+    src/ui/widgets/MapVehicleMarker.qml
     src/ui/widgets/WeatherCorners.qml
+    src/ui/widgets/WeatherMoodIcon.qml
     src/ui/widgets/BomCatalog.js
     src/ui/widgets/HighBeamHalo.qml
     src/ui/widgets/WiFiSetupOverlay.qml
@@ -171,6 +180,18 @@ if(WITH_MAPLIBRE_NATIVE)
         src/ui/widgets/MapCenterMapLibreNativeImpl.qml
     )
 endif()
+
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/widgets/qmldir" BEAGLEY_WIDGET_QMLDIR)
+string(REGEX MATCHALL "(^|\n)[A-Za-z_][A-Za-z0-9_]*[ \t]+[0-9]+\\.[0-9]+[ \t]+[A-Za-z0-9_./-]+\\.qml" BEAGLEY_WIDGET_QMLDIR_ENTRIES "${BEAGLEY_WIDGET_QMLDIR}")
+foreach(_entry IN LISTS BEAGLEY_WIDGET_QMLDIR_ENTRIES)
+    string(REGEX REPLACE "^[\r\n]*[A-Za-z_][A-Za-z0-9_]*[ \t]+[0-9]+\\.[0-9]+[ \t]+" "" _qml_file "${_entry}")
+    string(STRIP "${_qml_file}" _qml_file)
+    set(_qml_path "src/ui/widgets/${_qml_file}")
+    list(FIND BEAGLEY_QML_FILES "${_qml_path}" _qml_index)
+    if(_qml_index EQUAL -1)
+        message(FATAL_ERROR "QML dev/prod mismatch: ${_qml_path} is listed in src/ui/widgets/qmldir but is missing from BEAGLEY_QML_FILES")
+    endif()
+endforeach()
 
 qt_add_qml_module(beagley_cluster
     URI BeagleY

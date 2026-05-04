@@ -5,6 +5,11 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 HOST="${BEAGLEY_HOST:-root@beagley-ai.local}"
 HUB_URL="${VEHICLE_HUB_WS_URL:-ws://10.24.0.7:8765}"
 EFFECT_LEVEL="${BEAGLEY_EFFECT_LEVEL:-high}"
+MAP_RENDERER="${BEAGLEY_MAP_RENDERER:-maplibre-native}"
+MAPLIBRE_STYLE_URL="${BEAGLEY_MAPLIBRE_NATIVE_STYLE_URL:-https://tiles.openfreemap.org/styles/positron}"
+MAPLIBRE_TRUSTED_STYLES="${BEAGLEY_MAPLIBRE_NATIVE_TRUSTED_STYLES:-$MAPLIBRE_STYLE_URL}"
+MAPLIBRE_FULL_UNDERLAY="${BEAGLEY_MAPLIBRE_NATIVE_FULL_UNDERLAY:-0}"
+MAPLIBRE_MAX_ZOOM="${BEAGLEY_MAPLIBRE_NATIVE_MAX_ZOOM:-14.0}"
 METRICS=0
 RESTART=1
 HEALTH=1
@@ -16,7 +21,7 @@ Usage:
 
 Puts the BeagleY into the live production-like UI path:
 - V3 shell on the real BeagleY display
-- native-online maps
+- MapLibre Native maps in the safe compositor path
 - live BBB vehicle_state hub
 - no BeagleY app replay file
 - no BeagleY stress scene
@@ -29,6 +34,13 @@ Options:
   --host HOST             SSH target. Default: root@beagley-ai.local
   --hub-url URL           Vehicle hub URL. Default: ws://10.24.0.7:8765
   --effect-level LEVEL    off, low, or high. Default: high
+  --map-renderer MODE     maplibre-native or native-online. Default: maplibre-native
+  --maplibre-style-url URL
+                          Trusted MapLibre style. Default: OpenFreeMap Positron
+  --maplibre-full-underlay
+                          Let MapLibre draw under the full cluster shell.
+                          Experimental; unsafe on the BeagleY EGLFS display.
+  --maplibre-max-zoom Z   Max MapLibre zoom. Default: 14.0
   --metrics               Enable BeagleY perf metrics.
   --no-restart            Write env without restarting.
   --no-health             Skip post-restart health check.
@@ -48,6 +60,23 @@ while [[ $# -gt 0 ]]; do
       ;;
     --effect-level)
       EFFECT_LEVEL="${2:-}"
+      shift 2
+      ;;
+    --map-renderer)
+      MAP_RENDERER="${2:-}"
+      shift 2
+      ;;
+    --maplibre-style-url)
+      MAPLIBRE_STYLE_URL="${2:-}"
+      MAPLIBRE_TRUSTED_STYLES="$MAPLIBRE_STYLE_URL"
+      shift 2
+      ;;
+    --maplibre-full-underlay)
+      MAPLIBRE_FULL_UNDERLAY=1
+      shift
+      ;;
+    --maplibre-max-zoom)
+      MAPLIBRE_MAX_ZOOM="${2:-}"
       shift 2
       ;;
     --metrics)
@@ -74,7 +103,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-for value in "$HOST" "$HUB_URL" "$EFFECT_LEVEL"; do
+for value in "$HOST" "$HUB_URL" "$EFFECT_LEVEL" "$MAP_RENDERER" "$MAPLIBRE_STYLE_URL" "$MAPLIBRE_TRUSTED_STYLES" "$MAPLIBRE_FULL_UNDERLAY" "$MAPLIBRE_MAX_ZOOM"; do
   if [[ "$value" == *"'"* ]]; then
     echo "[beagley-live] values may not contain single quotes: $value" >&2
     exit 2
@@ -106,14 +135,18 @@ BEAGLEY_REQUIRE_TOUCH_GATE=0
 BEAGLEY_UI_VARIANT=v3
 BEAGLEY_RENDER_PROFILE=embedded
 BEAGLEY_EFFECT_LEVEL=$EFFECT_LEVEL
-BEAGLEY_MAP_RENDERER=native-online
+BEAGLEY_MAP_RENDERER=$MAP_RENDERER
 BEAGLEY_MAP_BOOT_MODE=staged
 BEAGLEY_MAP_STYLE_MODE=embedded
 BEAGLEY_PROFILE_METRICS=$METRICS
 BEAGLEY_REPLAY_LOOP=0
 BEAGLEY_STRESS_SCENE=0
-QSG_RENDER_LOOP=basic
 VEHICLE_HUB_WS_URL=$HUB_URL
+BEAGLEY_MAPLIBRE_NATIVE_STYLE_URL=$MAPLIBRE_STYLE_URL
+BEAGLEY_MAPLIBRE_NATIVE_TRUSTED_STYLES=$MAPLIBRE_TRUSTED_STYLES
+BEAGLEY_MAPLIBRE_NATIVE_ALLOW_UNTESTED_STYLES=0
+BEAGLEY_MAPLIBRE_NATIVE_FULL_UNDERLAY=$MAPLIBRE_FULL_UNDERLAY
+BEAGLEY_MAPLIBRE_NATIVE_MAX_ZOOM=$MAPLIBRE_MAX_ZOOM
 REMOTE_ENV
     chmod 0644 /etc/default/beagley-cluster.local
     rm -rf /root/.cache/Beagley/BeagleyCluster/qmlcache
