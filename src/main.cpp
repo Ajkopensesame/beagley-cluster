@@ -37,6 +37,22 @@
 #include <QtWebEngineQuick/QtWebEngineQuick>
 #endif
 
+#ifndef BEAGLEY_BUILD_SOURCE_PATH
+#define BEAGLEY_BUILD_SOURCE_PATH "unknown"
+#endif
+#ifndef BEAGLEY_BUILD_GIT_BRANCH
+#define BEAGLEY_BUILD_GIT_BRANCH "unknown"
+#endif
+#ifndef BEAGLEY_BUILD_GIT_COMMIT
+#define BEAGLEY_BUILD_GIT_COMMIT "unknown"
+#endif
+#ifndef BEAGLEY_BUILD_GIT_DIRTY
+#define BEAGLEY_BUILD_GIT_DIRTY "unknown"
+#endif
+#ifndef BEAGLEY_BUILD_TIMESTAMP_UTC
+#define BEAGLEY_BUILD_TIMESTAMP_UTC "unknown"
+#endif
+
 class BeagleyNetworkAccessManager final : public QNetworkAccessManager
 {
 public:
@@ -292,12 +308,38 @@ int main(int argc, char *argv[])
 #else
     const bool mapLibreNativeAvailable = false;
 #endif
-
-    if (mapRenderer == QLatin1String("maplibre-native")
-        && !qEnvironmentVariableIsSet("QSG_RHI_BACKEND")) {
-        qputenv("QSG_RHI_BACKEND", QByteArrayLiteral("opengl"));
+    const bool mapLibreNativeFullUnderlay =
+        qEnvironmentVariableIsSet("BEAGLEY_MAPLIBRE_NATIVE_FULL_UNDERLAY") &&
+        qEnvironmentVariableIntValue("BEAGLEY_MAPLIBRE_NATIVE_FULL_UNDERLAY") != 0;
+    const bool mapLibreNativeAllowUntestedStyles =
+        qEnvironmentVariableIsSet("BEAGLEY_MAPLIBRE_NATIVE_ALLOW_UNTESTED_STYLES") &&
+        qEnvironmentVariableIntValue("BEAGLEY_MAPLIBRE_NATIVE_ALLOW_UNTESTED_STYLES") != 0;
+    const QString mapLibreNativeStyleUrl = qEnvironmentVariableIsSet("BEAGLEY_MAPLIBRE_NATIVE_STYLE_URL")
+        ? QString::fromUtf8(qgetenv("BEAGLEY_MAPLIBRE_NATIVE_STYLE_URL")).trimmed()
+        : QString();
+    const QString mapLibreNativeTrustedStyles =
+        qEnvironmentVariableIsSet("BEAGLEY_MAPLIBRE_NATIVE_TRUSTED_STYLES")
+            ? QString::fromUtf8(qgetenv("BEAGLEY_MAPLIBRE_NATIVE_TRUSTED_STYLES")).trimmed()
+            : QString();
+    double mapLibreNativeMaxZoom = 14.0;
+    if (qEnvironmentVariableIsSet("BEAGLEY_MAPLIBRE_NATIVE_MAX_ZOOM")) {
+        bool ok = false;
+        const double configuredMaxZoom =
+            QString::fromUtf8(qgetenv("BEAGLEY_MAPLIBRE_NATIVE_MAX_ZOOM")).trimmed().toDouble(&ok);
+        if (ok && configuredMaxZoom >= 1.0 && configuredMaxZoom <= 22.0) {
+            mapLibreNativeMaxZoom = configuredMaxZoom;
+        }
     }
-    if (renderProfile == QLatin1String("embedded") && !qEnvironmentVariableIsSet("QSG_RENDER_LOOP")) {
+
+    if (mapRenderer == QLatin1String("maplibre-native")) {
+        QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGLRhi);
+        if (!qEnvironmentVariableIsSet("QSG_RHI_BACKEND")) {
+            qputenv("QSG_RHI_BACKEND", QByteArrayLiteral("opengl"));
+        }
+        if (!qEnvironmentVariableIsSet("QSG_RENDER_LOOP")) {
+            qputenv("QSG_RENDER_LOOP", QByteArrayLiteral("basic"));
+        }
+    } else if (renderProfile == QLatin1String("embedded") && !qEnvironmentVariableIsSet("QSG_RENDER_LOOP")) {
         qputenv("QSG_RENDER_LOOP", QByteArrayLiteral("threaded"));
     }
     qputenv("BEAGLEY_RENDER_PROFILE", renderProfile.toUtf8());
@@ -370,9 +412,22 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("BEAGLEY_MAP_BOOT_MODE", mapBootMode);
     engine.rootContext()->setContextProperty("BEAGLEY_MAP_STYLE_MODE", mapStyleMode);
     engine.rootContext()->setContextProperty("BEAGLEY_MAPLIBRE_NATIVE_AVAILABLE", mapLibreNativeAvailable);
+    engine.rootContext()->setContextProperty("BEAGLEY_MAPLIBRE_NATIVE_FULL_UNDERLAY",
+                                             mapLibreNativeFullUnderlay);
+    engine.rootContext()->setContextProperty("BEAGLEY_MAPLIBRE_NATIVE_ALLOW_UNTESTED_STYLES",
+                                             mapLibreNativeAllowUntestedStyles);
+    engine.rootContext()->setContextProperty("BEAGLEY_MAPLIBRE_NATIVE_STYLE_URL",
+                                             mapLibreNativeStyleUrl);
+    engine.rootContext()->setContextProperty("BEAGLEY_MAPLIBRE_NATIVE_TRUSTED_STYLES",
+                                             mapLibreNativeTrustedStyles);
+    engine.rootContext()->setContextProperty("BEAGLEY_MAPLIBRE_NATIVE_MAX_ZOOM",
+                                             mapLibreNativeMaxZoom);
     engine.rootContext()->setContextProperty("BEAGLEY_RENDER_PROFILE", renderProfile);
     engine.rootContext()->setContextProperty("BEAGLEY_EFFECT_LEVEL", effectLevel);
     engine.rootContext()->setContextProperty("BEAGLEY_MAP_RENDERER", mapRenderer);
+    engine.rootContext()->setContextProperty(
+        "BEAGLEY_INITIAL_WEATHER_EXPANDED_MODE",
+        QString::fromUtf8(qgetenv("BEAGLEY_INITIAL_WEATHER_EXPANDED_MODE")).trimmed());
     engine.rootContext()->setContextProperty(
         "BEAGLEY_WEBENGINE_SOFTWARE",
         qEnvironmentVariableIsSet("BEAGLEY_WEBENGINE_SOFTWARE")
@@ -381,6 +436,12 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("BEAGLEY_PROFILE_METRICS", perfMetricsEnabled);
     PerformanceMetrics perfMetrics(perfMetricsEnabled);
     engine.rootContext()->setContextProperty("performanceMetrics", &perfMetrics);
+    qInfo().noquote() << QStringLiteral("[BUILD] source=%1 branch=%2 commit=%3 dirty=%4 built=%5")
+                             .arg(QString::fromLatin1(BEAGLEY_BUILD_SOURCE_PATH),
+                                  QString::fromLatin1(BEAGLEY_BUILD_GIT_BRANCH),
+                                  QString::fromLatin1(BEAGLEY_BUILD_GIT_COMMIT),
+                                  QString::fromLatin1(BEAGLEY_BUILD_GIT_DIRTY),
+                                  QString::fromLatin1(BEAGLEY_BUILD_TIMESTAMP_UTC));
     qInfo() << "[BOOT] uiVariant env =" << qgetenv("BEAGLEY_UI_VARIANT")
             << "hubUrl =" << qgetenv("VEHICLE_HUB_WS_URL")
             << "mapStyle =" << mapStyleUrl
@@ -392,6 +453,9 @@ int main(int argc, char *argv[])
             << "effectLevel =" << effectLevel
             << "mapRenderer =" << mapRenderer
             << "mapLibreNativeAvailable =" << mapLibreNativeAvailable
+            << "mapLibreNativeAllowUntestedStyles =" << mapLibreNativeAllowUntestedStyles
+            << "mapLibreNativeStyleUrl =" << mapLibreNativeStyleUrl
+            << "mapLibreNativeMaxZoom =" << mapLibreNativeMaxZoom
             << "mapBootMode =" << mapBootMode
             << "mapStyleMode =" << mapStyleMode
             << "webEngineMode =" << normalizedSetting(qgetenv("BEAGLEY_WEBENGINE_MODE"),

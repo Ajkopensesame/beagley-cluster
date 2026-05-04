@@ -2,6 +2,38 @@ cmake_minimum_required(VERSION 3.21)
 
 project(beagley_cluster LANGUAGES CXX)
 
+execute_process(
+    COMMAND git -C "${CMAKE_SOURCE_DIR}" rev-parse --short=12 HEAD
+    OUTPUT_VARIABLE BEAGLEY_BUILD_GIT_COMMIT
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET
+)
+execute_process(
+    COMMAND git -C "${CMAKE_SOURCE_DIR}" rev-parse --abbrev-ref HEAD
+    OUTPUT_VARIABLE BEAGLEY_BUILD_GIT_BRANCH
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET
+)
+execute_process(
+    COMMAND git -C "${CMAKE_SOURCE_DIR}" status --porcelain
+    OUTPUT_VARIABLE BEAGLEY_BUILD_GIT_STATUS
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET
+)
+if(NOT BEAGLEY_BUILD_GIT_COMMIT)
+    set(BEAGLEY_BUILD_GIT_COMMIT "unknown")
+endif()
+if(NOT BEAGLEY_BUILD_GIT_BRANCH)
+    set(BEAGLEY_BUILD_GIT_BRANCH "unknown")
+endif()
+if(BEAGLEY_BUILD_GIT_STATUS)
+    set(BEAGLEY_BUILD_GIT_DIRTY "dirty")
+else()
+    set(BEAGLEY_BUILD_GIT_DIRTY "clean")
+endif()
+string(TIMESTAMP BEAGLEY_BUILD_TIMESTAMP_UTC "%Y-%m-%dT%H:%M:%SZ" UTC)
+message(STATUS "Beagley build identity: source=${CMAKE_SOURCE_DIR} branch=${BEAGLEY_BUILD_GIT_BRANCH} commit=${BEAGLEY_BUILD_GIT_COMMIT} dirty=${BEAGLEY_BUILD_GIT_DIRTY}")
+
 # --------------------
 # C++ configuration
 # --------------------
@@ -64,6 +96,14 @@ qt_add_executable(beagley_cluster
     src/system/WiFiHotspotProfiles.cpp
     src/system/WiFiSetupService.cpp
     src/system/WiFiSsidUtils.cpp
+)
+
+target_compile_definitions(beagley_cluster PRIVATE
+    "BEAGLEY_BUILD_SOURCE_PATH=\"${CMAKE_SOURCE_DIR}\""
+    "BEAGLEY_BUILD_GIT_BRANCH=\"${BEAGLEY_BUILD_GIT_BRANCH}\""
+    "BEAGLEY_BUILD_GIT_COMMIT=\"${BEAGLEY_BUILD_GIT_COMMIT}\""
+    "BEAGLEY_BUILD_GIT_DIRTY=\"${BEAGLEY_BUILD_GIT_DIRTY}\""
+    "BEAGLEY_BUILD_TIMESTAMP_UTC=\"${BEAGLEY_BUILD_TIMESTAMP_UTC}\""
 )
 
 # --------------------
