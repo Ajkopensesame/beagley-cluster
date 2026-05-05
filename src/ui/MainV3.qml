@@ -1103,6 +1103,30 @@ Window {
             anchors.verticalCenter: parent.verticalCenter
             anchors.leftMargin: root.gaugeEdgeBleed
 
+            Rectangle {
+                anchors.centerIn: parent
+                width: root.gaugeFaceSize
+                height: root.gaugeFaceSize
+                radius: width / 2
+                color: "#02040A"
+                border.width: 2
+                border.color: Qt.rgba(0.86, 0.90, 0.98, 0.13)
+                antialiasing: true
+                z: -20
+            }
+
+            Rectangle {
+                anchors.centerIn: parent
+                width: root.gaugeFaceSize + 24
+                height: root.gaugeFaceSize + 24
+                radius: width / 2
+                color: "transparent"
+                border.width: 14
+                border.color: Qt.rgba(0.0, 0.0, 0.0, 0.62)
+                antialiasing: true
+                z: -19
+            }
+
             Canvas {
                 anchors.fill: parent
                 visible: !root.lowEffectMode
@@ -1254,6 +1278,30 @@ Window {
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             anchors.rightMargin: root.gaugeEdgeBleed
+
+            Rectangle {
+                anchors.centerIn: parent
+                width: root.gaugeFaceSize
+                height: root.gaugeFaceSize
+                radius: width / 2
+                color: "#02040A"
+                border.width: 2
+                border.color: Qt.rgba(0.86, 0.90, 0.98, 0.13)
+                antialiasing: true
+                z: -20
+            }
+
+            Rectangle {
+                anchors.centerIn: parent
+                width: root.gaugeFaceSize + 24
+                height: root.gaugeFaceSize + 24
+                radius: width / 2
+                color: "transparent"
+                border.width: 14
+                border.color: Qt.rgba(0.0, 0.0, 0.0, 0.62)
+                antialiasing: true
+                z: -19
+            }
 
             Canvas {
                 anchors.fill: parent

@@ -1,4 +1,5 @@
 import QtQuick 2.15
+import QtQuick.Shapes 1.15
 
 Item {
     id: root
@@ -49,6 +50,7 @@ Item {
         ? ((7.0 * root.lowEffectArcTune) / root.lowEffectArcScale)
         : 11.5
     readonly property bool headVisible: root.clampedProgress > 0.002
+    readonly property color labelColor: (theme && theme.text) ? theme.text : Qt.color("#FFFFFF")
     property real lastPaintedProgress: -1.0
 
     function clamp(v, lo, hi) {
@@ -150,10 +152,159 @@ Item {
         }
     }
 
+    Item {
+        id: embeddedVectorDial
+        anchors.fill: parent
+        z: 60
+        visible: root.embeddedSafeMode
+
+        readonly property real cx: width / 2
+        readonly property real cy: height / 2
+        readonly property real tickOuterRadius: width * root.tickOuterFactor
+        readonly property real arcRadius: width * root.arcRadiusFactor
+        readonly property real labelRadius: tickOuterRadius - root.labelInset
+        readonly property real startDeg: root.startAngleDeg - 90
+        readonly property real activeSweepDeg: root.sweepAngleDeg * root.clampedProgress
+
+        Shape {
+            anchors.fill: parent
+            preferredRendererType: Shape.CurveRenderer
+
+            ShapePath {
+                fillColor: "transparent"
+                strokeColor: root.colorWithAlpha(root.chromeColor, root.lowEffectMode ? 0.10 : 0.08)
+                strokeWidth: root.lowEffectMode ? 13 : 18
+                capStyle: ShapePath.RoundCap
+
+                PathAngleArc {
+                    centerX: embeddedVectorDial.cx
+                    centerY: embeddedVectorDial.cy
+                    radiusX: embeddedVectorDial.arcRadius
+                    radiusY: embeddedVectorDial.arcRadius
+                    startAngle: embeddedVectorDial.startDeg
+                    sweepAngle: root.sweepAngleDeg
+                }
+            }
+
+            ShapePath {
+                fillColor: "transparent"
+                strokeColor: root.colorWithAlpha(root.chromeColor, root.lowEffectMode ? 0.28 : 0.32)
+                strokeWidth: root.lowEffectMode ? 5.5 : 7.0
+                capStyle: ShapePath.RoundCap
+
+                PathAngleArc {
+                    centerX: embeddedVectorDial.cx
+                    centerY: embeddedVectorDial.cy
+                    radiusX: embeddedVectorDial.arcRadius
+                    radiusY: embeddedVectorDial.arcRadius
+                    startAngle: embeddedVectorDial.startDeg
+                    sweepAngle: root.sweepAngleDeg
+                }
+            }
+
+            ShapePath {
+                fillColor: "transparent"
+                strokeColor: root.colorWithAlpha(root.blendToward(root.chromeColor, Qt.color("#FFFFFF"), 0.28, 1.0),
+                                                root.lowEffectMode ? 0.10 : 0.13)
+                strokeWidth: root.lowEffectMode ? 1.8 : 2.3
+                capStyle: ShapePath.RoundCap
+
+                PathAngleArc {
+                    centerX: embeddedVectorDial.cx
+                    centerY: embeddedVectorDial.cy
+                    radiusX: embeddedVectorDial.arcRadius
+                    radiusY: embeddedVectorDial.arcRadius
+                    startAngle: embeddedVectorDial.startDeg
+                    sweepAngle: root.sweepAngleDeg
+                }
+            }
+
+            ShapePath {
+                fillColor: "transparent"
+                strokeColor: root.colorWithAlpha(root.gaugeColor, root.lowEffectMode ? 0.80 : 0.88)
+                strokeWidth: root.lowEffectMode ? 7.5 : 11.0
+                capStyle: ShapePath.RoundCap
+
+                PathAngleArc {
+                    centerX: embeddedVectorDial.cx
+                    centerY: embeddedVectorDial.cy
+                    radiusX: embeddedVectorDial.arcRadius
+                    radiusY: embeddedVectorDial.arcRadius
+                    startAngle: embeddedVectorDial.startDeg
+                    sweepAngle: embeddedVectorDial.activeSweepDeg
+                }
+            }
+
+            ShapePath {
+                fillColor: "transparent"
+                strokeColor: root.colorWithAlpha(root.blendToward(root.gaugeColor, Qt.color("#FFFFFF"), 0.34, 1.0),
+                                                root.lowEffectMode ? 0.24 : 0.30)
+                strokeWidth: root.lowEffectMode ? 2.0 : 3.0
+                capStyle: ShapePath.RoundCap
+
+                PathAngleArc {
+                    centerX: embeddedVectorDial.cx
+                    centerY: embeddedVectorDial.cy
+                    radiusX: embeddedVectorDial.arcRadius
+                    radiusY: embeddedVectorDial.arcRadius
+                    startAngle: embeddedVectorDial.startDeg
+                    sweepAngle: embeddedVectorDial.activeSweepDeg
+                }
+            }
+        }
+
+        Repeater {
+            model: Math.floor(root.maxValue / Math.max(1e-6, root.minorStep)) + 1
+
+            Rectangle {
+                readonly property real value: index * root.minorStep
+                readonly property bool major: Math.abs(value % root.majorStep) < 1e-6
+                readonly property real angleRad: ((root.startAngleDeg - 90)
+                    + root.sweepAngleDeg * (value / Math.max(1e-6, root.maxValue))) * Math.PI / 180
+                readonly property real tickLength: major ? root.majorTickLength : root.minorTickLength
+
+                width: major ? root.majorTickWidth : root.minorTickWidth
+                height: tickLength
+                radius: width / 2
+                x: embeddedVectorDial.cx + Math.cos(angleRad) * (embeddedVectorDial.tickOuterRadius - tickLength / 2) - width / 2
+                y: embeddedVectorDial.cy + Math.sin(angleRad) * (embeddedVectorDial.tickOuterRadius - tickLength / 2) - height / 2
+                rotation: angleRad * 180 / Math.PI + 90
+                color: root.colorWithAlpha(root.chromeColor, root.tickAlpha(major))
+                antialiasing: true
+            }
+        }
+
+        Repeater {
+            model: Math.max(0, Math.floor((root.maxValue - root.labelStart) / Math.max(1e-6, root.labelStep)) + 1)
+
+            Text {
+                readonly property real value: root.labelStart + index * root.labelStep
+                readonly property real angleRad: ((root.startAngleDeg - 90)
+                    + root.sweepAngleDeg * (value / Math.max(1e-6, root.maxValue))) * Math.PI / 180
+
+                width: 58
+                height: 30
+                x: embeddedVectorDial.cx + Math.cos(angleRad) * embeddedVectorDial.labelRadius - width / 2
+                y: embeddedVectorDial.cy + Math.sin(angleRad) * embeddedVectorDial.labelRadius - height / 2
+                text: root.labelForValue(value)
+                color: root.labelColor
+                opacity: 0.86
+                font.family: (root.theme && root.theme.fontMono) ? root.theme.fontMono : "monospace"
+                font.pixelSize: root.labelFontSize
+                font.weight: Font.Bold
+                font.letterSpacing: 0
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+                renderType: Text.QtRendering
+            }
+        }
+    }
+
     Canvas {
         id: ticksCanvas
         anchors.fill: parent
         z: 10
+        visible: !root.embeddedSafeMode
         renderTarget: root.embeddedSafeMode ? Canvas.Image : Canvas.FramebufferObject
 
         onPaint: {
@@ -196,6 +347,7 @@ Item {
         id: labelCanvas
         anchors.fill: parent
         z: 30
+        visible: !root.embeddedSafeMode
         renderTarget: root.embeddedSafeMode ? Canvas.Image : Canvas.FramebufferObject
 
         onPaint: {
@@ -235,6 +387,7 @@ Item {
         width: parent.width * root.dynamicArcCanvasScale
         height: parent.height * root.dynamicArcCanvasScale
         z: 20
+        visible: !root.embeddedSafeMode
         scale: root.dynamicArcCanvasScale < 1.0 ? (1.0 / root.dynamicArcCanvasScale) : 1.0
         renderTarget: root.embeddedSafeMode ? Canvas.Image : Canvas.FramebufferObject
         antialiasing: !root.lowEffectMode && !root.embeddedSafeMode
