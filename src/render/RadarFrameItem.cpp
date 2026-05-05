@@ -317,8 +317,8 @@ bool sampleRadarGlow(QRgb pixel, QColor &color)
 
 int baseMapStep(const SamplePlan &plan, const QSize &targetSize)
 {
-    const int minimumStep = targetSize.width() >= 480 ? 5 : (targetSize.width() >= 180 ? 6 : 8);
-    return qBound(minimumStep, int(qCeil(plan.sourceToTarget * 2.4)), 12);
+    const int minimumStep = targetSize.width() >= 480 ? 3 : (targetSize.width() >= 180 ? 4 : 6);
+    return qBound(minimumStep, int(qCeil(plan.sourceToTarget * 1.55)), 8);
 }
 
 int radarReturnStep(const SamplePlan &plan, const QSize &targetSize)
@@ -338,8 +338,13 @@ void appendSampleLayer(RadarVectorRoot *root,
                        ColorSampler sampler,
                        const char *label)
 {
-    const qreal sampleWidth = qMax<qreal>(1.0, sampleStep * plan.scaleX * coverage);
-    const qreal sampleHeight = qMax<qreal>(1.0, sampleStep * plan.scaleY * coverage);
+    const QRectF itemBounds(0, 0, targetSize.width(), targetSize.height());
+    const qreal cellWidth = sampleStep * plan.scaleX;
+    const qreal cellHeight = sampleStep * plan.scaleY;
+    const qreal sampleWidth = qMax<qreal>(1.0, cellWidth * coverage);
+    const qreal sampleHeight = qMax<qreal>(1.0, cellHeight * coverage);
+    const qreal insetX = qMax<qreal>(0.0, (sampleWidth - cellWidth) * 0.5);
+    const qreal insetY = qMax<qreal>(0.0, (sampleHeight - cellHeight) * 0.5);
 
     QHash<QRgb, QVector<RadarSample>> samplesByColor;
     int totalSamples = 0;
@@ -359,8 +364,16 @@ void appendSampleLayer(RadarVectorRoot *root,
                     continue;
                 }
             }
+            const QRectF rect = QRectF(itemX - insetX,
+                                       itemY - insetY,
+                                       sampleWidth,
+                                       sampleHeight)
+                                    .intersected(itemBounds);
+            if (rect.isEmpty()) {
+                continue;
+            }
             const QRgb key = quantizedColorKey(color, colorBucket);
-            samplesByColor[key].append(RadarSample{QRectF(itemX, itemY, sampleWidth, sampleHeight)});
+            samplesByColor[key].append(RadarSample{rect});
             ++totalSamples;
         }
     }
@@ -390,7 +403,7 @@ void appendRadarSamples(RadarVectorRoot *root, const QImage &image, const QSize 
                       circular,
                       plan,
                       baseStep,
-                      1.06,
+                      1.22,
                       24,
                       sampleBaseMapColor,
                       "base-map");
@@ -400,7 +413,7 @@ void appendRadarSamples(RadarVectorRoot *root, const QImage &image, const QSize 
                       circular,
                       plan,
                       returnStep,
-                      2.85,
+                      3.10,
                       32,
                       sampleRadarGlow,
                       "radar-glow");
@@ -410,7 +423,7 @@ void appendRadarSamples(RadarVectorRoot *root, const QImage &image, const QSize 
                       circular,
                       plan,
                       returnStep,
-                      1.32,
+                      1.48,
                       16,
                       sampleRadarCore,
                       "radar-core");
