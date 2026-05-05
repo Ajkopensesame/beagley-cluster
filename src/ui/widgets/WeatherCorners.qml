@@ -104,6 +104,7 @@ Item {
     readonly property bool radarServiceAvailable: typeof radarImage !== "undefined" && radarImage !== null
     readonly property bool radarServiceReady: radarServiceAvailable && radarImage.ready && String(radarImage.imageUrl).length > 0
     readonly property url radarFrameUrl: radarServiceReady ? radarImage.imageUrl : ""
+    readonly property bool detailRadarReady: detailRadarImage.status === Image.Ready
 
     opacity: active ? 1 : 0
     visible: opacity > 0.01
@@ -1571,13 +1572,18 @@ Item {
                         border.color: Qt.rgba(0.36, 1.0, 0.88, 0.28)
                         clip: true
 
-                        RasterFrameItem {
-                            id: detailRadarFrame
+                        Image {
+                            id: detailRadarImage
                             anchors.fill: parent
                             anchors.margins: 8
                             source: root.expandedMode === "radar" ? root.radarFrameUrl : ""
-                            circular: false
-                            visible: ready
+                            fillMode: Image.PreserveAspectCrop
+                            asynchronous: true
+                            cache: false
+                            smooth: true
+                            sourceSize.width: Math.max(320, Math.round(width))
+                            sourceSize.height: Math.max(220, Math.round(height))
+                            visible: root.detailRadarReady
                         }
 
                         Rectangle {
@@ -1585,12 +1591,12 @@ Item {
                             anchors.margins: 8
                             radius: 5
                             color: "#080913"
-                            opacity: detailRadarFrame.ready ? 0.0 : 1.0
+                            opacity: root.detailRadarReady ? 0.0 : 1.0
 
                             Column {
                                 anchors.centerIn: parent
                                 spacing: 10
-                                visible: !detailRadarFrame.ready
+                                visible: !root.detailRadarReady
 
                                 WidgetLocal.RadarGlyph {
                                     width: 78
@@ -1614,7 +1620,7 @@ Item {
                                 }
 
                                 Text {
-                                    width: Math.min(320, detailRadarFrame.width * 0.70)
+                                    width: Math.min(320, detailRadarImage.width * 0.70)
                                     anchors.horizontalCenter: parent.horizontalCenter
                                     text: root.radarStatus === "LIVE" ? "RADAR LOADING" : root.radarStatus
                                     color: root.radarStatus === "LIVE" ? "#58FFE1" : "#FFD36B"
