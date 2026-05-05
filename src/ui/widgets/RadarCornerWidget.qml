@@ -36,16 +36,13 @@ Item {
             color: "#010307"
             clip: true
 
-            Image {
+            RasterFrameItem {
                 id: radarPreview
                 anchors.fill: parent
                 anchors.margins: -Math.round(parent.width * 0.12)
                 source: root.frameReady ? root.frameUrl : ""
-                fillMode: Image.PreserveAspectCrop
-                asynchronous: false
-                cache: false
-                smooth: true
-                visible: status === Image.Ready
+                circular: true
+                visible: ready
                 opacity: 0.96
             }
 

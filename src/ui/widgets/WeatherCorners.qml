@@ -1571,16 +1571,13 @@ Item {
                         border.color: Qt.rgba(0.36, 1.0, 0.88, 0.28)
                         clip: true
 
-                        Image {
+                        RasterFrameItem {
                             id: detailRadarFrame
                             anchors.fill: parent
                             anchors.margins: 8
                             source: root.expandedMode === "radar" ? root.radarFrameUrl : ""
-                            fillMode: Image.PreserveAspectCrop
-                            asynchronous: false
-                            cache: false
-                            smooth: true
-                            visible: status === Image.Ready
+                            circular: false
+                            visible: ready
                         }
 
                         Rectangle {
@@ -1588,12 +1585,12 @@ Item {
                             anchors.margins: 8
                             radius: 5
                             color: "#080913"
-                            opacity: detailRadarFrame.status === Image.Ready ? 0.0 : 1.0
+                            opacity: detailRadarFrame.ready ? 0.0 : 1.0
 
                             Column {
                                 anchors.centerIn: parent
                                 spacing: 10
-                                visible: detailRadarFrame.status !== Image.Ready
+                                visible: !detailRadarFrame.ready
 
                                 WidgetLocal.RadarGlyph {
                                     width: 78
