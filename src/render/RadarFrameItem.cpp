@@ -19,16 +19,16 @@ public:
     QSize size;
 };
 
-int quantizeColorChannel(int value)
+int quantizeColorChannel(int value, int bucket)
 {
-    return qBound(0, ((value + 8) / 16) * 16, 255);
+    return qBound(0, ((value + (bucket / 2)) / bucket) * bucket, 255);
 }
 
-QRgb quantizedColorKey(const QColor &color)
+QRgb quantizedColorKey(const QColor &color, int bucket = 16)
 {
-    return qRgba(quantizeColorChannel(color.red()),
-                 quantizeColorChannel(color.green()),
-                 quantizeColorChannel(color.blue()),
+    return qRgba(quantizeColorChannel(color.red(), bucket),
+                 quantizeColorChannel(color.green(), bucket),
+                 quantizeColorChannel(color.blue(), bucket),
                  color.alpha());
 }
 
@@ -37,7 +37,7 @@ QColor colorFromKey(QRgb key)
     return QColor(qRed(key), qGreen(key), qBlue(key), qAlpha(key));
 }
 
-bool sampleFrameColor(QRgb pixel, QColor &color)
+bool sampleRadarReturnColor(QRgb pixel, QColor &color, bool glow)
 {
     if (qAlpha(pixel) < 24) {
         return false;
@@ -50,22 +50,97 @@ bool sampleFrameColor(QRgb pixel, QColor &color)
     const int minChannel = qMin(r, qMin(g, b));
     const int spread = maxChannel - minChannel;
 
-    if (maxChannel < 24) {
+    if (maxChannel < 92 || spread < 30) {
         return false;
     }
 
-    const bool brightNeutral = maxChannel > 172 && spread < 92;
-    const bool saturatedReturn = maxChannel > 96 && spread > 36;
-    const bool brightReturn = maxChannel > 140 && spread > 18;
-    if (brightNeutral || saturatedReturn || brightReturn) {
-        color = QColor(r, g, b, 236);
+    const bool cyanReturn = ((b > 135 && g > 110 && r < 132 && b > r + 42)
+                             || (g > 142 && b > 108 && r < 122 && g > r + 44));
+    const bool yellowReturn = r > 150 && g > 132 && b < 142 && qMin(r, g) > b + 32;
+    const bool orangeReturn = r > 166 && g > 92 && g < 170 && b < 112 && r > b + 58;
+    const bool intenseReturn = maxChannel > 202 && spread > 48
+        && ((b > r + 35 && g > r + 20) || (r > b + 45 && g > b + 20));
+
+    if (!(cyanReturn || yellowReturn || orangeReturn || intenseReturn)) {
+        return false;
+    }
+
+    if (cyanReturn) {
+        color = glow ? QColor(31, 206, 255, 78) : QColor(0, 188, 235, 226);
+        return true;
+    }
+    if (yellowReturn) {
+        color = glow ? QColor(255, 226, 96, 70) : QColor(255, 214, 72, 218);
+        return true;
+    }
+    if (orangeReturn) {
+        color = glow ? QColor(255, 134, 54, 76) : QColor(255, 112, 44, 224);
         return true;
     }
 
-    color = QColor(qBound(0, int(r * 0.92), 255),
-                   qBound(0, int(g * 0.92), 255),
-                   qBound(0, int(b * 0.92), 255),
-                   218);
+    color = glow ? QColor(255, 245, 210, 62) : QColor(252, 248, 206, 198);
+    return true;
+}
+
+bool sampleBaseMapColor(QRgb pixel, QColor &color)
+{
+    if (qAlpha(pixel) < 24) {
+        return false;
+    }
+
+    QColor ignored;
+    if (sampleRadarReturnColor(pixel, ignored, false)) {
+        return false;
+    }
+
+    const int r = qRed(pixel);
+    const int g = qGreen(pixel);
+    const int b = qBlue(pixel);
+    const int maxChannel = qMax(r, qMax(g, b));
+    const int minChannel = qMin(r, qMin(g, b));
+    const int spread = maxChannel - minChannel;
+
+    if (maxChannel < 48) {
+        return false;
+    }
+
+    // Drop small dark labels from the source PNG. They turn into unreadable
+    // speckle after vectorization and make the radar panel look dirty.
+    if (maxChannel < 112 && spread < 54) {
+        return false;
+    }
+
+    const bool water = b > r + 12 && g > r + 5 && b > 92;
+    const bool forest = g > r + 8 && g > b + 1 && g > 78;
+    const bool road = r > 126 && g > 74 && b > 64 && r > b + 18 && r >= g + 4;
+    const bool boundary = b > r + 10 && r > 82 && g < 150 && spread > 24;
+    const bool neutralLand = spread < 58 && maxChannel > 118;
+
+    if (water) {
+        color = QColor(83, 113, 123, 208);
+        return true;
+    }
+    if (forest) {
+        color = QColor(79, 122, 83, 172);
+        return true;
+    }
+    if (road) {
+        color = QColor(168, 96, 88, 122);
+        return true;
+    }
+    if (boundary) {
+        color = QColor(130, 91, 134, 108);
+        return true;
+    }
+    if (neutralLand) {
+        color = QColor(142, 145, 132, 178);
+        return true;
+    }
+
+    color = QColor(qBound(0, int(r * 0.48), 190),
+                   qBound(0, int(g * 0.50), 194),
+                   qBound(0, int(b * 0.50), 196),
+                   118);
     return true;
 }
 
@@ -196,44 +271,95 @@ QRectF croppedSourceRect(const QImage &image, const QSize &targetSize)
     return sourceRect;
 }
 
-void appendRadarSamples(RadarVectorRoot *root, const QImage &image, const QSize &targetSize, bool circular)
+struct SamplePlan {
+    QRectF sourceRect;
+    qreal scaleX = 1.0;
+    qreal scaleY = 1.0;
+    qreal sourceToTarget = 1.0;
+    QPointF clipCenter;
+    qreal clipRadiusSquared = 0.0;
+    int left = 0;
+    int right = 0;
+    int top = 0;
+    int bottom = 0;
+};
+
+SamplePlan makeSamplePlan(const QImage &image, const QSize &targetSize)
 {
+    SamplePlan plan;
     const QRectF sourceRect = croppedSourceRect(image, targetSize);
-    const qreal scaleX = qreal(targetSize.width()) / sourceRect.width();
-    const qreal scaleY = qreal(targetSize.height()) / sourceRect.height();
-    const qreal sourceToTarget = qMax(sourceRect.width() / qMax(1, targetSize.width()),
-                                      sourceRect.height() / qMax(1, targetSize.height()));
-    const int minimumStep = targetSize.width() >= 480 ? 3 : (targetSize.width() >= 180 ? 4 : 6);
-    const int sampleStep = qBound(minimumStep, int(qCeil(sourceToTarget)), 7);
-    const qreal sampleWidth = qMax<qreal>(1.2, sampleStep * scaleX * 1.08);
-    const qreal sampleHeight = qMax<qreal>(1.2, sampleStep * scaleY * 1.08);
-    const QPointF clipCenter(targetSize.width() * 0.5, targetSize.height() * 0.5);
+    plan.sourceRect = sourceRect;
+    plan.scaleX = qreal(targetSize.width()) / sourceRect.width();
+    plan.scaleY = qreal(targetSize.height()) / sourceRect.height();
+    plan.sourceToTarget = qMax(sourceRect.width() / qMax(1, targetSize.width()),
+                               sourceRect.height() / qMax(1, targetSize.height()));
+    plan.clipCenter = QPointF(targetSize.width() * 0.5, targetSize.height() * 0.5);
     const qreal clipRadius = qMin(targetSize.width(), targetSize.height()) * 0.5 - 1.0;
-    const qreal clipRadiusSquared = clipRadius * clipRadius;
+    plan.clipRadiusSquared = clipRadius * clipRadius;
+    plan.left = qMax(0, int(qFloor(sourceRect.left())));
+    plan.right = qMin(image.width() - 1, int(qCeil(sourceRect.right())));
+    plan.top = qMax(0, int(qFloor(sourceRect.top())));
+    plan.bottom = qMin(image.height() - 1, int(qCeil(sourceRect.bottom())));
+    return plan;
+}
+
+using ColorSampler = bool (*)(QRgb, QColor &);
+
+bool sampleRadarCore(QRgb pixel, QColor &color)
+{
+    return sampleRadarReturnColor(pixel, color, false);
+}
+
+bool sampleRadarGlow(QRgb pixel, QColor &color)
+{
+    return sampleRadarReturnColor(pixel, color, true);
+}
+
+int baseMapStep(const SamplePlan &plan, const QSize &targetSize)
+{
+    const int minimumStep = targetSize.width() >= 480 ? 5 : (targetSize.width() >= 180 ? 6 : 8);
+    return qBound(minimumStep, int(qCeil(plan.sourceToTarget * 2.4)), 12);
+}
+
+int radarReturnStep(const SamplePlan &plan, const QSize &targetSize)
+{
+    const int minimumStep = targetSize.width() >= 480 ? 2 : (targetSize.width() >= 180 ? 3 : 5);
+    return qBound(minimumStep, int(qCeil(plan.sourceToTarget * 1.35)), 7);
+}
+
+void appendSampleLayer(RadarVectorRoot *root,
+                       const QImage &image,
+                       const QSize &targetSize,
+                       bool circular,
+                       const SamplePlan &plan,
+                       int sampleStep,
+                       qreal coverage,
+                       int colorBucket,
+                       ColorSampler sampler,
+                       const char *label)
+{
+    const qreal sampleWidth = qMax<qreal>(1.0, sampleStep * plan.scaleX * coverage);
+    const qreal sampleHeight = qMax<qreal>(1.0, sampleStep * plan.scaleY * coverage);
 
     QHash<QRgb, QVector<RadarSample>> samplesByColor;
     int totalSamples = 0;
-    const int left = qMax(0, int(qFloor(sourceRect.left())));
-    const int right = qMin(image.width() - 1, int(qCeil(sourceRect.right())));
-    const int top = qMax(0, int(qFloor(sourceRect.top())));
-    const int bottom = qMin(image.height() - 1, int(qCeil(sourceRect.bottom())));
-    for (int y = top; y <= bottom; y += sampleStep) {
+    for (int y = plan.top; y <= plan.bottom; y += sampleStep) {
         const QRgb *line = reinterpret_cast<const QRgb *>(image.constScanLine(y));
-        for (int x = left; x <= right; x += sampleStep) {
+        for (int x = plan.left; x <= plan.right; x += sampleStep) {
             QColor color;
-            if (!sampleFrameColor(line[x], color)) {
+            if (!sampler(line[x], color)) {
                 continue;
             }
-            const qreal itemX = (x - sourceRect.left()) * scaleX;
-            const qreal itemY = (y - sourceRect.top()) * scaleY;
+            const qreal itemX = (x - plan.sourceRect.left()) * plan.scaleX;
+            const qreal itemY = (y - plan.sourceRect.top()) * plan.scaleY;
             if (circular) {
-                const qreal dx = itemX - clipCenter.x();
-                const qreal dy = itemY - clipCenter.y();
-                if ((dx * dx) + (dy * dy) > clipRadiusSquared) {
+                const qreal dx = itemX - plan.clipCenter.x();
+                const qreal dy = itemY - plan.clipCenter.y();
+                if ((dx * dx) + (dy * dy) > plan.clipRadiusSquared) {
                     continue;
                 }
             }
-            const QRgb key = quantizedColorKey(color);
+            const QRgb key = quantizedColorKey(color, colorBucket);
             samplesByColor[key].append(RadarSample{QRectF(itemX, itemY, sampleWidth, sampleHeight)});
             ++totalSamples;
         }
@@ -245,11 +371,49 @@ void appendRadarSamples(RadarVectorRoot *root, const QImage &image, const QSize 
         }
     }
 
-    qInfo().noquote() << "[RadarFrameItem] palette samples" << totalSamples
+    qInfo().noquote() << "[RadarFrameItem]" << label << "samples" << totalSamples
                       << "step" << sampleStep << "target"
                       << targetSize.width() << "x" << targetSize.height()
                       << "colors" << samplesByColor.size()
                       << "circular" << circular;
+}
+
+void appendRadarSamples(RadarVectorRoot *root, const QImage &image, const QSize &targetSize, bool circular)
+{
+    const SamplePlan plan = makeSamplePlan(image, targetSize);
+    const int baseStep = baseMapStep(plan, targetSize);
+    const int returnStep = radarReturnStep(plan, targetSize);
+
+    appendSampleLayer(root,
+                      image,
+                      targetSize,
+                      circular,
+                      plan,
+                      baseStep,
+                      1.06,
+                      24,
+                      sampleBaseMapColor,
+                      "base-map");
+    appendSampleLayer(root,
+                      image,
+                      targetSize,
+                      circular,
+                      plan,
+                      returnStep,
+                      2.85,
+                      32,
+                      sampleRadarGlow,
+                      "radar-glow");
+    appendSampleLayer(root,
+                      image,
+                      targetSize,
+                      circular,
+                      plan,
+                      returnStep,
+                      1.32,
+                      16,
+                      sampleRadarCore,
+                      "radar-core");
 }
 
 void appendRadarGuides(RadarVectorRoot *root, const QSize &targetSize)

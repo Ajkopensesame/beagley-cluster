@@ -1591,7 +1591,7 @@ Item {
                             source: root.expandedMode === "radar" ? root.radarFrameUrl : ""
                             circular: false
                             backgroundVisible: true
-                            guidesVisible: false
+                            guidesVisible: true
                             visible: root.detailRadarReady
                         }
 
