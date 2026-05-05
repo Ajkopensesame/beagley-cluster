@@ -19,7 +19,7 @@ Item {
     readonly property string monoFont: theme && theme.fontMono ? theme.fontMono : "Oxanium"
     readonly property bool live: root.status === "LIVE"
     readonly property bool frameReady: root.live && String(root.frameUrl).length > 0
-    readonly property bool previewReady: radarPreview.status === Image.Ready
+    readonly property bool previewReady: radarPreview.ready
 
     CornerPodFrame {
         id: frame
@@ -37,17 +37,14 @@ Item {
             color: "#010307"
             clip: true
 
-            Image {
+            RadarFrameItem {
                 id: radarPreview
                 anchors.fill: parent
                 anchors.margins: -Math.round(parent.width * 0.08)
                 source: root.frameReady ? root.frameUrl : ""
-                fillMode: Image.PreserveAspectCrop
-                asynchronous: true
-                cache: false
-                smooth: true
-                sourceSize.width: Math.max(96, Math.round(width * 1.25))
-                sourceSize.height: Math.max(96, Math.round(height * 1.25))
+                circular: true
+                backgroundVisible: true
+                guidesVisible: false
                 visible: root.previewReady
                 opacity: 0.96
             }

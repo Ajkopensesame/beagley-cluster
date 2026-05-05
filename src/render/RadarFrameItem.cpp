@@ -37,8 +37,12 @@ QColor colorFromKey(QRgb key)
     return QColor(qRed(key), qGreen(key), qBlue(key), qAlpha(key));
 }
 
-bool radarSampleColor(QRgb pixel, QColor &color)
+bool sampleFrameColor(QRgb pixel, QColor &color)
 {
+    if (qAlpha(pixel) < 24) {
+        return false;
+    }
+
     const int r = qRed(pixel);
     const int g = qGreen(pixel);
     const int b = qBlue(pixel);
@@ -46,19 +50,22 @@ bool radarSampleColor(QRgb pixel, QColor &color)
     const int minChannel = qMin(r, qMin(g, b));
     const int spread = maxChannel - minChannel;
 
-    if (maxChannel < 72) {
+    if (maxChannel < 24) {
         return false;
     }
 
     const bool brightNeutral = maxChannel > 172 && spread < 92;
     const bool saturatedReturn = maxChannel > 96 && spread > 36;
     const bool brightReturn = maxChannel > 140 && spread > 18;
-    if (!brightNeutral && !saturatedReturn && !brightReturn) {
-        return false;
+    if (brightNeutral || saturatedReturn || brightReturn) {
+        color = QColor(r, g, b, 236);
+        return true;
     }
 
-    const int alpha = brightNeutral ? 235 : 225;
-    color = QColor(r, g, b, alpha);
+    color = QColor(qBound(0, int(r * 0.92), 255),
+                   qBound(0, int(g * 0.92), 255),
+                   qBound(0, int(b * 0.92), 255),
+                   218);
     return true;
 }
 
@@ -194,14 +201,12 @@ void appendRadarSamples(RadarVectorRoot *root, const QImage &image, const QSize 
     const QRectF sourceRect = croppedSourceRect(image, targetSize);
     const qreal scaleX = qreal(targetSize.width()) / sourceRect.width();
     const qreal scaleY = qreal(targetSize.height()) / sourceRect.height();
-    const int sampleStep = targetSize.width() >= 260
-        ? 1
-        : qBound(3,
-                 int(qRound(qMax(sourceRect.width() / qMax(1, targetSize.width()),
-                                 sourceRect.height() / qMax(1, targetSize.height())))),
-                 5);
-    const qreal sampleWidth = qMax<qreal>(0.9, sampleStep * scaleX * 0.88);
-    const qreal sampleHeight = qMax<qreal>(0.9, sampleStep * scaleY * 0.88);
+    const qreal sourceToTarget = qMax(sourceRect.width() / qMax(1, targetSize.width()),
+                                      sourceRect.height() / qMax(1, targetSize.height()));
+    const int minimumStep = targetSize.width() >= 480 ? 3 : (targetSize.width() >= 180 ? 4 : 6);
+    const int sampleStep = qBound(minimumStep, int(qCeil(sourceToTarget)), 7);
+    const qreal sampleWidth = qMax<qreal>(1.2, sampleStep * scaleX * 1.08);
+    const qreal sampleHeight = qMax<qreal>(1.2, sampleStep * scaleY * 1.08);
     const QPointF clipCenter(targetSize.width() * 0.5, targetSize.height() * 0.5);
     const qreal clipRadius = qMin(targetSize.width(), targetSize.height()) * 0.5 - 1.0;
     const qreal clipRadiusSquared = clipRadius * clipRadius;
@@ -216,7 +221,7 @@ void appendRadarSamples(RadarVectorRoot *root, const QImage &image, const QSize 
         const QRgb *line = reinterpret_cast<const QRgb *>(image.constScanLine(y));
         for (int x = left; x <= right; x += sampleStep) {
             QColor color;
-            if (!radarSampleColor(line[x], color)) {
+            if (!sampleFrameColor(line[x], color)) {
                 continue;
             }
             const qreal itemX = (x - sourceRect.left()) * scaleX;

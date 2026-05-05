@@ -981,7 +981,7 @@ Window {
             stressScene: root.stressScene
             phase: root.sharedEffectPhase
             nowPlayingService: (typeof nowPlaying !== "undefined") ? nowPlaying : null
-            expandedMode: (typeof BEAGLEY_INITIAL_WEATHER_EXPANDED_MODE !== "undefined")
+            initialExpandedMode: (typeof BEAGLEY_INITIAL_WEATHER_EXPANDED_MODE !== "undefined")
                 ? String(BEAGLEY_INITIAL_WEATHER_EXPANDED_MODE)
                 : ""
             active: !root.mapMenuOpen && !root.navControlsOpen

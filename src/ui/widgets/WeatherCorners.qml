@@ -98,13 +98,14 @@ Item {
     property real radarSiteDistanceKm: NaN
     property string radarFrameLabel: ""
     property string expandedMode: ""
+    property string initialExpandedMode: ""
 
     signal mapMenuRequested()
 
     readonly property bool radarServiceAvailable: typeof radarImage !== "undefined" && radarImage !== null
     readonly property bool radarServiceReady: radarServiceAvailable && radarImage.ready && String(radarImage.imageUrl).length > 0
     readonly property url radarFrameUrl: radarServiceReady ? radarImage.imageUrl : ""
-    readonly property bool detailRadarReady: detailRadarImage.status === Image.Ready
+    readonly property bool detailRadarReady: detailRadarFrame.ready
 
     opacity: active ? 1 : 0
     visible: opacity > 0.01
@@ -864,6 +865,17 @@ Item {
     }
 
     Timer {
+        id: initialExpandedModeTimer
+        interval: 1600
+        repeat: false
+        onTriggered: {
+            const requested = root.cleanText(root.initialExpandedMode)
+            if (requested === "temp" || requested === "radar" || requested === "music")
+                root.expandedMode = requested
+        }
+    }
+
+    Timer {
         id: coordinateDebounce
         interval: root.lowEffectMode ? 7000 : 4500
         repeat: false
@@ -1572,17 +1584,14 @@ Item {
                         border.color: Qt.rgba(0.36, 1.0, 0.88, 0.28)
                         clip: true
 
-                        Image {
-                            id: detailRadarImage
+                        RadarFrameItem {
+                            id: detailRadarFrame
                             anchors.fill: parent
                             anchors.margins: 8
                             source: root.expandedMode === "radar" ? root.radarFrameUrl : ""
-                            fillMode: Image.PreserveAspectCrop
-                            asynchronous: true
-                            cache: false
-                            smooth: true
-                            sourceSize.width: Math.max(320, Math.round(width))
-                            sourceSize.height: Math.max(220, Math.round(height))
+                            circular: false
+                            backgroundVisible: true
+                            guidesVisible: false
                             visible: root.detailRadarReady
                         }
 
@@ -1620,7 +1629,7 @@ Item {
                                 }
 
                                 Text {
-                                    width: Math.min(320, detailRadarImage.width * 0.70)
+                                    width: Math.min(320, detailRadarFrame.width * 0.70)
                                     anchors.horizontalCenter: parent.horizontalCenter
                                     text: root.radarStatus === "LIVE" ? "RADAR LOADING" : root.radarStatus
                                     color: root.radarStatus === "LIVE" ? "#58FFE1" : "#FFD36B"
@@ -1717,5 +1726,7 @@ Item {
     Component.onCompleted: {
         if (root.active)
             startupRefreshTimer.start()
+        if (root.cleanText(root.initialExpandedMode).length > 0)
+            initialExpandedModeTimer.restart()
     }
 }
