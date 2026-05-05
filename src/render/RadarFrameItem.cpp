@@ -338,7 +338,10 @@ void appendSampleLayer(RadarVectorRoot *root,
                        ColorSampler sampler,
                        const char *label)
 {
-    const QRectF itemBounds(0, 0, targetSize.width(), targetSize.height());
+    const qreal bottomGuard = circular
+        ? 0.0
+        : qMax<qreal>(4.0, qMin(targetSize.width(), targetSize.height()) * 0.012);
+    const QRectF itemBounds(0, 0, targetSize.width(), qMax<qreal>(1.0, targetSize.height() - bottomGuard));
     const qreal cellWidth = sampleStep * plan.scaleX;
     const qreal cellHeight = sampleStep * plan.scaleY;
     const qreal sampleWidth = qMax<qreal>(1.0, cellWidth * coverage);
