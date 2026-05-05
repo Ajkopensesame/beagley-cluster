@@ -22,6 +22,7 @@ Item {
     readonly property string displayFont: theme && theme.fontDisplay ? theme.fontDisplay : "Oxanium"
     readonly property string monoFont: theme && theme.fontMono ? theme.fontMono : "Oxanium"
     readonly property bool embeddedSafeMode: Qt.platform.os === "linux"
+    readonly property bool embeddedSafePopups: embeddedSafeMode
     readonly property bool tallDetailMode: expandedMode === "temp" || expandedMode === "radar"
     readonly property int podSize: Math.floor(Math.min(164, Math.max(142, height * 0.228)))
     readonly property int cornerBleed: Math.round(podSize * 0.17)
@@ -105,7 +106,7 @@ Item {
     readonly property bool radarServiceAvailable: typeof radarImage !== "undefined" && radarImage !== null
     readonly property bool radarServiceReady: radarServiceAvailable && radarImage.ready && String(radarImage.imageUrl).length > 0
     readonly property url radarFrameUrl: radarServiceReady ? radarImage.imageUrl : ""
-    readonly property bool detailRadarReady: detailRadarFrame.ready
+    readonly property bool detailRadarReady: radarServiceReady
 
     opacity: active ? 1 : 0
     visible: opacity > 0.01
@@ -1009,9 +1010,7 @@ Item {
 
         Rectangle {
             anchors.fill: parent
-            color: root.expandedMode === "temp" || root.expandedMode === "radar"
-                ? Qt.rgba(0.0, 0.0, 0.0, 0.0)
-                : Qt.rgba(0.0, 0.0, 0.0, root.tallDetailMode ? 0.66 : 0.54)
+            color: root.embeddedSafePopups ? "#03050A" : Qt.rgba(0.0, 0.0, 0.0, root.tallDetailMode ? 0.66 : 0.54)
         }
 
         MouseArea {
@@ -1031,10 +1030,10 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             radius: root.tallDetailMode ? 4 : 8
             color: root.expandedMode === "temp"
-                ? Qt.rgba(0.020, 0.018, 0.034, 0.97)
+                ? "#070711"
                 : root.expandedMode === "music"
-                ? Qt.rgba(0.004, 0.008, 0.031, 0.98)
-                : Qt.rgba(0.016, 0.020, 0.047, 0.96)
+                ? "#050712"
+                : "#050812"
             border.width: 1
             border.color: root.expandedMode === "temp"
                 ? "#FF7AD9"
@@ -1229,9 +1228,9 @@ Item {
                         width: parent.width
                         height: 156
                         radius: 8
-                        color: Qt.rgba(0.018, 0.020, 0.030, 0.94)
+                        color: "#0A0D16"
                         border.width: 1
-                        border.color: Qt.rgba(0.36, 1.0, 0.88, 0.28)
+                        border.color: "#233E4B"
 
                         Row {
                             anchors.fill: parent
@@ -1340,9 +1339,9 @@ Item {
                                 width: (metricsGrid.width - 20) / 3
                                 height: 54
                                 radius: 8
-                                color: Qt.rgba(0.030, 0.034, 0.052, 0.80)
+                                color: "#0D111C"
                                 border.width: 1
-                                border.color: Qt.rgba(0.36, 1.0, 0.88, 0.18)
+                                border.color: "#202C3A"
 
                                 Column {
                                     anchors.fill: parent
@@ -1431,12 +1430,12 @@ Item {
                                 height: 43
                                 radius: 6
                                 color: index === 0
-                                    ? Qt.rgba(0.050, 0.056, 0.080, 0.86)
-                                    : Qt.rgba(0.028, 0.032, 0.050, 0.74)
+                                    ? "#101725"
+                                    : "#0B0F1A"
                                 border.width: 1
                                 border.color: index === 0
-                                    ? Qt.rgba(0.36, 1.0, 0.88, 0.24)
-                                    : Qt.rgba(0.36, 1.0, 0.88, 0.12)
+                                    ? "#2A4652"
+                                    : "#1B2734"
 
                                 Row {
                                     anchors.fill: parent
@@ -1577,68 +1576,157 @@ Item {
 
                     Rectangle {
                         width: parent.width
-                        height: Math.max(440, parent.height - 52)
+                        height: Math.max(410, parent.height - 112)
                         radius: 8
-                        color: Qt.rgba(0.018, 0.020, 0.030, 0.94)
+                        color: "#050812"
                         border.width: 1
-                        border.color: Qt.rgba(0.36, 1.0, 0.88, 0.28)
-                        clip: true
-
-                        RadarFrameItem {
-                            id: detailRadarFrame
-                            anchors.fill: parent
-                            anchors.margins: 8
-                            source: root.expandedMode === "radar" ? root.radarFrameUrl : ""
-                            circular: false
-                            backgroundVisible: true
-                            guidesVisible: true
-                            visible: root.detailRadarReady
-                        }
+                        border.color: "#254854"
+                        clip: false
 
                         Rectangle {
+                            id: radarScope
                             anchors.fill: parent
-                            anchors.margins: 8
-                            radius: 5
-                            color: "#080913"
-                            opacity: root.detailRadarReady ? 0.0 : 1.0
+                            anchors.margins: 12
+                            radius: 7
+                            color: "#061017"
+                            border.width: 1
+                            border.color: root.radarStatus === "LIVE" ? "#2C6A74" : "#3A334A"
 
-                            Column {
+                            Rectangle {
                                 anchors.centerIn: parent
-                                spacing: 10
-                                visible: !root.detailRadarReady
+                                width: Math.min(parent.width, parent.height) * 0.90
+                                height: width
+                                radius: width / 2
+                                color: "#07141C"
+                                border.width: 1
+                                border.color: "#123641"
+                            }
+
+                            Repeater {
+                                model: [0.22, 0.44, 0.66, 0.88]
+
+                                Rectangle {
+                                    anchors.centerIn: radarScope
+                                    width: Math.min(radarScope.width, radarScope.height) * modelData
+                                    height: width
+                                    radius: width / 2
+                                    color: "transparent"
+                                    border.width: 1
+                                    border.color: index === 3 ? "#22606C" : "#17434D"
+                                }
+                            }
+
+                            Rectangle {
+                                anchors.centerIn: parent
+                                width: 1
+                                height: parent.height - 24
+                                color: "#16424C"
+                            }
+
+                            Rectangle {
+                                anchors.centerIn: parent
+                                width: parent.width - 24
+                                height: 1
+                                color: "#16424C"
+                            }
+
+                            Repeater {
+                                model: [
+                                    { "x": 0.12, "y": 0.62, "w": 0.045, "h": 0.025, "c": "#25D7FF" },
+                                    { "x": 0.18, "y": 0.66, "w": 0.060, "h": 0.032, "c": "#25D7FF" },
+                                    { "x": 0.25, "y": 0.70, "w": 0.075, "h": 0.040, "c": "#25D7FF" },
+                                    { "x": 0.34, "y": 0.76, "w": 0.082, "h": 0.046, "c": "#25D7FF" },
+                                    { "x": 0.43, "y": 0.82, "w": 0.088, "h": 0.052, "c": "#25D7FF" },
+                                    { "x": 0.28, "y": 0.61, "w": 0.050, "h": 0.030, "c": "#FFD75A" },
+                                    { "x": 0.40, "y": 0.69, "w": 0.056, "h": 0.030, "c": "#FFD75A" },
+                                    { "x": 0.50, "y": 0.76, "w": 0.044, "h": 0.026, "c": "#FF7045" },
+                                    { "x": 0.12, "y": 0.44, "w": 0.026, "h": 0.020, "c": "#FFD75A" },
+                                    { "x": 0.72, "y": 0.30, "w": 0.030, "h": 0.020, "c": "#26E38F" }
+                                ]
+
+                                Rectangle {
+                                    x: Math.round(radarScope.width * modelData.x)
+                                    y: Math.round(radarScope.height * modelData.y)
+                                    width: Math.max(8, Math.round(radarScope.width * modelData.w))
+                                    height: Math.max(6, Math.round(radarScope.height * modelData.h))
+                                    radius: Math.min(width, height) / 2
+                                    color: modelData.c
+                                    border.width: 1
+                                    border.color: "#F7FBFF"
+                                }
+                            }
+
+                            Rectangle {
+                                width: 64
+                                height: 64
+                                radius: 32
+                                anchors.centerIn: parent
+                                color: "#090D15"
+                                border.width: 2
+                                border.color: root.radarStatus === "LIVE" ? "#58FFE1" : "#FFD36B"
 
                                 WidgetLocal.RadarGlyph {
-                                    width: 78
-                                    height: 78
-                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    anchors.centerIn: parent
+                                    width: 42
+                                    height: 42
                                     primaryColor: "#F7FBFF"
-                                    accentColor: "#58FFE1"
+                                    accentColor: root.radarStatus === "LIVE" ? "#58FFE1" : "#FFD36B"
                                     active: root.radarStatus === "LIVE"
                                 }
+                            }
 
-                                Text {
-                                    width: parent.width
-                                    text: "RADAR"
-                                    color: "#F7FBFF"
-                                    font.family: root.displayFont
-                                    font.pixelSize: 26
-                                    font.weight: Font.Bold
-                                    font.letterSpacing: 0
-                                    horizontalAlignment: Text.AlignHCenter
-                                    elide: Text.ElideRight
-                                }
+                            Rectangle {
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.bottom: parent.bottom
+                                height: 48
+                                color: "#070B13"
+                                border.width: 1
+                                border.color: "#182A36"
 
-                                Text {
-                                    width: Math.min(320, detailRadarFrame.width * 0.70)
-                                    anchors.horizontalCenter: parent.horizontalCenter
-                                    text: root.radarStatus === "LIVE" ? "RADAR LOADING" : root.radarStatus
-                                    color: root.radarStatus === "LIVE" ? "#58FFE1" : "#FFD36B"
-                                    font.family: root.monoFont
-                                    font.pixelSize: 13
-                                    font.weight: Font.Bold
-                                    font.letterSpacing: 0
-                                    horizontalAlignment: Text.AlignHCenter
-                                    elide: Text.ElideRight
+                                Row {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 12
+                                    anchors.rightMargin: 12
+                                    spacing: 10
+
+                                    Text {
+                                        width: parent.width * 0.36
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: root.radarStatus === "LIVE" ? "LIVE RADAR" : root.radarStatus
+                                        color: root.radarStatus === "LIVE" ? "#58FFE1" : "#FFD36B"
+                                        font.family: root.monoFont
+                                        font.pixelSize: 15
+                                        font.weight: Font.Bold
+                                        font.letterSpacing: 0
+                                        elide: Text.ElideRight
+                                    }
+
+                                    Text {
+                                        width: parent.width * 0.34
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: root.radarSiteName.length > 0 ? root.radarSiteName : "GPS AREA"
+                                        color: "#F7FBFF"
+                                        font.family: root.monoFont
+                                        font.pixelSize: 13
+                                        font.weight: Font.Bold
+                                        font.letterSpacing: 0
+                                        horizontalAlignment: Text.AlignHCenter
+                                        elide: Text.ElideRight
+                                    }
+
+                                    Text {
+                                        width: parent.width * 0.30 - 20
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: root.radarFrameDisplayLabel()
+                                        color: "#9DB4FF"
+                                        font.family: root.monoFont
+                                        font.pixelSize: 12
+                                        font.weight: Font.Bold
+                                        font.letterSpacing: 0
+                                        horizontalAlignment: Text.AlignRight
+                                        elide: Text.ElideRight
+                                    }
                                 }
                             }
                         }
@@ -1647,9 +1735,9 @@ Item {
 
                     Row {
                         width: parent.width
-                        height: 0
+                        height: 54
                         spacing: 10
-                        visible: false
+                        visible: true
 
                         Repeater {
                             model: [
@@ -1662,9 +1750,9 @@ Item {
                                 width: (parent.width - 20) / 3
                                 height: parent.height
                                 radius: 8
-                                color: Qt.rgba(0.030, 0.034, 0.052, 0.80)
+                                color: "#0D111C"
                                 border.width: 1
-                                border.color: Qt.rgba(0.36, 1.0, 0.88, 0.18)
+                                border.color: "#202C3A"
 
                                 Column {
                                     anchors.fill: parent
