@@ -1577,7 +1577,7 @@ Item {
 
                     Rectangle {
                         width: parent.width
-                        height: Math.max(360, parent.height - 122)
+                        height: Math.max(440, parent.height - 52)
                         radius: 8
                         color: Qt.rgba(0.018, 0.020, 0.030, 0.94)
                         border.width: 1
@@ -1647,8 +1647,9 @@ Item {
 
                     Row {
                         width: parent.width
-                        height: 54
+                        height: 0
                         spacing: 10
+                        visible: false
 
                         Repeater {
                             model: [
