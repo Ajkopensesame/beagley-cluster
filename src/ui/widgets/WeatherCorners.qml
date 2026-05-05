@@ -930,6 +930,7 @@ Item {
         id: weatherCorner
         width: root.podSize
         height: root.podSize
+        visible: root.expandedMode === ""
         anchors.left: parent.left
         anchors.top: parent.top
         anchors.leftMargin: root.cornerInset
@@ -950,6 +951,7 @@ Item {
         id: radarCorner
         width: root.podSize
         height: root.podSize
+        visible: root.expandedMode === ""
         anchors.right: parent.right
         anchors.top: parent.top
         anchors.rightMargin: root.cornerInset
@@ -958,7 +960,7 @@ Item {
         corner: "topRight"
         effectLevel: root.effectLevel
         bleedFraction: root.podBleedFraction
-        frameUrl: root.radarFrameUrl
+        frameUrl: root.expandedMode === "" ? root.radarFrameUrl : ""
         status: root.radarStatus
         frameLabel: root.radarFrameDisplayLabel()
         onClicked: root.expandedMode = root.expandedMode === "radar" ? "" : "radar"
@@ -968,6 +970,7 @@ Item {
         id: mediaCorner
         width: root.podSize
         height: root.podSize
+        visible: root.expandedMode === ""
         anchors.left: parent.left
         anchors.bottom: parent.bottom
         anchors.leftMargin: root.cornerInset
@@ -987,6 +990,7 @@ Item {
         id: mapMenuCorner
         width: root.podSize
         height: root.podSize
+        visible: root.expandedMode === ""
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         anchors.rightMargin: root.cornerInset
