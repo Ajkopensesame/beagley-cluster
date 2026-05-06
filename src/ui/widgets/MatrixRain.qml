@@ -276,6 +276,8 @@ Item {
         id: nativeRain
         anchors.fill: parent
         visible: root.nativePrimitiveMode
+        layer.enabled: root.nativePrimitiveMode
+        layer.smooth: false
         rainColor: root.rainColor
         glowColor: root.glowColor
         effectEnabled: root.effectEnabled
