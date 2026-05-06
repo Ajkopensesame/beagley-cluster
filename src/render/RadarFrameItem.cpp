@@ -416,8 +416,6 @@ void appendBaseMapLayer(RadarVectorRoot *root,
         ? 0.0
         : qMax<qreal>(4.0, qMin(targetSize.width(), targetSize.height()) * 0.012);
     const QRectF itemBounds(0, 0, targetSize.width(), qMax<qreal>(1.0, targetSize.height() - bottomGuard));
-    const qreal cellWidth = blockStep * plan.scaleX;
-    const qreal cellHeight = blockStep * plan.scaleY;
     const int sampleStride = qMax(2, blockStep / 4);
 
     QHash<QRgb, QVector<RadarSample>> samplesByColor;
@@ -491,10 +489,13 @@ void appendBaseMapLayer(RadarVectorRoot *root,
             return;
         }
 
-        const qreal itemX = (startX - plan.sourceRect.left()) * plan.scaleX;
-        const qreal itemY = (rowY - plan.sourceRect.top()) * plan.scaleY;
-        const qreal itemEndX = (endX - plan.sourceRect.left()) * plan.scaleX;
-        const QPointF center((itemX + itemEndX) * 0.5, itemY + cellHeight * 0.5);
+        const int exclusiveEndX = qMin(endX, plan.right + 1);
+        const int exclusiveEndY = qMin(rowY + blockStep, plan.bottom + 1);
+        const qreal itemX = qRound((startX - plan.sourceRect.left()) * plan.scaleX);
+        const qreal itemY = qRound((rowY - plan.sourceRect.top()) * plan.scaleY);
+        const qreal itemEndX = qRound((exclusiveEndX - plan.sourceRect.left()) * plan.scaleX);
+        const qreal itemEndY = qRound((exclusiveEndY - plan.sourceRect.top()) * plan.scaleY);
+        const QPointF center((itemX + itemEndX) * 0.5, (itemY + itemEndY) * 0.5);
         if (circular) {
             const qreal dx = center.x() - plan.clipCenter.x();
             const qreal dy = center.y() - plan.clipCenter.y();
@@ -505,8 +506,8 @@ void appendBaseMapLayer(RadarVectorRoot *root,
 
         const QRectF rect = QRectF(itemX,
                                    itemY,
-                                   qMax<qreal>(1.0, itemEndX - itemX + 0.75),
-                                   qMax<qreal>(1.0, cellHeight + 0.75))
+                                   qMax<qreal>(1.0, itemEndX - itemX),
+                                   qMax<qreal>(1.0, itemEndY - itemY))
                                 .intersected(itemBounds);
         if (rect.isEmpty()) {
             return;
@@ -608,19 +609,6 @@ void appendRadarGuides(RadarVectorRoot *root, const QSize &targetSize)
         }
     }
 
-    QVector<QPointF> vertical;
-    vertical << QPointF(center.x(), targetSize.height() * 0.08)
-             << QPointF(center.x(), targetSize.height() * 0.92);
-    if (auto *node = makeLineNode(vertical, guideColor, 1.0f)) {
-        root->appendChildNode(node);
-    }
-
-    QVector<QPointF> horizontal;
-    horizontal << QPointF(targetSize.width() * 0.20, center.y())
-               << QPointF(targetSize.width() * 0.80, center.y());
-    if (auto *node = makeLineNode(horizontal, guideColor, 1.0f)) {
-        root->appendChildNode(node);
-    }
 }
 } // namespace
 
