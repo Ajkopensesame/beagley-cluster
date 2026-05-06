@@ -197,6 +197,9 @@ set(BEAGLEY_QML_FILES
     src/ui/widgets/MapLibreGaugeBackplate.qml
     src/ui/widgets/MapVehicleMarker.qml
     src/ui/widgets/WeatherCorners.qml
+    src/ui/widgets/WeatherDetailPanel.qml
+    src/ui/widgets/RadarDetailPanel.qml
+    src/ui/widgets/MusicDetailPanel.qml
     src/ui/widgets/WeatherMoodIcon.qml
     src/ui/widgets/BomCatalog.js
     src/ui/widgets/HighBeamHalo.qml
