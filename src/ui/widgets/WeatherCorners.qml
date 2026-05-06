@@ -1046,7 +1046,7 @@ Item {
                 : root.tallDetailMode
                 ? "#58FFE1"
                 : (root.expandedMode === "music" ? "#58FFE1" : "#5C4B90")
-            clip: true
+            clip: false
 
             MouseArea {
                 anchors.fill: parent
@@ -1545,34 +1545,52 @@ Item {
                 anchors.margins: 20
                 visible: root.expandedMode === "radar"
 
-                Column {
+                Item {
+                    id: radarPanel
                     anchors.fill: parent
-                    spacing: 9
 
-                    Row {
-                        width: parent.width
-                        height: 34
-                        spacing: 10
+                    Rectangle {
+                        id: radarHeader
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        height: 44
+                        color: "#070B12"
+                        border.width: 1
+                        border.color: "#245866"
+
+                        Rectangle {
+                            anchors.left: parent.left
+                            anchors.top: parent.top
+                            anchors.bottom: parent.bottom
+                            width: 6
+                            color: root.radarStatus === "LIVE" ? "#58FFE1" : "#FFD36B"
+                        }
 
                         Text {
-                            width: parent.width * 0.58
+                            anchors.left: parent.left
+                            anchors.leftMargin: 16
                             anchors.verticalCenter: parent.verticalCenter
-                            text: "RADAR"
+                            width: parent.width * 0.46
+                            text: "GPS RADAR"
                             color: "#F7FBFF"
                             font.family: root.monoFont
-                            font.pixelSize: 14
+                            font.pixelSize: 19
                             font.weight: Font.Bold
                             font.letterSpacing: 0
                             elide: Text.ElideRight
                         }
 
                         Text {
-                            width: parent.width * 0.42 - 10
+                            anchors.right: parent.right
+                            anchors.rightMargin: 16
                             anchors.verticalCenter: parent.verticalCenter
-                            text: root.radarStatus === "LIVE" ? root.radarFrameDisplayLabel() : root.radarStatus
-                            color: root.radarStatus === "LIVE" ? "#9DB4FF" : "#FFD36B"
+                            width: parent.width * 0.44
+                            text: (root.radarStatus === "LIVE" ? "LIVE  " : root.radarStatus + "  ")
+                                + root.radarFrameDisplayLabel()
+                            color: root.radarStatus === "LIVE" ? "#58FFE1" : "#FFD36B"
                             font.family: root.monoFont
-                            font.pixelSize: 11
+                            font.pixelSize: 13
                             font.weight: Font.Bold
                             font.letterSpacing: 0
                             horizontalAlignment: Text.AlignRight
@@ -1581,169 +1599,264 @@ Item {
                     }
 
                     Rectangle {
-                        width: parent.width
-                        height: Math.max(410, parent.height - 112)
-                        radius: root.modalRadius
-                        color: "#050812"
+                        id: radarScope
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: radarHeader.bottom
+                        anchors.topMargin: 10
+                        anchors.bottom: radarTimeline.top
+                        anchors.bottomMargin: 10
+                        color: "#030B11"
                         border.width: 1
-                        border.color: "#254854"
+                        border.color: root.radarStatus === "LIVE" ? "#2B7B88" : "#564C2C"
                         clip: false
 
                         Rectangle {
-                            id: radarScope
-                            anchors.fill: parent
-                            anchors.margins: 12
-                            radius: root.modalSmallRadius
-                            color: "#061017"
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.top: parent.top
+                            height: 30
+                            color: "#06131B"
                             border.width: 1
-                            border.color: root.radarStatus === "LIVE" ? "#2C6A74" : "#3A334A"
+                            border.color: "#183B47"
 
-                            Rectangle {
-                                anchors.centerIn: parent
-                                width: Math.min(parent.width, parent.height) * 0.90
-                                height: width
-                                radius: root.embeddedSafePopups ? 0 : width / 2
-                                color: "#07141C"
-                                border.width: 1
-                                border.color: "#123641"
-                            }
-
-                            Repeater {
-                                model: [0.22, 0.44, 0.66, 0.88]
-
-                                Rectangle {
-                                    anchors.centerIn: radarScope
-                                    width: Math.min(radarScope.width, radarScope.height) * modelData
-                                    height: width
-                                    radius: root.embeddedSafePopups ? 0 : width / 2
-                                    color: "transparent"
-                                    border.width: 1
-                                    border.color: index === 3 ? "#22606C" : "#17434D"
-                                }
-                            }
-
-                            Rectangle {
-                                anchors.centerIn: parent
-                                width: 1
-                                height: parent.height - 24
-                                color: "#16424C"
-                            }
-
-                            Rectangle {
-                                anchors.centerIn: parent
-                                width: parent.width - 24
-                                height: 1
-                                color: "#16424C"
-                            }
-
-                            Repeater {
-                                model: [
-                                    { "x": 0.12, "y": 0.62, "w": 0.045, "h": 0.025, "c": "#25D7FF" },
-                                    { "x": 0.18, "y": 0.66, "w": 0.060, "h": 0.032, "c": "#25D7FF" },
-                                    { "x": 0.25, "y": 0.70, "w": 0.075, "h": 0.040, "c": "#25D7FF" },
-                                    { "x": 0.34, "y": 0.76, "w": 0.082, "h": 0.046, "c": "#25D7FF" },
-                                    { "x": 0.43, "y": 0.82, "w": 0.088, "h": 0.052, "c": "#25D7FF" },
-                                    { "x": 0.28, "y": 0.61, "w": 0.050, "h": 0.030, "c": "#FFD75A" },
-                                    { "x": 0.40, "y": 0.69, "w": 0.056, "h": 0.030, "c": "#FFD75A" },
-                                    { "x": 0.50, "y": 0.76, "w": 0.044, "h": 0.026, "c": "#FF7045" },
-                                    { "x": 0.12, "y": 0.44, "w": 0.026, "h": 0.020, "c": "#FFD75A" },
-                                    { "x": 0.72, "y": 0.30, "w": 0.030, "h": 0.020, "c": "#26E38F" }
-                                ]
-
-                                Rectangle {
-                                    x: Math.round(radarScope.width * modelData.x)
-                                    y: Math.round(radarScope.height * modelData.y)
-                                    width: Math.max(8, Math.round(radarScope.width * modelData.w))
-                                    height: Math.max(6, Math.round(radarScope.height * modelData.h))
-                                    radius: root.embeddedSafePopups ? 0 : Math.min(width, height) / 2
-                                    color: modelData.c
-                                    border.width: 1
-                                    border.color: "#F7FBFF"
-                                }
-                            }
-
-                            Rectangle {
-                                width: 64
-                                height: 64
-                                radius: root.embeddedSafePopups ? 0 : 32
-                                anchors.centerIn: parent
-                                color: "#090D15"
-                                border.width: 2
-                                border.color: root.radarStatus === "LIVE" ? "#58FFE1" : "#FFD36B"
-
-                                WidgetLocal.RadarGlyph {
-                                    anchors.centerIn: parent
-                                    width: 42
-                                    height: 42
-                                    primaryColor: "#F7FBFF"
-                                    accentColor: root.radarStatus === "LIVE" ? "#58FFE1" : "#FFD36B"
-                                    active: root.radarStatus === "LIVE"
-                                }
-                            }
-
-                            Rectangle {
+                            Text {
                                 anchors.left: parent.left
+                                anchors.leftMargin: 12
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: parent.width * 0.50
+                                text: root.radarSiteName.length > 0 ? root.radarSiteName : "GPS AREA"
+                                color: "#F7FBFF"
+                                font.family: root.monoFont
+                                font.pixelSize: 12
+                                font.weight: Font.Bold
+                                font.letterSpacing: 0
+                                elide: Text.ElideRight
+                            }
+
+                            Text {
                                 anchors.right: parent.right
-                                anchors.bottom: parent.bottom
-                                height: 48
-                                color: "#070B13"
-                                border.width: 1
-                                border.color: "#182A36"
-
-                                Row {
-                                    anchors.fill: parent
-                                    anchors.leftMargin: 12
-                                    anchors.rightMargin: 12
-                                    spacing: 10
-
-                                    Text {
-                                        width: parent.width * 0.36
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        text: root.radarStatus === "LIVE" ? "LIVE RADAR" : root.radarStatus
-                                        color: root.radarStatus === "LIVE" ? "#58FFE1" : "#FFD36B"
-                                        font.family: root.monoFont
-                                        font.pixelSize: 15
-                                        font.weight: Font.Bold
-                                        font.letterSpacing: 0
-                                        elide: Text.ElideRight
-                                    }
-
-                                    Text {
-                                        width: parent.width * 0.34
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        text: root.radarSiteName.length > 0 ? root.radarSiteName : "GPS AREA"
-                                        color: "#F7FBFF"
-                                        font.family: root.monoFont
-                                        font.pixelSize: 13
-                                        font.weight: Font.Bold
-                                        font.letterSpacing: 0
-                                        horizontalAlignment: Text.AlignHCenter
-                                        elide: Text.ElideRight
-                                    }
-
-                                    Text {
-                                        width: parent.width * 0.30 - 20
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        text: root.radarFrameDisplayLabel()
-                                        color: "#9DB4FF"
-                                        font.family: root.monoFont
-                                        font.pixelSize: 12
-                                        font.weight: Font.Bold
-                                        font.letterSpacing: 0
-                                        horizontalAlignment: Text.AlignRight
-                                        elide: Text.ElideRight
-                                    }
-                                }
+                                anchors.rightMargin: 12
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: parent.width * 0.42
+                                text: root.radarProduct.length > 0
+                                    ? root.radarProduct
+                                    : root.formatDistanceKm(root.radarSiteDistanceKm)
+                                color: "#9DB4FF"
+                                font.family: root.monoFont
+                                font.pixelSize: 11
+                                font.weight: Font.Bold
+                                font.letterSpacing: 0
+                                horizontalAlignment: Text.AlignRight
+                                elide: Text.ElideRight
                             }
                         }
 
+                        Repeater {
+                            model: [0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875]
+
+                            Rectangle {
+                                x: Math.round(radarScope.width * modelData)
+                                y: 30
+                                width: 1
+                                height: radarScope.height - 66
+                                color: index === 3 ? "#236777" : "#123641"
+                            }
+                        }
+
+                        Repeater {
+                            model: [0.18, 0.32, 0.46, 0.60, 0.74, 0.88]
+
+                            Rectangle {
+                                x: 12
+                                y: Math.round(30 + (radarScope.height - 66) * modelData)
+                                width: radarScope.width - 24
+                                height: 1
+                                color: index === 2 ? "#236777" : "#123641"
+                            }
+                        }
+
+                        Repeater {
+                            model: [
+                                { "x": 0.13, "y": 0.62, "w": 0.05, "h": 0.025, "c": "#25D7FF" },
+                                { "x": 0.19, "y": 0.65, "w": 0.065, "h": 0.030, "c": "#25D7FF" },
+                                { "x": 0.27, "y": 0.69, "w": 0.080, "h": 0.035, "c": "#25D7FF" },
+                                { "x": 0.36, "y": 0.73, "w": 0.086, "h": 0.040, "c": "#25D7FF" },
+                                { "x": 0.46, "y": 0.78, "w": 0.092, "h": 0.045, "c": "#25D7FF" },
+                                { "x": 0.32, "y": 0.60, "w": 0.052, "h": 0.026, "c": "#FFD75A" },
+                                { "x": 0.43, "y": 0.66, "w": 0.058, "h": 0.026, "c": "#FFD75A" },
+                                { "x": 0.56, "y": 0.72, "w": 0.046, "h": 0.024, "c": "#FF7045" },
+                                { "x": 0.15, "y": 0.42, "w": 0.028, "h": 0.020, "c": "#FFD75A" },
+                                { "x": 0.73, "y": 0.28, "w": 0.032, "h": 0.020, "c": "#26E38F" },
+                                { "x": 0.70, "y": 0.45, "w": 0.018, "h": 0.012, "c": "#F7FBFF" }
+                            ]
+
+                            Rectangle {
+                                x: Math.round(radarScope.width * modelData.x)
+                                y: Math.round(radarScope.height * modelData.y)
+                                width: Math.max(8, Math.round(radarScope.width * modelData.w))
+                                height: Math.max(5, Math.round(radarScope.height * modelData.h))
+                                color: modelData.c
+                                border.width: 1
+                                border.color: "#02060B"
+                            }
+                        }
+
+                        Rectangle {
+                            id: ownVehicle
+                            anchors.centerIn: parent
+                            width: 54
+                            height: 54
+                            color: "#02060B"
+                            border.width: 2
+                            border.color: root.radarStatus === "LIVE" ? "#58FFE1" : "#FFD36B"
+
+                            Rectangle {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                anchors.top: parent.top
+                                anchors.topMargin: 8
+                                width: 6
+                                height: 18
+                                color: "#F7FBFF"
+                            }
+
+                            Rectangle {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                anchors.bottom: parent.bottom
+                                anchors.bottomMargin: 8
+                                width: 6
+                                height: 18
+                                color: "#F7FBFF"
+                            }
+
+                            Rectangle {
+                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.left: parent.left
+                                anchors.leftMargin: 8
+                                width: 18
+                                height: 6
+                                color: "#F7FBFF"
+                            }
+
+                            Rectangle {
+                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.right: parent.right
+                                anchors.rightMargin: 8
+                                width: 18
+                                height: 6
+                                color: "#F7FBFF"
+                            }
+
+                            Rectangle {
+                                anchors.centerIn: parent
+                                width: 10
+                                height: 10
+                                color: root.radarStatus === "LIVE" ? "#58FFE1" : "#FFD36B"
+                            }
+                        }
+
+                        Text {
+                            x: 14
+                            y: 42
+                            text: "N"
+                            color: "#9DB4FF"
+                            font.family: root.monoFont
+                            font.pixelSize: 11
+                            font.weight: Font.Bold
+                            font.letterSpacing: 0
+                        }
+
+                        Text {
+                            anchors.right: parent.right
+                            anchors.rightMargin: 14
+                            y: 42
+                            text: "E"
+                            color: "#9DB4FF"
+                            font.family: root.monoFont
+                            font.pixelSize: 11
+                            font.weight: Font.Bold
+                            font.letterSpacing: 0
+                        }
+
+                        Rectangle {
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.bottom: parent.bottom
+                            height: 36
+                            color: "#050A12"
+                            border.width: 1
+                            border.color: "#172E3B"
+
+                            Text {
+                                anchors.left: parent.left
+                                anchors.leftMargin: 12
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: parent.width * 0.42
+                                text: "RADAR RETURNS"
+                                color: "#58FFE1"
+                                font.family: root.monoFont
+                                font.pixelSize: 12
+                                font.weight: Font.Bold
+                                font.letterSpacing: 0
+                                elide: Text.ElideRight
+                            }
+
+                            Text {
+                                anchors.right: parent.right
+                                anchors.rightMargin: 12
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: parent.width * 0.48
+                                text: root.radarSourceLabel()
+                                color: "#F7FBFF"
+                                font.family: root.monoFont
+                                font.pixelSize: 11
+                                font.weight: Font.Bold
+                                font.letterSpacing: 0
+                                horizontalAlignment: Text.AlignRight
+                                elide: Text.ElideRight
+                            }
+                        }
                     }
 
                     Row {
-                        width: parent.width
-                        height: 54
+                        id: radarTimeline
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: radarData.top
+                        anchors.bottomMargin: 10
+                        height: 30
+                        spacing: 6
+
+                        Repeater {
+                            model: ["-30", "-20", "-10", "NOW", "+10", "+20"]
+
+                            Rectangle {
+                                width: (radarTimeline.width - 30) / 6
+                                height: radarTimeline.height
+                                color: modelData === "NOW" ? "#123D45" : "#071019"
+                                border.width: 1
+                                border.color: modelData === "NOW" ? "#58FFE1" : "#1E3B48"
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: modelData
+                                    color: modelData === "NOW" ? "#F7FBFF" : "#9DB4FF"
+                                    font.family: root.monoFont
+                                    font.pixelSize: 11
+                                    font.weight: Font.Bold
+                                    font.letterSpacing: 0
+                                }
+                            }
+                        }
+                    }
+
+                    Row {
+                        id: radarData
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        height: 58
                         spacing: 10
-                        visible: true
 
                         Repeater {
                             model: [
@@ -1753,12 +1866,11 @@ Item {
                             ]
 
                             Rectangle {
-                                width: (parent.width - 20) / 3
-                                height: parent.height
-                                radius: root.modalRadius
-                                color: "#0D111C"
+                                width: (radarData.width - 20) / 3
+                                height: radarData.height
+                                color: "#0B111B"
                                 border.width: 1
-                                border.color: "#202C3A"
+                                border.color: "#243949"
 
                                 Column {
                                     anchors.fill: parent
