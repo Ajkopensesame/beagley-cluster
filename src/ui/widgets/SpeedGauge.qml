@@ -388,17 +388,17 @@ Item {
             )
             fps: root.embeddedSafeMode ? 1.0 : (root.lowEffectMode ? 7 : 12)
             speedMultiplier: root.embeddedSafeMode ? 0.18 : (root.lowEffectMode ? 0.11 : 0.20)
-            density: root.embeddedSafeMode ? 0.82 : (root.lowEffectMode ? 0.15 : 0.30)
+            density: root.embeddedSafeMode ? 0.46 : (root.lowEffectMode ? 0.15 : 0.30)
             glowSpeed: root.embeddedSafeMode ? 0.82 : (root.lowEffectMode ? 0.58 : 0.72)
             glowFloor: root.embeddedSafeMode ? 0.18 : (root.lowEffectMode ? 0.22 : 0.28)
             glowBlur: root.embeddedSafeMode ? 6.5 : 7.0
             driftScale: root.embeddedSafeMode ? 0.86 : 0.90
             charChangeChance: root.embeddedSafeMode ? 0.010 : (root.lowEffectMode ? 0.032 : 0.026)
-            fontPx: root.embeddedSafeMode ? 16 : (root.lowEffectMode ? 18 : 12)
+            fontPx: root.embeddedSafeMode ? 20 : (root.lowEffectMode ? 18 : 12)
             fadeAlpha: root.embeddedSafeMode ? 0.030 : (root.lowEffectMode ? 0.075 : 0.024)
-            tailLength: root.embeddedSafeMode ? 26 : (root.lowEffectMode ? 12 : 48)
-            headAlpha: root.embeddedSafeMode ? 0.90 : (root.lowEffectMode ? 0.74 : 0.92)
-            tailMinAlpha: root.embeddedSafeMode ? 0.070 : (root.lowEffectMode ? 0.025 : 0.12)
+            tailLength: root.embeddedSafeMode ? 14 : (root.lowEffectMode ? 12 : 48)
+            headAlpha: root.embeddedSafeMode ? 0.82 : (root.lowEffectMode ? 0.74 : 0.92)
+            tailMinAlpha: root.embeddedSafeMode ? 0.045 : (root.lowEffectMode ? 0.025 : 0.12)
         }
 
         DialChrome {
