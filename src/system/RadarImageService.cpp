@@ -182,6 +182,28 @@ void RadarImageService::setPosition(double lat, double lng, bool valid)
     refresh();
 }
 
+void RadarImageService::setAnimationEnabled(bool enabled)
+{
+    if (m_animationEnabled == enabled) {
+        return;
+    }
+
+    m_animationEnabled = enabled;
+    emit animationEnabledChanged();
+
+    if (!m_animationEnabled) {
+        m_animationTimer.stop();
+        if (!m_animationFrames.isEmpty()) {
+            showAnimationFrame(m_animationFrames.size() - 1);
+        }
+        return;
+    }
+
+    if (m_animationFrames.size() > 1 && !m_animationTimer.isActive()) {
+        m_animationTimer.start();
+    }
+}
+
 void RadarImageService::refresh()
 {
     if (!m_positionValid) {
@@ -267,7 +289,7 @@ void RadarImageService::startTimelineFetch(const QList<RadarFrame> &frames)
         && m_imageUrl.isLocalFile()
         && QFileInfo::exists(m_imageUrl.toLocalFile())) {
         m_inFlight = false;
-        if (m_animationFrames.size() > 1 && !m_animationTimer.isActive()) {
+        if (m_animationEnabled && m_animationFrames.size() > 1 && !m_animationTimer.isActive()) {
             m_animationTimer.start();
         }
         setStatus(QStringLiteral("LIVE"));
@@ -524,10 +546,14 @@ void RadarImageService::publishTimelineFrames()
     }
     setReady(true);
     setStatus(QStringLiteral("LIVE"));
-    advanceAnimationFrame();
-    if (m_animationFrames.size() > 1 && !m_animationTimer.isActive()) {
+    if (m_animationEnabled) {
+        advanceAnimationFrame();
+    } else {
+        showAnimationFrame(m_animationFrames.size() - 1);
+    }
+    if (m_animationEnabled && m_animationFrames.size() > 1 && !m_animationTimer.isActive()) {
         m_animationTimer.start();
-    } else if (m_animationFrames.size() <= 1) {
+    } else if (!m_animationEnabled || m_animationFrames.size() <= 1) {
         m_animationTimer.stop();
     }
     qInfo().noquote() << "[RadarImage] timeline ready"
@@ -543,9 +569,27 @@ void RadarImageService::advanceAnimationFrame()
         return;
     }
 
+    if (!m_animationEnabled) {
+        m_animationTimer.stop();
+        showAnimationFrame(m_animationFrames.size() - 1);
+        return;
+    }
+
     const int nextIndex = (m_animationIndex + 1) % m_animationFrames.size();
-    if (m_animationIndex != nextIndex) {
-        m_animationIndex = nextIndex;
+    showAnimationFrame(nextIndex);
+}
+
+void RadarImageService::showAnimationFrame(int index)
+{
+    if (m_animationFrames.isEmpty()) {
+        m_animationTimer.stop();
+        setReady(false);
+        return;
+    }
+
+    const int boundedIndex = qBound(0, index, m_animationFrames.size() - 1);
+    if (m_animationIndex != boundedIndex) {
+        m_animationIndex = boundedIndex;
         emit frameIndexChanged();
     }
 

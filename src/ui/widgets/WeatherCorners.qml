@@ -812,6 +812,11 @@ Item {
         }
     }
 
+    function syncRadarAnimationMode() {
+        if (radarServiceAvailable)
+            radarImage.animationEnabled = root.active && root.expandedMode === "radar"
+    }
+
     function handlePositionChanged() {
         if (!root.active)
             return
@@ -918,6 +923,7 @@ Item {
     onSafeLngChanged: handlePositionChanged()
     onLivePositionValidChanged: handlePositionChanged()
     onExpandedModeChanged: {
+        root.syncRadarAnimationMode()
         if (!root.active)
             return
         if (root.expandedMode === "temp" || root.expandedMode === "radar") {
@@ -1102,6 +1108,7 @@ Item {
     }
 
     onActiveChanged: {
+        root.syncRadarAnimationMode()
         if (!active) {
             expandedMode = ""
             startupRefreshTimer.stop()
@@ -1111,6 +1118,7 @@ Item {
     }
 
     Component.onCompleted: {
+        root.syncRadarAnimationMode()
         if (root.active)
             startupRefreshTimer.start()
         if (root.cleanText(root.initialExpandedMode).length > 0)

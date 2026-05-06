@@ -79,10 +79,11 @@ Window {
     readonly property bool embeddedDirectMapCamera: renderProfile === "embedded"
     readonly property bool embeddedGaugeMatrixRainMode: renderProfile === "embedded"
     readonly property bool gaugeMatrixRainEnabled: !effectsOff
-    readonly property real gaugeMatrixRainSharedPhase: (gaugeMatrixRainEnabled && !embeddedGaugeMatrixRainMode)
+    readonly property bool sharedGaugeMatrixRainClock: gaugeMatrixRainEnabled && embeddedGaugeMatrixRainMode
+    readonly property real gaugeMatrixRainSharedPhase: (gaugeMatrixRainEnabled && (sharedGaugeMatrixRainClock || !embeddedGaugeMatrixRainMode))
         ? sharedEffectPhase
         : NaN
-    readonly property bool sharedEffectClockEnabled: !effectsOff && !embeddedEffectBudgetMode
+    readonly property bool sharedEffectClockEnabled: !effectsOff && (!embeddedEffectBudgetMode || sharedGaugeMatrixRainClock)
     readonly property bool stressMapMotionEnabled: stressScene && !lowEffectMode && renderProfile !== "embedded"
     readonly property int gaugeShellSize: 840
     readonly property int gaugePodSize: 704
@@ -384,7 +385,7 @@ Window {
         if (isFinite(zoomValue))
             hints.zoom = Math.min(zoomValue, root.activeMapMaxZoom)
         if (!isFinite(Number(hints.zoomAnimationMs)))
-            hints.zoomAnimationMs = 760
+            hints.zoomAnimationMs = root.embeddedEffectBudgetMode ? 520 : 760
         return hints
     }
 
@@ -749,7 +750,7 @@ Window {
 
     Timer {
         id: effectClock
-        interval: root.embeddedHighEffectBudgetMode ? 300 : (root.lowEffectMode ? 140 : 90)
+        interval: root.embeddedEffectBudgetMode ? 950 : (root.embeddedHighEffectBudgetMode ? 300 : (root.lowEffectMode ? 140 : 90))
         running: root.sharedEffectClockEnabled
         repeat: true
         onTriggered: root.sharedEffectPhase += interval / 1000.0

@@ -43,14 +43,23 @@ Item {
     readonly property bool lowEffectMode: effectLevel === "low"
     readonly property bool embeddedSafeMode: Qt.platform.os === "linux"
     readonly property bool embeddedHighEffectBudgetMode: embeddedSafeMode && effectLevel === "high"
+    readonly property bool embeddedLowEffectBudgetMode: embeddedSafeMode && lowEffectMode
     readonly property bool useSharedPhase: !isNaN(sharedPhase)
     readonly property real renderScale: 1.0
-    readonly property real effectiveDensity: embeddedHighEffectBudgetMode ? Math.min(density, 0.80) : density
-    readonly property int effectiveTailLength: embeddedHighEffectBudgetMode ? Math.min(tailLength, 36) : tailLength
-    readonly property real effectiveCharChangeChance: embeddedHighEffectBudgetMode ? Math.min(charChangeChance, 0.016) : charChangeChance
-    readonly property real effectiveGlowBlur: embeddedHighEffectBudgetMode ? Math.min(glowBlur, 7.0) : glowBlur
+    readonly property real effectiveDensity: embeddedLowEffectBudgetMode
+        ? Math.min(density, 0.84)
+        : (embeddedHighEffectBudgetMode ? Math.min(density, 0.80) : density)
+    readonly property int effectiveTailLength: embeddedLowEffectBudgetMode
+        ? Math.min(tailLength, 26)
+        : (embeddedHighEffectBudgetMode ? Math.min(tailLength, 36) : tailLength)
+    readonly property real effectiveCharChangeChance: embeddedLowEffectBudgetMode
+        ? Math.min(charChangeChance, 0.012)
+        : (embeddedHighEffectBudgetMode ? Math.min(charChangeChance, 0.016) : charChangeChance)
+    readonly property real effectiveGlowBlur: embeddedLowEffectBudgetMode
+        ? Math.min(glowBlur, 5.5)
+        : (embeddedHighEffectBudgetMode ? Math.min(glowBlur, 7.0) : glowBlur)
     readonly property real effectiveFps: lowEffectMode
-        ? Math.min(fps, embeddedHighEffectBudgetMode ? 2.0 : 8.0)
+        ? Math.min(fps, embeddedSafeMode ? 1.1 : 8.0)
         : (embeddedHighEffectBudgetMode ? Math.min(fps, 2.0) : fps)
     property var greekGlyphs: [
         "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
@@ -214,10 +223,10 @@ Item {
 
                 var step = root.speedMultiplier * (0.35 + 0.65 * pulse) * root.driftScale
                 if (root.lowEffectMode)
-                    step = Math.max(step, 0.10 + Math.random() * 0.045)
+                    step = Math.max(step, root.embeddedLowEffectBudgetMode ? 0.052 + Math.random() * 0.024 : 0.10 + Math.random() * 0.045)
                 root.drops[i] += step
 
-                var churnChance = Math.max(root.effectiveCharChangeChance * pulse, root.lowEffectMode ? 0.030 : 0.0)
+                var churnChance = Math.max(root.effectiveCharChangeChance * pulse, root.embeddedLowEffectBudgetMode ? 0.008 : (root.lowEffectMode ? 0.030 : 0.0))
                 if (isActive && Math.random() < churnChance) {
                     if (Math.random() < 0.18) {
                         root.assignVerse(i)

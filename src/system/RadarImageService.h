@@ -22,6 +22,7 @@ class RadarImageService : public QObject
     Q_PROPERTY(int frameCount READ frameCount NOTIFY frameCountChanged)
     Q_PROPERTY(int frameIndex READ frameIndex NOTIFY frameIndexChanged)
     Q_PROPERTY(bool ready READ ready NOTIFY readyChanged)
+    Q_PROPERTY(bool animationEnabled READ animationEnabled WRITE setAnimationEnabled NOTIFY animationEnabledChanged)
 
 public:
     explicit RadarImageService(const QByteArray &userAgent, QObject *parent = nullptr);
@@ -33,9 +34,11 @@ public:
     int frameCount() const { return m_animationFrames.size(); }
     int frameIndex() const { return m_animationIndex; }
     bool ready() const { return m_ready; }
+    bool animationEnabled() const { return m_animationEnabled; }
 
     Q_INVOKABLE void setPosition(double lat, double lng, bool valid);
     Q_INVOKABLE void refresh();
+    Q_INVOKABLE void setAnimationEnabled(bool enabled);
 
 signals:
     void imageChanged();
@@ -45,6 +48,7 @@ signals:
     void frameCountChanged();
     void frameIndexChanged();
     void readyChanged();
+    void animationEnabledChanged();
 
 private:
     struct RadarTile {
@@ -94,6 +98,7 @@ private:
     bool composeRadarImage(const QList<RadarTile> &tiles, const CenterTile &center, const RadarFrame &frame);
     void publishTimelineFrames();
     void advanceAnimationFrame();
+    void showAnimationFrame(int index);
     CenterTile centerTile() const;
     QUrl tileUrl(const RadarFrame &frame, int row, int col) const;
     QUrl mapTileUrl(int row, int col) const;
@@ -124,6 +129,7 @@ private:
     double m_lng = 0.0;
     bool m_positionValid = false;
     bool m_ready = false;
+    bool m_animationEnabled = true;
     bool m_inFlight = false;
     int m_sequence = 0;
     int m_pendingTiles = 0;
