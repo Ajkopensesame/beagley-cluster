@@ -82,15 +82,23 @@ bool sampleRadarReturnColor(QRgb pixel, QColor &color, bool glow)
     return true;
 }
 
-bool sampleBaseMapColor(QRgb pixel, QColor &color)
+enum class BaseMapClass {
+    None,
+    Water,
+    Forest,
+    Road,
+    Land
+};
+
+BaseMapClass classifyBaseMapPixel(QRgb pixel)
 {
     if (qAlpha(pixel) < 24) {
-        return false;
+        return BaseMapClass::None;
     }
 
     QColor ignored;
     if (sampleRadarReturnColor(pixel, ignored, false)) {
-        return false;
+        return BaseMapClass::None;
     }
 
     const int r = qRed(pixel);
@@ -101,47 +109,50 @@ bool sampleBaseMapColor(QRgb pixel, QColor &color)
     const int spread = maxChannel - minChannel;
 
     if (maxChannel < 48) {
-        return false;
+        return BaseMapClass::None;
     }
 
-    // Drop small dark labels from the source PNG. They turn into unreadable
-    // speckle after vectorization and make the radar panel look dirty.
-    if (maxChannel < 112 && spread < 54) {
-        return false;
+    // Dark labels and single-pixel map details are the main source of the
+    // "static" look when converted to primitive rectangles.
+    if (maxChannel < 116 && spread < 64) {
+        return BaseMapClass::None;
     }
 
-    const bool water = b > r + 12 && g > r + 5 && b > 92;
-    const bool forest = g > r + 8 && g > b + 1 && g > 78;
-    const bool road = r > 126 && g > 74 && b > 64 && r > b + 18 && r >= g + 4;
-    const bool boundary = b > r + 10 && r > 82 && g < 150 && spread > 24;
-    const bool neutralLand = spread < 58 && maxChannel > 118;
+    const bool water = b > r + 10 && g > r + 4 && b > 82;
+    const bool forest = g > r + 8 && g > b + 1 && g > 72;
+    const bool road = r > 128 && g > 78 && b > 62 && r > b + 16 && r >= g;
+    const bool neutralLand = spread < 56 && maxChannel > 126;
 
     if (water) {
-        color = QColor(83, 113, 123, 208);
-        return true;
+        return BaseMapClass::Water;
     }
     if (forest) {
-        color = QColor(79, 122, 83, 172);
-        return true;
+        return BaseMapClass::Forest;
     }
     if (road) {
-        color = QColor(168, 96, 88, 122);
-        return true;
-    }
-    if (boundary) {
-        color = QColor(130, 91, 134, 108);
-        return true;
+        return BaseMapClass::Road;
     }
     if (neutralLand) {
-        color = QColor(142, 145, 132, 178);
-        return true;
+        return BaseMapClass::Land;
     }
+    return BaseMapClass::None;
+}
 
-    color = QColor(qBound(0, int(r * 0.48), 190),
-                   qBound(0, int(g * 0.50), 194),
-                   qBound(0, int(b * 0.50), 196),
-                   118);
-    return true;
+QColor baseMapClassColor(BaseMapClass klass)
+{
+    switch (klass) {
+    case BaseMapClass::Water:
+        return QColor(40, 88, 98, 162);
+    case BaseMapClass::Forest:
+        return QColor(37, 84, 58, 130);
+    case BaseMapClass::Road:
+        return QColor(118, 86, 78, 116);
+    case BaseMapClass::Land:
+        return QColor(56, 62, 72, 118);
+    case BaseMapClass::None:
+        break;
+    }
+    return QColor();
 }
 
 QSGGeometryNode *makeRectNode(const QRectF &rect, const QColor &color)
@@ -317,8 +328,8 @@ bool sampleRadarGlow(QRgb pixel, QColor &color)
 
 int baseMapStep(const SamplePlan &plan, const QSize &targetSize)
 {
-    const int minimumStep = targetSize.width() >= 480 ? 3 : (targetSize.width() >= 180 ? 4 : 6);
-    return qBound(minimumStep, int(qCeil(plan.sourceToTarget * 1.55)), 8);
+    const int minimumStep = targetSize.width() >= 480 ? 14 : (targetSize.width() >= 180 ? 16 : 20);
+    return qBound(minimumStep, int(qCeil(plan.sourceToTarget * 3.2)), 28);
 }
 
 int radarReturnStep(const SamplePlan &plan, const QSize &targetSize)
@@ -394,22 +405,135 @@ void appendSampleLayer(RadarVectorRoot *root,
                       << "circular" << circular;
 }
 
+void appendBaseMapLayer(RadarVectorRoot *root,
+                        const QImage &image,
+                        const QSize &targetSize,
+                        bool circular,
+                        const SamplePlan &plan,
+                        int blockStep)
+{
+    const qreal bottomGuard = circular
+        ? 0.0
+        : qMax<qreal>(4.0, qMin(targetSize.width(), targetSize.height()) * 0.012);
+    const QRectF itemBounds(0, 0, targetSize.width(), qMax<qreal>(1.0, targetSize.height() - bottomGuard));
+    const qreal cellWidth = blockStep * plan.scaleX;
+    const qreal cellHeight = blockStep * plan.scaleY;
+    const int sampleStride = qMax(2, blockStep / 4);
+
+    QHash<QRgb, QVector<RadarSample>> samplesByColor;
+    int totalSamples = 0;
+    int acceptedBlocks = 0;
+    for (int y = plan.top; y <= plan.bottom; y += blockStep) {
+        for (int x = plan.left; x <= plan.right; x += blockStep) {
+            int water = 0;
+            int forest = 0;
+            int road = 0;
+            int land = 0;
+            int valid = 0;
+            int total = 0;
+            const int yEnd = qMin(plan.bottom, y + blockStep - 1);
+            const int xEnd = qMin(plan.right, x + blockStep - 1);
+            for (int sy = y; sy <= yEnd; sy += sampleStride) {
+                const QRgb *line = reinterpret_cast<const QRgb *>(image.constScanLine(sy));
+                for (int sx = x; sx <= xEnd; sx += sampleStride) {
+                    ++total;
+                    const BaseMapClass klass = classifyBaseMapPixel(line[sx]);
+                    switch (klass) {
+                    case BaseMapClass::Water:
+                        ++water;
+                        ++valid;
+                        break;
+                    case BaseMapClass::Forest:
+                        ++forest;
+                        ++valid;
+                        break;
+                    case BaseMapClass::Road:
+                        ++road;
+                        ++valid;
+                        break;
+                    case BaseMapClass::Land:
+                        ++land;
+                        ++valid;
+                        break;
+                    case BaseMapClass::None:
+                        break;
+                    }
+                }
+            }
+
+            ++totalSamples;
+            if (valid < qMax(2, total / 4)) {
+                continue;
+            }
+
+            BaseMapClass dominant = BaseMapClass::Land;
+            int dominantCount = land;
+            if (water > dominantCount) {
+                dominant = BaseMapClass::Water;
+                dominantCount = water;
+            }
+            if (forest > dominantCount) {
+                dominant = BaseMapClass::Forest;
+                dominantCount = forest;
+            }
+            if (road > dominantCount && road >= qMax(2, valid / 3)) {
+                dominant = BaseMapClass::Road;
+                dominantCount = road;
+            }
+            if (dominantCount < qMax(2, valid / 3)) {
+                continue;
+            }
+
+            const qreal itemX = (x - plan.sourceRect.left()) * plan.scaleX;
+            const qreal itemY = (y - plan.sourceRect.top()) * plan.scaleY;
+            const QPointF center(itemX + cellWidth * 0.5, itemY + cellHeight * 0.5);
+            if (circular) {
+                const qreal dx = center.x() - plan.clipCenter.x();
+                const qreal dy = center.y() - plan.clipCenter.y();
+                if ((dx * dx) + (dy * dy) > plan.clipRadiusSquared) {
+                    continue;
+                }
+            }
+
+            const QRectF rect = QRectF(itemX,
+                                       itemY,
+                                       qMax<qreal>(1.0, cellWidth + 0.65),
+                                       qMax<qreal>(1.0, cellHeight + 0.65))
+                                    .intersected(itemBounds);
+            if (rect.isEmpty()) {
+                continue;
+            }
+
+            const QColor color = baseMapClassColor(dominant);
+            if (!color.isValid()) {
+                continue;
+            }
+            samplesByColor[quantizedColorKey(color, 8)].append(RadarSample{rect});
+            ++acceptedBlocks;
+        }
+    }
+
+    for (auto it = samplesByColor.constBegin(); it != samplesByColor.constEnd(); ++it) {
+        if (auto *node = makeSampleNode(it.value(), colorFromKey(it.key()))) {
+            root->appendChildNode(node);
+        }
+    }
+
+    qInfo().noquote() << "[RadarFrameItem] base-map-blocks samples" << totalSamples
+                      << "accepted" << acceptedBlocks
+                      << "step" << blockStep << "target"
+                      << targetSize.width() << "x" << targetSize.height()
+                      << "colors" << samplesByColor.size()
+                      << "circular" << circular;
+}
+
 void appendRadarSamples(RadarVectorRoot *root, const QImage &image, const QSize &targetSize, bool circular)
 {
     const SamplePlan plan = makeSamplePlan(image, targetSize);
     const int baseStep = baseMapStep(plan, targetSize);
     const int returnStep = radarReturnStep(plan, targetSize);
 
-    appendSampleLayer(root,
-                      image,
-                      targetSize,
-                      circular,
-                      plan,
-                      baseStep,
-                      1.22,
-                      24,
-                      sampleBaseMapColor,
-                      "base-map");
+    appendBaseMapLayer(root, image, targetSize, circular, plan, baseStep);
     appendSampleLayer(root,
                       image,
                       targetSize,
