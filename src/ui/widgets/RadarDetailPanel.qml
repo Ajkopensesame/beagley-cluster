@@ -143,7 +143,7 @@ Item {
             RadarFrameItem {
                 id: radarPreview
                 anchors.fill: parent
-                source: panel.radarFrameReady ? panel.radarFrameUrl : ""
+                source: panel.visible && panel.radarFrameReady ? panel.radarFrameUrl : ""
                 circular: false
                 backgroundVisible: true
                 guidesVisible: false

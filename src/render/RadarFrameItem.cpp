@@ -8,6 +8,7 @@
 #include <QSGGeometry>
 #include <QSGGeometryNode>
 #include <QSGNode>
+#include <QtGlobal>
 #include <QtMath>
 
 namespace {
@@ -35,6 +36,12 @@ QRgb quantizedColorKey(const QColor &color, int bucket = 16)
 QColor colorFromKey(QRgb key)
 {
     return QColor(qRed(key), qGreen(key), qBlue(key), qAlpha(key));
+}
+
+bool radarFrameLogsEnabled()
+{
+    static const bool enabled = qEnvironmentVariableIntValue("BEAGLEY_RADAR_FRAME_LOGS") > 0;
+    return enabled;
 }
 
 bool sampleRadarReturnColor(QRgb pixel, QColor &color, bool glow)
@@ -401,11 +408,13 @@ void appendSampleLayer(RadarVectorRoot *root,
         }
     }
 
-    qInfo().noquote() << "[RadarFrameItem]" << label << "samples" << totalSamples
-                      << "step" << sampleStep << "target"
-                      << targetSize.width() << "x" << targetSize.height()
-                      << "colors" << samplesByColor.size()
-                      << "circular" << circular;
+    if (radarFrameLogsEnabled()) {
+        qInfo().noquote() << "[RadarFrameItem]" << label << "samples" << totalSamples
+                          << "step" << sampleStep << "target"
+                          << targetSize.width() << "x" << targetSize.height()
+                          << "colors" << samplesByColor.size()
+                          << "circular" << circular;
+    }
 }
 
 void appendBaseMapLayer(RadarVectorRoot *root,
@@ -554,13 +563,15 @@ void appendBaseMapLayer(RadarVectorRoot *root,
         }
     }
 
-    qInfo().noquote() << "[RadarFrameItem] base-map-strips cells" << totalCells
-                      << "accepted" << acceptedCells
-                      << "strips" << stripCount
-                      << "step" << blockStep << "target"
-                      << targetSize.width() << "x" << targetSize.height()
-                      << "colors" << samplesByColor.size()
-                      << "circular" << circular;
+    if (radarFrameLogsEnabled()) {
+        qInfo().noquote() << "[RadarFrameItem] base-map-strips cells" << totalCells
+                          << "accepted" << acceptedCells
+                          << "strips" << stripCount
+                          << "step" << blockStep << "target"
+                          << targetSize.width() << "x" << targetSize.height()
+                          << "colors" << samplesByColor.size()
+                          << "circular" << circular;
+    }
 }
 
 void appendRadarSamples(RadarVectorRoot *root, const QImage &image, const QSize &targetSize, bool circular)
@@ -704,7 +715,9 @@ void RadarFrameItem::loadSource()
     }
 
     m_image = image.convertToFormat(QImage::Format_ARGB32);
-    qInfo().noquote() << "[RadarFrameItem] loaded" << path << m_image.width() << "x" << m_image.height();
+    if (radarFrameLogsEnabled()) {
+        qInfo().noquote() << "[RadarFrameItem] loaded" << path << m_image.width() << "x" << m_image.height();
+    }
     setReady(true);
     update();
 }

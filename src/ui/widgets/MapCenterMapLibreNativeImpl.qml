@@ -26,6 +26,7 @@ Item {
     property var mapConnectivity: ({})
     property string styleUrl: ""
     property bool interactionEnabled: true
+    property bool vehicleMarkerEnabled: true
 
     readonly property bool embeddedMapThrottle: (typeof BEAGLEY_RENDER_PROFILE !== "undefined"
         && String(BEAGLEY_RENDER_PROFILE) === "embedded")
@@ -107,10 +108,12 @@ Item {
     }
     readonly property real vehicleAnchorY: guidanceCameraActive ? 0.84 : 0.5
     readonly property var routeFeatureCollection: routeGeoJson(nativeRoutePath)
-    readonly property real embeddedCoordinateSyncDelta: 0.000015
-    readonly property real embeddedMapBearingSyncDelta: 1.25
-    readonly property real embeddedVehicleBearingSyncDelta: 1.0
-    readonly property real embeddedZoomSyncDelta: 0.08
+    readonly property real embeddedCoordinateSyncDelta: 0.000008
+    readonly property real embeddedMapBearingSyncDelta: 0.75
+    readonly property real embeddedVehicleBearingSyncDelta: 0.65
+    readonly property real embeddedZoomSyncDelta: 0.04
+    readonly property int nativeCameraAnimationMs: embeddedMapThrottle ? 135 : 0
+    readonly property int nativeVehicleAnimationMs: embeddedMapThrottle ? 115 : 0
 
     function hasKeys(value) {
         return !!value && Object.keys(value).length > 0
@@ -363,6 +366,36 @@ Item {
         }
     }
 
+    Behavior on nativeCenterLat {
+        enabled: root.embeddedMapThrottle
+        NumberAnimation { duration: root.nativeCameraAnimationMs; easing.type: Easing.Linear }
+    }
+
+    Behavior on nativeCenterLng {
+        enabled: root.embeddedMapThrottle
+        NumberAnimation { duration: root.nativeCameraAnimationMs; easing.type: Easing.Linear }
+    }
+
+    Behavior on nativeMapBearing {
+        enabled: root.embeddedMapThrottle
+        NumberAnimation { duration: root.nativeCameraAnimationMs; easing.type: Easing.Linear }
+    }
+
+    Behavior on nativeVehicleLat {
+        enabled: root.embeddedMapThrottle
+        NumberAnimation { duration: root.nativeVehicleAnimationMs; easing.type: Easing.Linear }
+    }
+
+    Behavior on nativeVehicleLng {
+        enabled: root.embeddedMapThrottle
+        NumberAnimation { duration: root.nativeVehicleAnimationMs; easing.type: Easing.Linear }
+    }
+
+    Behavior on nativeVehicleBearing {
+        enabled: root.embeddedMapThrottle
+        NumberAnimation { duration: root.nativeVehicleAnimationMs; easing.type: Easing.Linear }
+    }
+
     Component.onCompleted: {
         nativeRoutePath = resolvedRoutePath
         nativeStyleUrl = resolvedStyleUrl
@@ -371,7 +404,7 @@ Item {
 
     Timer {
         id: embeddedViewSyncTimer
-        interval: 120
+        interval: 90
         running: root.embeddedMapThrottle
         repeat: true
         onTriggered: root.syncNativeView(false)
@@ -451,7 +484,7 @@ Item {
         width: 54
         height: 64
         z: 40
-        visible: root.nativeVehicleVisible
+        visible: root.vehicleMarkerEnabled && root.nativeVehicleVisible
         x: Math.round(parent.width * 0.5 - width * 0.5)
         y: Math.round(parent.height * root.vehicleAnchorY - height * 0.54)
         rotation: root.nativeVehicleBearing

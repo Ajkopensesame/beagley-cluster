@@ -337,7 +337,10 @@ int main(int argc, char *argv[])
             qputenv("QSG_RHI_BACKEND", QByteArrayLiteral("opengl"));
         }
         if (!qEnvironmentVariableIsSet("QSG_RENDER_LOOP")) {
-            qputenv("QSG_RENDER_LOOP", QByteArrayLiteral("basic"));
+            qputenv("QSG_RENDER_LOOP",
+                    renderProfile == QLatin1String("embedded")
+                        ? QByteArrayLiteral("threaded")
+                        : QByteArrayLiteral("basic"));
         }
     } else if (renderProfile == QLatin1String("embedded") && !qEnvironmentVariableIsSet("QSG_RENDER_LOOP")) {
         qputenv("QSG_RENDER_LOOP", QByteArrayLiteral("threaded"));

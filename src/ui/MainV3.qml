@@ -750,7 +750,7 @@ Window {
 
     Timer {
         id: effectClock
-        interval: root.embeddedEffectBudgetMode ? 950 : (root.embeddedHighEffectBudgetMode ? 300 : (root.lowEffectMode ? 140 : 90))
+        interval: root.embeddedEffectBudgetMode ? 1000 : (root.embeddedHighEffectBudgetMode ? 300 : (root.lowEffectMode ? 140 : 90))
         running: root.sharedEffectClockEnabled
         repeat: true
         onTriggered: root.sharedEffectPhase += interval / 1000.0
@@ -932,6 +932,7 @@ Window {
             mapConnectivity: navigation.mapConnectivity
             tileUrlTemplate: root.activeMapTileUrlTemplate
             styleUrl: root.activeMapStyleUrl
+            mapLibreNativeVehicleMarkerEnabled: false
             snapshotRefreshMs: 0
             videoEnabled: false
             videoUrl: ""

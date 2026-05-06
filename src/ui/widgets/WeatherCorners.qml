@@ -814,7 +814,7 @@ Item {
 
     function syncRadarAnimationMode() {
         if (radarServiceAvailable)
-            radarImage.animationEnabled = root.active && root.expandedMode === "radar"
+            radarImage.animationEnabled = root.active && (root.expandedMode === "" || root.expandedMode === "radar")
     }
 
     function handlePositionChanged() {
