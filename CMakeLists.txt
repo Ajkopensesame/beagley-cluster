@@ -84,6 +84,8 @@ qt_add_executable(beagley_cluster
     src/navigation/NavigationService.cpp
     src/render/ClusterRenderModel.cpp
     src/render/NativeRasterMapItem.cpp
+    src/render/NativeMatrixRainItem.cpp
+    src/render/NativeMatrixRainItem.h
     src/render/RasterFrameItem.cpp
     src/render/RasterFrameItem.h
     src/render/RadarFrameItem.cpp

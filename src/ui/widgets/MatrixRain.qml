@@ -1,4 +1,5 @@
 import QtQuick 2.15
+import BeagleY 1.0
 
 Item {
     id: root
@@ -44,6 +45,7 @@ Item {
     readonly property bool embeddedSafeMode: Qt.platform.os === "linux"
     readonly property bool embeddedHighEffectBudgetMode: embeddedSafeMode && effectLevel === "high"
     readonly property bool embeddedLowEffectBudgetMode: embeddedSafeMode && lowEffectMode
+    readonly property bool nativePrimitiveMode: embeddedSafeMode && !effectDisabled
     readonly property bool useSharedPhase: !isNaN(sharedPhase)
     readonly property real renderScale: 1.0
     readonly property real effectiveDensity: embeddedLowEffectBudgetMode
@@ -116,6 +118,13 @@ Item {
     }
 
     function resetDrops() {
+        if (root.nativePrimitiveMode) {
+            drops = []
+            activeColumns = []
+            verseStreams = []
+            verseOffsets = []
+            return
+        }
         if (root.effectDisabled) {
             drops = []
             activeColumns = []
@@ -140,6 +149,7 @@ Item {
     Canvas {
         id: canvas
         anchors.fill: parent
+        visible: !root.nativePrimitiveMode
         renderTarget: root.embeddedSafeMode ? Canvas.Image : Canvas.FramebufferObject
         antialiasing: false
         smooth: false
@@ -153,6 +163,9 @@ Item {
             const drawWidth = Math.max(1, canvas.canvasSize.width)
             const drawHeight = Math.max(1, canvas.canvasSize.height)
             ctx.clearRect(0, 0, drawWidth, drawHeight)
+
+            if (root.nativePrimitiveMode)
+                return
 
             if (root.effectDisabled) {
                 return
@@ -259,13 +272,37 @@ Item {
         }
     }
 
+    NativeMatrixRainItem {
+        id: nativeRain
+        anchors.fill: parent
+        visible: root.nativePrimitiveMode
+        rainColor: root.rainColor
+        glowColor: root.glowColor
+        effectEnabled: root.effectEnabled
+        effectLevel: root.effectLevel
+        phase: root.useSharedPhase ? root.sharedPhase : root.timePhase
+        columns: root.columns
+        fontPx: root.fontPx
+        density: root.effectiveDensity
+        speedMultiplier: root.speedMultiplier
+        driftScale: root.driftScale
+        tailLength: root.effectiveTailLength
+        headAlpha: root.headAlpha
+        tailMinAlpha: root.tailMinAlpha
+        circularMask: root.circularMask
+        maskCenterX: root.maskCenterX
+        maskCenterY: root.maskCenterY
+        maskRadius: root.maskRadius
+    }
+
     Timer {
         interval: Math.round(1000 / Math.max(0.25, root.effectiveFps))
         running: !root.effectDisabled && !root.useSharedPhase
         repeat: true
         onTriggered: {
             root.timePhase += interval / 1000.0
-            canvas.requestPaint()
+            if (!root.nativePrimitiveMode)
+                canvas.requestPaint()
         }
     }
 
@@ -280,12 +317,13 @@ Item {
     onSharedPhaseChanged: {
         if (root.useSharedPhase && !root.effectDisabled) {
             root.timePhase = root.sharedPhase
-            canvas.requestPaint()
+            if (!root.nativePrimitiveMode)
+                canvas.requestPaint()
         }
     }
-    onCircularMaskChanged: canvas.requestPaint()
-    onMaskCenterXChanged: canvas.requestPaint()
-    onMaskCenterYChanged: canvas.requestPaint()
-    onMaskRadiusChanged: canvas.requestPaint()
+    onCircularMaskChanged: if (!root.nativePrimitiveMode) canvas.requestPaint()
+    onMaskCenterXChanged: if (!root.nativePrimitiveMode) canvas.requestPaint()
+    onMaskCenterYChanged: if (!root.nativePrimitiveMode) canvas.requestPaint()
+    onMaskRadiusChanged: if (!root.nativePrimitiveMode) canvas.requestPaint()
     Component.onCompleted: resetDrops()
 }
