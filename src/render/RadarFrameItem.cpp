@@ -328,8 +328,8 @@ bool sampleRadarGlow(QRgb pixel, QColor &color)
 
 int baseMapStep(const SamplePlan &plan, const QSize &targetSize)
 {
-    const int minimumStep = targetSize.width() >= 480 ? 14 : (targetSize.width() >= 180 ? 16 : 20);
-    return qBound(minimumStep, int(qCeil(plan.sourceToTarget * 3.2)), 28);
+    const int minimumStep = targetSize.width() >= 480 ? 8 : (targetSize.width() >= 180 ? 10 : 14);
+    return qBound(minimumStep, int(qCeil(plan.sourceToTarget * 2.4)), 18);
 }
 
 int radarReturnStep(const SamplePlan &plan, const QSize &targetSize)
@@ -421,96 +421,127 @@ void appendBaseMapLayer(RadarVectorRoot *root,
     const int sampleStride = qMax(2, blockStep / 4);
 
     QHash<QRgb, QVector<RadarSample>> samplesByColor;
-    int totalSamples = 0;
-    int acceptedBlocks = 0;
-    for (int y = plan.top; y <= plan.bottom; y += blockStep) {
-        for (int x = plan.left; x <= plan.right; x += blockStep) {
-            int water = 0;
-            int forest = 0;
-            int road = 0;
-            int land = 0;
-            int valid = 0;
-            int total = 0;
-            const int yEnd = qMin(plan.bottom, y + blockStep - 1);
-            const int xEnd = qMin(plan.right, x + blockStep - 1);
-            for (int sy = y; sy <= yEnd; sy += sampleStride) {
-                const QRgb *line = reinterpret_cast<const QRgb *>(image.constScanLine(sy));
-                for (int sx = x; sx <= xEnd; sx += sampleStride) {
-                    ++total;
-                    const BaseMapClass klass = classifyBaseMapPixel(line[sx]);
-                    switch (klass) {
-                    case BaseMapClass::Water:
-                        ++water;
-                        ++valid;
-                        break;
-                    case BaseMapClass::Forest:
-                        ++forest;
-                        ++valid;
-                        break;
-                    case BaseMapClass::Road:
-                        ++road;
-                        ++valid;
-                        break;
-                    case BaseMapClass::Land:
-                        ++land;
-                        ++valid;
-                        break;
-                    case BaseMapClass::None:
-                        break;
-                    }
+    int totalCells = 0;
+    int acceptedCells = 0;
+    int stripCount = 0;
+
+    auto cellClass = [&](int x, int y) -> BaseMapClass {
+        int water = 0;
+        int forest = 0;
+        int road = 0;
+        int land = 0;
+        int valid = 0;
+        int total = 0;
+        const int yEnd = qMin(plan.bottom, y + blockStep - 1);
+        const int xEnd = qMin(plan.right, x + blockStep - 1);
+        for (int sy = y; sy <= yEnd; sy += sampleStride) {
+            const QRgb *line = reinterpret_cast<const QRgb *>(image.constScanLine(sy));
+            for (int sx = x; sx <= xEnd; sx += sampleStride) {
+                ++total;
+                const BaseMapClass klass = classifyBaseMapPixel(line[sx]);
+                switch (klass) {
+                case BaseMapClass::Water:
+                    ++water;
+                    ++valid;
+                    break;
+                case BaseMapClass::Forest:
+                    ++forest;
+                    ++valid;
+                    break;
+                case BaseMapClass::Road:
+                    ++road;
+                    ++valid;
+                    break;
+                case BaseMapClass::Land:
+                    ++land;
+                    ++valid;
+                    break;
+                case BaseMapClass::None:
+                    break;
                 }
             }
-
-            ++totalSamples;
-            if (valid < qMax(2, total / 4)) {
-                continue;
-            }
-
-            BaseMapClass dominant = BaseMapClass::Land;
-            int dominantCount = land;
-            if (water > dominantCount) {
-                dominant = BaseMapClass::Water;
-                dominantCount = water;
-            }
-            if (forest > dominantCount) {
-                dominant = BaseMapClass::Forest;
-                dominantCount = forest;
-            }
-            if (road > dominantCount && road >= qMax(2, valid / 3)) {
-                dominant = BaseMapClass::Road;
-                dominantCount = road;
-            }
-            if (dominantCount < qMax(2, valid / 3)) {
-                continue;
-            }
-
-            const qreal itemX = (x - plan.sourceRect.left()) * plan.scaleX;
-            const qreal itemY = (y - plan.sourceRect.top()) * plan.scaleY;
-            const QPointF center(itemX + cellWidth * 0.5, itemY + cellHeight * 0.5);
-            if (circular) {
-                const qreal dx = center.x() - plan.clipCenter.x();
-                const qreal dy = center.y() - plan.clipCenter.y();
-                if ((dx * dx) + (dy * dy) > plan.clipRadiusSquared) {
-                    continue;
-                }
-            }
-
-            const QRectF rect = QRectF(itemX,
-                                       itemY,
-                                       qMax<qreal>(1.0, cellWidth + 0.65),
-                                       qMax<qreal>(1.0, cellHeight + 0.65))
-                                    .intersected(itemBounds);
-            if (rect.isEmpty()) {
-                continue;
-            }
-
-            const QColor color = baseMapClassColor(dominant);
-            if (!color.isValid()) {
-                continue;
-            }
-            samplesByColor[quantizedColorKey(color, 8)].append(RadarSample{rect});
-            ++acceptedBlocks;
         }
+
+        if (valid < qMax(2, total / 4)) {
+            return BaseMapClass::None;
+        }
+
+        BaseMapClass dominant = BaseMapClass::Land;
+        int dominantCount = land;
+        if (water > dominantCount) {
+            dominant = BaseMapClass::Water;
+            dominantCount = water;
+        }
+        if (forest > dominantCount) {
+            dominant = BaseMapClass::Forest;
+            dominantCount = forest;
+        }
+        if (road > dominantCount && road >= qMax(2, valid / 3)) {
+            dominant = BaseMapClass::Road;
+            dominantCount = road;
+        }
+        if (dominantCount < qMax(2, valid / 3)) {
+            return BaseMapClass::None;
+        }
+        return dominant;
+    };
+
+    auto appendStrip = [&](int rowY, int startX, int endX, BaseMapClass klass) {
+        if (klass == BaseMapClass::None || endX <= startX) {
+            return;
+        }
+
+        const qreal itemX = (startX - plan.sourceRect.left()) * plan.scaleX;
+        const qreal itemY = (rowY - plan.sourceRect.top()) * plan.scaleY;
+        const qreal itemEndX = (endX - plan.sourceRect.left()) * plan.scaleX;
+        const QPointF center((itemX + itemEndX) * 0.5, itemY + cellHeight * 0.5);
+        if (circular) {
+            const qreal dx = center.x() - plan.clipCenter.x();
+            const qreal dy = center.y() - plan.clipCenter.y();
+            if ((dx * dx) + (dy * dy) > plan.clipRadiusSquared) {
+                return;
+            }
+        }
+
+        const QRectF rect = QRectF(itemX,
+                                   itemY,
+                                   qMax<qreal>(1.0, itemEndX - itemX + 0.75),
+                                   qMax<qreal>(1.0, cellHeight + 0.75))
+                                .intersected(itemBounds);
+        if (rect.isEmpty()) {
+            return;
+        }
+
+        const QColor color = baseMapClassColor(klass);
+        if (!color.isValid()) {
+            return;
+        }
+        samplesByColor[quantizedColorKey(color, 8)].append(RadarSample{rect});
+        ++stripCount;
+    };
+
+    for (int y = plan.top; y <= plan.bottom; y += blockStep) {
+        BaseMapClass runClass = BaseMapClass::None;
+        int runStart = plan.left;
+        for (int x = plan.left; x <= plan.right; x += blockStep) {
+            ++totalCells;
+            const BaseMapClass klass = cellClass(x, y);
+            if (klass != BaseMapClass::None) {
+                ++acceptedCells;
+            }
+            if (x == plan.left) {
+                runClass = klass;
+                runStart = x;
+                continue;
+            }
+            if (klass == runClass) {
+                continue;
+            }
+            appendStrip(y, runStart, x, runClass);
+            runClass = klass;
+            runStart = x;
+        }
+        appendStrip(y, runStart, plan.right + blockStep, runClass);
     }
 
     for (auto it = samplesByColor.constBegin(); it != samplesByColor.constEnd(); ++it) {
@@ -519,8 +550,9 @@ void appendBaseMapLayer(RadarVectorRoot *root,
         }
     }
 
-    qInfo().noquote() << "[RadarFrameItem] base-map-blocks samples" << totalSamples
-                      << "accepted" << acceptedBlocks
+    qInfo().noquote() << "[RadarFrameItem] base-map-strips cells" << totalCells
+                      << "accepted" << acceptedCells
+                      << "strips" << stripCount
                       << "step" << blockStep << "target"
                       << targetSize.width() << "x" << targetSize.height()
                       << "colors" << samplesByColor.size()

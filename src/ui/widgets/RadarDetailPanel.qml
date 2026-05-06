@@ -158,30 +158,6 @@ Item {
             }
 
             Repeater {
-                model: [0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875]
-
-                Rectangle {
-                    x: Math.round(radarMapBody.width * modelData)
-                    y: 0
-                    width: 1
-                    height: radarMapBody.height
-                    color: index === 3 ? "#236777" : "#123641"
-                }
-            }
-
-            Repeater {
-                model: [0.18, 0.32, 0.46, 0.60, 0.74, 0.88]
-
-                Rectangle {
-                    x: 12
-                    y: Math.round(radarMapBody.height * modelData)
-                    width: radarMapBody.width - 24
-                    height: 1
-                    color: index === 2 ? "#236777" : "#123641"
-                }
-            }
-
-            Repeater {
                 model: [
                     { "x": 0.13, "y": 0.62, "w": 0.05, "h": 0.025, "c": "#25D7FF" },
                     { "x": 0.19, "y": 0.65, "w": 0.065, "h": 0.030, "c": "#25D7FF" },
@@ -206,82 +182,6 @@ Item {
                     border.width: 1
                     border.color: "#02060B"
                 }
-            }
-
-            Rectangle {
-                id: ownVehicle
-                anchors.centerIn: parent
-                width: 54
-                height: 54
-                color: "#02060B"
-                border.width: 2
-                border.color: panel.radarStatus === "LIVE" ? "#58FFE1" : "#FFD36B"
-
-                Rectangle {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.top: parent.top
-                    anchors.topMargin: 8
-                    width: 6
-                    height: 18
-                    color: "#F7FBFF"
-                }
-
-                Rectangle {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.bottom: parent.bottom
-                    anchors.bottomMargin: 8
-                    width: 6
-                    height: 18
-                    color: "#F7FBFF"
-                }
-
-                Rectangle {
-                    anchors.verticalCenter: parent.verticalCenter
-                    anchors.left: parent.left
-                    anchors.leftMargin: 8
-                    width: 18
-                    height: 6
-                    color: "#F7FBFF"
-                }
-
-                Rectangle {
-                    anchors.verticalCenter: parent.verticalCenter
-                    anchors.right: parent.right
-                    anchors.rightMargin: 8
-                    width: 18
-                    height: 6
-                    color: "#F7FBFF"
-                }
-
-                Rectangle {
-                    anchors.centerIn: parent
-                    width: 10
-                    height: 10
-                    color: panel.radarStatus === "LIVE" ? "#58FFE1" : "#FFD36B"
-                }
-            }
-
-            Text {
-                x: 14
-                y: 12
-                text: "N"
-                color: "#9DB4FF"
-                font.family: panel.monoFont
-                font.pixelSize: 11
-                font.weight: Font.Bold
-                font.letterSpacing: 0
-            }
-
-            Text {
-                anchors.right: parent.right
-                anchors.rightMargin: 14
-                y: 12
-                text: "E"
-                color: "#9DB4FF"
-                font.family: panel.monoFont
-                font.pixelSize: 11
-                font.weight: Font.Bold
-                font.letterSpacing: 0
             }
         }
 
