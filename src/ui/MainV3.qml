@@ -217,6 +217,8 @@ Window {
     property bool mapMenuOpen: false
     property bool navControlsOpen: false
     property bool searchKeyboardOpen: false
+    property bool weatherPopupOpen: false
+    readonly property bool mapSuppressedForModal: weatherPopupOpen && effectiveMapRenderer === "maplibre-native"
     property string mapMenuStage: "search"
     property var pendingDestination: ({})
     property int selectedRouteIndex: 0
@@ -483,6 +485,31 @@ Window {
             pendingDestination = navigation.activeRoute.destination
         root.mapMenuStage = (root.availableRouteOptions().length > 0 && hasActiveRoute) ? "routes" : "search"
         root.syncSelectedRouteIndexFromNavigation()
+    }
+
+    function centerMapMode() {
+        if (root.mapSuppressedForModal)
+            return "placeholder"
+
+        if ((typeof BEAGLEY_NO_MAP !== "undefined" && BEAGLEY_NO_MAP)
+                && !(root.effectiveMapRenderer === "native"
+                    || root.effectiveMapRenderer === "native-online"
+                    || root.effectiveMapRenderer === "maplibre-native")) {
+            return "placeholder"
+        }
+
+        if (root.effectiveMapRenderer === "maplibre-native")
+            return "maplibre-native"
+
+        if (root.effectiveMapRenderer === "web"
+                && !(typeof BEAGLEY_FORCE_SNAPSHOT_MAP !== "undefined" && BEAGLEY_FORCE_SNAPSHOT_MAP)) {
+            return "web"
+        }
+
+        if (root.effectiveMapRenderer === "native" || root.effectiveMapRenderer === "native-online")
+            return "native"
+
+        return "snapshot"
     }
 
     function chooseMapMenuTab(stage) {
@@ -884,19 +911,8 @@ Window {
             anchors.topMargin: root.mapLibreSafeVerticalInset
             anchors.bottomMargin: root.mapLibreSafeVerticalInset
             clip: false
-            mode: ((typeof BEAGLEY_NO_MAP !== "undefined" && BEAGLEY_NO_MAP)
-                && !(root.effectiveMapRenderer === "native"
-                    || root.effectiveMapRenderer === "native-online"
-                    || root.effectiveMapRenderer === "maplibre-native"))
-                ? "placeholder"
-                : ((root.effectiveMapRenderer === "maplibre-native")
-                    ? "maplibre-native"
-                    : ((root.effectiveMapRenderer === "web"
-                    && !(typeof BEAGLEY_FORCE_SNAPSHOT_MAP !== "undefined" && BEAGLEY_FORCE_SNAPSHOT_MAP))
-                    ? "web"
-                    : ((root.effectiveMapRenderer === "native" || root.effectiveMapRenderer === "native-online")
-                        ? "native"
-                        : "snapshot")))
+            visible: !root.mapSuppressedForModal
+            mode: root.centerMapMode()
             interactionEnabled: !((typeof BEAGLEY_EMBEDDED_DISPLAY !== "undefined" && BEAGLEY_EMBEDDED_DISPLAY) || false)
             lat: root.displayMapLat
             lng: root.displayMapLng
@@ -964,13 +980,14 @@ Window {
             width: 54
             height: 64
             z: 180
-            visible: root.mapVehicleMarkerVisible
+            visible: root.mapVehicleMarkerVisible && !root.mapSuppressedForModal
             x: Math.round(parent.width * 0.5 - width * 0.5)
             y: Math.round(parent.height * (root.mapVehicleMarkerGuidanceAnchor ? 0.84 : 0.5) - height * 0.54)
             bearing: root.displayMapBearing
         }
 
         W.WeatherCorners {
+            id: weatherCorners
             anchors.fill: parent
             z: 260
             theme: appTheme
@@ -988,6 +1005,14 @@ Window {
 
             onMapMenuRequested: {
                 root.openMapMenu()
+            }
+
+            onExpandedModeChanged: {
+                root.weatherPopupOpen = expandedMode !== ""
+            }
+
+            Component.onCompleted: {
+                root.weatherPopupOpen = expandedMode !== ""
             }
         }
 
