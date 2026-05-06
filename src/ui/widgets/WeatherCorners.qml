@@ -23,6 +23,8 @@ Item {
     readonly property string monoFont: theme && theme.fontMono ? theme.fontMono : "Oxanium"
     readonly property bool embeddedSafeMode: Qt.platform.os === "linux"
     readonly property bool embeddedSafePopups: embeddedSafeMode
+    readonly property int modalRadius: embeddedSafePopups ? 0 : 8
+    readonly property int modalSmallRadius: embeddedSafePopups ? 0 : 6
     readonly property bool tallDetailMode: expandedMode === "temp" || expandedMode === "radar"
     readonly property int podSize: Math.floor(Math.min(164, Math.max(142, height * 0.228)))
     readonly property int cornerBleed: Math.round(podSize * 0.17)
@@ -1032,7 +1034,7 @@ Item {
                 : Math.floor(Math.min(360, Math.max(272, parent.height * 0.46)))
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.verticalCenter: parent.verticalCenter
-            radius: root.tallDetailMode ? 4 : 8
+            radius: root.embeddedSafePopups ? 0 : (root.tallDetailMode ? 4 : 8)
             color: root.expandedMode === "temp"
                 ? "#070711"
                 : root.expandedMode === "music"
@@ -1098,7 +1100,7 @@ Item {
                     Rectangle {
                         width: parent.width
                         height: parent.height - 30
-                        radius: 8
+                        radius: root.modalRadius
                         color: "#070913"
                         border.width: 1
                         border.color: root.musicPlaying ? "#58FFE1" : "#3C325E"
@@ -1111,7 +1113,7 @@ Item {
                             Rectangle {
                                 width: 96
                                 height: 96
-                                radius: 48
+                                radius: root.embeddedSafePopups ? 0 : 48
                                 anchors.horizontalCenter: parent.horizontalCenter
                                 color: "#05060A"
                                 border.width: 1
@@ -1131,7 +1133,7 @@ Item {
 
                             Rectangle {
                                 width: parent.width
-                                radius: 8
+                                radius: root.modalRadius
                                 color: "#0A0D18"
                                 border.width: 1
                                 border.color: "#22283D"
@@ -1231,7 +1233,7 @@ Item {
                     Rectangle {
                         width: parent.width
                         height: 156
-                        radius: 8
+                        radius: root.modalRadius
                         color: "#0A0D16"
                         border.width: 1
                         border.color: "#233E4B"
@@ -1342,7 +1344,7 @@ Item {
                             Rectangle {
                                 width: (metricsGrid.width - 20) / 3
                                 height: 54
-                                radius: 8
+                                radius: root.modalRadius
                                 color: "#0D111C"
                                 border.width: 1
                                 border.color: "#202C3A"
@@ -1432,7 +1434,7 @@ Item {
                             Rectangle {
                                 width: forecastList.width
                                 height: 43
-                                radius: 6
+                                radius: root.modalSmallRadius
                                 color: index === 0
                                     ? "#101725"
                                     : "#0B0F1A"
@@ -1581,7 +1583,7 @@ Item {
                     Rectangle {
                         width: parent.width
                         height: Math.max(410, parent.height - 112)
-                        radius: 8
+                        radius: root.modalRadius
                         color: "#050812"
                         border.width: 1
                         border.color: "#254854"
@@ -1591,7 +1593,7 @@ Item {
                             id: radarScope
                             anchors.fill: parent
                             anchors.margins: 12
-                            radius: 7
+                            radius: root.modalSmallRadius
                             color: "#061017"
                             border.width: 1
                             border.color: root.radarStatus === "LIVE" ? "#2C6A74" : "#3A334A"
@@ -1600,7 +1602,7 @@ Item {
                                 anchors.centerIn: parent
                                 width: Math.min(parent.width, parent.height) * 0.90
                                 height: width
-                                radius: width / 2
+                                radius: root.embeddedSafePopups ? 0 : width / 2
                                 color: "#07141C"
                                 border.width: 1
                                 border.color: "#123641"
@@ -1613,7 +1615,7 @@ Item {
                                     anchors.centerIn: radarScope
                                     width: Math.min(radarScope.width, radarScope.height) * modelData
                                     height: width
-                                    radius: width / 2
+                                    radius: root.embeddedSafePopups ? 0 : width / 2
                                     color: "transparent"
                                     border.width: 1
                                     border.color: index === 3 ? "#22606C" : "#17434D"
@@ -1653,7 +1655,7 @@ Item {
                                     y: Math.round(radarScope.height * modelData.y)
                                     width: Math.max(8, Math.round(radarScope.width * modelData.w))
                                     height: Math.max(6, Math.round(radarScope.height * modelData.h))
-                                    radius: Math.min(width, height) / 2
+                                    radius: root.embeddedSafePopups ? 0 : Math.min(width, height) / 2
                                     color: modelData.c
                                     border.width: 1
                                     border.color: "#F7FBFF"
@@ -1663,7 +1665,7 @@ Item {
                             Rectangle {
                                 width: 64
                                 height: 64
-                                radius: 32
+                                radius: root.embeddedSafePopups ? 0 : 32
                                 anchors.centerIn: parent
                                 color: "#090D15"
                                 border.width: 2
@@ -1753,7 +1755,7 @@ Item {
                             Rectangle {
                                 width: (parent.width - 20) / 3
                                 height: parent.height
-                                radius: 8
+                                radius: root.modalRadius
                                 color: "#0D111C"
                                 border.width: 1
                                 border.color: "#202C3A"
