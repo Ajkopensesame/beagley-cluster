@@ -328,6 +328,9 @@ bool sampleRadarGlow(QRgb pixel, QColor &color)
 
 int baseMapStep(const SamplePlan &plan, const QSize &targetSize)
 {
+    if (targetSize.width() >= 540 && targetSize.height() >= 300) {
+        return qBound(4, int(qCeil(plan.sourceToTarget * 1.2)), 8);
+    }
     const int minimumStep = targetSize.width() >= 480 ? 8 : (targetSize.width() >= 180 ? 10 : 14);
     return qBound(minimumStep, int(qCeil(plan.sourceToTarget * 2.4)), 18);
 }
