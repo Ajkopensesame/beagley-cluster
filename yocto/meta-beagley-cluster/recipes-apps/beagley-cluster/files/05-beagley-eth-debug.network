@@ -6,8 +6,15 @@ KernelCommandLine=!root=/dev/nfs
 RequiredForOnline=no
 
 [Network]
-# Keep the BBB/debug Ethernet leg reachable without installing a default route.
-# Wi-Fi is the intended internet path for map tiles and other outbound traffic.
+# Keep the BBB/debug Ethernet leg reachable while also accepting a normal
+# modem/shop DHCP lease when eth0 is plugged into infrastructure Ethernet.
 Address=10.24.0.46/24
+DHCP=ipv4
 LLMNR=yes
 MulticastDNS=yes
+
+[DHCPv4]
+ClientIdentifier=mac
+RouteMetric=50
+UseDNS=yes
+UseRoutes=yes
