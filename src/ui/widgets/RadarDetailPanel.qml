@@ -15,6 +15,8 @@ Item {
     readonly property url radarFrameUrl: controller ? controller.radarFrameUrl : ""
     readonly property bool detailRadarReady: controller ? controller.detailRadarReady : false
     readonly property bool radarFrameReady: detailRadarReady && String(radarFrameUrl).length > 0
+    readonly property bool weatherPositionReady: controller ? controller.weatherPositionReady : false
+    readonly property bool radarServiceAvailable: controller ? controller.radarServiceAvailable : false
 
     function formatDistanceKm(value) {
         return controller ? controller.formatDistanceKm(value) : "-- KM"
@@ -26,6 +28,30 @@ Item {
 
     function radarFrameDisplayLabel() {
         return controller ? controller.radarFrameDisplayLabel() : radarStatus
+    }
+
+    function radarUnavailableTitle() {
+        if (!weatherPositionReady)
+            return "WAITING FOR GPS"
+        if (!radarServiceAvailable)
+            return "RADAR SERVICE OFFLINE"
+        if (radarStatus === "LIVE")
+            return "RADAR FRAME LOADING"
+        return radarStatus.length > 0 ? radarStatus : "RADAR SYNC"
+    }
+
+    function radarUnavailableDetail() {
+        if (!weatherPositionReady)
+            return "Live GPS has not reached the weather/radar path yet."
+        if (!radarServiceAvailable)
+            return "Radar renderer is not available in this build."
+        if (radarStatus === "OFFLINE")
+            return "No radar tiles were received. Check BeagleY internet first."
+        if (radarStatus === "NO GPS")
+            return "No valid GPS coordinate is available for radar."
+        if (radarStatus === "SYNC")
+            return "Waiting for the first real radar frame."
+        return "No real radar frame is ready yet."
     }
 
     Rectangle {
@@ -157,30 +183,34 @@ Item {
                 visible: !radarPreview.ready
             }
 
-            Repeater {
-                model: [
-                    { "x": 0.13, "y": 0.62, "w": 0.05, "h": 0.025, "c": "#25D7FF" },
-                    { "x": 0.19, "y": 0.65, "w": 0.065, "h": 0.030, "c": "#25D7FF" },
-                    { "x": 0.27, "y": 0.69, "w": 0.080, "h": 0.035, "c": "#25D7FF" },
-                    { "x": 0.36, "y": 0.73, "w": 0.086, "h": 0.040, "c": "#25D7FF" },
-                    { "x": 0.46, "y": 0.78, "w": 0.092, "h": 0.045, "c": "#25D7FF" },
-                    { "x": 0.32, "y": 0.60, "w": 0.052, "h": 0.026, "c": "#FFD75A" },
-                    { "x": 0.43, "y": 0.66, "w": 0.058, "h": 0.026, "c": "#FFD75A" },
-                    { "x": 0.56, "y": 0.72, "w": 0.046, "h": 0.024, "c": "#FF7045" },
-                    { "x": 0.15, "y": 0.42, "w": 0.028, "h": 0.020, "c": "#FFD75A" },
-                    { "x": 0.73, "y": 0.28, "w": 0.032, "h": 0.020, "c": "#26E38F" },
-                    { "x": 0.70, "y": 0.45, "w": 0.018, "h": 0.012, "c": "#F7FBFF" }
-                ]
+            Column {
+                width: Math.min(parent.width - 42, 360)
+                anchors.centerIn: parent
+                spacing: 10
+                visible: !radarPreview.ready
 
-                Rectangle {
-                    x: Math.round(radarMapBody.width * modelData.x)
-                    y: Math.round(radarMapBody.height * modelData.y)
-                    width: Math.max(8, Math.round(radarMapBody.width * modelData.w))
-                    height: Math.max(5, Math.round(radarMapBody.height * modelData.h))
-                    visible: !radarPreview.ready
-                    color: modelData.c
-                    border.width: 1
-                    border.color: "#02060B"
+                Text {
+                    width: parent.width
+                    text: panel.radarUnavailableTitle()
+                    color: "#FFD36B"
+                    font.family: panel.displayFont
+                    font.pixelSize: 27
+                    font.weight: Font.Bold
+                    font.letterSpacing: 0
+                    horizontalAlignment: Text.AlignHCenter
+                    elide: Text.ElideRight
+                }
+
+                Text {
+                    width: parent.width
+                    text: panel.radarUnavailableDetail()
+                    color: "#F7FBFF"
+                    font.family: panel.monoFont
+                    font.pixelSize: 13
+                    font.weight: Font.Bold
+                    font.letterSpacing: 0
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
                 }
             }
         }
@@ -200,7 +230,7 @@ Item {
                 anchors.leftMargin: 12
                 anchors.verticalCenter: parent.verticalCenter
                 width: parent.width * 0.42
-                text: radarPreview.ready ? "RADAR MAP" : "RADAR RETURNS"
+                text: radarPreview.ready ? "RADAR MAP" : "RADAR STATUS"
                 color: "#58FFE1"
                 font.family: panel.monoFont
                 font.pixelSize: 12

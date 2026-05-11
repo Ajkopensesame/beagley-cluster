@@ -20,6 +20,8 @@ Item {
     readonly property real precipitationMm: controller ? controller.precipitationMm : NaN
     readonly property string weatherWindDir: controller && controller.weatherWindDir ? controller.weatherWindDir : ""
     readonly property real windKph: controller ? controller.windKph : NaN
+    readonly property bool weatherPositionReady: controller ? controller.weatherPositionReady : false
+    readonly property bool liveWeatherReady: weatherStatus === "LIVE" && isFinite(Number(displayTempC))
 
     function currentConditionLabel() {
         return controller ? controller.currentConditionLabel() : panel.weatherStatus
@@ -51,6 +53,28 @@ Item {
 
     function weatherMoodSubLine(value) {
         return controller ? controller.weatherMoodSubLine(value) : panel.weatherStatus
+    }
+
+    function weatherUnavailableTitle() {
+        if (!weatherPositionReady)
+            return "WAITING FOR GPS"
+        if (weatherStatus === "OFFLINE")
+            return "WEATHER OFFLINE"
+        if (weatherStatus === "NO DATA")
+            return "NO WEATHER DATA"
+        return weatherStatus.length > 0 ? weatherStatus : "WEATHER SYNC"
+    }
+
+    function weatherUnavailableDetail() {
+        if (!weatherPositionReady)
+            return "Live GPS has not reached the weather path yet."
+        if (weatherStatus === "OFFLINE")
+            return "No weather response was received. Check BeagleY internet first."
+        if (weatherStatus === "NO DATA")
+            return "No nearby weather station returned a usable observation."
+        if (weatherStatus === "SYNC")
+            return "Waiting for the first live weather update."
+        return "Live weather is not ready yet."
     }
 
     Column {
@@ -100,6 +124,7 @@ Item {
                 anchors.fill: parent
                 anchors.margins: 16
                 spacing: 18
+                visible: panel.liveWeatherReady
 
                 WeatherMoodIcon {
                     width: 116
@@ -181,6 +206,37 @@ Item {
                         font.letterSpacing: 0
                         elide: Text.ElideRight
                     }
+                }
+            }
+
+            Column {
+                width: Math.min(parent.width - 40, 360)
+                anchors.centerIn: parent
+                spacing: 8
+                visible: !panel.liveWeatherReady
+
+                Text {
+                    width: parent.width
+                    text: panel.weatherUnavailableTitle()
+                    color: "#FFD36B"
+                    font.family: panel.displayFont
+                    font.pixelSize: 30
+                    font.weight: Font.Bold
+                    font.letterSpacing: 0
+                    horizontalAlignment: Text.AlignHCenter
+                    elide: Text.ElideRight
+                }
+
+                Text {
+                    width: parent.width
+                    text: panel.weatherUnavailableDetail()
+                    color: "#F7FBFF"
+                    font.family: panel.monoFont
+                    font.pixelSize: 13
+                    font.weight: Font.Bold
+                    font.letterSpacing: 0
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
                 }
             }
         }
