@@ -1,10 +1,12 @@
 #!/bin/bash
 set -euo pipefail
 
-BASE="/Users/joshkomant/projects/beagley-cluster"
-HOST="root@beagley-ai.local"
 REMOTE_TMP="/var/volatile/beagley_cluster.new"
 REMOTE_ROLLBACK="/var/volatile/beagley_cluster.rollback"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BASE="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+source "$SCRIPT_DIR/../../beagley-common/scripts/ssh.sh"
 
 echo "[DEPLOY] Step 1: Build Linux aarch64 target..."
 cd "$BASE"
@@ -32,15 +34,22 @@ if [[ "$BIN_DESC" != *"ELF 64-bit"* || "$BIN_DESC" != *"aarch64"* ]]; then
   exit 2
 fi
 
-echo "[DEPLOY] Step 2: Transfer binary..."
-ssh $HOST "mkdir -p /var/volatile && rm -f '$REMOTE_TMP' '$REMOTE_ROLLBACK' /tmp/beagley_cluster.new"
-scp "$BIN" "$HOST:$REMOTE_TMP"
+echo "[DEPLOY] Step 2: Resolve BeagleY endpoint..."
+if ! beagley_require_ssh_target; then
+  echo "[DEPLOY] No reachable SSH endpoint resolved from $BEAGLEY_HOST_NAME" >&2
+  exit 2
+fi
+echo "[DEPLOY] Using SSH target: $BEAGLEY_SSH_TARGET"
 
-echo "[DEPLOY] Step 3: Free old generated deploy backups..."
-ssh $HOST "for path in /usr/bin/beagley_cluster.bak /usr/bin/beagley_cluster.bak.* /usr/bin/beagley_cluster.backup-* /usr/bin/beagley_cluster.compare.*; do [ -e \"\$path\" ] && rm -f \"\$path\"; done; true"
+echo "[DEPLOY] Step 3: Transfer binary..."
+beagley_ssh "mkdir -p /var/volatile && rm -f '$REMOTE_TMP' '$REMOTE_ROLLBACK' /tmp/beagley_cluster.new"
+beagley_scp_to "$BIN" "$REMOTE_TMP"
 
-echo "[DEPLOY] Step 4: Install new version..."
-ssh $HOST "bash -s" <<REMOTE
+echo "[DEPLOY] Step 4: Free old generated deploy backups..."
+beagley_ssh "for path in /usr/bin/beagley_cluster.bak /usr/bin/beagley_cluster.bak.* /usr/bin/beagley_cluster.backup-* /usr/bin/beagley_cluster.compare.*; do [ -e \"\$path\" ] && rm -f \"\$path\"; done; true"
+
+echo "[DEPLOY] Step 5: Install new version..."
+beagley_ssh "bash -s" <<REMOTE
 set -euo pipefail
 restore_on_error() {
   echo "[DEPLOY] Install failed; attempting rollback" >&2
@@ -62,14 +71,14 @@ sync
 trap - ERR
 REMOTE
 
-echo "[DEPLOY] Step 5: Restart service..."
-ssh $HOST "systemctl reset-failed beagley_cluster"
-ssh $HOST "systemctl restart beagley_cluster"
+echo "[DEPLOY] Step 6: Restart service..."
+beagley_ssh "systemctl reset-failed beagley_cluster"
+beagley_ssh "systemctl restart beagley_cluster"
 
-echo "[DEPLOY] Step 6: Verify service..."
-ssh $HOST "systemctl status beagley_cluster --no-pager"
+echo "[DEPLOY] Step 7: Verify service..."
+beagley_ssh "systemctl status beagley_cluster --no-pager"
 
-echo "[DEPLOY] Step 7: Health check..."
+echo "[DEPLOY] Step 8: Health check..."
 if ! "$BASE/skills/beagley-health-check/scripts/check.sh"; then
   echo "[DEPLOY] Health check failed; collecting diagnostics..."
   "$BASE/skills/beagley-debug-service/scripts/debug.sh" || true

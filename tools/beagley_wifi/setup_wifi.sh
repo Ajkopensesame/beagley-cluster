@@ -393,6 +393,7 @@ STATE_FILE=/run/beagley-hotspot-watchdog.state
 DRIVER_RESET_ENABLE=1
 DRIVER_MODULES="cc33xx_sdio cc33xx"
 REQUIRE_INTERNET=0
+RESET_WHILE_SCANNING=0
 EOF
 
   cat >"$script_file" <<'EOF'
@@ -409,9 +410,17 @@ export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 : "${DRIVER_RESET_ENABLE:=1}"
 : "${DRIVER_MODULES:=cc33xx_sdio cc33xx}"
 : "${REQUIRE_INTERNET:=0}"
+: "${RESET_WHILE_SCANNING:=0}"
 
 log() {
   logger -t beagley-hotspot-watchdog "$*"
+}
+
+is_enabled() {
+  case "$1" in
+    1|true|True|TRUE|yes|Yes|YES|on|On|ON) return 0 ;;
+    *) return 1 ;;
+  esac
 }
 
 has_ipv4() {
@@ -470,6 +479,18 @@ supplicant_unhealthy() {
   return 1
 }
 
+wpa_state=""
+if command -v wpa_cli >/dev/null 2>&1; then
+  wpa_state="$(
+    wpa_cli -i "$IFACE" status 2>/dev/null | awk -F= '
+      $1 == "wpa_state" {
+        print $2
+        exit
+      }
+    '
+  )"
+fi
+
 assoc_known=0
 connected=0
 if command -v iw >/dev/null 2>&1; then
@@ -479,7 +500,7 @@ if command -v iw >/dev/null 2>&1; then
   fi
 elif command -v wpa_cli >/dev/null 2>&1; then
   assoc_known=1
-  if wpa_cli -i "$IFACE" status 2>/dev/null | grep -q '^wpa_state=COMPLETED$'; then
+  if [[ "$wpa_state" == "COMPLETED" ]]; then
     connected=1
   fi
 fi
@@ -542,6 +563,16 @@ fi
 
 if [[ "$healthy" == "1" ]]; then
   printf '0 %s\n' "$last_restart" > "$STATE_FILE"
+  exit 0
+fi
+
+if [[ "$reason" == "not-associated" ]] && ! is_enabled "$RESET_WHILE_SCANNING"; then
+  if command -v wpa_cli >/dev/null 2>&1; then
+    wpa_cli -i "$IFACE" scan >/dev/null 2>&1 || true
+    wpa_cli -i "$IFACE" reassociate >/dev/null 2>&1 || true
+  fi
+  printf '0 %s\n' "$last_restart" > "$STATE_FILE"
+  log "waiting iface=${IFACE} reason=${reason} wpa_state=${wpa_state:-unknown}; leaving supplicant scanning"
   exit 0
 fi
 
