@@ -22,6 +22,7 @@ SRC_URI = " \
     file://55-beagley-usb-recovery.network \
     file://12-en.network \
     file://gai.conf \
+    file://90-beagley-arp-flux.conf \
     file://journald-persistent.conf \
     file://beagley-cluster-journal.conf \
     file://beagley-cluster-volatile.conf \
@@ -120,6 +121,8 @@ do_install:append() {
     install -m 0644 ${WORKDIR}/55-beagley-usb-recovery.network ${D}${sysconfdir}/systemd/network/55-beagley-usb-recovery.network
     install -m 0644 ${WORKDIR}/12-en.network ${D}${sysconfdir}/systemd/network/12-en.network
     install -m 0644 ${WORKDIR}/gai.conf ${D}${sysconfdir}/gai.conf
+    install -d ${D}${sysconfdir}/sysctl.d
+    install -m 0644 ${WORKDIR}/90-beagley-arp-flux.conf ${D}${sysconfdir}/sysctl.d/90-beagley-arp-flux.conf
 
     install -d ${D}${sysconfdir}/systemd/journald.conf.d
     install -m 0644 ${WORKDIR}/journald-persistent.conf ${D}${sysconfdir}/systemd/journald.conf.d/persistent.conf
@@ -150,6 +153,7 @@ FILES:${PN} += " \
     ${sysconfdir}/systemd/network/55-beagley-usb-recovery.network \
     ${sysconfdir}/systemd/network/12-en.network \
     ${sysconfdir}/gai.conf \
+    ${sysconfdir}/sysctl.d/90-beagley-arp-flux.conf \
     ${sysconfdir}/systemd/journald.conf.d/persistent.conf \
     ${nonarch_libdir}/tmpfiles.d/beagley-cluster-journal.conf \
     ${nonarch_libdir}/tmpfiles.d/beagley-cluster-volatile.conf \

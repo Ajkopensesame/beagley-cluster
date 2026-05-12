@@ -189,6 +189,10 @@ Expected shape:
 - `wpa_supplicant@wlan0.service` is `enabled` and `active`
 - `beagley-hotspot-watchdog.timer` is `enabled` and `active`
 - the highest-priority saved hotspot in range is selected automatically
+- when Wi-Fi loses carrier, stale DHCP addresses are cleared from `wlan0` so
+  the Ethernet MAC does not appear to own the Wi-Fi reservation
+- ARP flux protection is enabled so `eth0` and `wlan0` do not answer ARP for
+  each other's home-router leases
 - hotspot SSH can use the configured fallback address for that known hotspot if `.local` resolution is unavailable
 - in BBB gateway mode, `net.ipv4.ip_forward=1` and BBB traffic egresses through `wlan0`
 
@@ -197,6 +201,9 @@ Recovery contract:
 - `wpa_supplicant@wlan0` failures with `Could not set interface wlan0 flags (UP): Device or resource busy`
   are treated as CC33xx driver-stuck states.
 - The watchdog first tries DHCP/networkd refresh for lease-only failures.
+- For not-associated/scanning states, the watchdog clears stale Wi-Fi DHCP
+  state, waits through a grace threshold, then does a bounded CC33xx radio
+  reset instead of either resetting constantly or waiting forever.
 - For supplicant/driver failures it stops supplicant, unloads/reloads
   `cc33xx_sdio cc33xx`, restarts `systemd-networkd`, resets the failed
   supplicant state, and starts `wpa_supplicant@wlan0` again.

@@ -394,6 +394,8 @@ DRIVER_RESET_ENABLE=1
 DRIVER_MODULES="cc33xx_sdio cc33xx"
 REQUIRE_INTERNET=0
 RESET_WHILE_SCANNING=0
+SCANNING_FAIL_THRESHOLD=8
+FLUSH_STALE_ADDRESS_WHILE_SCANNING=1
 EOF
 
   cat >"$script_file" <<'EOF'
@@ -411,6 +413,8 @@ export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 : "${DRIVER_MODULES:=cc33xx_sdio cc33xx}"
 : "${REQUIRE_INTERNET:=0}"
 : "${RESET_WHILE_SCANNING:=0}"
+: "${SCANNING_FAIL_THRESHOLD:=8}"
+: "${FLUSH_STALE_ADDRESS_WHILE_SCANNING:=1}"
 
 log() {
   logger -t beagley-hotspot-watchdog "$*"
@@ -435,6 +439,12 @@ try_dhcp_refresh() {
   networkctl renew "$IFACE" >/dev/null 2>&1 || true
   networkctl reconfigure "$IFACE" >/dev/null 2>&1 || true
   sleep 3
+}
+
+flush_stale_wifi_address() {
+  ip addr flush dev "$IFACE" scope global >/dev/null 2>&1 || true
+  ip route flush dev "$IFACE" proto dhcp >/dev/null 2>&1 || true
+  networkctl reconfigure "$IFACE" >/dev/null 2>&1 || true
 }
 
 full_radio_reset() {
@@ -531,8 +541,9 @@ fi
 now="$(date +%s)"
 count=0
 last_restart=0
+last_reason=""
 if [[ -f "$STATE_FILE" ]]; then
-  read -r count last_restart < "$STATE_FILE" || true
+  read -r count last_restart last_reason < "$STATE_FILE" || true
 fi
 
 healthy=1
@@ -562,17 +573,36 @@ elif ! ping -I "$IFACE" -c 1 -W 1 "$target" >/dev/null 2>&1; then
 fi
 
 if [[ "$healthy" == "1" ]]; then
-  printf '0 %s\n' "$last_restart" > "$STATE_FILE"
+  printf '0 %s healthy\n' "$last_restart" > "$STATE_FILE"
   exit 0
 fi
 
+if [[ "$last_reason" != "$reason" ]]; then
+  count=0
+fi
+
 if [[ "$reason" == "not-associated" ]] && ! is_enabled "$RESET_WHILE_SCANNING"; then
+  count=$((count + 1))
+  if is_enabled "$FLUSH_STALE_ADDRESS_WHILE_SCANNING"; then
+    flush_stale_wifi_address
+  fi
   if command -v wpa_cli >/dev/null 2>&1; then
     wpa_cli -i "$IFACE" scan >/dev/null 2>&1 || true
     wpa_cli -i "$IFACE" reassociate >/dev/null 2>&1 || true
   fi
-  printf '0 %s\n' "$last_restart" > "$STATE_FILE"
-  log "waiting iface=${IFACE} reason=${reason} wpa_state=${wpa_state:-unknown}; leaving supplicant scanning"
+  if (( count < SCANNING_FAIL_THRESHOLD )); then
+    printf '%s %s %s\n' "$count" "$last_restart" "$reason" > "$STATE_FILE"
+    log "waiting iface=${IFACE} reason=${reason} count=${count}/${SCANNING_FAIL_THRESHOLD} wpa_state=${wpa_state:-unknown}; leaving supplicant scanning"
+    exit 0
+  fi
+  if (( now - last_restart < COOLDOWN_SEC )); then
+    printf '%s %s %s\n' "$count" "$last_restart" "$reason" > "$STATE_FILE"
+    log "cooldown iface=${IFACE} reason=${reason} count=${count}/${SCANNING_FAIL_THRESHOLD} wpa_state=${wpa_state:-unknown}; reset deferred"
+    exit 0
+  fi
+  log "recover iface=${IFACE} reason=${reason} count=${count}/${SCANNING_FAIL_THRESHOLD}; sustained scanning, resetting radio+supplicant+networkd"
+  full_radio_reset
+  printf '0 %s reset-scanning\n' "$now" > "$STATE_FILE"
   exit 0
 fi
 
@@ -583,19 +613,19 @@ if (( count >= FAIL_THRESHOLD )); then
       log "refresh iface=${IFACE} reason=${reason} count=${count}; renewing dhcp"
       try_dhcp_refresh
       if has_ipv4 && has_default_route; then
-        printf '0 %s\n' "$last_restart" > "$STATE_FILE"
+        printf '0 %s recovered-dhcp\n' "$last_restart" > "$STATE_FILE"
         exit 0
       fi
     fi
 
     log "recover iface=${IFACE} reason=${reason} count=${count}; resetting radio+supplicant+networkd"
     full_radio_reset
-    printf '0 %s\n' "$now" > "$STATE_FILE"
+    printf '0 %s %s\n' "$now" "$reason" > "$STATE_FILE"
     exit 0
   fi
 fi
 
-printf '%s %s\n' "$count" "$last_restart" > "$STATE_FILE"
+printf '%s %s %s\n' "$count" "$last_restart" "$reason" > "$STATE_FILE"
 log "unhealthy iface=${IFACE} reason=${reason} count=${count}"
 EOF
 
@@ -626,6 +656,32 @@ Unit=$(basename "$service_file")
 [Install]
 WantedBy=timers.target
 EOF
+}
+
+install_arp_flux_sysctl() {
+  local sysctl_file="$1"
+  local eth_iface="$2"
+  local wifi_iface="$3"
+
+  cat >"$sysctl_file" <<EOF
+# Keep the BeagleY Ethernet and Wi-Fi modem leases from answering for each
+# other. Without this, eth0 can answer ARP for wlan0's reserved IP after a
+# carrier loss, which makes the router and deploy tools think Wi-Fi is alive.
+net.ipv4.conf.all.arp_ignore=1
+net.ipv4.conf.default.arp_ignore=1
+net.ipv4.conf.${eth_iface}.arp_ignore=1
+net.ipv4.conf.${wifi_iface}.arp_ignore=1
+net.ipv4.conf.all.arp_announce=2
+net.ipv4.conf.default.arp_announce=2
+net.ipv4.conf.${eth_iface}.arp_announce=2
+net.ipv4.conf.${wifi_iface}.arp_announce=2
+net.ipv4.conf.all.arp_filter=1
+net.ipv4.conf.default.arp_filter=1
+net.ipv4.conf.${eth_iface}.arp_filter=1
+net.ipv4.conf.${wifi_iface}.arp_filter=1
+EOF
+
+  sysctl -p "$sysctl_file" >/dev/null || true
 }
 
 add_profile() {
@@ -869,10 +925,12 @@ WATCHDOG_TIMER_FILE="$SYSTEMD_DIR/beagley-hotspot-watchdog.timer"
 BBB_GATEWAY_SYSCTL_FILE="$SYSCTL_DIR/90-beagley-bbb-gateway.conf"
 BBB_GATEWAY_NFT_FILE="$BEAGLEY_DIR/bbb-gateway.nft"
 BBB_GATEWAY_SERVICE_FILE="$SYSTEMD_DIR/beagley-bbb-gateway.service"
+ARP_FLUX_SYSCTL_FILE="$SYSCTL_DIR/90-beagley-arp-flux.conf"
 
 mkdir -p "$WPA_DIR" "$NET_DIR" "$DEFAULT_DIR" "$BEAGLEY_DIR" "$LIBEXEC_DIR" "$SYSCTL_DIR"
 mkdir -p /var/volatile/tmp
 chmod 1777 /var/volatile /var/volatile/tmp 2>/dev/null || true
+install_arp_flux_sysctl "$ARP_FLUX_SYSCTL_FILE" "$ETH_IFACE" "$IFACE"
 
 if [[ -f "$WPA_FILE" ]]; then
   cp "$WPA_FILE" "${WPA_FILE}.bak.$(timestamp)"
