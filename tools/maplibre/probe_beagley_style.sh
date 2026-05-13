@@ -9,10 +9,18 @@ PROMOTE=0
 KEEP_RUNNING=0
 DELAY_MS=14000
 MAX_ZOOM=""
-RENDER_LOOP=""
+RENDER_LOOP="basic"
 REMOTE_ENV="/etc/default/beagley-cluster.local"
 OUT_DIR="$BASE/build/maplibre-probes"
 USER_AGENT="BeagleyCluster/1.0 (MapLibre probe)"
+SSH_OPTS=(
+  -o BatchMode=yes
+  -o ConnectTimeout=20
+  -o ConnectionAttempts=1
+  -o ServerAliveInterval=5
+  -o ServerAliveCountMax=1
+  -o StrictHostKeyChecking=accept-new
+)
 
 usage() {
   cat <<EOF
@@ -88,17 +96,62 @@ REMOTE_BACKUP="/var/volatile/beagley-cluster.local.maplibre.$RUN_LABEL.bak"
 RESTORE_ON_EXIT=1
 
 mkdir -p "$RUN_DIR"
+SSH_OPTS+=(
+  -o ControlMaster=auto
+  -o ControlPath="/tmp/beagley-maplibre-ssh-%C"
+  -o ControlPersist=120
+)
 
 remote_quote() {
   printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
 }
 
+ssh_probe() {
+  ssh "${SSH_OPTS[@]}" "$HOST" "$@"
+}
+
+close_ssh_control() {
+  ssh_probe -O exit >/dev/null 2>&1 || true
+}
+
+wait_for_ssh() {
+  local attempt
+  for attempt in 1 2 3 4 5; do
+    if ssh_probe true >/dev/null 2>&1; then
+      return 0
+    fi
+    echo "[PROBE] SSH connect attempt $attempt failed for $HOST; retrying" >&2
+    sleep 3
+  done
+  return 1
+}
+
 run_health_or_debug() {
-  if "$BASE/skills/beagley-health-check/scripts/check.sh"; then
+  local health_output
+
+  if health_output="$(
+    ssh_probe "bash -s" <<'REMOTE'
+set -euo pipefail
+for _ in $(seq 1 20); do
+  state="$(systemctl is-active beagley_cluster 2>/dev/null || echo unknown)"
+  restarts="$(systemctl show beagley_cluster -p NRestarts --value 2>/dev/null || echo 0)"
+  pid="$(systemctl show beagley_cluster -p MainPID --value 2>/dev/null || echo 0)"
+  if [ "$state" = active ] && [ "${restarts:-0}" -le 5 ] && [ "${pid:-0}" -gt 0 ]; then
+    printf '[OK] SSH target healthy: state=%s restarts=%s pid=%s\n' "$state" "$restarts" "$pid"
+    exit 0
+  fi
+  sleep 1
+done
+printf '[FAIL] SSH target unhealthy: state=%s restarts=%s pid=%s\n' "$state" "$restarts" "${pid:-0}" >&2
+exit 1
+REMOTE
+  )"; then
+    printf '%s\n' "$health_output"
     return 0
   fi
-  echo "[PROBE] Health check failed; collecting diagnostics" >&2
-  "$BASE/skills/beagley-debug-service/scripts/debug.sh" || true
+  echo "[PROBE] Health check failed for $HOST; collecting diagnostics" >&2
+  printf '%s\n' "$health_output" >&2
+  BEAGLEY_HOST="$HOST" "$BASE/skills/beagley-debug-service/scripts/debug.sh" || true
   return 1
 }
 
@@ -106,11 +159,11 @@ restore_remote_env() {
   set +e
   if [[ "$RESTORE_ON_EXIT" -eq 1 ]]; then
     echo "[PROBE] Restoring previous BeagleY environment"
-    ssh "$HOST" "if [ -s $(remote_quote "$REMOTE_BACKUP") ]; then cp $(remote_quote "$REMOTE_BACKUP") $(remote_quote "$REMOTE_ENV"); systemctl reset-failed beagley_cluster; systemctl restart beagley_cluster; fi" >/dev/null 2>&1
+    ssh_probe "if [ -s $(remote_quote "$REMOTE_BACKUP") ]; then cp $(remote_quote "$REMOTE_BACKUP") $(remote_quote "$REMOTE_ENV"); systemctl reset-failed beagley_cluster; systemctl restart beagley_cluster; fi" >/dev/null 2>&1
   fi
 }
 
-trap restore_remote_env EXIT
+trap 'restore_remote_env; close_ssh_control' EXIT
 
 write_remote_env() {
   local allow_untested="$1"
@@ -118,7 +171,7 @@ write_remote_env() {
   local screenshot_path="$3"
   local screenshot_exit="$4"
 
-  ssh "$HOST" \
+  ssh_probe \
     "STYLE_URL=$(remote_quote "$STYLE_URL") TRUSTED_STYLES=$(remote_quote "$trusted_styles") ALLOW_UNTESTED=$(remote_quote "$allow_untested") MAX_ZOOM=$(remote_quote "$MAX_ZOOM") RENDER_LOOP=$(remote_quote "$RENDER_LOOP") SCREENSHOT_PATH=$(remote_quote "$screenshot_path") SCREENSHOT_DELAY_MS=$(remote_quote "$DELAY_MS") SCREENSHOT_EXIT=$(remote_quote "$screenshot_exit") REMOTE_ENV=$(remote_quote "$REMOTE_ENV") bash -s" <<'REMOTE'
 set -euo pipefail
 touch "$REMOTE_ENV"
@@ -161,23 +214,23 @@ restart_and_capture() {
   local local_log="$RUN_DIR/$phase.journal.log"
   local local_analysis="$RUN_DIR/$phase.analysis.json"
 
-  since="$(ssh "$HOST" "date '+%Y-%m-%d %H:%M:%S'")"
-  ssh "$HOST" "rm -f $(remote_quote "$remote_screenshot"); systemctl reset-failed beagley_cluster; systemctl restart beagley_cluster"
+  since="$(ssh_probe "date '+%Y-%m-%d %H:%M:%S'")"
+  ssh_probe "rm -f $(remote_quote "$remote_screenshot"); systemctl reset-failed beagley_cluster; systemctl restart beagley_cluster"
   timeout_seconds=$((DELAY_MS / 1000 + 24))
   echo "[PROBE] Waiting for $phase screenshot: $remote_screenshot"
   for _ in $(seq 1 "$timeout_seconds"); do
-    if ssh "$HOST" "[ -s $(remote_quote "$remote_screenshot") ]"; then
+    if ssh_probe "[ -s $(remote_quote "$remote_screenshot") ]"; then
       break
     fi
     sleep 1
   done
-  if ! ssh "$HOST" "[ -s $(remote_quote "$remote_screenshot") ]"; then
+  if ! ssh_probe "[ -s $(remote_quote "$remote_screenshot") ]"; then
     echo "[PROBE] Screenshot was not created for $phase" >&2
     return 1
   fi
 
-  scp "$HOST:$remote_screenshot" "$local_screenshot" >/dev/null
-  ssh "$HOST" "journalctl -u beagley_cluster --since $(remote_quote "$since") --no-pager" > "$local_log" || true
+  ssh_probe "cat $(remote_quote "$remote_screenshot")" > "$local_screenshot"
+  ssh_probe "journalctl -u beagley_cluster --since $(remote_quote "$since") --no-pager" > "$local_log" || true
   if ! python3 "$BASE/tools/maplibre/analyze_screenshot.py" "$local_screenshot" --json > "$local_analysis"; then
     echo "[PROBE] Screenshot analysis failed for $phase:" >&2
     cat "$local_analysis" >&2 || true
@@ -195,6 +248,7 @@ restart_and_capture() {
 }
 
 echo "[PROBE] Baseline health check"
+wait_for_ssh
 run_health_or_debug
 
 echo "[PROBE] Inspecting style dependencies"
@@ -222,10 +276,10 @@ fi
 echo "[PROBE] Using MapLibre max zoom: $MAX_ZOOM"
 
 echo "[PROBE] Verifying BeagleY can fetch the style URL"
-ssh "$HOST" "curl -fsSL --max-time 20 -A $(remote_quote "$USER_AGENT") $(remote_quote "$STYLE_URL") >/tmp/beagley-maplibre-style-probe.json"
+ssh_probe "curl -fsSL --max-time 20 -A $(remote_quote "$USER_AGENT") $(remote_quote "$STYLE_URL") >/tmp/beagley-maplibre-style-probe.json"
 
 echo "[PROBE] Backing up $REMOTE_ENV to $REMOTE_BACKUP"
-ssh "$HOST" "touch $(remote_quote "$REMOTE_ENV"); cp $(remote_quote "$REMOTE_ENV") $(remote_quote "$REMOTE_BACKUP")"
+ssh_probe "touch $(remote_quote "$REMOTE_ENV"); cp $(remote_quote "$REMOTE_ENV") $(remote_quote "$REMOTE_BACKUP")"
 
 echo "[PROBE] Running untrusted-style probe with temporary guard bypass"
 write_remote_env 1 "$STYLE_URL" "$REMOTE_SCREENSHOT" 0
@@ -239,14 +293,14 @@ if [[ "$PROMOTE" -eq 1 ]]; then
   echo "[PROBE] Promoting MapLibre Native style"
   write_remote_env 0 "$STYLE_URL" "" 0
   RESTORE_ON_EXIT=0
-  ssh "$HOST" "systemctl reset-failed beagley_cluster; systemctl restart beagley_cluster"
+  ssh_probe "systemctl reset-failed beagley_cluster; systemctl restart beagley_cluster"
   run_health_or_debug
   echo "[PROBE] Promoted style: $STYLE_URL"
 elif [[ "$KEEP_RUNNING" -eq 1 ]]; then
   echo "[PROBE] Leaving BeagleY in temporary MapLibre test mode"
   write_remote_env 1 "$STYLE_URL" "" 0
   RESTORE_ON_EXIT=0
-  ssh "$HOST" "systemctl reset-failed beagley_cluster; systemctl restart beagley_cluster"
+  ssh_probe "systemctl reset-failed beagley_cluster; systemctl restart beagley_cluster"
 else
   echo "[PROBE] Probe complete. Restoring previous environment."
 fi

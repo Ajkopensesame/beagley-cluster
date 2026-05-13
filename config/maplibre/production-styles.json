@@ -12,9 +12,11 @@
     {
       "id": "openfreemap-positron",
       "label": "OpenFreeMap Positron",
-      "role": "production-candidate",
+      "role": "production-default",
       "url": "https://tiles.openfreemap.org/styles/positron",
-      "notes": "Light road-map candidate for the embedded cluster."
+      "verifiedAt": "2026-05-13T20:19:00+10:00",
+      "verifiedBy": "tools/maplibre/probe_beagley_style.sh --promote on the real BeagleY display",
+      "notes": "Known-good default for the embedded cluster."
     },
     {
       "id": "openfreemap-liberty",

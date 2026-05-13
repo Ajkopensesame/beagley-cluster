@@ -10,7 +10,7 @@ Source of truth:
 
 ```text
 UNO/CAN/bench sim -> BBB vehicle_state hub -> BeagleY cluster UI
-hardware GPS ----^                         -> live native-online maps
+hardware GPS ----^                         -> live MapLibre Native maps
 ```
 
 The BeagleY production-like profile is:
@@ -18,7 +18,10 @@ The BeagleY production-like profile is:
 ```text
 BEAGLEY_UI_VARIANT=v3
 BEAGLEY_RENDER_PROFILE=embedded
-BEAGLEY_MAP_RENDERER=native-online
+BEAGLEY_MAP_RENDERER=maplibre-native
+BEAGLEY_MAPLIBRE_NATIVE_STYLE_URL=https://tiles.openfreemap.org/styles/positron
+BEAGLEY_MAPLIBRE_NATIVE_TRUSTED_STYLES=https://tiles.openfreemap.org/styles/positron
+BEAGLEY_MAPLIBRE_NATIVE_ALLOW_UNTESTED_STYLES=0
 BEAGLEY_REPLAY_LOOP=0
 BEAGLEY_STRESS_SCENE=0
 VEHICLE_HUB_WS_URL=ws://10.24.0.7:8765

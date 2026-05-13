@@ -55,7 +55,7 @@ RDEPENDS:${PN} += " \
     qtwebsockets \
 "
 
-PACKAGECONFIG ??= ""
+PACKAGECONFIG ??= "maplibre-native"
 PACKAGECONFIG[maplibre-native] = "-DWITH_MAPLIBRE_NATIVE=ON,-DWITH_MAPLIBRE_NATIVE=OFF,maplibre-native-qt qtlocation qtpositioning,maplibre-native-qt qtlocation qtpositioning qtbase-plugins libsqlite3"
 
 EXTRA_OECMAKE += " \

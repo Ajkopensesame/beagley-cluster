@@ -8,7 +8,7 @@ desktop workflow.
 - OS: Yocto appliance image built from TI Processor SDK Linux 11.00
 - Graphics: `eglfs` + `eglfs_kms`
 - UI entrypoint: `MainEmbedded.qml`
-- Map path: native online raster map via `NativeRasterMapItem`
+- Map path: MapLibre Native with the probed OpenFreeMap Positron style
 - Perf source: `PerformanceMetrics`
 - Replay harness: `BEAGLEY_REPLAY_FILE`
 
@@ -17,11 +17,16 @@ desktop workflow.
 - Embedded appliance builds should use:
   - `-DBEAGLEY_APPLIANCE_PRODUCTION=ON`
   - `-DWITH_WEBENGINE=OFF`
+  - `-DWITH_MAPLIBRE_NATIVE=ON`
 - Embedded runtime defaults should use:
   - `BEAGLEY_UI_VARIANT=embedded`
   - `BEAGLEY_RENDER_PROFILE=embedded`
   - `BEAGLEY_EFFECT_LEVEL=low`
-  - `BEAGLEY_MAP_RENDERER=native-online`
+  - `BEAGLEY_MAP_RENDERER=maplibre-native`
+  - `QSG_RENDER_LOOP=basic`
+  - `BEAGLEY_MAPLIBRE_NATIVE_STYLE_URL=https://tiles.openfreemap.org/styles/positron`
+  - `BEAGLEY_MAPLIBRE_NATIVE_TRUSTED_STYLES=https://tiles.openfreemap.org/styles/positron`
+  - `BEAGLEY_MAPLIBRE_NATIVE_ALLOW_UNTESTED_STYLES=0`
   - `QT_QPA_PLATFORM=eglfs`
   - `QT_QPA_EGLFS_INTEGRATION=eglfs_kms`
 

@@ -7,10 +7,16 @@ Wants=beagley-cluster-provision.service beagley-cluster-gpu-probe.service
 Type=simple
 Environment=QT_QPA_PLATFORM=eglfs
 Environment=QT_QPA_EGLFS_INTEGRATION=eglfs_kms
+Environment=QSG_RENDER_LOOP=basic
 Environment=BEAGLEY_UI_VARIANT=embedded
 Environment=BEAGLEY_RENDER_PROFILE=embedded
 Environment=BEAGLEY_EFFECT_LEVEL=low
-Environment=BEAGLEY_MAP_RENDERER=native-online
+Environment=BEAGLEY_MAP_RENDERER=maplibre-native
+Environment=BEAGLEY_MAPLIBRE_NATIVE_STYLE_URL=https://tiles.openfreemap.org/styles/positron
+Environment=BEAGLEY_MAPLIBRE_NATIVE_TRUSTED_STYLES=https://tiles.openfreemap.org/styles/positron
+Environment=BEAGLEY_MAPLIBRE_NATIVE_ALLOW_UNTESTED_STYLES=0
+Environment=BEAGLEY_MAPLIBRE_NATIVE_FULL_UNDERLAY=0
+Environment=BEAGLEY_MAPLIBRE_NATIVE_MAX_ZOOM=14.0
 Environment=BEAGLEY_REQUIRE_GPU_GATE=1
 Environment=BEAGLEY_GPU_GATE_FILE=/run/beagley_gpu_gate.ok
 Environment=BEAGLEY_GPU_PROBE_STATUS_FILE=/run/beagley_gpu_gate.status

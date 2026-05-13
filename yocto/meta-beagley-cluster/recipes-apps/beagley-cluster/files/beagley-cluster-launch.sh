@@ -3,15 +3,20 @@ set -euo pipefail
 
 export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-eglfs}"
 export QT_QPA_EGLFS_INTEGRATION="${QT_QPA_EGLFS_INTEGRATION:-eglfs_kms}"
-# Leave QSG_RENDER_LOOP unset by default. main.cpp selects threaded for the
-# native embedded renderer and basic/OpenGL for the experimental MapLibre path.
+export QSG_RENDER_LOOP="${QSG_RENDER_LOOP:-basic}"
+# MapLibre Native is the production map path and expects the basic render loop.
 # The appliance defaults to the embedded UI, but explicit systemd/default-file
 # overrides must win. The BeagleY development display workflow relies on
 # /etc/default/beagley-cluster.local being able to select the V3 shell.
 export BEAGLEY_UI_VARIANT="${BEAGLEY_UI_VARIANT:-embedded}"
 export BEAGLEY_RENDER_PROFILE="${BEAGLEY_RENDER_PROFILE:-embedded}"
 export BEAGLEY_EFFECT_LEVEL="${BEAGLEY_EFFECT_LEVEL:-low}"
-export BEAGLEY_MAP_RENDERER="${BEAGLEY_MAP_RENDERER:-native-online}"
+export BEAGLEY_MAP_RENDERER="${BEAGLEY_MAP_RENDERER:-maplibre-native}"
+export BEAGLEY_MAPLIBRE_NATIVE_STYLE_URL="${BEAGLEY_MAPLIBRE_NATIVE_STYLE_URL:-https://tiles.openfreemap.org/styles/positron}"
+export BEAGLEY_MAPLIBRE_NATIVE_TRUSTED_STYLES="${BEAGLEY_MAPLIBRE_NATIVE_TRUSTED_STYLES:-$BEAGLEY_MAPLIBRE_NATIVE_STYLE_URL}"
+export BEAGLEY_MAPLIBRE_NATIVE_ALLOW_UNTESTED_STYLES="${BEAGLEY_MAPLIBRE_NATIVE_ALLOW_UNTESTED_STYLES:-0}"
+export BEAGLEY_MAPLIBRE_NATIVE_FULL_UNDERLAY="${BEAGLEY_MAPLIBRE_NATIVE_FULL_UNDERLAY:-0}"
+export BEAGLEY_MAPLIBRE_NATIVE_MAX_ZOOM="${BEAGLEY_MAPLIBRE_NATIVE_MAX_ZOOM:-14.0}"
 export BEAGLEY_MAP_BOOT_MODE="${BEAGLEY_MAP_BOOT_MODE:-staged}"
 export BEAGLEY_MAP_STYLE_MODE="${BEAGLEY_MAP_STYLE_MODE:-embedded}"
 export BEAGLEY_REQUIRE_GPU_GATE="${BEAGLEY_REQUIRE_GPU_GATE:-1}"

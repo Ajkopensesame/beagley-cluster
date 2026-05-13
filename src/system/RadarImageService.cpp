@@ -28,14 +28,16 @@ constexpr int kTileSize = 256;
 constexpr int kOutputWidth = 768;
 constexpr int kOutputHeight = 512;
 constexpr int kTileDrawSize = 256;
+constexpr int kTileRadius = 1;
+constexpr int kTileSpan = (kTileRadius * 2) + 1;
 constexpr int kRefreshIntervalMs = 60 * 1000;
 constexpr int kAnimationFrameIntervalMs = 850;
-constexpr int kNetworkTimeoutMs = 20000;
+constexpr int kNetworkTimeoutMs = 8000;
 constexpr int kTileColorScheme = 2;
 constexpr auto kTileOptions = "1_1";
-constexpr int kPastFramesWithNowcast = 4;
-constexpr int kPastFramesFallback = 4;
-constexpr int kNowcastFrames = 3;
+constexpr int kPastFramesWithNowcast = 1;
+constexpr int kPastFramesFallback = 1;
+constexpr int kNowcastFrames = 0;
 constexpr auto kBasicRadarCachePrefix = "radar-basic-v2";
 
 bool coordValid(double value, double minValue, double maxValue)
@@ -332,14 +334,14 @@ void RadarImageService::startTileFetch(const RadarFrame &frame)
 
     const int sequence = ++m_sequence;
     const int tilesPerAxis = 1 << kTileZoom;
-    for (int dy = -2; dy <= 2; ++dy) {
-        for (int dx = -2; dx <= 2; ++dx) {
+    for (int dy = -kTileRadius; dy <= kTileRadius; ++dy) {
+        for (int dx = -kTileRadius; dx <= kTileRadius; ++dx) {
             const int col = wrapTileX(center.col + dx, tilesPerAxis);
             const int row = center.row + dy;
             if (row < 0 || row >= tilesPerAxis) {
                 continue;
             }
-            const int tileKey = (dy + 2) * 5 + (dx + 2);
+            const int tileKey = (dy + kTileRadius) * kTileSpan + (dx + kTileRadius);
             RadarTile tile;
             tile.dx = dx;
             tile.dy = dy;
@@ -367,7 +369,7 @@ void RadarImageService::handleTileReply(QNetworkReply *reply, int sequence, int 
         return;
     }
 
-    const int tileKey = (dy + 2) * 5 + (dx + 2);
+    const int tileKey = (dy + kTileRadius) * kTileSpan + (dx + kTileRadius);
     RadarTile tile = m_currentTiles.value(tileKey);
     tile.dx = dx;
     tile.dy = dy;

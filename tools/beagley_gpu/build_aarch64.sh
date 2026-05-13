@@ -5,6 +5,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 BUILD_DIR="${BEAGLEY_AARCH64_BUILD_DIR:-$ROOT/build-beagley-aarch64}"
 BUILD_TYPE="${BEAGLEY_AARCH64_BUILD_TYPE:-RelWithDebInfo}"
 JOBS="${BEAGLEY_AARCH64_BUILD_JOBS:-}"
+MAPLIBRE_NATIVE="${BEAGLEY_WITH_MAPLIBRE_NATIVE:-ON}"
 
 fail() {
   echo "[build-aarch64] FAIL: $*" >&2
@@ -17,6 +18,7 @@ cmake_args=(
   -DCMAKE_BUILD_TYPE="$BUILD_TYPE"
   -DBEAGLEY_APPLIANCE_PRODUCTION=ON
   -DWITH_WEBENGINE=OFF
+  -DWITH_MAPLIBRE_NATIVE="$MAPLIBRE_NATIVE"
 )
 
 if [[ "$(uname -s)" == "Linux" && "$(uname -m)" == "aarch64" ]]; then

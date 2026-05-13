@@ -5,7 +5,8 @@ This project now treats embedded rendering as a gated contract.
 For production, the supported path is now the Yocto appliance image. Debian-side
 bridge repair remains a diagnostics workflow only.
 
-- Beagley production defaults to `BEAGLEY_MAP_RENDERER=native`.
+- Beagley production defaults to `BEAGLEY_MAP_RENDERER=maplibre-native` with a
+  probed, allowlisted style.
 - WebEngine map is desktop/debug only.
 - Embedded launch can require a hardware GPU gate pass file before app start.
 
@@ -13,7 +14,11 @@ bridge repair remains a diagnostics workflow only.
 
 - `BEAGLEY_RENDER_PROFILE=embedded`
 - `BEAGLEY_EFFECT_LEVEL=low`
-- `BEAGLEY_MAP_RENDERER=native`
+- `BEAGLEY_MAP_RENDERER=maplibre-native`
+- `QSG_RENDER_LOOP=basic`
+- `BEAGLEY_MAPLIBRE_NATIVE_STYLE_URL=https://tiles.openfreemap.org/styles/positron`
+- `BEAGLEY_MAPLIBRE_NATIVE_TRUSTED_STYLES=https://tiles.openfreemap.org/styles/positron`
+- `BEAGLEY_MAPLIBRE_NATIVE_ALLOW_UNTESTED_STYLES=0`
 - `BEAGLEY_MAP_BOOT_MODE=staged`
 - `BEAGLEY_MAP_STYLE_MODE=embedded`
 
