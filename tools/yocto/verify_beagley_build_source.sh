@@ -6,6 +6,8 @@ BUILD_DIR="${YOCTO_BUILD_DIR:-/home/pneumaion/ti-sdk-11.00/yocto-build/build}"
 EXPECTED_REPO="${BEAGLEY_EXPECTED_REPO:-$ROOT}"
 EXPECTED_BRANCH="${BEAGLEY_EXPECTED_BRANCH:-}"
 EXPECTED_COMMIT="${BEAGLEY_EXPECTED_COMMIT:-}"
+SOURCE_REMOTE="${BEAGLEY_SOURCE_REMOTE:-}"
+REQUIRE_REMOTE_REF="${BEAGLEY_REQUIRE_REMOTE_REF:-0}"
 FAIL_DIRTY=0
 MANIFEST_PATH=""
 
@@ -25,6 +27,10 @@ Options:
                            Default: this script's repo root.
   --expected-branch NAME   Branch that local.conf must build.
   --expected-commit SHA    Commit that must be at HEAD.
+  --source-remote REMOTE   Remote name or URL to compare against when
+                           --require-remote-ref is set. Default: origin.
+  --require-remote-ref     Fail unless the configured branch's remote tip
+                           exactly matches the build repo HEAD.
   --fail-dirty             Fail if the build source checkout has uncommitted
                            changes. Without this, dirty state is reported as a
                            warning because Yocto builds the committed git ref.
@@ -84,6 +90,14 @@ while [[ $# -gt 0 ]]; do
       EXPECTED_COMMIT="${2:-}"
       shift 2
       ;;
+    --source-remote)
+      SOURCE_REMOTE="${2:-}"
+      shift 2
+      ;;
+    --require-remote-ref)
+      REQUIRE_REMOTE_REF=1
+      shift
+      ;;
     --fail-dirty)
       FAIL_DIRTY=1
       shift
@@ -132,6 +146,8 @@ BUILD_REPO_REAL="$(cd "$BUILD_REPO" && pwd -P)"
 CURRENT_BRANCH="$(git -C "$BUILD_REPO" branch --show-current)"
 CURRENT_COMMIT="$(git -C "$BUILD_REPO" rev-parse --short=12 HEAD)"
 CURRENT_COMMIT_FULL="$(git -C "$BUILD_REPO" rev-parse HEAD)"
+REMOTE_STATE="not_checked"
+REMOTE_COMMIT=""
 DIRTY_STATUS="$(git -C "$BUILD_REPO" status --porcelain)"
 if [[ -n "$DIRTY_STATUS" ]]; then
   DIRTY_STATE=dirty
@@ -160,6 +176,22 @@ if [[ "$DIRTY_STATE" == dirty ]]; then
   fi
   warn "build source has $DIRTY_COUNT uncommitted change(s); Yocto builds committed HEAD only"
 fi
+if [[ "$REQUIRE_REMOTE_REF" == 1 ]]; then
+  SOURCE_REMOTE="${SOURCE_REMOTE:-origin}"
+  REMOTE_STATE="missing"
+  REMOTE_OUTPUT="$(git -C "$BUILD_REPO" ls-remote --heads "$SOURCE_REMOTE" "$CONFIG_BRANCH" 2>&1)" || {
+    printf '%s\n' "$REMOTE_OUTPUT" >&2
+    fail "could not read remote branch ${CONFIG_BRANCH} from ${SOURCE_REMOTE}"
+  }
+  REMOTE_COMMIT="$(
+    printf '%s\n' "$REMOTE_OUTPUT" \
+      | awk -v ref="refs/heads/${CONFIG_BRANCH}" '$2 == ref { print $1; found=1 } END { exit !found }'
+  )" || fail "remote ${SOURCE_REMOTE} has no branch ${CONFIG_BRANCH}"
+  if [[ "$REMOTE_COMMIT" != "$CURRENT_COMMIT_FULL" ]]; then
+    fail "build repo HEAD is ${CURRENT_COMMIT_FULL}, but ${SOURCE_REMOTE}/${CONFIG_BRANCH} is ${REMOTE_COMMIT}; push or sync the source before building"
+  fi
+  REMOTE_STATE="matched"
+fi
 
 MANIFEST="$(
   cat <<EOF
@@ -170,6 +202,10 @@ commit=$CURRENT_COMMIT_FULL
 commit_short=$CURRENT_COMMIT
 dirty=$DIRTY_STATE
 dirty_count=$DIRTY_COUNT
+remote_check=$REMOTE_STATE
+remote_source=${SOURCE_REMOTE:-}
+remote_branch=$CONFIG_BRANCH
+remote_commit=$REMOTE_COMMIT
 build_dir=$(cd "$BUILD_DIR" && pwd -P)
 local_conf=$LOCAL_CONF
 bblayers_conf=$BBLAYERS_CONF

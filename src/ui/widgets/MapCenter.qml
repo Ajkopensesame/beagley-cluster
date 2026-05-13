@@ -37,7 +37,6 @@ Item {
     property string tileUrlTemplate: ""
     property string styleUrl: ""
     property bool interactionEnabled: true
-    property bool mapLibreNativeVehicleMarkerEnabled: true
 
     // Snapshot mode (BBB will serve a periodic map image later)
     property string snapshotUrl: ""
@@ -199,7 +198,6 @@ Item {
             tileUrlTemplate: root.tileUrlTemplate
             styleUrl: root.styleUrl
             interactionEnabled: root.interactionEnabled
-            vehicleMarkerEnabled: root.mapLibreNativeVehicleMarkerEnabled
         }
     }
 

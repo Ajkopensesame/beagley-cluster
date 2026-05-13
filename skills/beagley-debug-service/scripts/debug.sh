@@ -1,5 +1,5 @@
 #!/bin/bash
-set -u
+set -u  # remove -e so it doesn't stop on failure
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../../beagley-common/scripts/ssh.sh"

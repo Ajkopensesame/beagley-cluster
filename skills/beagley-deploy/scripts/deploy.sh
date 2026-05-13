@@ -1,11 +1,11 @@
 #!/bin/bash
 set -euo pipefail
 
+BASE="/Users/joshkomant/projects/beagley-cluster"
 REMOTE_TMP="/var/volatile/beagley_cluster.new"
 REMOTE_ROLLBACK="/var/volatile/beagley_cluster.rollback"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BASE="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 source "$SCRIPT_DIR/../../beagley-common/scripts/ssh.sh"
 
 echo "[DEPLOY] Step 1: Build Linux aarch64 target..."

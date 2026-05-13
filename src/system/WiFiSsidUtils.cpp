@@ -60,18 +60,22 @@ QVector<ScanRow> parseIwScanNetworks(const QString &scanText)
     QVector<ScanRow> rows;
     QSet<QString> seenSsids;
 
-    QString currentSsid;
-    double currentSignal = -999.0;
-    bool currentSecure = false;
-
-    const auto flushCurrent = [&]() {
-        const QString decoded = decodeIwEscapedSsid(currentSsid).trimmed();
+    const auto appendRow = [&](const QString &rawSsid, double signalDbm, bool secure) {
+        const QString decoded = decodeIwEscapedSsid(rawSsid).trimmed();
         if (decoded.isEmpty() || seenSsids.contains(decoded)) {
             return;
         }
 
         seenSsids.insert(decoded);
-        rows.push_back(ScanRow{decoded, currentSignal, currentSecure});
+        rows.push_back(ScanRow{decoded, signalDbm, secure});
+    };
+
+    QString currentSsid;
+    double currentSignal = -999.0;
+    bool currentSecure = false;
+
+    const auto flushCurrent = [&]() {
+        appendRow(currentSsid, currentSignal, currentSecure);
     };
 
     const QStringList lines = scanText.split(QLatin1Char('\n'));
@@ -86,6 +90,22 @@ QVector<ScanRow> parseIwScanNetworks(const QString &scanText)
             currentSignal = -999.0;
             currentSecure = false;
             continue;
+        }
+
+        if (!line.startsWith(QStringLiteral("bssid")) && line.contains(QLatin1Char('\t'))) {
+            const QStringList columns = line.split(QLatin1Char('\t'));
+            if (columns.size() >= 5) {
+                bool signalOk = false;
+                const double signal = columns.at(2).trimmed().toDouble(&signalOk);
+                const QString flags = columns.at(3);
+                const QString ssid = columns.mid(4).join(QLatin1Char('\t')).trimmed();
+                if (signalOk) {
+                    appendRow(ssid,
+                              signal,
+                              flags.contains(QStringLiteral("WPA"), Qt::CaseInsensitive));
+                    continue;
+                }
+            }
         }
 
         const QRegularExpressionMatch signalMatch = signalRe.match(line);

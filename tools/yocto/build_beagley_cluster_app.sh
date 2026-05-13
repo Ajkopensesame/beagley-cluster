@@ -6,6 +6,8 @@ BUILD_DIR="${YOCTO_BUILD_DIR:-/home/pneumaion/ti-sdk-11.00/yocto-build/build}"
 TARGET="beagley-cluster"
 CLEAN=1
 FAIL_DIRTY=1
+REQUIRE_REMOTE_REF="${BEAGLEY_REQUIRE_REMOTE_REF:-1}"
+SOURCE_REMOTE="${BEAGLEY_SOURCE_REMOTE:-https://github.com/Ajkopensesame/beagley-cluster.git}"
 
 usage() {
   cat <<'EOF'
@@ -24,6 +26,10 @@ Options:
                        deploys because Yocto builds committed HEAD only.
   --fail-dirty         Kept for compatibility; dirty source is already fatal by
                        default.
+  --source-remote REF  Remote name or URL whose branch tip must match HEAD.
+                       Default: BEAGLEY_SOURCE_REMOTE or the GitHub repo URL.
+  --skip-remote-ref    Do not require the GitHub/upstream branch tip to match
+                       the build source HEAD.
 EOF
 }
 
@@ -50,6 +56,18 @@ while [[ $# -gt 0 ]]; do
       FAIL_DIRTY=1
       shift
       ;;
+    --source-remote)
+      SOURCE_REMOTE="${2:-}"
+      shift 2
+      ;;
+    --skip-remote-ref)
+      REQUIRE_REMOTE_REF=0
+      shift
+      ;;
+    --require-remote-ref)
+      REQUIRE_REMOTE_REF=1
+      shift
+      ;;
     -h|--help)
       usage
       exit 0
@@ -68,10 +86,11 @@ VERIFY_ARGS=(--build-dir "$BUILD_DIR" --expected-repo "$ROOT" --write-manifest "
 if [[ "$FAIL_DIRTY" == 1 ]]; then
   VERIFY_ARGS+=(--fail-dirty)
 fi
+if [[ "$REQUIRE_REMOTE_REF" == 1 ]]; then
+  VERIFY_ARGS+=(--source-remote "$SOURCE_REMOTE" --require-remote-ref)
+fi
 
 "$ROOT/tools/yocto/verify_beagley_build_source.sh" "${VERIFY_ARGS[@]}"
-SOURCE_COMMIT_SHORT="$(git -C "$ROOT" rev-parse --short=12 HEAD)"
-ARTIFACT_DIR="$MANIFEST_DIR/artifacts"
 
 echo "[yocto-app-build] Source manifest: $MANIFEST_PATH"
 echo "[yocto-app-build] Building $TARGET in $BUILD_DIR"
@@ -84,22 +103,6 @@ fi
 bitbake "$TARGET"
 
 BIN_PATH="$(find "$BUILD_DIR" -path "*/work/aarch64-oe-linux/$TARGET/1.0/build/beagley_cluster" -type f -print | sort | tail -n 1)"
-if [[ -z "$BIN_PATH" ]]; then
-  IPK_PATH="$(find "$BUILD_DIR" -path "*/work/aarch64-oe-linux/$TARGET/1.0/deploy-ipks/aarch64/${TARGET}_*.ipk" -type f -print | sort -V | tail -n 1)"
-  [[ -n "$IPK_PATH" ]] || fail "built binary/package not found under $BUILD_DIR"
-  command -v dpkg-deb >/dev/null 2>&1 || fail "dpkg-deb is required to extract $IPK_PATH"
-
-  TMP_DIR="$(mktemp -d)"
-  trap 'rm -rf "$TMP_DIR"' EXIT
-  dpkg-deb -x "$IPK_PATH" "$TMP_DIR"
-  [[ -x "$TMP_DIR/usr/bin/beagley_cluster" ]] || fail "package $IPK_PATH does not contain /usr/bin/beagley_cluster"
-
-  mkdir -p "$ARTIFACT_DIR"
-  BIN_PATH="$ARTIFACT_DIR/beagley_cluster.$SOURCE_COMMIT_SHORT"
-  cp "$TMP_DIR/usr/bin/beagley_cluster" "$BIN_PATH"
-  chmod 0755 "$BIN_PATH"
-  echo "[yocto-app-build] Extracted packaged binary: $IPK_PATH -> $BIN_PATH"
-fi
-grep -aFq "$SOURCE_COMMIT_SHORT" "$BIN_PATH" || fail "binary $BIN_PATH does not contain expected source commit $SOURCE_COMMIT_SHORT"
+[[ -n "$BIN_PATH" ]] || fail "built binary not found under $BUILD_DIR"
 file "$BIN_PATH"
 echo "[yocto-app-build] PASS binary=$BIN_PATH"

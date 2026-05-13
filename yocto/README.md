@@ -91,6 +91,33 @@ Environment overrides:
 - `YOCTO_GIT_FETCH_RETRIES`
 - `YOCTO_DL_DIR`
 - `YOCTO_SSTATE_DIR`
+- `BEAGLEY_SOURCE_REMOTE`
+- `BEAGLEY_REQUIRE_REMOTE_REF`
+- `BEAGLEY_ALLOW_DIRTY_SOURCE`
+
+## Source provenance guard
+
+Production Yocto builds are gated before `bitbake` starts. The helper verifies
+that the Yocto layer resolves to the expected repo, `local.conf` builds the
+expected `BEAGLEY_CLUSTER_GIT_BRANCH`, the build repo is clean, and the branch
+tip in `BEAGLEY_SOURCE_REMOTE` matches the exact local commit.
+
+If `BEAGLEY_CLUSTER_GIT_BRANCH` is not set, the appliance helper uses the
+current checkout branch and only falls back to `main` when Git cannot report a
+branch.
+
+The default `BEAGLEY_SOURCE_REMOTE` is
+`https://github.com/Ajkopensesame/beagley-cluster.git`. Set
+`BEAGLEY_ALLOW_DIRTY_SOURCE=1` only for explicit local experiments; dirty source
+is refused by default because BitBake fetches committed Git refs, not
+worktree-only edits. Set `BEAGLEY_REQUIRE_REMOTE_REF=0` only for an intentional
+offline build.
+
+For a preflight check from the Mac against the EliteBook builder, run:
+
+```bash
+skills/beagley-build-source-guard/scripts/check.sh
+```
 
 Resource profiles:
 

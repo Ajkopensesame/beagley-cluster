@@ -394,7 +394,10 @@ DRIVER_RESET_ENABLE=1
 DRIVER_MODULES="cc33xx_sdio cc33xx"
 REQUIRE_INTERNET=0
 RESET_WHILE_SCANNING=0
-SCANNING_FAIL_THRESHOLD=8
+SCANNING_FAIL_THRESHOLD=0
+EMPTY_SCAN_RESET_THRESHOLD=4
+EMPTY_SCAN_RESET_COOLDOWN_SEC=300
+SCAN_SETTLE_SEC=8
 FLUSH_STALE_ADDRESS_WHILE_SCANNING=1
 EOF
 
@@ -413,7 +416,10 @@ export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 : "${DRIVER_MODULES:=cc33xx_sdio cc33xx}"
 : "${REQUIRE_INTERNET:=0}"
 : "${RESET_WHILE_SCANNING:=0}"
-: "${SCANNING_FAIL_THRESHOLD:=8}"
+: "${SCANNING_FAIL_THRESHOLD:=0}"
+: "${EMPTY_SCAN_RESET_THRESHOLD:=4}"
+: "${EMPTY_SCAN_RESET_COOLDOWN_SEC:=300}"
+: "${SCAN_SETTLE_SEC:=8}"
 : "${FLUSH_STALE_ADDRESS_WHILE_SCANNING:=1}"
 
 log() {
@@ -439,6 +445,24 @@ try_dhcp_refresh() {
   networkctl renew "$IFACE" >/dev/null 2>&1 || true
   networkctl reconfigure "$IFACE" >/dev/null 2>&1 || true
   sleep 3
+}
+
+count_visible_bss() {
+  if ! command -v wpa_cli >/dev/null 2>&1; then
+    echo unknown
+    return
+  fi
+
+  wpa_cli -i "$IFACE" scan >/dev/null 2>&1 || true
+  sleep "$SCAN_SETTLE_SEC"
+  wpa_cli -i "$IFACE" scan_results 2>/dev/null | awk '
+    NR > 1 && $1 ~ /^([[:xdigit:]]{2}:){5}[[:xdigit:]]{2}$/ {
+      count++
+    }
+    END {
+      print count + 0
+    }
+  '
 }
 
 flush_stale_wifi_address() {
@@ -582,25 +606,46 @@ if [[ "$last_reason" != "$reason" ]]; then
 fi
 
 if [[ "$reason" == "not-associated" ]] && ! is_enabled "$RESET_WHILE_SCANNING"; then
+  visible_bss="$(count_visible_bss)"
   count=$((count + 1))
   if is_enabled "$FLUSH_STALE_ADDRESS_WHILE_SCANNING"; then
     flush_stale_wifi_address
   fi
-  if command -v wpa_cli >/dev/null 2>&1; then
-    wpa_cli -i "$IFACE" scan >/dev/null 2>&1 || true
-    wpa_cli -i "$IFACE" reassociate >/dev/null 2>&1 || true
-  fi
-  if (( count < SCANNING_FAIL_THRESHOLD )); then
+  if [[ "$visible_bss" =~ ^[0-9]+$ && "$visible_bss" == "0" && "$EMPTY_SCAN_RESET_THRESHOLD" =~ ^[0-9]+$ && "$EMPTY_SCAN_RESET_THRESHOLD" -gt 0 ]]; then
+    if (( count >= EMPTY_SCAN_RESET_THRESHOLD )); then
+      empty_scan_cooldown="$EMPTY_SCAN_RESET_COOLDOWN_SEC"
+      if [[ ! "$empty_scan_cooldown" =~ ^[0-9]+$ ]]; then
+        empty_scan_cooldown="$COOLDOWN_SEC"
+      fi
+      if (( now - last_restart >= empty_scan_cooldown )); then
+        log "recover iface=${IFACE} reason=${reason} count=${count}/${EMPTY_SCAN_RESET_THRESHOLD} visible_bss=0 wpa_state=${wpa_state:-unknown}; empty scans, resetting radio+supplicant+networkd"
+        full_radio_reset
+        printf '0 %s reset-empty-scan\n' "$now" > "$STATE_FILE"
+        exit 0
+      fi
+      printf '%s %s %s\n' "$count" "$last_restart" "$reason" > "$STATE_FILE"
+      log "cooldown iface=${IFACE} reason=${reason} count=${count}/${EMPTY_SCAN_RESET_THRESHOLD} visible_bss=0 wpa_state=${wpa_state:-unknown}; empty-scan reset deferred"
+      exit 0
+    fi
     printf '%s %s %s\n' "$count" "$last_restart" "$reason" > "$STATE_FILE"
-    log "waiting iface=${IFACE} reason=${reason} count=${count}/${SCANNING_FAIL_THRESHOLD} wpa_state=${wpa_state:-unknown}; leaving supplicant scanning"
+    log "waiting iface=${IFACE} reason=${reason} count=${count}/${EMPTY_SCAN_RESET_THRESHOLD} visible_bss=0 wpa_state=${wpa_state:-unknown}; empty scans below reset threshold"
+    exit 0
+  fi
+  if (( SCANNING_FAIL_THRESHOLD <= 0 || count < SCANNING_FAIL_THRESHOLD )); then
+    printf '%s %s %s\n' "$count" "$last_restart" "$reason" > "$STATE_FILE"
+    if (( SCANNING_FAIL_THRESHOLD <= 0 )); then
+      log "waiting iface=${IFACE} reason=${reason} count=${count} visible_bss=${visible_bss} wpa_state=${wpa_state:-unknown}; leaving supplicant scanning without radio reset"
+    else
+      log "waiting iface=${IFACE} reason=${reason} count=${count}/${SCANNING_FAIL_THRESHOLD} visible_bss=${visible_bss} wpa_state=${wpa_state:-unknown}; leaving supplicant scanning"
+    fi
     exit 0
   fi
   if (( now - last_restart < COOLDOWN_SEC )); then
     printf '%s %s %s\n' "$count" "$last_restart" "$reason" > "$STATE_FILE"
-    log "cooldown iface=${IFACE} reason=${reason} count=${count}/${SCANNING_FAIL_THRESHOLD} wpa_state=${wpa_state:-unknown}; reset deferred"
+    log "cooldown iface=${IFACE} reason=${reason} count=${count}/${SCANNING_FAIL_THRESHOLD} visible_bss=${visible_bss} wpa_state=${wpa_state:-unknown}; reset deferred"
     exit 0
   fi
-  log "recover iface=${IFACE} reason=${reason} count=${count}/${SCANNING_FAIL_THRESHOLD}; sustained scanning, resetting radio+supplicant+networkd"
+  log "recover iface=${IFACE} reason=${reason} count=${count}/${SCANNING_FAIL_THRESHOLD} visible_bss=${visible_bss}; sustained scanning, resetting radio+supplicant+networkd"
   full_radio_reset
   printf '0 %s reset-scanning\n' "$now" > "$STATE_FILE"
   exit 0

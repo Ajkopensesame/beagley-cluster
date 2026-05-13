@@ -15,9 +15,6 @@ MatrixRain    1.0 MatrixRain.qml
 SpeedoPearl   1.0 SpeedoPearl.qml
 FuelGauge    1.0 FuelGauge.qml
 WeatherCorners 1.0 WeatherCorners.qml
-WeatherDetailPanel 1.0 WeatherDetailPanel.qml
-RadarDetailPanel 1.0 RadarDetailPanel.qml
-MusicDetailPanel 1.0 MusicDetailPanel.qml
 WeatherMoodIcon 1.0 WeatherMoodIcon.qml
 MapCenterMapLibreNative 1.0 MapCenterMapLibreNative.qml
 

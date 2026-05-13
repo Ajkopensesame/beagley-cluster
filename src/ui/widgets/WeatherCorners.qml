@@ -22,9 +22,6 @@ Item {
     readonly property string displayFont: theme && theme.fontDisplay ? theme.fontDisplay : "Oxanium"
     readonly property string monoFont: theme && theme.fontMono ? theme.fontMono : "Oxanium"
     readonly property bool embeddedSafeMode: Qt.platform.os === "linux"
-    readonly property bool embeddedSafePopups: embeddedSafeMode
-    readonly property int modalRadius: embeddedSafePopups ? 0 : 8
-    readonly property int modalSmallRadius: embeddedSafePopups ? 0 : 6
     readonly property bool tallDetailMode: expandedMode === "temp" || expandedMode === "radar"
     readonly property int podSize: Math.floor(Math.min(164, Math.max(142, height * 0.228)))
     readonly property int cornerBleed: Math.round(podSize * 0.17)
@@ -101,14 +98,12 @@ Item {
     property real radarSiteDistanceKm: NaN
     property string radarFrameLabel: ""
     property string expandedMode: ""
-    property string initialExpandedMode: ""
 
     signal mapMenuRequested()
 
     readonly property bool radarServiceAvailable: typeof radarImage !== "undefined" && radarImage !== null
     readonly property bool radarServiceReady: radarServiceAvailable && radarImage.ready && String(radarImage.imageUrl).length > 0
     readonly property url radarFrameUrl: radarServiceReady ? radarImage.imageUrl : ""
-    readonly property bool detailRadarReady: radarServiceReady
 
     opacity: active ? 1 : 0
     visible: opacity > 0.01
@@ -812,11 +807,6 @@ Item {
         }
     }
 
-    function syncRadarAnimationMode() {
-        if (radarServiceAvailable)
-            radarImage.animationEnabled = root.active && (root.expandedMode === "" || root.expandedMode === "radar")
-    }
-
     function handlePositionChanged() {
         if (!root.active)
             return
@@ -873,17 +863,6 @@ Item {
     }
 
     Timer {
-        id: initialExpandedModeTimer
-        interval: 1600
-        repeat: false
-        onTriggered: {
-            const requested = root.cleanText(root.initialExpandedMode)
-            if (requested === "temp" || requested === "radar" || requested === "music")
-                root.expandedMode = requested
-        }
-    }
-
-    Timer {
         id: coordinateDebounce
         interval: root.lowEffectMode ? 7000 : 4500
         repeat: false
@@ -923,7 +902,6 @@ Item {
     onSafeLngChanged: handlePositionChanged()
     onLivePositionValidChanged: handlePositionChanged()
     onExpandedModeChanged: {
-        root.syncRadarAnimationMode()
         if (!root.active)
             return
         if (root.expandedMode === "temp" || root.expandedMode === "radar") {
@@ -938,7 +916,6 @@ Item {
         id: weatherCorner
         width: root.podSize
         height: root.podSize
-        visible: root.expandedMode === ""
         anchors.left: parent.left
         anchors.top: parent.top
         anchors.leftMargin: root.cornerInset
@@ -959,7 +936,6 @@ Item {
         id: radarCorner
         width: root.podSize
         height: root.podSize
-        visible: root.expandedMode === ""
         anchors.right: parent.right
         anchors.top: parent.top
         anchors.rightMargin: root.cornerInset
@@ -968,7 +944,7 @@ Item {
         corner: "topRight"
         effectLevel: root.effectLevel
         bleedFraction: root.podBleedFraction
-        frameUrl: root.expandedMode === "" ? root.radarFrameUrl : ""
+        frameUrl: root.radarFrameUrl
         status: root.radarStatus
         frameLabel: root.radarFrameDisplayLabel()
         onClicked: root.expandedMode = root.expandedMode === "radar" ? "" : "radar"
@@ -978,7 +954,6 @@ Item {
         id: mediaCorner
         width: root.podSize
         height: root.podSize
-        visible: root.expandedMode === ""
         anchors.left: parent.left
         anchors.bottom: parent.bottom
         anchors.leftMargin: root.cornerInset
@@ -998,7 +973,6 @@ Item {
         id: mapMenuCorner
         width: root.podSize
         height: root.podSize
-        visible: root.expandedMode === ""
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         anchors.rightMargin: root.cornerInset
@@ -1022,7 +996,9 @@ Item {
 
         Rectangle {
             anchors.fill: parent
-            color: root.embeddedSafePopups ? "#03050A" : Qt.rgba(0.0, 0.0, 0.0, root.tallDetailMode ? 0.66 : 0.54)
+            color: root.expandedMode === "temp" || root.expandedMode === "radar"
+                ? Qt.rgba(0.0, 0.0, 0.0, 0.0)
+                : Qt.rgba(0.0, 0.0, 0.0, root.tallDetailMode ? 0.66 : 0.54)
         }
 
         MouseArea {
@@ -1040,19 +1016,19 @@ Item {
                 : Math.floor(Math.min(360, Math.max(272, parent.height * 0.46)))
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.verticalCenter: parent.verticalCenter
-            radius: root.embeddedSafePopups ? 0 : (root.tallDetailMode ? 4 : 8)
+            radius: root.tallDetailMode ? 4 : 8
             color: root.expandedMode === "temp"
-                ? "#070711"
+                ? Qt.rgba(0.020, 0.018, 0.034, 0.97)
                 : root.expandedMode === "music"
-                ? "#050712"
-                : "#050812"
+                ? Qt.rgba(0.004, 0.008, 0.031, 0.98)
+                : Qt.rgba(0.016, 0.020, 0.047, 0.96)
             border.width: 1
             border.color: root.expandedMode === "temp"
                 ? "#FF7AD9"
                 : root.tallDetailMode
                 ? "#58FFE1"
                 : (root.expandedMode === "music" ? "#58FFE1" : "#5C4B90")
-            clip: false
+            clip: true
 
             MouseArea {
                 anchors.fill: parent
@@ -1083,32 +1059,649 @@ Item {
                 }
             }
 
-            MusicDetailPanel {
+            Item {
                 anchors.fill: parent
                 anchors.margins: 20
                 visible: root.expandedMode === "music"
-                controller: root
+
+                Column {
+                    anchors.fill: parent
+                    spacing: 14
+
+                    Text {
+                        width: parent.width
+                        text: "NOW PLAYING"
+                        color: "#58FFE1"
+                        font.family: root.monoFont
+                        font.pixelSize: 13
+                        font.weight: Font.Bold
+                        font.letterSpacing: 0
+                        horizontalAlignment: Text.AlignHCenter
+                    }
+
+                    Rectangle {
+                        width: parent.width
+                        height: parent.height - 30
+                        radius: 8
+                        color: "#070913"
+                        border.width: 1
+                        border.color: root.musicPlaying ? "#58FFE1" : "#3C325E"
+
+                        Column {
+                            anchors.fill: parent
+                            anchors.margins: 18
+                            spacing: 14
+
+                            Rectangle {
+                                width: 96
+                                height: 96
+                                radius: 48
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                color: "#05060A"
+                                border.width: 1
+                                border.color: root.musicPlaying ? "#58FFE1" : "#5C4B90"
+
+                                OemIcon {
+                                    anchors.centerIn: parent
+                                    width: 62
+                                    height: 62
+                                    icon: "audio"
+                                    active: root.musicPlaying
+                                    color: "#F7FBFF"
+                                    accentColor: "#58FFE1"
+                                    strokeWidth: 5.0
+                                }
+                            }
+
+                            Rectangle {
+                                width: parent.width
+                                radius: 8
+                                color: "#0A0D18"
+                                border.width: 1
+                                border.color: "#22283D"
+                                implicitHeight: titleColumn.implicitHeight + 22
+
+                                Column {
+                                    id: titleColumn
+                                    anchors.fill: parent
+                                    anchors.margins: 11
+                                    spacing: 8
+
+                                    Text {
+                                        width: parent.width
+                                        text: root.musicTitle.length > 0 ? root.musicTitle : root.musicStatus
+                                        color: "#F7FBFF"
+                                        font.family: root.displayFont
+                                        font.pixelSize: 24
+                                        font.weight: Font.Bold
+                                        font.letterSpacing: 0
+                                        horizontalAlignment: Text.AlignHCenter
+                                        wrapMode: Text.Wrap
+                                        maximumLineCount: 2
+                                    }
+
+                                    Text {
+                                        width: parent.width
+                                        text: root.musicArtist.length > 0 ? root.musicArtist : root.musicDetail
+                                        color: "#58FFE1"
+                                        font.family: root.monoFont
+                                        font.pixelSize: 14
+                                        font.weight: Font.Bold
+                                        font.letterSpacing: 0
+                                        horizontalAlignment: Text.AlignHCenter
+                                        wrapMode: Text.Wrap
+                                        maximumLineCount: 2
+                                    }
+
+                                    Text {
+                                        width: parent.width
+                                        text: root.musicAlbum.length > 0 ? root.musicAlbum : "SPOTIFY"
+                                        color: "#C568FF"
+                                        font.family: root.monoFont
+                                        font.pixelSize: 12
+                                        font.weight: Font.Bold
+                                        font.letterSpacing: 0
+                                        horizontalAlignment: Text.AlignHCenter
+                                        wrapMode: Text.Wrap
+                                        maximumLineCount: 2
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
-            WeatherDetailPanel {
+            Item {
                 anchors.fill: parent
                 anchors.margins: 20
                 visible: root.expandedMode === "temp"
-                controller: root
+
+                Column {
+                    anchors.fill: parent
+                    spacing: 9
+
+                    Row {
+                        width: parent.width
+                        height: 34
+                        spacing: 10
+
+                        Text {
+                            width: parent.width * 0.58
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "TODAY"
+                            color: "#F7FBFF"
+                            font.family: root.monoFont
+                            font.pixelSize: 14
+                            font.weight: Font.Bold
+                            font.letterSpacing: 0
+                            elide: Text.ElideRight
+                        }
+
+                        Text {
+                            width: parent.width * 0.42 - 10
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: root.locationName.length > 0 ? root.locationName : root.weatherStatus
+                            color: "#9DB4FF"
+                            font.family: root.monoFont
+                            font.pixelSize: 11
+                            font.weight: Font.Bold
+                            font.letterSpacing: 0
+                            horizontalAlignment: Text.AlignRight
+                            elide: Text.ElideRight
+                        }
+                    }
+
+                    Rectangle {
+                        width: parent.width
+                        height: 156
+                        radius: 8
+                        color: Qt.rgba(0.018, 0.020, 0.030, 0.94)
+                        border.width: 1
+                        border.color: Qt.rgba(0.36, 1.0, 0.88, 0.28)
+
+                        Row {
+                            anchors.fill: parent
+                            anchors.margins: 16
+                            spacing: 18
+
+                            WeatherMoodIcon {
+                                width: 116
+                                height: 116
+                                anchors.verticalCenter: parent.verticalCenter
+                                kind: root.weatherKind(root.currentConditionLabel())
+                                primaryColor: "#FFD36B"
+                                secondaryColor: "#58FFE1"
+                            }
+
+                            Column {
+                                width: parent.width - 134
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 5
+
+                                Row {
+                                    width: parent.width
+                                    spacing: 10
+
+                                    Text {
+                                        width: 128
+                                        text: root.formatTemp(root.displayTempC)
+                                        color: "#F9FBFF"
+                                        font.family: root.displayFont
+                                        font.pixelSize: 82
+                                        font.weight: Font.Bold
+                                        font.letterSpacing: 0
+                                        lineHeight: 0.82
+                                        horizontalAlignment: Text.AlignRight
+                                    }
+
+                                    Column {
+                                        width: parent.width - 138
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        spacing: 5
+
+                                        Text {
+                                            width: parent.width
+                                            text: "\u00B0C"
+                                            color: "#58FFE1"
+                                            font.family: root.monoFont
+                                            font.pixelSize: 18
+                                            font.weight: Font.Bold
+                                            font.letterSpacing: 0
+                                            elide: Text.ElideRight
+                                        }
+
+                                        Text {
+                                            width: parent.width
+                                            text: root.weatherMoodLine(root.currentConditionLabel())
+                                            color: "#FFD36B"
+                                            font.family: root.displayFont
+                                            font.pixelSize: 30
+                                            font.weight: Font.Bold
+                                            font.letterSpacing: 0
+                                            elide: Text.ElideRight
+                                        }
+                                    }
+                                }
+
+                                Text {
+                                    width: parent.width
+                                    text: root.weatherMoodSubLine(root.currentConditionLabel())
+                                    color: "#F7FBFF"
+                                    font.family: root.displayFont
+                                    font.pixelSize: 18
+                                    font.weight: Font.Bold
+                                    font.letterSpacing: 0
+                                    elide: Text.ElideRight
+                                }
+
+                                Text {
+                                    width: parent.width
+                                    text: root.currentConditionLabel() + "  /  updated " + root.weatherUpdatedText
+                                    color: "#9DB4FF"
+                                    font.family: root.monoFont
+                                    font.pixelSize: 11
+                                    font.weight: Font.Bold
+                                    font.letterSpacing: 0
+                                    elide: Text.ElideRight
+                                }
+                            }
+                        }
+                    }
+
+                    Grid {
+                        id: metricsGrid
+                        width: parent.width
+                        columns: 3
+                        columnSpacing: 10
+                        rowSpacing: 6
+
+                        Repeater {
+                            model: [
+                                { "k": "FEELS", "v": root.formatTemp(root.displayFeelsC) + "\u00B0", "s": "outside" },
+                                { "k": "RAIN", "v": root.formatRain(root.precipitationMm) + " MM", "s": root.rainShortLine(root.precipitationMm) },
+                                { "k": "WIND", "v": (root.weatherWindDir.length > 0 ? root.weatherWindDir + " " : "") + root.formatWind(root.windKph), "s": "km/h" }
+                            ]
+
+                            Rectangle {
+                                width: (metricsGrid.width - 20) / 3
+                                height: 54
+                                radius: 8
+                                color: Qt.rgba(0.030, 0.034, 0.052, 0.80)
+                                border.width: 1
+                                border.color: Qt.rgba(0.36, 1.0, 0.88, 0.18)
+
+                                Column {
+                                    anchors.fill: parent
+                                    anchors.margins: 7
+                                    spacing: 1
+
+                                    Text {
+                                        width: parent.width
+                                        text: modelData.k
+                                        color: "#9DB4FF"
+                                        font.family: root.monoFont
+                                        font.pixelSize: 10
+                                        font.weight: Font.Bold
+                                        font.letterSpacing: 0
+                                        horizontalAlignment: Text.AlignHCenter
+                                        elide: Text.ElideRight
+                                    }
+
+                                    Text {
+                                        width: parent.width
+                                        text: modelData.v
+                                        color: "#F7FBFF"
+                                        font.family: root.monoFont
+                                        font.pixelSize: 14
+                                        font.weight: Font.Bold
+                                        font.letterSpacing: 0
+                                        horizontalAlignment: Text.AlignHCenter
+                                        elide: Text.ElideRight
+                                    }
+
+                                    Text {
+                                        width: parent.width
+                                        text: modelData.s
+                                        color: "#58FFE1"
+                                        font.family: root.monoFont
+                                        font.pixelSize: 9
+                                        font.weight: Font.Bold
+                                        font.letterSpacing: 0
+                                        horizontalAlignment: Text.AlignHCenter
+                                        elide: Text.ElideRight
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Row {
+                        width: parent.width
+                        height: 22
+
+                        Text {
+                            width: parent.width * 0.54
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "THIS WEEK"
+                            color: "#F7FBFF"
+                            font.family: root.monoFont
+                            font.pixelSize: 14
+                            font.weight: Font.Bold
+                            font.letterSpacing: 0
+                        }
+
+                        Text {
+                            width: parent.width * 0.46
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: root.forecastStatus === "LIVE" ? root.forecastUpdatedText : root.forecastStatus
+                            color: "#9DB4FF"
+                            font.family: root.monoFont
+                            font.pixelSize: 11
+                            font.weight: Font.Bold
+                            font.letterSpacing: 0
+                            horizontalAlignment: Text.AlignRight
+                            elide: Text.ElideRight
+                        }
+                    }
+
+                    Column {
+                        id: forecastList
+                        width: parent.width
+                        spacing: 0
+
+                        Repeater {
+                            model: root.forecastRows
+
+                            Rectangle {
+                                width: forecastList.width
+                                height: 43
+                                radius: 6
+                                color: index === 0
+                                    ? Qt.rgba(0.050, 0.056, 0.080, 0.86)
+                                    : Qt.rgba(0.028, 0.032, 0.050, 0.74)
+                                border.width: 1
+                                border.color: index === 0
+                                    ? Qt.rgba(0.36, 1.0, 0.88, 0.24)
+                                    : Qt.rgba(0.36, 1.0, 0.88, 0.12)
+
+                                Row {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 8
+                                    anchors.rightMargin: 8
+                                    spacing: 8
+
+                                    WeatherMoodIcon {
+                                        width: 30
+                                        height: 30
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        kind: root.weatherKind(modelData.label)
+                                        primaryColor: "#FFD36B"
+                                        secondaryColor: "#58FFE1"
+                                    }
+
+                                    Text {
+                                        width: 68
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: modelData.day
+                                        color: index === 0 ? "#58FFE1" : "#F7FBFF"
+                                        font.family: root.monoFont
+                                        font.pixelSize: 13
+                                        font.weight: Font.Bold
+                                        font.letterSpacing: 0
+                                        elide: Text.ElideRight
+                                    }
+
+                                    Column {
+                                        width: parent.width - 224
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        spacing: 1
+
+                                        Text {
+                                            width: parent.width
+                                            text: modelData.label
+                                            color: "#F7FBFF"
+                                            font.family: root.monoFont
+                                            font.pixelSize: 13
+                                            font.weight: Font.Bold
+                                            font.letterSpacing: 0
+                                            elide: Text.ElideRight
+                                        }
+
+                                        Text {
+                                            width: parent.width
+                                            text: root.rainShortLine(modelData.rain) + " rain"
+                                            color: "#9DB4FF"
+                                            font.family: root.monoFont
+                                            font.pixelSize: 10
+                                            font.weight: Font.Bold
+                                            font.letterSpacing: 0
+                                            elide: Text.ElideRight
+                                        }
+                                    }
+
+                                    Text {
+                                        width: 62
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: (modelData.high !== null ? modelData.high : "--") + "\u00B0/" + (modelData.low !== null ? modelData.low : "--") + "\u00B0"
+                                        color: "#F7FBFF"
+                                        font.family: root.displayFont
+                                        font.pixelSize: 17
+                                        font.weight: Font.Bold
+                                        font.letterSpacing: 0
+                                        horizontalAlignment: Text.AlignRight
+                                    }
+
+                                    Text {
+                                        width: 40
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: modelData.rain !== null ? modelData.rain + "%" : "--%"
+                                        color: "#FFD36B"
+                                        font.family: root.monoFont
+                                        font.pixelSize: 12
+                                        font.weight: Font.Bold
+                                        font.letterSpacing: 0
+                                        horizontalAlignment: Text.AlignRight
+                                    }
+                                }
+                            }
+                        }
+
+                        Text {
+                            width: parent.width
+                            visible: root.forecastRows.length === 0
+                            text: root.forecastStatus
+                            color: "#FFD36B"
+                            font.family: root.monoFont
+                            font.pixelSize: 14
+                            font.weight: Font.Bold
+                            font.letterSpacing: 0
+                            horizontalAlignment: Text.AlignHCenter
+                        }
+                    }
+                }
             }
 
-            RadarDetailPanel {
+            Item {
                 anchors.fill: parent
                 anchors.margins: 20
                 visible: root.expandedMode === "radar"
-                controller: root
-            }
 
+                Column {
+                    anchors.fill: parent
+                    spacing: 9
+
+                    Row {
+                        width: parent.width
+                        height: 34
+                        spacing: 10
+
+                        Text {
+                            width: parent.width * 0.58
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "RADAR"
+                            color: "#F7FBFF"
+                            font.family: root.monoFont
+                            font.pixelSize: 14
+                            font.weight: Font.Bold
+                            font.letterSpacing: 0
+                            elide: Text.ElideRight
+                        }
+
+                        Text {
+                            width: parent.width * 0.42 - 10
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: root.radarStatus === "LIVE" ? root.radarFrameDisplayLabel() : root.radarStatus
+                            color: root.radarStatus === "LIVE" ? "#9DB4FF" : "#FFD36B"
+                            font.family: root.monoFont
+                            font.pixelSize: 11
+                            font.weight: Font.Bold
+                            font.letterSpacing: 0
+                            horizontalAlignment: Text.AlignRight
+                            elide: Text.ElideRight
+                        }
+                    }
+
+                    Rectangle {
+                        width: parent.width
+                        height: Math.max(360, parent.height - 122)
+                        radius: 8
+                        color: Qt.rgba(0.018, 0.020, 0.030, 0.94)
+                        border.width: 1
+                        border.color: Qt.rgba(0.36, 1.0, 0.88, 0.28)
+                        clip: true
+
+                        RadarFrameItem {
+                            id: detailRadarFrame
+                            anchors.fill: parent
+                            anchors.margins: 8
+                            source: root.expandedMode === "radar" ? root.radarFrameUrl : ""
+                            circular: false
+                            backgroundVisible: true
+                            guidesVisible: true
+                            visible: ready
+                        }
+
+                        Rectangle {
+                            anchors.fill: parent
+                            anchors.margins: 8
+                            radius: 5
+                            color: "#080913"
+                            opacity: detailRadarFrame.ready ? 0.0 : 1.0
+
+                            Column {
+                                anchors.centerIn: parent
+                                spacing: 10
+                                visible: !detailRadarFrame.ready
+
+                                WidgetLocal.RadarGlyph {
+                                    width: 78
+                                    height: 78
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    primaryColor: "#F7FBFF"
+                                    accentColor: "#58FFE1"
+                                    active: root.radarStatus === "LIVE"
+                                }
+
+                                Text {
+                                    width: parent.width
+                                    text: "RADAR"
+                                    color: "#F7FBFF"
+                                    font.family: root.displayFont
+                                    font.pixelSize: 26
+                                    font.weight: Font.Bold
+                                    font.letterSpacing: 0
+                                    horizontalAlignment: Text.AlignHCenter
+                                    elide: Text.ElideRight
+                                }
+
+                                Text {
+                                    width: Math.min(320, detailRadarFrame.width * 0.70)
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    text: root.radarStatus === "LIVE" ? "RADAR LOADING" : root.radarStatus
+                                    color: root.radarStatus === "LIVE" ? "#58FFE1" : "#FFD36B"
+                                    font.family: root.monoFont
+                                    font.pixelSize: 13
+                                    font.weight: Font.Bold
+                                    font.letterSpacing: 0
+                                    horizontalAlignment: Text.AlignHCenter
+                                    elide: Text.ElideRight
+                                }
+                            }
+                        }
+
+                    }
+
+                    Row {
+                        width: parent.width
+                        height: 54
+                        spacing: 10
+
+                        Repeater {
+                            model: [
+                                { "k": "FRAME", "v": root.radarFrameDisplayLabel(), "s": "time" },
+                                { "k": "SOURCE", "v": root.radarSiteName.length > 0 ? root.radarSiteName : "GPS", "s": root.formatDistanceKm(root.radarSiteDistanceKm) },
+                                { "k": "STATUS", "v": root.radarStatus === "LIVE" ? "LIVE NOW" : root.radarStatus, "s": root.radarProduct.length > 0 ? root.radarProduct : root.radarSourceLabel() }
+                            ]
+
+                            Rectangle {
+                                width: (parent.width - 20) / 3
+                                height: parent.height
+                                radius: 8
+                                color: Qt.rgba(0.030, 0.034, 0.052, 0.80)
+                                border.width: 1
+                                border.color: Qt.rgba(0.36, 1.0, 0.88, 0.18)
+
+                                Column {
+                                    anchors.fill: parent
+                                    anchors.margins: 7
+                                    spacing: 1
+
+                                    Text {
+                                        width: parent.width
+                                        text: modelData.k
+                                        color: "#9DB4FF"
+                                        font.family: root.monoFont
+                                        font.pixelSize: 10
+                                        font.weight: Font.Bold
+                                        font.letterSpacing: 0
+                                        horizontalAlignment: Text.AlignHCenter
+                                        elide: Text.ElideRight
+                                    }
+
+                                    Text {
+                                        width: parent.width
+                                        text: modelData.v
+                                        color: "#F7FBFF"
+                                        font.family: root.monoFont
+                                        font.pixelSize: 14
+                                        font.weight: Font.Bold
+                                        font.letterSpacing: 0
+                                        horizontalAlignment: Text.AlignHCenter
+                                        elide: Text.ElideRight
+                                    }
+
+                                    Text {
+                                        width: parent.width
+                                        text: modelData.s
+                                        color: "#58FFE1"
+                                        font.family: root.monoFont
+                                        font.pixelSize: 9
+                                        font.weight: Font.Bold
+                                        font.letterSpacing: 0
+                                        horizontalAlignment: Text.AlignHCenter
+                                        elide: Text.ElideRight
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
     onActiveChanged: {
-        root.syncRadarAnimationMode()
         if (!active) {
             expandedMode = ""
             startupRefreshTimer.stop()
@@ -1118,10 +1711,7 @@ Item {
     }
 
     Component.onCompleted: {
-        root.syncRadarAnimationMode()
         if (root.active)
             startupRefreshTimer.start()
-        if (root.cleanText(root.initialExpandedMode).length > 0)
-            initialExpandedModeTimer.restart()
     }
 }

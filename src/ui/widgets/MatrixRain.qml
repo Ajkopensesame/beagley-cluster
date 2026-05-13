@@ -1,5 +1,4 @@
 import QtQuick 2.15
-import BeagleY 1.0
 
 Item {
     id: root
@@ -44,24 +43,14 @@ Item {
     readonly property bool lowEffectMode: effectLevel === "low"
     readonly property bool embeddedSafeMode: Qt.platform.os === "linux"
     readonly property bool embeddedHighEffectBudgetMode: embeddedSafeMode && effectLevel === "high"
-    readonly property bool embeddedLowEffectBudgetMode: embeddedSafeMode && lowEffectMode
-    readonly property bool nativePrimitiveMode: embeddedSafeMode && !effectDisabled
     readonly property bool useSharedPhase: !isNaN(sharedPhase)
     readonly property real renderScale: 1.0
-    readonly property real effectiveDensity: embeddedLowEffectBudgetMode
-        ? Math.min(density, 0.84)
-        : (embeddedHighEffectBudgetMode ? Math.min(density, 0.80) : density)
-    readonly property int effectiveTailLength: embeddedLowEffectBudgetMode
-        ? Math.min(tailLength, 26)
-        : (embeddedHighEffectBudgetMode ? Math.min(tailLength, 36) : tailLength)
-    readonly property real effectiveCharChangeChance: embeddedLowEffectBudgetMode
-        ? Math.min(charChangeChance, 0.012)
-        : (embeddedHighEffectBudgetMode ? Math.min(charChangeChance, 0.016) : charChangeChance)
-    readonly property real effectiveGlowBlur: embeddedLowEffectBudgetMode
-        ? Math.min(glowBlur, 5.5)
-        : (embeddedHighEffectBudgetMode ? Math.min(glowBlur, 7.0) : glowBlur)
+    readonly property real effectiveDensity: embeddedHighEffectBudgetMode ? Math.min(density, 0.80) : density
+    readonly property int effectiveTailLength: embeddedHighEffectBudgetMode ? Math.min(tailLength, 36) : tailLength
+    readonly property real effectiveCharChangeChance: embeddedHighEffectBudgetMode ? Math.min(charChangeChance, 0.016) : charChangeChance
+    readonly property real effectiveGlowBlur: embeddedHighEffectBudgetMode ? Math.min(glowBlur, 7.0) : glowBlur
     readonly property real effectiveFps: lowEffectMode
-        ? Math.min(fps, embeddedSafeMode ? 1.1 : 8.0)
+        ? Math.min(fps, embeddedHighEffectBudgetMode ? 2.0 : 8.0)
         : (embeddedHighEffectBudgetMode ? Math.min(fps, 2.0) : fps)
     property var greekGlyphs: [
         "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
@@ -118,13 +107,6 @@ Item {
     }
 
     function resetDrops() {
-        if (root.nativePrimitiveMode) {
-            drops = []
-            activeColumns = []
-            verseStreams = []
-            verseOffsets = []
-            return
-        }
         if (root.effectDisabled) {
             drops = []
             activeColumns = []
@@ -149,7 +131,6 @@ Item {
     Canvas {
         id: canvas
         anchors.fill: parent
-        visible: !root.nativePrimitiveMode
         renderTarget: root.embeddedSafeMode ? Canvas.Image : Canvas.FramebufferObject
         antialiasing: false
         smooth: false
@@ -163,9 +144,6 @@ Item {
             const drawWidth = Math.max(1, canvas.canvasSize.width)
             const drawHeight = Math.max(1, canvas.canvasSize.height)
             ctx.clearRect(0, 0, drawWidth, drawHeight)
-
-            if (root.nativePrimitiveMode)
-                return
 
             if (root.effectDisabled) {
                 return
@@ -236,10 +214,10 @@ Item {
 
                 var step = root.speedMultiplier * (0.35 + 0.65 * pulse) * root.driftScale
                 if (root.lowEffectMode)
-                    step = Math.max(step, root.embeddedLowEffectBudgetMode ? 0.052 + Math.random() * 0.024 : 0.10 + Math.random() * 0.045)
+                    step = Math.max(step, 0.10 + Math.random() * 0.045)
                 root.drops[i] += step
 
-                var churnChance = Math.max(root.effectiveCharChangeChance * pulse, root.embeddedLowEffectBudgetMode ? 0.008 : (root.lowEffectMode ? 0.030 : 0.0))
+                var churnChance = Math.max(root.effectiveCharChangeChance * pulse, root.lowEffectMode ? 0.030 : 0.0)
                 if (isActive && Math.random() < churnChance) {
                     if (Math.random() < 0.18) {
                         root.assignVerse(i)
@@ -272,39 +250,13 @@ Item {
         }
     }
 
-    NativeMatrixRainItem {
-        id: nativeRain
-        anchors.fill: parent
-        visible: root.nativePrimitiveMode
-        layer.enabled: root.nativePrimitiveMode
-        layer.smooth: false
-        rainColor: root.rainColor
-        glowColor: root.glowColor
-        effectEnabled: root.effectEnabled
-        effectLevel: root.effectLevel
-        phase: root.useSharedPhase ? root.sharedPhase : root.timePhase
-        columns: root.columns
-        fontPx: root.fontPx
-        density: root.effectiveDensity
-        speedMultiplier: root.speedMultiplier
-        driftScale: root.driftScale
-        tailLength: root.effectiveTailLength
-        headAlpha: root.headAlpha
-        tailMinAlpha: root.tailMinAlpha
-        circularMask: root.circularMask
-        maskCenterX: root.maskCenterX
-        maskCenterY: root.maskCenterY
-        maskRadius: root.maskRadius
-    }
-
     Timer {
         interval: Math.round(1000 / Math.max(0.25, root.effectiveFps))
         running: !root.effectDisabled && !root.useSharedPhase
         repeat: true
         onTriggered: {
             root.timePhase += interval / 1000.0
-            if (!root.nativePrimitiveMode)
-                canvas.requestPaint()
+            canvas.requestPaint()
         }
     }
 
@@ -319,13 +271,12 @@ Item {
     onSharedPhaseChanged: {
         if (root.useSharedPhase && !root.effectDisabled) {
             root.timePhase = root.sharedPhase
-            if (!root.nativePrimitiveMode)
-                canvas.requestPaint()
+            canvas.requestPaint()
         }
     }
-    onCircularMaskChanged: if (!root.nativePrimitiveMode) canvas.requestPaint()
-    onMaskCenterXChanged: if (!root.nativePrimitiveMode) canvas.requestPaint()
-    onMaskCenterYChanged: if (!root.nativePrimitiveMode) canvas.requestPaint()
-    onMaskRadiusChanged: if (!root.nativePrimitiveMode) canvas.requestPaint()
+    onCircularMaskChanged: canvas.requestPaint()
+    onMaskCenterXChanged: canvas.requestPaint()
+    onMaskCenterYChanged: canvas.requestPaint()
+    onMaskRadiusChanged: canvas.requestPaint()
     Component.onCompleted: resetDrops()
 }

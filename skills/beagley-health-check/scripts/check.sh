@@ -28,13 +28,14 @@ RESTARTS=$(ssh_run "systemctl show beagley_cluster -p NRestarts --value" 2>/dev/
 
 echo "[INFO] state=$STATE restarts=$RESTARTS"
 
-# Restart loops are failures even while systemd reports the service active.
+# 🚨 Detect restart loop
 if [ "$RESTARTS" -gt 5 ]; then
   echo "[FAIL] Service is restarting repeatedly (restart loop)"
   ssh_run "systemctl status beagley_cluster --no-pager"
   exit 1
 fi
 
+# Normal active check
 if [ "$STATE" != "active" ]; then
   echo "[FAIL] Service is not active"
   ssh_run "systemctl status beagley_cluster --no-pager"

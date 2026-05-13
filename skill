@@ -1,18 +1,29 @@
 #!/bin/bash
+set -euo pipefail
 
 BASE="$HOME/projects/beagley-cluster/skills"
+COMMAND="${1:-}"
+if [[ $# -gt 0 ]]; then
+  shift
+fi
 
-case "$1" in
+case "$COMMAND" in
 
   elitebook)
     echo "[RUN] elitebook-connect → Connect to EliteBook"
-    $BASE/elitebook-connect/scripts/connect.sh
+    "$BASE/elitebook-connect/scripts/connect.sh" "$@"
+    ;;
+
+  build-source|source-guard)
+    echo "[RUN] beagley-build-source-guard -> Verify clean GitHub/EliteBook build source"
+    "$BASE/beagley-build-source-guard/scripts/check.sh" "$@"
     ;;
 
   *)
     echo "Available skills:"
     echo ""
-    echo "  skill elitebook → Connect to EliteBook"
+    echo "  skill elitebook                   -> Connect to EliteBook"
+    echo "  skill build-source                -> Verify clean GitHub/EliteBook build source"
     echo ""
     ;;
 esac

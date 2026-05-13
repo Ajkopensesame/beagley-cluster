@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 HOST="${BEAGLEY_HOST:-root@beagley-ai.local}"
 HUB_URL="${VEHICLE_HUB_WS_URL:-ws://10.24.0.7:8765}"
-EFFECT_LEVEL="${BEAGLEY_EFFECT_LEVEL:-low}"
+EFFECT_LEVEL="${BEAGLEY_EFFECT_LEVEL:-high}"
 MAP_RENDERER="${BEAGLEY_MAP_RENDERER:-maplibre-native}"
 MAPLIBRE_STYLE_URL="${BEAGLEY_MAPLIBRE_NATIVE_STYLE_URL:-https://tiles.openfreemap.org/styles/positron}"
 MAPLIBRE_TRUSTED_STYLES="${BEAGLEY_MAPLIBRE_NATIVE_TRUSTED_STYLES:-$MAPLIBRE_STYLE_URL}"
@@ -33,7 +33,7 @@ inputs without a road test.
 Options:
   --host HOST             SSH target. Default: root@beagley-ai.local
   --hub-url URL           Vehicle hub URL. Default: ws://10.24.0.7:8765
-  --effect-level LEVEL    off, low, or high. Default: low
+  --effect-level LEVEL    off, low, or high. Default: high
   --map-renderer MODE     maplibre-native or native-online. Default: maplibre-native
   --maplibre-style-url URL
                           Trusted MapLibre style. Default: OpenFreeMap Positron

@@ -22,7 +22,6 @@ Item {
     property string tileUrlTemplate: ""
     property string styleUrl: ""
     property bool interactionEnabled: true
-    property bool vehicleMarkerEnabled: true
 
     readonly property bool mapLibreNativeAvailable: (typeof BEAGLEY_MAPLIBRE_NATIVE_AVAILABLE !== "undefined")
         && BEAGLEY_MAPLIBRE_NATIVE_AVAILABLE
@@ -136,7 +135,6 @@ Item {
             mapConnectivity: root.mapConnectivity
             styleUrl: root.styleUrl
             interactionEnabled: root.interactionEnabled
-            vehicleMarkerEnabled: root.vehicleMarkerEnabled
         }
     }
 

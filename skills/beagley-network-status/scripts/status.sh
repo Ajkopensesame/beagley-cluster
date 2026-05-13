@@ -43,13 +43,30 @@ section wifi-status
 wpa_cli -i wlan0 status 2>/dev/null || true
 iw dev wlan0 link 2>/dev/null || true
 
+section visible-wifi-networks
+if command -v wpa_cli >/dev/null 2>&1; then
+  wpa_cli -i wlan0 scan >/dev/null 2>&1 || true
+  sleep 3
+  wpa_cli -i wlan0 scan_results 2>/dev/null || true
+fi
+
+section cc33xx-radio
+for param in /sys/module/cc33xx/parameters/ht_mode /sys/module/cc33xx/parameters/no_recovery; do
+  if [ -f "$param" ]; then
+    printf '%s=%s\n' "$(basename "$param")" "$(cat "$param")"
+  fi
+done
+journalctl -k -b --no-pager 2>/dev/null \
+  | grep -E 'Wireless (driver|firmware|PHY) version|cc33xx.*nvs|cc33xx-conf.bin' \
+  | tail -n 12 || true
+
 section saved-wifi-networks
 wpa_cli -i wlan0 list_networks 2>/dev/null || true
 
 section wifi-watchdog
 systemctl show beagley-hotspot-watchdog.timer \
   -p ActiveState -p SubState --no-pager 2>/dev/null || true
-grep -n 'RESET_WHILE_SCANNING\|DRIVER_RESET_ENABLE\|FAIL_THRESHOLD\|COOLDOWN_SEC' \
+grep -n 'RESET_WHILE_SCANNING\|DRIVER_RESET_ENABLE\|FAIL_THRESHOLD\|EMPTY_SCAN\|SCAN_SETTLE\|COOLDOWN_SEC' \
   /etc/default/beagley-hotspot-watchdog 2>/dev/null || true
 
 section bbb-link

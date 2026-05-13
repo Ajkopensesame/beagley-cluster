@@ -19,6 +19,7 @@ SRC_URI = " \
     file://systemd-resolved-tmpfiles-order.conf \
     file://systemd-timesyncd-tmpfiles-order.conf \
     file://05-beagley-eth-debug.network \
+    file://20-beagley-wlan0.network \
     file://55-beagley-usb-recovery.network \
     file://12-en.network \
     file://gai.conf \
@@ -118,6 +119,7 @@ do_install:append() {
 
     install -d ${D}${sysconfdir}/systemd/network
     install -m 0644 ${WORKDIR}/05-beagley-eth-debug.network ${D}${sysconfdir}/systemd/network/05-beagley-eth-debug.network
+    install -m 0644 ${WORKDIR}/20-beagley-wlan0.network ${D}${sysconfdir}/systemd/network/20-beagley-wlan0.network
     install -m 0644 ${WORKDIR}/55-beagley-usb-recovery.network ${D}${sysconfdir}/systemd/network/55-beagley-usb-recovery.network
     install -m 0644 ${WORKDIR}/12-en.network ${D}${sysconfdir}/systemd/network/12-en.network
     install -m 0644 ${WORKDIR}/gai.conf ${D}${sysconfdir}/gai.conf
@@ -150,6 +152,7 @@ FILES:${PN} += " \
     ${libexecdir}/beagley-cluster/beagley-diagnostic.sh \
     ${sysconfdir}/default/beagley-cluster \
     ${sysconfdir}/systemd/network/05-beagley-eth-debug.network \
+    ${sysconfdir}/systemd/network/20-beagley-wlan0.network \
     ${sysconfdir}/systemd/network/55-beagley-usb-recovery.network \
     ${sysconfdir}/systemd/network/12-en.network \
     ${sysconfdir}/gai.conf \

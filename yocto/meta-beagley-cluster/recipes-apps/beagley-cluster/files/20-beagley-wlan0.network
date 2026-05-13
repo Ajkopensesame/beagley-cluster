@@ -1,0 +1,15 @@
+[Match]
+Name=wlan0
+Type=wlan
+
+[Link]
+RequiredForOnline=no
+
+[Network]
+ConfigureWithoutCarrier=yes
+DHCP=ipv4
+
+[DHCPv4]
+ClientIdentifier=mac
+RouteMetric=200
+UseDNS=yes

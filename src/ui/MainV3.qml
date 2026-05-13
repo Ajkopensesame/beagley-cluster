@@ -65,8 +65,10 @@ Window {
     readonly property bool mapLibreNativeFullUnderlay: (typeof BEAGLEY_MAPLIBRE_NATIVE_FULL_UNDERLAY !== "undefined")
         && BEAGLEY_MAPLIBRE_NATIVE_FULL_UNDERLAY
     readonly property bool mapLibreSafeCompositor: mapLibreNativeActive && !mapLibreNativeFullUnderlay
-    readonly property int mapLibreSafeSideInset: 0
-    readonly property int mapLibreSafeVerticalInset: 0
+    readonly property int mapLibreSafeSideInset: mapLibreSafeCompositor
+        ? Math.round(gaugeFaceSize * 0.54)
+        : 0
+    readonly property int mapLibreSafeVerticalInset: mapLibreSafeCompositor ? 18 : 0
     readonly property bool lowEffectMode: effectLevel === "low" || effectLevel === "off"
     readonly property bool effectsOff: effectLevel === "off"
     readonly property bool embeddedSafeMode: Qt.platform.os === "linux"
@@ -79,11 +81,10 @@ Window {
     readonly property bool embeddedDirectMapCamera: renderProfile === "embedded"
     readonly property bool embeddedGaugeMatrixRainMode: renderProfile === "embedded"
     readonly property bool gaugeMatrixRainEnabled: !effectsOff
-    readonly property bool sharedGaugeMatrixRainClock: gaugeMatrixRainEnabled && embeddedGaugeMatrixRainMode
-    readonly property real gaugeMatrixRainSharedPhase: (gaugeMatrixRainEnabled && (sharedGaugeMatrixRainClock || !embeddedGaugeMatrixRainMode))
+    readonly property real gaugeMatrixRainSharedPhase: (gaugeMatrixRainEnabled && !embeddedGaugeMatrixRainMode)
         ? sharedEffectPhase
         : NaN
-    readonly property bool sharedEffectClockEnabled: !effectsOff && (!embeddedEffectBudgetMode || sharedGaugeMatrixRainClock)
+    readonly property bool sharedEffectClockEnabled: !effectsOff && !embeddedEffectBudgetMode
     readonly property bool stressMapMotionEnabled: stressScene && !lowEffectMode && renderProfile !== "embedded"
     readonly property int gaugeShellSize: 840
     readonly property int gaugePodSize: 704
@@ -218,8 +219,6 @@ Window {
     property bool mapMenuOpen: false
     property bool navControlsOpen: false
     property bool searchKeyboardOpen: false
-    property bool weatherPopupOpen: false
-    readonly property bool mapSuppressedForModal: weatherPopupOpen && effectiveMapRenderer === "maplibre-native"
     property string mapMenuStage: "search"
     property var pendingDestination: ({})
     property int selectedRouteIndex: 0
@@ -385,7 +384,7 @@ Window {
         if (isFinite(zoomValue))
             hints.zoom = Math.min(zoomValue, root.activeMapMaxZoom)
         if (!isFinite(Number(hints.zoomAnimationMs)))
-            hints.zoomAnimationMs = root.embeddedEffectBudgetMode ? 520 : 760
+            hints.zoomAnimationMs = 760
         return hints
     }
 
@@ -486,31 +485,6 @@ Window {
             pendingDestination = navigation.activeRoute.destination
         root.mapMenuStage = (root.availableRouteOptions().length > 0 && hasActiveRoute) ? "routes" : "search"
         root.syncSelectedRouteIndexFromNavigation()
-    }
-
-    function centerMapMode() {
-        if (root.mapSuppressedForModal)
-            return "placeholder"
-
-        if ((typeof BEAGLEY_NO_MAP !== "undefined" && BEAGLEY_NO_MAP)
-                && !(root.effectiveMapRenderer === "native"
-                    || root.effectiveMapRenderer === "native-online"
-                    || root.effectiveMapRenderer === "maplibre-native")) {
-            return "placeholder"
-        }
-
-        if (root.effectiveMapRenderer === "maplibre-native")
-            return "maplibre-native"
-
-        if (root.effectiveMapRenderer === "web"
-                && !(typeof BEAGLEY_FORCE_SNAPSHOT_MAP !== "undefined" && BEAGLEY_FORCE_SNAPSHOT_MAP)) {
-            return "web"
-        }
-
-        if (root.effectiveMapRenderer === "native" || root.effectiveMapRenderer === "native-online")
-            return "native"
-
-        return "snapshot"
     }
 
     function chooseMapMenuTab(stage) {
@@ -750,7 +724,7 @@ Window {
 
     Timer {
         id: effectClock
-        interval: root.embeddedEffectBudgetMode ? 1000 : (root.embeddedHighEffectBudgetMode ? 300 : (root.lowEffectMode ? 140 : 90))
+        interval: root.embeddedHighEffectBudgetMode ? 300 : (root.lowEffectMode ? 140 : 90)
         running: root.sharedEffectClockEnabled
         repeat: true
         onTriggered: root.sharedEffectPhase += interval / 1000.0
@@ -912,8 +886,19 @@ Window {
             anchors.topMargin: root.mapLibreSafeVerticalInset
             anchors.bottomMargin: root.mapLibreSafeVerticalInset
             clip: false
-            visible: !root.mapSuppressedForModal
-            mode: root.centerMapMode()
+            mode: ((typeof BEAGLEY_NO_MAP !== "undefined" && BEAGLEY_NO_MAP)
+                && !(root.effectiveMapRenderer === "native"
+                    || root.effectiveMapRenderer === "native-online"
+                    || root.effectiveMapRenderer === "maplibre-native"))
+                ? "placeholder"
+                : ((root.effectiveMapRenderer === "maplibre-native")
+                    ? "maplibre-native"
+                    : ((root.effectiveMapRenderer === "web"
+                    && !(typeof BEAGLEY_FORCE_SNAPSHOT_MAP !== "undefined" && BEAGLEY_FORCE_SNAPSHOT_MAP))
+                    ? "web"
+                    : ((root.effectiveMapRenderer === "native" || root.effectiveMapRenderer === "native-online")
+                        ? "native"
+                        : "snapshot")))
             interactionEnabled: !((typeof BEAGLEY_EMBEDDED_DISPLAY !== "undefined" && BEAGLEY_EMBEDDED_DISPLAY) || false)
             lat: root.displayMapLat
             lng: root.displayMapLng
@@ -932,7 +917,6 @@ Window {
             mapConnectivity: navigation.mapConnectivity
             tileUrlTemplate: root.activeMapTileUrlTemplate
             styleUrl: root.activeMapStyleUrl
-            mapLibreNativeVehicleMarkerEnabled: false
             snapshotRefreshMs: 0
             videoEnabled: false
             videoUrl: ""
@@ -941,7 +925,7 @@ Window {
         Item {
             id: mapLibreCompositorFence
             anchors.fill: parent
-            visible: false
+            visible: root.mapLibreSafeCompositor
             z: 8
 
             Rectangle {
@@ -982,14 +966,13 @@ Window {
             width: 54
             height: 64
             z: 180
-            visible: root.mapVehicleMarkerVisible && !root.mapSuppressedForModal
+            visible: root.mapVehicleMarkerVisible
             x: Math.round(parent.width * 0.5 - width * 0.5)
             y: Math.round(parent.height * (root.mapVehicleMarkerGuidanceAnchor ? 0.84 : 0.5) - height * 0.54)
             bearing: root.displayMapBearing
         }
 
         W.WeatherCorners {
-            id: weatherCorners
             anchors.fill: parent
             z: 260
             theme: appTheme
@@ -1000,21 +983,13 @@ Window {
             stressScene: root.stressScene
             phase: root.sharedEffectPhase
             nowPlayingService: (typeof nowPlaying !== "undefined") ? nowPlaying : null
-            initialExpandedMode: (typeof BEAGLEY_INITIAL_WEATHER_EXPANDED_MODE !== "undefined")
+            expandedMode: (typeof BEAGLEY_INITIAL_WEATHER_EXPANDED_MODE !== "undefined")
                 ? String(BEAGLEY_INITIAL_WEATHER_EXPANDED_MODE)
                 : ""
             active: !root.mapMenuOpen && !root.navControlsOpen
 
             onMapMenuRequested: {
                 root.openMapMenu()
-            }
-
-            onExpandedModeChanged: {
-                root.weatherPopupOpen = expandedMode !== ""
-            }
-
-            Component.onCompleted: {
-                root.weatherPopupOpen = expandedMode !== ""
             }
         }
 
@@ -1132,131 +1107,43 @@ Window {
 
             Rectangle {
                 anchors.centerIn: parent
-                width: root.gaugeFaceSize
-                height: root.gaugeFaceSize
+                width: root.gaugeFaceSize + 18
+                height: width
                 radius: width / 2
-                color: "#02040A"
-                border.width: 2
-                border.color: Qt.rgba(0.86, 0.90, 0.98, 0.13)
-                antialiasing: true
-                z: -20
+                visible: root.mapLibreSafeCompositor
+                color: "#010309"
             }
 
-            Rectangle {
-                anchors.centerIn: parent
-                width: root.gaugeFaceSize + 24
-                height: root.gaugeFaceSize + 24
-                radius: width / 2
-                color: "transparent"
-                border.width: 14
-                border.color: Qt.rgba(0.0, 0.0, 0.0, 0.62)
-                antialiasing: true
-                z: -19
-            }
-
-            Canvas {
+            W.GaugeLensShell {
                 anchors.fill: parent
                 visible: !root.lowEffectMode
-                renderTarget: root.embeddedSafeMode ? Canvas.Image : Canvas.FramebufferObject
-                antialiasing: true
-                smooth: true
-                onPaint: {
-                    const ctx = getContext("2d")
-                    ctx.clearRect(0, 0, width, height)
-
-                    const cx = width / 2
-                    const cy = height / 2
-                    const innerR = width * 0.414
-                    const outerR = width * 0.50
-                    const fade = ctx.createRadialGradient(cx, cy, innerR, cx, cy, outerR)
-                    fade.addColorStop(0.00, "rgba(0,0,0,0.98)")
-                    fade.addColorStop(0.62, "rgba(0,0,0,0.98)")
-                    fade.addColorStop(0.82, "rgba(0,0,0,0.42)")
-                    fade.addColorStop(0.93, "rgba(0,0,0,0.10)")
-                    fade.addColorStop(1.00, "rgba(0,0,0,0.00)")
-
-                    ctx.fillStyle = fade
-                    ctx.beginPath()
-                    ctx.arc(cx, cy, outerR, 0, Math.PI * 2)
-                    ctx.arc(cx, cy, innerR, 0, Math.PI * 2, true)
-                    ctx.fill("evenodd")
-                }
+                theme: appTheme
+                effectLevel: root.effectLevel
+                gaugeColor: appTheme.speedColor(root.displaySpeedValue)
+                chromeColor: appTheme.pearlLow
+                podSize: root.gaugePodSize
+                faceSize: root.gaugeFaceSize
             }
 
-            Item {
-                id: speedPod
+            W.MapLibreGaugeBackplate {
                 anchors.centerIn: parent
-                width: root.gaugePodSize
-                height: root.gaugePodSize
-
-                Canvas {
-                    anchors.fill: parent
-                    visible: !root.lowEffectMode
-                    renderTarget: root.embeddedSafeMode ? Canvas.Image : Canvas.FramebufferObject
-                    antialiasing: true
-                    smooth: true
-                    onPaint: {
-                        const ctx = getContext("2d")
-                        ctx.clearRect(0, 0, width, height)
-
-                        const cx = width / 2
-                        const cy = height / 2
-                        const outerR = width * 0.50
-                        const innerR = width * 0.43
-
-                        const barrel = ctx.createRadialGradient(cx, cy, innerR, cx, cy, outerR)
-                        barrel.addColorStop(0.00, "rgba(3,4,6,0.94)")
-                        barrel.addColorStop(0.58, "rgba(2,3,4,0.98)")
-                        barrel.addColorStop(1.00, "rgba(0,0,0,1.00)")
-
-                        ctx.fillStyle = barrel
-                        ctx.beginPath()
-                        ctx.arc(cx, cy, outerR, 0, Math.PI * 2)
-                        ctx.arc(cx, cy, innerR, 0, Math.PI * 2, true)
-                        ctx.fill("evenodd")
-                    }
-                }
-
-                Canvas {
-                    anchors.fill: parent
-                    visible: !root.lowEffectMode
-                    renderTarget: root.embeddedSafeMode ? Canvas.Image : Canvas.FramebufferObject
-                    antialiasing: true
-                    smooth: true
-                    onPaint: {
-                        const ctx = getContext("2d")
-                        ctx.clearRect(0, 0, width, height)
-
-                        const cx = width / 2
-                        const cy = height / 2
-                        const r = width * 0.465
-
-                        ctx.beginPath()
-                        ctx.strokeStyle = "rgba(0,0,0,0.72)"
-                        ctx.lineWidth = 18
-                        ctx.arc(cx, cy, r, 0, Math.PI * 2)
-                        ctx.stroke()
-
-                        const rim = ctx.createLinearGradient(0, 0, width, height)
-                        rim.addColorStop(0.00, "rgba(255,255,255,0.16)")
-                        rim.addColorStop(0.18, "rgba(160,220,255,0.06)")
-                        rim.addColorStop(0.55, "rgba(0,0,0,0.04)")
-                        rim.addColorStop(1.00, "rgba(0,0,0,0.18)")
-
-                        ctx.beginPath()
-                        ctx.strokeStyle = rim
-                        ctx.lineWidth = 6
-                        ctx.arc(cx, cy, r, 0, Math.PI * 2)
-                        ctx.stroke()
-
-                        ctx.beginPath()
-                        ctx.strokeStyle = "rgba(255,255,255,0.08)"
-                        ctx.lineWidth = 3
-                        ctx.lineCap = "round"
-                        ctx.arc(cx, cy, r - 7, Math.PI * 0.86, Math.PI * 1.56)
-                        ctx.stroke()
-                    }
-                }
+                width: root.gaugeFaceSize
+                height: root.gaugeFaceSize
+                z: -1
+                visible: root.mapLibreNativeActive
+                theme: appTheme
+                primaryColor: appTheme.speedColor(root.displaySpeedValue)
+                auxColor: root.displayCoolantValue >= 100 ? appTheme.danger : (root.displayCoolantValue < 40 ? "#63C9FF" : appTheme.pearlLow)
+                primaryProgress: Math.max(0, Math.min(1, root.displaySpeedValue / 140))
+                auxProgress: Math.max(0.14, Math.min(1, (root.displayCoolantValue - 40) / 70))
+                maxValue: 140
+                minorStep: 10
+                majorStep: 20
+                labelStep: 20
+                labelStart: 20
+                labelDivisor: 1
+                auxStartLabel: "H"
+                auxEndLabel: "C"
             }
 
             W.SpeedGauge {
@@ -1308,131 +1195,43 @@ Window {
 
             Rectangle {
                 anchors.centerIn: parent
-                width: root.gaugeFaceSize
-                height: root.gaugeFaceSize
+                width: root.gaugeFaceSize + 18
+                height: width
                 radius: width / 2
-                color: "#02040A"
-                border.width: 2
-                border.color: Qt.rgba(0.86, 0.90, 0.98, 0.13)
-                antialiasing: true
-                z: -20
+                visible: root.mapLibreSafeCompositor
+                color: "#010309"
             }
 
-            Rectangle {
-                anchors.centerIn: parent
-                width: root.gaugeFaceSize + 24
-                height: root.gaugeFaceSize + 24
-                radius: width / 2
-                color: "transparent"
-                border.width: 14
-                border.color: Qt.rgba(0.0, 0.0, 0.0, 0.62)
-                antialiasing: true
-                z: -19
-            }
-
-            Canvas {
+            W.GaugeLensShell {
                 anchors.fill: parent
                 visible: !root.lowEffectMode
-                renderTarget: root.embeddedSafeMode ? Canvas.Image : Canvas.FramebufferObject
-                antialiasing: true
-                smooth: true
-                onPaint: {
-                    const ctx = getContext("2d")
-                    ctx.clearRect(0, 0, width, height)
-
-                    const cx = width / 2
-                    const cy = height / 2
-                    const innerR = width * 0.414
-                    const outerR = width * 0.50
-                    const fade = ctx.createRadialGradient(cx, cy, innerR, cx, cy, outerR)
-                    fade.addColorStop(0.00, "rgba(0,0,0,0.98)")
-                    fade.addColorStop(0.62, "rgba(0,0,0,0.98)")
-                    fade.addColorStop(0.82, "rgba(0,0,0,0.42)")
-                    fade.addColorStop(0.93, "rgba(0,0,0,0.10)")
-                    fade.addColorStop(1.00, "rgba(0,0,0,0.00)")
-
-                    ctx.fillStyle = fade
-                    ctx.beginPath()
-                    ctx.arc(cx, cy, outerR, 0, Math.PI * 2)
-                    ctx.arc(cx, cy, innerR, 0, Math.PI * 2, true)
-                    ctx.fill("evenodd")
-                }
+                theme: appTheme
+                effectLevel: root.effectLevel
+                gaugeColor: appTheme.rpmColor(root.displayRpmValue)
+                chromeColor: appTheme.pearlLow
+                podSize: root.gaugePodSize
+                faceSize: root.gaugeFaceSize
             }
 
-            Item {
-                id: tachPod
+            W.MapLibreGaugeBackplate {
                 anchors.centerIn: parent
-                width: root.gaugePodSize
-                height: root.gaugePodSize
-
-                Canvas {
-                    anchors.fill: parent
-                    visible: !root.lowEffectMode
-                    renderTarget: root.embeddedSafeMode ? Canvas.Image : Canvas.FramebufferObject
-                    antialiasing: true
-                    smooth: true
-                    onPaint: {
-                        const ctx = getContext("2d")
-                        ctx.clearRect(0, 0, width, height)
-
-                        const cx = width / 2
-                        const cy = height / 2
-                        const outerR = width * 0.50
-                        const innerR = width * 0.43
-
-                        const barrel = ctx.createRadialGradient(cx, cy, innerR, cx, cy, outerR)
-                        barrel.addColorStop(0.00, "rgba(3,4,6,0.94)")
-                        barrel.addColorStop(0.58, "rgba(2,3,4,0.98)")
-                        barrel.addColorStop(1.00, "rgba(0,0,0,1.00)")
-
-                        ctx.fillStyle = barrel
-                        ctx.beginPath()
-                        ctx.arc(cx, cy, outerR, 0, Math.PI * 2)
-                        ctx.arc(cx, cy, innerR, 0, Math.PI * 2, true)
-                        ctx.fill("evenodd")
-                    }
-                }
-
-                Canvas {
-                    anchors.fill: parent
-                    visible: !root.lowEffectMode
-                    renderTarget: root.embeddedSafeMode ? Canvas.Image : Canvas.FramebufferObject
-                    antialiasing: true
-                    smooth: true
-                    onPaint: {
-                        const ctx = getContext("2d")
-                        ctx.clearRect(0, 0, width, height)
-
-                        const cx = width / 2
-                        const cy = height / 2
-                        const r = width * 0.465
-
-                        ctx.beginPath()
-                        ctx.strokeStyle = "rgba(0,0,0,0.72)"
-                        ctx.lineWidth = 18
-                        ctx.arc(cx, cy, r, 0, Math.PI * 2)
-                        ctx.stroke()
-
-                        const rim = ctx.createLinearGradient(0, 0, width, height)
-                        rim.addColorStop(0.00, "rgba(255,255,255,0.16)")
-                        rim.addColorStop(0.18, "rgba(160,220,255,0.06)")
-                        rim.addColorStop(0.55, "rgba(0,0,0,0.04)")
-                        rim.addColorStop(1.00, "rgba(0,0,0,0.18)")
-
-                        ctx.beginPath()
-                        ctx.strokeStyle = rim
-                        ctx.lineWidth = 6
-                        ctx.arc(cx, cy, r, 0, Math.PI * 2)
-                        ctx.stroke()
-
-                        ctx.beginPath()
-                        ctx.strokeStyle = "rgba(255,255,255,0.08)"
-                        ctx.lineWidth = 3
-                        ctx.lineCap = "round"
-                        ctx.arc(cx, cy, r - 7, Math.PI * 0.86, Math.PI * 1.56)
-                        ctx.stroke()
-                    }
-                }
+                width: root.gaugeFaceSize
+                height: root.gaugeFaceSize
+                z: -1
+                visible: root.mapLibreNativeActive
+                theme: appTheme
+                primaryColor: appTheme.rpmColor(root.displayRpmValue)
+                auxColor: root.displayFuelValue <= 12 ? appTheme.danger : appTheme.pearlLow
+                primaryProgress: Math.max(0, Math.min(1, root.displayRpmValue / 8000))
+                auxProgress: Math.max(0, Math.min(1, root.displayFuelValue / 100))
+                maxValue: 8
+                minorStep: 0.5
+                majorStep: 1
+                labelStep: 1
+                labelStart: 1
+                labelDivisor: 1
+                auxStartLabel: "F"
+                auxEndLabel: "E"
             }
 
             W.TachGauge {

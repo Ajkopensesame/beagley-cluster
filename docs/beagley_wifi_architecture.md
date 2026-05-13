@@ -141,6 +141,13 @@ Gateway-mode contract:
 
 - Treat hotspot credentials as **OS-preprovisioned**, not app-managed.
 - Maintain an **ordered known list** of saved hotspots instead of one active hotspot at a time.
+- Keep the BeagleY Linux hostname stable as `beagley-ai`; use router lease labels
+  `beagley-ai-eth` and `beagley-ai-wifi` for the two modem entries.
+- Reserve both modem-side identities:
+  `c0:d6:0a:f9:55:1c -> 192.168.0.46` for Ethernet and
+  `10:ca:bf:d6:34:1a -> 192.168.0.92` for Wi-Fi.
+- Local tooling should try BeagleY SSH targets in this order:
+  `root@192.168.0.46`, `root@192.168.0.92`, then `root@beagley-ai.local`.
 - Standardize on an **ASCII SSID/password** for the deployed hotspot profile to avoid punctuation/unicode edge cases.
 - In BBB gateway mode, treat `eth0` as the local static BBB link instead of a DHCP dev uplink.
 - Keep `RouteMetric=200` on `wlan0` so the BBB/local telemetry path stays preferred.
@@ -193,6 +200,9 @@ Expected shape:
   the Ethernet MAC does not appear to own the Wi-Fi reservation
 - ARP flux protection is enabled so `eth0` and `wlan0` do not answer ARP for
   each other's home-router leases
+- `skills/beagley-network-status/scripts/status.sh` reports the active SSH
+  target, routes, Wi-Fi state, saved networks, watchdog settings, and BBB link
+  state without changing the BeagleY.
 - hotspot SSH can use the configured fallback address for that known hotspot if `.local` resolution is unavailable
 - in BBB gateway mode, `net.ipv4.ip_forward=1` and BBB traffic egresses through `wlan0`
 
@@ -202,8 +212,15 @@ Recovery contract:
   are treated as CC33xx driver-stuck states.
 - The watchdog first tries DHCP/networkd refresh for lease-only failures.
 - For not-associated/scanning states, the watchdog clears stale Wi-Fi DHCP
-  state, waits through a grace threshold, then does a bounded CC33xx radio
-  reset instead of either resetting constantly or waiting forever.
+  state and asks supplicant to scan, but by default it does **not** reset the
+  CC33xx radio just because no access point is in range. It also does not force
+  `reassociate` on every timer tick, because that can interrupt an association
+  attempt before DHCP/auth settles.
+- If repeated supplicant scans return zero visible BSS entries, the watchdog
+  treats that separately as a possible CC33xx empty-scan failure and allows a
+  slower radio reset cadence. This keeps normal saved-hotspot scanning calm
+  while still recovering the observed state where the driver is loaded but all
+  scans return an empty table.
 - For supplicant/driver failures it stops supplicant, unloads/reloads
   `cc33xx_sdio cc33xx`, restarts `systemd-networkd`, resets the failed
   supplicant state, and starts `wpa_supplicant@wlan0` again.

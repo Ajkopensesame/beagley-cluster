@@ -8,6 +8,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QImageReader>
 #include <QNetworkDiskCache>
 #include <QNetworkReply>
 #include <QNetworkRequest>
@@ -20,22 +21,22 @@
 #include <cmath>
 
 namespace {
-constexpr auto kTimelineUrl = "https://api.rainviewer.com/public/weather-maps.json";
+constexpr auto kTimelineUrl = "http://api.rainviewer.com/public/weather-maps.json";
 constexpr auto kDefaultTileHost = "https://tilecache.rainviewer.com";
-constexpr auto kMapTileTemplate = "https://tile.openstreetmap.org/%1/%2/%3.png";
 constexpr int kTileZoom = 7;
 constexpr int kTileSize = 256;
 constexpr int kOutputWidth = 768;
 constexpr int kOutputHeight = 512;
 constexpr int kTileDrawSize = 256;
 constexpr int kRefreshIntervalMs = 60 * 1000;
-constexpr int kAnimationFrameIntervalMs = 1000;
-constexpr int kNetworkTimeoutMs = 7000;
+constexpr int kAnimationFrameIntervalMs = 850;
+constexpr int kNetworkTimeoutMs = 20000;
 constexpr int kTileColorScheme = 2;
 constexpr auto kTileOptions = "1_1";
 constexpr int kPastFramesWithNowcast = 4;
 constexpr int kPastFramesFallback = 4;
 constexpr int kNowcastFrames = 3;
+constexpr auto kBasicRadarCachePrefix = "radar-basic-v2";
 
 bool coordValid(double value, double minValue, double maxValue)
 {
@@ -78,6 +79,9 @@ QString normalizedHost(QString host)
     }
     while (host.endsWith(QLatin1Char('/'))) {
         host.chop(1);
+    }
+    if (host == QLatin1String("https://tilecache.rainviewer.com")) {
+        return QStringLiteral("http://tilecache.rainviewer.com");
     }
     return host;
 }
@@ -163,6 +167,7 @@ void RadarImageService::setPosition(double lat, double lng, bool valid)
         m_animationFrames.clear();
         m_buildFrameIndex = -1;
         m_animationIndex = -1;
+        m_cachedBootstrap = false;
         m_lastTimelineRequestMsecs = 0;
         m_lastCompositeKey.clear();
         m_currentTimelineKey.clear();
@@ -179,29 +184,10 @@ void RadarImageService::setPosition(double lat, double lng, bool valid)
     if (!m_refreshTimer.isActive()) {
         m_refreshTimer.start();
     }
+    if (!m_ready) {
+        tryPublishLatestCachedFrame(QStringLiteral("STALE"));
+    }
     refresh();
-}
-
-void RadarImageService::setAnimationEnabled(bool enabled)
-{
-    if (m_animationEnabled == enabled) {
-        return;
-    }
-
-    m_animationEnabled = enabled;
-    emit animationEnabledChanged();
-
-    if (!m_animationEnabled) {
-        m_animationTimer.stop();
-        if (!m_animationFrames.isEmpty()) {
-            showAnimationFrame(m_animationFrames.size() - 1);
-        }
-        return;
-    }
-
-    if (m_animationFrames.size() > 1 && !m_animationTimer.isActive()) {
-        m_animationTimer.start();
-    }
 }
 
 void RadarImageService::refresh()
@@ -216,6 +202,7 @@ void RadarImageService::refresh()
     }
     const qint64 nowMsecs = QDateTime::currentMSecsSinceEpoch();
     if (m_ready
+        && !m_cachedBootstrap
         && m_lastTimelineRequestMsecs > 0
         && nowMsecs - m_lastTimelineRequestMsecs < kRefreshIntervalMs) {
         setStatus(QStringLiteral("LIVE"));
@@ -258,6 +245,9 @@ void RadarImageService::handleTimelineReply(QNetworkReply *reply, int sequence)
             setStatus(QStringLiteral("STALE"));
             return;
         }
+        if (tryPublishLatestCachedFrame(QStringLiteral("STALE"))) {
+            return;
+        }
         setReady(false);
         setStatus(QStringLiteral("OFFLINE"));
         return;
@@ -289,7 +279,7 @@ void RadarImageService::startTimelineFetch(const QList<RadarFrame> &frames)
         && m_imageUrl.isLocalFile()
         && QFileInfo::exists(m_imageUrl.toLocalFile())) {
         m_inFlight = false;
-        if (m_animationEnabled && m_animationFrames.size() > 1 && !m_animationTimer.isActive()) {
+        if (m_animationFrames.size() > 1 && !m_animationTimer.isActive()) {
             m_animationTimer.start();
         }
         setStatus(QStringLiteral("LIVE"));
@@ -356,15 +346,9 @@ void RadarImageService::startTileFetch(const RadarFrame &frame)
             m_currentTiles.insert(tileKey, tile);
 
             ++m_pendingTiles;
-            QNetworkReply *mapReply = get(mapTileUrl(row, col));
-            connect(mapReply, &QNetworkReply::finished, this, [this, mapReply, sequence, dx, dy]() {
-                handleTileReply(mapReply, sequence, dx, dy, TileLayer::Map);
-            });
-
-            ++m_pendingTiles;
             QNetworkReply *radarReply = get(tileUrl(m_currentFrame, row, col));
             connect(radarReply, &QNetworkReply::finished, this, [this, radarReply, sequence, dx, dy]() {
-                handleTileReply(radarReply, sequence, dx, dy, TileLayer::Radar);
+                handleTileReply(radarReply, sequence, dx, dy);
             });
         }
     }
@@ -376,7 +360,7 @@ void RadarImageService::startTileFetch(const RadarFrame &frame)
     }
 }
 
-void RadarImageService::handleTileReply(QNetworkReply *reply, int sequence, int dx, int dy, TileLayer layer)
+void RadarImageService::handleTileReply(QNetworkReply *reply, int sequence, int dx, int dy)
 {
     if (sequence != m_sequence) {
         reply->deleteLater();
@@ -390,17 +374,10 @@ void RadarImageService::handleTileReply(QNetworkReply *reply, int sequence, int 
     if (reply->error() == QNetworkReply::NoError) {
         QImage image;
         const bool ok = image.loadFromData(reply->readAll());
-        if (layer == TileLayer::Map) {
-            tile.mapOk = ok;
-            tile.mapImage = image;
-        } else {
-            tile.radarOk = ok;
-            tile.radarImage = image;
-        }
+        tile.radarOk = ok;
+        tile.radarImage = image;
     } else {
-        qWarning().noquote() << "[RadarImage]"
-                             << (layer == TileLayer::Map ? "map" : "radar")
-                             << "tile fetch failed:" << reply->errorString();
+        qWarning().noquote() << "[RadarImage] radar tile fetch failed:" << reply->errorString();
     }
     reply->deleteLater();
 
@@ -418,18 +395,20 @@ void RadarImageService::finishTileFetch(int sequence)
     }
 
     QList<RadarTile> tiles = m_currentTiles.values();
-    bool anyMapOk = false;
     bool anyRadarOk = false;
     for (const RadarTile &tile : tiles) {
-        anyMapOk = anyMapOk || tile.mapOk;
         anyRadarOk = anyRadarOk || tile.radarOk;
     }
 
-    if (!anyMapOk && !anyRadarOk) {
+    if (!anyRadarOk) {
         qWarning().noquote() << "[RadarImage] all radar tile fetches failed";
         if (m_ready && m_imageUrl.isLocalFile() && QFileInfo::exists(m_imageUrl.toLocalFile())) {
             m_inFlight = false;
             setStatus(QStringLiteral("STALE"));
+            return;
+        }
+        if (tryPublishLatestCachedFrame(QStringLiteral("STALE"))) {
+            m_inFlight = false;
             return;
         }
         m_inFlight = false;
@@ -465,8 +444,8 @@ bool RadarImageService::composeRadarImage(const QList<RadarTile> &tiles,
         return false;
     }
 
-    QImage output(QSize(kOutputWidth, kOutputHeight), QImage::Format_RGB888);
-    output.fill(QColor(16, 23, 34));
+    QImage output(QSize(kOutputWidth, kOutputHeight), QImage::Format_ARGB32_Premultiplied);
+    output.fill(QColor(3, 4, 10));
 
     QPainter painter(&output);
     painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
@@ -474,17 +453,6 @@ bool RadarImageService::composeRadarImage(const QList<RadarTile> &tiles,
 
     const double centerTileLeft = kOutputWidth / 2.0 - center.fracX * kTileDrawSize;
     const double centerTileTop = kOutputHeight / 2.0 - center.fracY * kTileDrawSize;
-    for (const RadarTile &tile : tiles) {
-        if (!tile.mapOk || tile.mapImage.isNull()) {
-            continue;
-        }
-        const QRectF target(centerTileLeft + tile.dx * kTileDrawSize,
-                            centerTileTop + tile.dy * kTileDrawSize,
-                            kTileDrawSize,
-                            kTileDrawSize);
-        painter.drawImage(target, tile.mapImage);
-    }
-    painter.fillRect(output.rect(), QColor(6, 8, 14, 74));
     for (const RadarTile &tile : tiles) {
         if (!tile.radarOk || tile.radarImage.isNull()) {
             continue;
@@ -540,20 +508,17 @@ void RadarImageService::publishTimelineFrames()
     }
 
     m_frame = m_animationFrames.last().frame;
+    m_cachedBootstrap = false;
     m_lastCompositeKey = m_currentTimelineKey;
     if (m_animationIndex < 0 || m_animationIndex >= m_animationFrames.size()) {
         m_animationIndex = -1;
     }
     setReady(true);
     setStatus(QStringLiteral("LIVE"));
-    if (m_animationEnabled) {
-        advanceAnimationFrame();
-    } else {
-        showAnimationFrame(m_animationFrames.size() - 1);
-    }
-    if (m_animationEnabled && m_animationFrames.size() > 1 && !m_animationTimer.isActive()) {
+    advanceAnimationFrame();
+    if (m_animationFrames.size() > 1 && !m_animationTimer.isActive()) {
         m_animationTimer.start();
-    } else if (!m_animationEnabled || m_animationFrames.size() <= 1) {
+    } else if (m_animationFrames.size() <= 1) {
         m_animationTimer.stop();
     }
     qInfo().noquote() << "[RadarImage] timeline ready"
@@ -569,27 +534,9 @@ void RadarImageService::advanceAnimationFrame()
         return;
     }
 
-    if (!m_animationEnabled) {
-        m_animationTimer.stop();
-        showAnimationFrame(m_animationFrames.size() - 1);
-        return;
-    }
-
     const int nextIndex = (m_animationIndex + 1) % m_animationFrames.size();
-    showAnimationFrame(nextIndex);
-}
-
-void RadarImageService::showAnimationFrame(int index)
-{
-    if (m_animationFrames.isEmpty()) {
-        m_animationTimer.stop();
-        setReady(false);
-        return;
-    }
-
-    const int boundedIndex = qBound(0, index, m_animationFrames.size() - 1);
-    if (m_animationIndex != boundedIndex) {
-        m_animationIndex = boundedIndex;
+    if (m_animationIndex != nextIndex) {
+        m_animationIndex = nextIndex;
         emit frameIndexChanged();
     }
 
@@ -636,15 +583,6 @@ QUrl RadarImageService::tileUrl(const RadarFrame &frame, int row, int col) const
     return QUrl(urlText);
 }
 
-QUrl RadarImageService::mapTileUrl(int row, int col) const
-{
-    const int tilesPerAxis = 1 << kTileZoom;
-    return QUrl(QString::fromLatin1(kMapTileTemplate)
-                    .arg(QString::number(kTileZoom),
-                         QString::number(wrapTileX(col, tilesPerAxis)),
-                         QString::number(row)));
-}
-
 QNetworkReply *RadarImageService::get(const QUrl &url)
 {
     QNetworkRequest request(url);
@@ -669,10 +607,49 @@ QString RadarImageService::compositePath(const RadarFrame &frame, const CenterTi
              QString::number(center.col),
              frame.path,
              QString::number(frame.epochSeconds))
+        .append(QLatin1String(":basic-radar-v2"))
         .toUtf8();
     const QString digest = QString::fromLatin1(
         QCryptographicHash::hash(key, QCryptographicHash::Sha1).toHex().left(16));
-    return QDir(m_cacheDirectory).filePath(QStringLiteral("radar-%1.png").arg(digest));
+    return QDir(m_cacheDirectory).filePath(QStringLiteral("%1-%2.png")
+                                               .arg(QString::fromLatin1(kBasicRadarCachePrefix), digest));
+}
+
+bool RadarImageService::tryPublishLatestCachedFrame(const QString &status)
+{
+    QDir dir(m_cacheDirectory);
+    const QFileInfoList candidates = dir.entryInfoList({QStringLiteral("%1-*.png")
+                                                            .arg(QString::fromLatin1(kBasicRadarCachePrefix))},
+                                                       QDir::Files | QDir::Readable,
+                                                       QDir::Time);
+    for (const QFileInfo &info : candidates) {
+        if (info.size() <= 0) {
+            continue;
+        }
+
+        QImageReader reader(info.absoluteFilePath());
+        if (!reader.canRead() || !reader.size().isValid()) {
+            continue;
+        }
+
+        const int previousCount = m_animationFrames.size();
+        m_animationFrames.clear();
+        if (previousCount != 0) {
+            emit frameCountChanged();
+        }
+        m_animationIndex = -1;
+        emit frameIndexChanged();
+        m_cachedBootstrap = true;
+        setImageUrl(QUrl::fromLocalFile(info.absoluteFilePath()));
+        setFrameTime(info.lastModified().toLocalTime().toString(QStringLiteral("HH:mm")));
+        setFrameLabel(QStringLiteral("CACHE"));
+        setReady(true);
+        setStatus(status);
+        qInfo().noquote() << "[RadarImage] cached bootstrap" << info.absoluteFilePath()
+                          << reader.size().width() << "x" << reader.size().height();
+        return true;
+    }
+    return false;
 }
 
 QList<RadarImageService::RadarFrame> RadarImageService::parseRadarFrames(const QByteArray &payload) const

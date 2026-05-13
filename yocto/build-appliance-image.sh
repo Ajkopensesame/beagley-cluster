@@ -18,8 +18,12 @@ YOCTO_NINJAJOBS="${YOCTO_NINJAJOBS:-}"
 YOCTO_BITBAKE_RETRIES="${YOCTO_BITBAKE_RETRIES:-3}"
 YOCTO_GIT_FETCH_RETRIES="${YOCTO_GIT_FETCH_RETRIES:-6}"
 YOCTO_BITBAKE_REPLY_WAIT_SEC="${YOCTO_BITBAKE_REPLY_WAIT_SEC:-300}"
-BEAGLEY_CLUSTER_GIT_BRANCH="${BEAGLEY_CLUSTER_GIT_BRANCH:-main}"
+DEFAULT_GIT_BRANCH="$(git -C "$REPO_ROOT" branch --show-current 2>/dev/null || true)"
+BEAGLEY_CLUSTER_GIT_BRANCH="${BEAGLEY_CLUSTER_GIT_BRANCH:-${DEFAULT_GIT_BRANCH:-main}}"
 BEAGLEY_CLUSTER_PACKAGECONFIG_APPEND="${BEAGLEY_CLUSTER_PACKAGECONFIG_APPEND:-}"
+BEAGLEY_SOURCE_REMOTE="${BEAGLEY_SOURCE_REMOTE:-https://github.com/Ajkopensesame/beagley-cluster.git}"
+BEAGLEY_REQUIRE_REMOTE_REF="${BEAGLEY_REQUIRE_REMOTE_REF:-1}"
+BEAGLEY_ALLOW_DIRTY_SOURCE="${BEAGLEY_ALLOW_DIRTY_SOURCE:-0}"
 
 fail() {
   echo "[yocto-build] FAIL: $*" >&2
@@ -767,6 +771,20 @@ CREATE_SRCIPK:pn-linux-ti-staging = "0"
 CREATE_SRCIPK:pn-linux-ti-staging-rt = "0"
 CREATE_SRCIPK:pn-u-boot-ti-staging = "0"
 EOF
+
+source_verify_args=(
+  --build-dir "$PWD"
+  --expected-repo "$REPO_ROOT"
+  --expected-branch "$BEAGLEY_CLUSTER_GIT_BRANCH"
+  --write-manifest "$PWD/beagley-cluster-source-manifest.env"
+)
+if [[ "$BEAGLEY_ALLOW_DIRTY_SOURCE" != 1 ]]; then
+  source_verify_args+=(--fail-dirty)
+fi
+if [[ "$BEAGLEY_REQUIRE_REMOTE_REF" == 1 ]]; then
+  source_verify_args+=(--source-remote "$BEAGLEY_SOURCE_REMOTE" --require-remote-ref)
+fi
+"$REPO_ROOT/tools/yocto/verify_beagley_build_source.sh" "${source_verify_args[@]}"
 
 log "building $IMAGE_NAME for MACHINE=${MACHINE_NAME} (policy=${MACHINE_POLICY})"
 if ! run_bitbake_with_retries; then

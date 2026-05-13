@@ -73,6 +73,24 @@ void testParseScanOutput()
     expectTrue(std::abs(rows[1].signalDbm - (-48.0)) < 0.01, "second SSID signal parsed");
 }
 
+void testParseWpaCliScanResults()
+{
+    const QString scan = QStringLiteral(
+        "bssid / frequency / signal level / flags / ssid\n"
+        "32:5b:fe:3f:db:e6\t2437\t-48\t[WPA2-PSK-CCMP][ESS]\tJosh\\xe2\\x80\\x99s iPhone\n");
+
+    const QVector<WiFiSsidUtils::ScanRow> rows = WiFiSsidUtils::parseIwScanNetworks(scan);
+    expectTrue(rows.size() == 1, "parse wpa_cli scan should yield one network");
+    if (rows.size() != 1) {
+        return;
+    }
+
+    const QString expectedUnicode = QString::fromUtf8("Josh\xe2\x80\x99s iPhone");
+    expectEqual(rows[0].ssid, expectedUnicode, "wpa_cli SSID decoded from escaped bytes");
+    expectTrue(rows[0].secure, "wpa_cli SSID marked secure from WPA flags");
+    expectTrue(std::abs(rows[0].signalDbm - (-48.0)) < 0.01, "wpa_cli signal parsed");
+}
+
 } // namespace
 
 int main()
@@ -81,6 +99,7 @@ int main()
     testDecodeAsciiUntouched();
     testDecodeInvalidEscapeSafeFallback();
     testParseScanOutput();
+    testParseWpaCliScanResults();
 
     if (g_failures == 0) {
         std::cout << "wifi_ssid_utils_test: PASS\n";

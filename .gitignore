@@ -21,6 +21,7 @@ src/ui/widgets/VehicleStateCoreAnimated.qml
 # Local build outputs
 build-ninja/
 build/
+build-beagley-aarch64/
 
 # Local web experiments
 src/ui/web/test/

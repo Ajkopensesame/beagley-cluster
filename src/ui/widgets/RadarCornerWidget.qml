@@ -19,7 +19,6 @@ Item {
     readonly property string monoFont: theme && theme.fontMono ? theme.fontMono : "Oxanium"
     readonly property bool live: root.status === "LIVE"
     readonly property bool frameReady: root.live && String(root.frameUrl).length > 0
-    readonly property bool previewReady: radarPreview.ready
 
     CornerPodFrame {
         id: frame
@@ -40,12 +39,12 @@ Item {
             RadarFrameItem {
                 id: radarPreview
                 anchors.fill: parent
-                anchors.margins: -Math.round(parent.width * 0.08)
+                anchors.margins: -Math.round(parent.width * 0.12)
                 source: root.frameReady ? root.frameUrl : ""
                 circular: true
-                backgroundVisible: true
-                guidesVisible: false
-                visible: root.previewReady
+                backgroundVisible: false
+                guidesVisible: true
+                visible: ready
                 opacity: 0.96
             }
 
@@ -70,7 +69,7 @@ Item {
             anchors.centerIn: parent
             width: Math.round(frame.side * 0.46)
             height: width
-            visible: !root.previewReady
+            visible: !radarPreview.ready
 
             WidgetLocal.RadarGlyph {
                 width: parent.width

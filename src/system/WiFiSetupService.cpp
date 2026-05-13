@@ -267,7 +267,7 @@ WiFiSetupService::WiFiSetupService(QObject *parent)
                 : true))
     , m_wizardTrigger(normalizedWizardTrigger(qEnvironmentVariableIsSet("BEAGLEY_WIFI_WIZARD_TRIGGER")
             ? QString::fromUtf8(qgetenv("BEAGLEY_WIFI_WIZARD_TRIGGER"))
-            : QStringLiteral("no_config")))
+            : QStringLiteral("offline")))
     , m_configWriteEnabled(m_onboardingEnabled)
     , m_adminPasswordFile(qEnvironmentVariableIsSet("BEAGLEY_WIFI_ADMIN_PASSWORD_FILE")
             ? QString::fromUtf8(qgetenv("BEAGLEY_WIFI_ADMIN_PASSWORD_FILE")).trimmed()
@@ -404,8 +404,10 @@ void WiFiSetupService::updateSetupMessaging()
 {
     const bool onboardingActive = m_onboardingEnabled
         && (!m_hasSavedConfig || m_wizardTrigger == QLatin1String("offline"));
+    const bool waitingForSavedNetwork = m_hasSavedConfig
+        && m_networkState == QLatin1String("waiting_for_hotspot");
     const bool required = onboardingActive
-        && (!m_hasSavedConfig || m_networkState != QLatin1String("online"));
+        && (!m_hasSavedConfig || waitingForSavedNetwork);
 
     QString shortMessage;
     QString detailMessage;
@@ -479,7 +481,7 @@ bool WiFiSetupService::shouldAutoShowPrompt() const
         return false;
     }
     if (m_wizardTrigger == QLatin1String("offline")) {
-        return m_networkState != QLatin1String("online");
+        return !m_hasSavedConfig || m_networkState == QLatin1String("waiting_for_hotspot");
     }
     return !m_hasSavedConfig;
 }
@@ -825,7 +827,11 @@ void WiFiSetupService::scanNetworks()
         scheduleReconcile(0);
     });
 
-    const QString command = QStringLiteral("iw dev ") + shellQuote(m_interfaceName) + QStringLiteral(" scan");
+    const QString command = QStringLiteral(
+        "wpa_cli -i %1 scan >/dev/null 2>&1 || true; "
+        "sleep 4; "
+        "wpa_cli -i %1 scan_results 2>/dev/null || iw dev %1 scan")
+        .arg(shellQuote(m_interfaceName));
     m_process->start(QStringLiteral("bash"), {QStringLiteral("-lc"), command});
 }
 

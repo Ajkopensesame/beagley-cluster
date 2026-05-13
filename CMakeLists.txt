@@ -84,8 +84,6 @@ qt_add_executable(beagley_cluster
     src/navigation/NavigationService.cpp
     src/render/ClusterRenderModel.cpp
     src/render/NativeRasterMapItem.cpp
-    src/render/NativeMatrixRainItem.cpp
-    src/render/NativeMatrixRainItem.h
     src/render/RasterFrameItem.cpp
     src/render/RasterFrameItem.h
     src/render/RadarFrameItem.cpp
@@ -199,9 +197,6 @@ set(BEAGLEY_QML_FILES
     src/ui/widgets/MapLibreGaugeBackplate.qml
     src/ui/widgets/MapVehicleMarker.qml
     src/ui/widgets/WeatherCorners.qml
-    src/ui/widgets/WeatherDetailPanel.qml
-    src/ui/widgets/RadarDetailPanel.qml
-    src/ui/widgets/MusicDetailPanel.qml
     src/ui/widgets/WeatherMoodIcon.qml
     src/ui/widgets/BomCatalog.js
     src/ui/widgets/HighBeamHalo.qml
