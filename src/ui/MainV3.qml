@@ -155,10 +155,19 @@ Window {
     readonly property real rpmValue: truthOk && hub ? (hub.rpm || 0) : 0
     readonly property real fuelValue: truthOk && hub ? (hub.fuelPct || 0) : 0
     readonly property real coolantValue: truthOk && hub ? (hub.coolantC || 0) : 0
-    readonly property real displaySpeedValue: stressScene ? (78 + 50 * Math.sin(stressPhase * 0.9)) : speedValue
-    readonly property real displayRpmValue: stressScene ? (2400 + 1800 * (0.5 + 0.5 * Math.sin(stressPhase * 1.15 + 0.4))) : rpmValue
-    readonly property real displayFuelValue: stressScene ? (18 + 11 * Math.sin(stressPhase * 0.30 - 1.2)) : fuelValue
-    readonly property real displayCoolantValue: stressScene ? (70 + 42 * Math.sin(stressPhase * 0.42 + 1.3)) : coolantValue
+    readonly property bool gaugeReviewMode: gaugeDemo && !stressScene
+    readonly property real displaySpeedValue: stressScene
+        ? (78 + 50 * Math.sin(stressPhase * 0.9))
+        : (gaugeReviewMode ? 96 : speedValue)
+    readonly property real displayRpmValue: stressScene
+        ? (2400 + 1800 * (0.5 + 0.5 * Math.sin(stressPhase * 1.15 + 0.4)))
+        : (gaugeReviewMode ? 3600 : rpmValue)
+    readonly property real displayFuelValue: stressScene
+        ? (18 + 11 * Math.sin(stressPhase * 0.30 - 1.2))
+        : (gaugeReviewMode ? 68 : fuelValue)
+    readonly property real displayCoolantValue: stressScene
+        ? (70 + 42 * Math.sin(stressPhase * 0.42 + 1.3))
+        : (gaugeReviewMode ? 92 : coolantValue)
     readonly property int indicatorVisualHoldMs: 1850
     readonly property bool rawLeftIndicator: stressScene
         ? Math.sin(stressPhase * 1.35) > 0.68
@@ -1162,6 +1171,8 @@ Window {
                 auxColor: root.displayCoolantValue >= 100 ? appTheme.danger : (root.displayCoolantValue < 40 ? "#63C9FF" : appTheme.pearlLow)
                 primaryProgress: Math.max(0, Math.min(1, root.displaySpeedValue / 140))
                 auxProgress: Math.max(0.14, Math.min(1, (root.displayCoolantValue - 40) / 70))
+                primaryScared: root.displaySpeedValue > 115
+                auxScared: root.displayCoolantValue >= 100
                 maxValue: 140
                 minorStep: 10
                 majorStep: 20
@@ -1255,6 +1266,8 @@ Window {
                 auxColor: root.displayFuelValue <= 12 ? appTheme.danger : appTheme.pearlLow
                 primaryProgress: Math.max(0, Math.min(1, root.displayRpmValue / 8000))
                 auxProgress: Math.max(0, Math.min(1, root.displayFuelValue / 100))
+                primaryScared: root.displayRpmValue > 3500
+                auxScared: root.displayFuelValue <= 15
                 maxValue: 8
                 minorStep: 0.5
                 majorStep: 1

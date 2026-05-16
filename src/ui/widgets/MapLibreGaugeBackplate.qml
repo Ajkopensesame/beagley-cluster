@@ -18,6 +18,9 @@ Item {
     property string auxStartLabel: ""
     property string auxEndLabel: ""
     property bool drawFaceBackground: true
+    property bool showArcHeads: true
+    property bool primaryScared: false
+    property bool auxScared: false
 
     readonly property real startAngleDeg: 225
     readonly property real sweepAngleDeg: 210
@@ -27,6 +30,10 @@ Item {
     readonly property real auxSweepDeg: 360 - sweepAngleDeg - 24
     readonly property real clampedPrimary: clamp(primaryProgress, 0, 1)
     readonly property real clampedAux: clamp(auxProgress, 0, 1)
+    readonly property real primaryHeadDeg: startAngleDeg + sweepAngleDeg * clampedPrimary
+    readonly property real auxHeadDeg: auxStartDeg + auxSweepDeg * clampedAux
+    readonly property real primaryHeadRadius: Math.max(14, width * 0.026)
+    readonly property real auxHeadRadius: Math.max(12, width * 0.022)
     readonly property color chromeColor: theme?.pearlLow ?? Qt.color("#C7B7FF")
     readonly property color textColor: theme?.text ?? Qt.color("#F7FBFF")
 
@@ -195,5 +202,25 @@ Item {
         font.bold: true
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
+    }
+
+    GaugeArcHead {
+        z: 90
+        visible: root.showArcHeads && root.clampedPrimary > 0.002
+        lowEffectMode: false
+        scared: root.primaryScared
+        headRadius: root.primaryHeadRadius
+        x: root.pointX(root.primaryHeadDeg, root.arcRadius, width)
+        y: root.pointY(root.primaryHeadDeg, root.arcRadius, height)
+    }
+
+    GaugeArcHead {
+        z: 92
+        visible: root.showArcHeads && root.clampedAux > 0.002
+        lowEffectMode: false
+        scared: root.auxScared
+        headRadius: root.auxHeadRadius
+        x: root.pointX(root.auxHeadDeg, root.width * 0.36, width)
+        y: root.pointY(root.auxHeadDeg, root.width * 0.36, height)
     }
 }
