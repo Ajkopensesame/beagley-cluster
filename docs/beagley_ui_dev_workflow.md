@@ -46,6 +46,19 @@ cd /Users/joshkomant/projects/beagley-cluster
 ./tools/ui/beagley_sync_qml.sh
 ```
 
+Each sync writes `/opt/beagley-cluster/qml-dev/.beagley-qml-manifest` with the
+local branch, commit, dirty count, and sync time. Check the live display source
+with:
+
+```bash
+./tools/ui/beagley_display_status.sh
+```
+
+If `qml_source=qml-dev`, the BeagleY is showing synced filesystem QML, not the
+compiled QML inside the deployed binary. That is the right mode for UI
+iteration, but final validation should disable QML-dev and use the Yocto-built
+binary.
+
 ## Main Files
 
 - `src/ui/MainV3.qml`: current display layout.

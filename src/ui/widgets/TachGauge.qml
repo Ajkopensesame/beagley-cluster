@@ -8,6 +8,8 @@ Item {
     // Pass the theme object in from Main.qml
     property var theme
     property string effectLevel: "high"
+    property string detailMode: "safe"
+    property bool demoTelltales: false
     property bool matrixRainEnabled: true
     property real matrixRainSharedPhase: NaN
 
@@ -83,7 +85,8 @@ Item {
     readonly property bool lowEffectMode: effectLevel === "low" || effectLevel === "off"
     readonly property bool embeddedSafeMode: Qt.platform.os === "linux"
     readonly property bool embeddedHighEffectBudgetMode: embeddedSafeMode && effectLevel === "high"
-    readonly property bool cheapAuxArcMode: true
+    readonly property bool richDetailMode: detailMode === "rich"
+    readonly property bool cheapAuxArcMode: !richDetailMode
     readonly property bool auxArcAnimationEnabled: !cheapAuxArcMode && !embeddedSafeMode && !lowEffectMode
     readonly property color chromeColor: theme?.pearlLow ?? Qt.color("#C7B7FF")
     readonly property real auxArcCanvasScale: embeddedHighEffectBudgetMode
@@ -151,35 +154,36 @@ Item {
                                && vehicleState.connected
                                && !vehicleState.linkStale
                                && !vehicleState.bbbStale
+    readonly property bool telltaleDemoActive: root.stressScene || root.demoTelltales
 
-    readonly property bool displayHighBeam: root.stressScene
+    readonly property bool displayHighBeam: root.telltaleDemoActive
         ? Math.sin(root.stressPhase * 0.72) > 0.20
         : root.linkOk && !!root.vehicleState && !!root.vehicleState.highBeam
-    readonly property bool displayWarnDoor: root.stressScene
+    readonly property bool displayWarnDoor: root.telltaleDemoActive
         ? true
         : root.linkOk && !!root.vehicleState && !!root.vehicleState.warnDoor
-    readonly property bool displayWarnCharge: root.stressScene
+    readonly property bool displayWarnCharge: root.telltaleDemoActive
         ? true
         : root.linkOk && !!root.vehicleState && !!root.vehicleState.warnCharge
-    readonly property bool displayWarnBrake: root.stressScene
+    readonly property bool displayWarnBrake: root.telltaleDemoActive
         ? true
         : root.linkOk && !!root.vehicleState && !!root.vehicleState.warnBrake
-    readonly property bool displayWarnOil: root.stressScene
+    readonly property bool displayWarnOil: root.telltaleDemoActive
         ? true
         : root.linkOk && !!root.vehicleState && !!root.vehicleState.warnOil
-    readonly property bool displayWarnCheckEngine: root.stressScene
+    readonly property bool displayWarnCheckEngine: root.telltaleDemoActive
         ? true
         : root.linkOk && !!root.vehicleState && !!root.vehicleState.warnCheckEngine
-    readonly property bool displayWarnAT: root.stressScene
+    readonly property bool displayWarnAT: root.telltaleDemoActive
         ? true
         : root.linkOk && !!root.vehicleState && !!root.vehicleState.warnAT
-    readonly property bool displayWarnFuelLow: root.stressScene
+    readonly property bool displayWarnFuelLow: root.telltaleDemoActive
         ? true
         : root.linkOk && !!root.vehicleState && !!root.vehicleState.warnFuelLow
-    readonly property string displayDrivetrainMode: root.stressScene
+    readonly property string displayDrivetrainMode: root.telltaleDemoActive
         ? (Math.sin(root.stressPhase * 0.22) > 0.45 ? "4wd" : "2wd")
         : (root.linkOk && !!root.vehicleState ? root.vehicleState.drivetrainMode : "2wd")
-    readonly property bool displayTransferLock: root.stressScene
+    readonly property bool displayTransferLock: root.telltaleDemoActive
         ? Math.sin(root.stressPhase * 0.18 + 1.1) > 0.78
         : root.linkOk && !!root.vehicleState && !!root.vehicleState.transferLock
 
@@ -373,6 +377,7 @@ Item {
             z: 20
             theme: root.theme
             effectLevel: root.effectLevel
+            detailMode: root.detailMode
             gaugeColor: root.gaugeColor
             chromeColor: root.chromeColor
             progress: root.progress

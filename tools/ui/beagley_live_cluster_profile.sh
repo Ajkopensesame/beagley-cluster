@@ -4,7 +4,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 HOST="${BEAGLEY_HOST:-root@beagley-ai.local}"
 HUB_URL="${VEHICLE_HUB_WS_URL:-ws://10.24.0.7:8765}"
-EFFECT_LEVEL="${BEAGLEY_EFFECT_LEVEL:-high}"
+EFFECT_LEVEL="${BEAGLEY_EFFECT_LEVEL:-low}"
+GAUGE_DETAIL="${BEAGLEY_GAUGE_DETAIL:-rich}"
+GAUGE_DEMO="${BEAGLEY_GAUGE_DEMO:-0}"
 MAP_RENDERER="${BEAGLEY_MAP_RENDERER:-maplibre-native}"
 MAPLIBRE_STYLE_URL="${BEAGLEY_MAPLIBRE_NATIVE_STYLE_URL:-https://tiles.openfreemap.org/styles/positron}"
 MAPLIBRE_TRUSTED_STYLES="${BEAGLEY_MAPLIBRE_NATIVE_TRUSTED_STYLES:-$MAPLIBRE_STYLE_URL}"
@@ -33,7 +35,10 @@ inputs without a road test.
 Options:
   --host HOST             SSH target. Default: root@beagley-ai.local
   --hub-url URL           Vehicle hub URL. Default: ws://10.24.0.7:8765
-  --effect-level LEVEL    off, low, or high. Default: high
+  --effect-level LEVEL    off, low, or high. Default: low
+  --gauge-detail MODE     safe or rich. Default: rich
+  --gauge-demo            Show telltales/gear review state without BeagleY replay.
+  --no-gauge-demo         Disable gauge visual-review telltales. Default.
   --map-renderer MODE     maplibre-native or native-online. Default: maplibre-native
   --maplibre-style-url URL
                           Trusted MapLibre style. Default: OpenFreeMap Positron
@@ -61,6 +66,18 @@ while [[ $# -gt 0 ]]; do
     --effect-level)
       EFFECT_LEVEL="${2:-}"
       shift 2
+      ;;
+    --gauge-detail)
+      GAUGE_DETAIL="${2:-}"
+      shift 2
+      ;;
+    --gauge-demo)
+      GAUGE_DEMO=1
+      shift
+      ;;
+    --no-gauge-demo)
+      GAUGE_DEMO=0
+      shift
       ;;
     --map-renderer)
       MAP_RENDERER="${2:-}"
@@ -103,7 +120,35 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-for value in "$HOST" "$HUB_URL" "$EFFECT_LEVEL" "$MAP_RENDERER" "$MAPLIBRE_STYLE_URL" "$MAPLIBRE_TRUSTED_STYLES" "$MAPLIBRE_FULL_UNDERLAY" "$MAPLIBRE_MAX_ZOOM"; do
+GAUGE_DETAIL_NORMALIZED="$(printf '%s' "$GAUGE_DETAIL" | tr '[:upper:]' '[:lower:]')"
+case "$GAUGE_DETAIL_NORMALIZED" in
+  rich|full|high)
+    GAUGE_DETAIL=rich
+    ;;
+  safe|simple|low)
+    GAUGE_DETAIL=safe
+    ;;
+  *)
+    echo "[beagley-live] --gauge-detail must be safe or rich: $GAUGE_DETAIL" >&2
+    exit 2
+    ;;
+esac
+
+GAUGE_DEMO_NORMALIZED="$(printf '%s' "$GAUGE_DEMO" | tr '[:upper:]' '[:lower:]')"
+case "$GAUGE_DEMO_NORMALIZED" in
+  1|true|yes|on)
+    GAUGE_DEMO=1
+    ;;
+  0|false|no|off)
+    GAUGE_DEMO=0
+    ;;
+  *)
+    echo "[beagley-live] BEAGLEY_GAUGE_DEMO must be 0 or 1: $GAUGE_DEMO" >&2
+    exit 2
+    ;;
+esac
+
+for value in "$HOST" "$HUB_URL" "$EFFECT_LEVEL" "$GAUGE_DETAIL" "$GAUGE_DEMO" "$MAP_RENDERER" "$MAPLIBRE_STYLE_URL" "$MAPLIBRE_TRUSTED_STYLES" "$MAPLIBRE_FULL_UNDERLAY" "$MAPLIBRE_MAX_ZOOM"; do
   if [[ "$value" == *"'"* ]]; then
     echo "[beagley-live] values may not contain single quotes: $value" >&2
     exit 2
@@ -135,6 +180,8 @@ BEAGLEY_REQUIRE_TOUCH_GATE=0
 BEAGLEY_UI_VARIANT=v3
 BEAGLEY_RENDER_PROFILE=embedded
 BEAGLEY_EFFECT_LEVEL=$EFFECT_LEVEL
+BEAGLEY_GAUGE_DETAIL=$GAUGE_DETAIL
+BEAGLEY_GAUGE_DEMO=$GAUGE_DEMO
 BEAGLEY_MAP_RENDERER=$MAP_RENDERER
 BEAGLEY_MAP_BOOT_MODE=staged
 BEAGLEY_MAP_STYLE_MODE=embedded

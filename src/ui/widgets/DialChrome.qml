@@ -5,6 +5,7 @@ Item {
 
     property var theme
     property string effectLevel: "high"
+    property string detailMode: "safe"
     property color gaugeColor: "white"
     property color chromeColor: gaugeColor
     property real progress: 0.0
@@ -30,7 +31,8 @@ Item {
     readonly property bool lowEffectMode: effectLevel === "low" || effectLevel === "off"
     readonly property bool embeddedSafeMode: Qt.platform.os === "linux"
     readonly property bool embeddedHighEffectBudgetMode: embeddedSafeMode && effectLevel === "high"
-    readonly property bool staticArcMode: true
+    readonly property bool richDetailMode: detailMode === "rich"
+    readonly property bool staticArcMode: !richDetailMode
     readonly property bool lavaAnimationEnabled: !staticArcMode && !embeddedSafeMode && !lowEffectMode
     readonly property real lowEffectArcScale: 0.36
     readonly property real lowEffectArcTune: lowEffectArcScale / 0.42

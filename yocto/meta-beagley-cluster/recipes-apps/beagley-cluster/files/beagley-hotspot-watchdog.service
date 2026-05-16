@@ -1,0 +1,9 @@
+[Unit]
+Description=Beagley hotspot gateway watchdog
+After=wpa_supplicant@wlan0.service systemd-networkd.service
+Wants=wpa_supplicant@wlan0.service systemd-networkd.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/default/beagley-hotspot-watchdog
+ExecStart=/usr/libexec/beagley-cluster/beagley-hotspot-watchdog.sh

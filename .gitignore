@@ -23,6 +23,10 @@ build-ninja/
 build/
 build-beagley-aarch64/
 
+# Machine-local helpers and target overrides
+/skill
+config/beagley-target.env
+
 # Local web experiments
 src/ui/web/test/
 

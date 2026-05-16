@@ -56,6 +56,21 @@ if [[ "$REMOTE_ROOT" == *"'"* ]]; then
   exit 2
 fi
 
+MANIFEST="$(mktemp -t beagley-qml-manifest.XXXXXX)"
+cleanup() {
+  rm -f "$MANIFEST"
+}
+trap cleanup EXIT
+
+{
+  printf 'synced_at_utc=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  printf 'source_path=%s\n' "$ROOT"
+  printf 'git_branch=%s\n' "$(cd "$ROOT" && git rev-parse --abbrev-ref HEAD 2>/dev/null || printf unknown)"
+  printf 'git_commit=%s\n' "$(cd "$ROOT" && git rev-parse --short=12 HEAD 2>/dev/null || printf unknown)"
+  printf 'git_dirty_count=%s\n' "$(cd "$ROOT" && git status --porcelain 2>/dev/null | wc -l | tr -d ' ')"
+  printf 'remote_root=%s\n' "$REMOTE_ROOT"
+} >"$MANIFEST"
+
 echo "[beagley-ui] Step 1: Verify SSH..."
 ssh -o ConnectTimeout=5 "$HOST" "true"
 
@@ -72,6 +87,9 @@ echo "[beagley-ui] Step 2: Sync QML to $HOST:$REMOTE_ROOT..."
   mv \"\$tmp\" '$REMOTE_ROOT';
   chown -R root:root '$REMOTE_ROOT' 2>/dev/null || true;
   find '$REMOTE_ROOT/src/ui' -type f \\( -name '*.qml' -o -name '*.js' -o -name 'qmldir' \\) | wc -l"
+
+echo "[beagley-ui] Step 2b: Write QML source manifest..."
+ssh "$HOST" "cat > '$REMOTE_ROOT/.beagley-qml-manifest'" <"$MANIFEST"
 
 if [[ "$RESTART" != "1" ]]; then
   echo "[beagley-ui] Sync complete; restart skipped"

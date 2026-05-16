@@ -13,6 +13,8 @@ SRC_URI = " \
     file://beagley-cluster-gpu-probe.service \
     file://beagley-cluster-touch-probe.service \
     file://beagley-cluster-provision.service \
+    file://beagley-hotspot-watchdog.service \
+    file://beagley-hotspot-watchdog.timer \
     file://beagley-diagnostic-local-fs.service \
     file://beagley-diagnostic-collect.service \
     file://beagley-diagnostic-network-online.service \
@@ -32,8 +34,10 @@ SRC_URI = " \
     file://beagley-touch-gate.sh \
     file://beagley-gpu-gate.sh \
     file://beagley-cluster-provision.sh \
+    file://beagley-hotspot-watchdog.sh \
     file://beagley-diagnostic.sh \
     file://beagley-cluster.default \
+    file://beagley-hotspot-watchdog.default \
 "
 SRCREV = "${AUTOREV}"
 S = "${WORKDIR}/git"
@@ -68,6 +72,7 @@ SYSTEMD_SERVICE:${PN} = "beagley_cluster.service"
 SYSTEMD_SERVICE:${PN} += " beagley-cluster-gpu-probe.service"
 SYSTEMD_SERVICE:${PN} += " beagley-cluster-touch-probe.service"
 SYSTEMD_SERVICE:${PN} += " beagley-cluster-provision.service"
+SYSTEMD_SERVICE:${PN} += " beagley-hotspot-watchdog.timer"
 SYSTEMD_SERVICE:${PN} += " beagley-diagnostic-local-fs.service"
 SYSTEMD_SERVICE:${PN} += " beagley-diagnostic-collect.service"
 SYSTEMD_SERVICE:${PN} += " beagley-diagnostic-network-online.service"
@@ -79,6 +84,8 @@ do_install:append() {
     install -m 0644 ${WORKDIR}/beagley-cluster-gpu-probe.service ${D}${systemd_system_unitdir}/beagley-cluster-gpu-probe.service
     install -m 0644 ${WORKDIR}/beagley-cluster-touch-probe.service ${D}${systemd_system_unitdir}/beagley-cluster-touch-probe.service
     install -m 0644 ${WORKDIR}/beagley-cluster-provision.service ${D}${systemd_system_unitdir}/beagley-cluster-provision.service
+    install -m 0644 ${WORKDIR}/beagley-hotspot-watchdog.service ${D}${systemd_system_unitdir}/beagley-hotspot-watchdog.service
+    install -m 0644 ${WORKDIR}/beagley-hotspot-watchdog.timer ${D}${systemd_system_unitdir}/beagley-hotspot-watchdog.timer
     install -m 0644 ${WORKDIR}/beagley-diagnostic-local-fs.service ${D}${systemd_system_unitdir}/beagley-diagnostic-local-fs.service
     install -m 0644 ${WORKDIR}/beagley-diagnostic-collect.service ${D}${systemd_system_unitdir}/beagley-diagnostic-collect.service
     install -m 0644 ${WORKDIR}/beagley-diagnostic-network-online.service ${D}${systemd_system_unitdir}/beagley-diagnostic-network-online.service
@@ -100,6 +107,7 @@ do_install:append() {
     install -m 0755 ${WORKDIR}/beagley-cluster-gpu-probe.sh ${D}${libexecdir}/beagley-cluster/beagley-cluster-gpu-probe.sh
     install -m 0755 ${WORKDIR}/beagley-touch-gate.sh ${D}${libexecdir}/beagley-cluster/beagley-touch-gate.sh
     install -m 0755 ${WORKDIR}/beagley-cluster-provision.sh ${D}${libexecdir}/beagley-cluster/beagley-cluster-provision.sh
+    install -m 0755 ${WORKDIR}/beagley-hotspot-watchdog.sh ${D}${libexecdir}/beagley-cluster/beagley-hotspot-watchdog.sh
     install -m 0755 ${WORKDIR}/beagley-diagnostic.sh ${D}${libexecdir}/beagley-cluster/beagley-diagnostic.sh
 
     install -d ${D}${libdir}/qml/BeagleY
@@ -116,6 +124,7 @@ do_install:append() {
 
     install -d ${D}${sysconfdir}/default
     install -m 0644 ${WORKDIR}/beagley-cluster.default ${D}${sysconfdir}/default/beagley-cluster
+    install -m 0644 ${WORKDIR}/beagley-hotspot-watchdog.default ${D}${sysconfdir}/default/beagley-hotspot-watchdog
 
     install -d ${D}${sysconfdir}/systemd/network
     install -m 0644 ${WORKDIR}/05-beagley-eth-debug.network ${D}${sysconfdir}/systemd/network/05-beagley-eth-debug.network
@@ -139,6 +148,8 @@ FILES:${PN} += " \
     ${systemd_system_unitdir}/beagley-cluster-gpu-probe.service \
     ${systemd_system_unitdir}/beagley-cluster-touch-probe.service \
     ${systemd_system_unitdir}/beagley-cluster-provision.service \
+    ${systemd_system_unitdir}/beagley-hotspot-watchdog.service \
+    ${systemd_system_unitdir}/beagley-hotspot-watchdog.timer \
     ${systemd_system_unitdir}/beagley-diagnostic-local-fs.service \
     ${systemd_system_unitdir}/beagley-diagnostic-collect.service \
     ${systemd_system_unitdir}/beagley-diagnostic-network-online.service \
@@ -149,8 +160,10 @@ FILES:${PN} += " \
     ${libexecdir}/beagley-cluster/beagley-cluster-gpu-probe.sh \
     ${libexecdir}/beagley-cluster/beagley-touch-gate.sh \
     ${libexecdir}/beagley-cluster/beagley-cluster-provision.sh \
+    ${libexecdir}/beagley-cluster/beagley-hotspot-watchdog.sh \
     ${libexecdir}/beagley-cluster/beagley-diagnostic.sh \
     ${sysconfdir}/default/beagley-cluster \
+    ${sysconfdir}/default/beagley-hotspot-watchdog \
     ${sysconfdir}/systemd/network/05-beagley-eth-debug.network \
     ${sysconfdir}/systemd/network/20-beagley-wlan0.network \
     ${sysconfdir}/systemd/network/55-beagley-usb-recovery.network \

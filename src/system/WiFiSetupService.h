@@ -21,9 +21,14 @@ class WiFiSetupService : public QObject
     Q_PROPERTY(QString statusDetail READ statusDetail NOTIFY statusDetailChanged)
     Q_PROPERTY(bool connected READ connected NOTIFY connectionChanged)
     Q_PROPERTY(bool hasIpLease READ hasIpLease NOTIFY connectionChanged)
+    Q_PROPERTY(QString ipv4Address READ ipv4Address NOTIFY connectionChanged)
+    Q_PROPERTY(double signalDbm READ signalDbm NOTIFY connectionChanged)
     Q_PROPERTY(QString currentSsid READ currentSsid NOTIFY connectionChanged)
     Q_PROPERTY(bool internetReachable READ internetReachable NOTIFY internetReachableChanged)
     Q_PROPERTY(bool hasSavedConfig READ hasSavedConfig NOTIFY savedConfigChanged)
+    Q_PROPERTY(int savedProfileCount READ savedProfileCount NOTIFY savedConfigChanged)
+    Q_PROPERTY(QString activeProfileId READ activeProfileId NOTIFY connectionChanged)
+    Q_PROPERTY(QString activeFallbackAddress READ activeFallbackAddress NOTIFY connectionChanged)
     Q_PROPERTY(QString networkState READ networkState NOTIFY networkStateChanged)
     Q_PROPERTY(bool promptVisible READ promptVisible NOTIFY promptVisibleChanged)
     Q_PROPERTY(bool onboardingEnabled READ onboardingEnabled CONSTANT)
@@ -43,9 +48,14 @@ public:
     QString statusDetail() const { return m_statusDetail; }
     bool connected() const { return m_connected; }
     bool hasIpLease() const { return m_hasIpLease; }
+    QString ipv4Address() const { return m_ipv4Address; }
+    double signalDbm() const { return m_signalDbm; }
     QString currentSsid() const { return m_currentSsid; }
     bool internetReachable() const { return m_internetReachable; }
     bool hasSavedConfig() const { return m_hasSavedConfig; }
+    int savedProfileCount() const { return m_savedProfiles.size(); }
+    QString activeProfileId() const { return m_activeProfileId; }
+    QString activeFallbackAddress() const { return m_activeFallbackAddress; }
     QString networkState() const { return m_networkState; }
     bool promptVisible() const { return m_promptVisible; }
     bool onboardingEnabled() const { return m_onboardingEnabled; }
@@ -107,6 +117,8 @@ private:
     void setBusy(bool value);
     void setPromptVisible(bool value);
     void setHasIpLease(bool value);
+    void setIpv4Address(const QString &value);
+    void setSignalDbm(double value);
     void setInternetReachable(bool value);
     void setHasSavedConfig(bool value);
     void setNetworkState(const QString &value);
@@ -122,6 +134,8 @@ private:
     QString m_statusDetail;
     bool m_connected = false;
     bool m_hasIpLease = false;
+    QString m_ipv4Address;
+    double m_signalDbm = -999.0;
     QString m_currentSsid;
     bool m_internetReachable = false;
     bool m_hasSavedConfig = false;

@@ -36,6 +36,30 @@ Window {
     readonly property string effectLevel: (typeof BEAGLEY_EFFECT_LEVEL !== "undefined" && BEAGLEY_EFFECT_LEVEL)
         ? String(BEAGLEY_EFFECT_LEVEL)
         : "high"
+    function boolEnvValue(value) {
+        const v = String(value || "").trim().toLowerCase()
+        return v === "1" || v === "true" || v === "yes" || v === "on"
+    }
+    function gaugeDetailValue(value) {
+        const v = String(value || "").trim().toLowerCase()
+        if (v === "rich" || v === "full" || v === "high")
+            return "rich"
+        return "safe"
+    }
+    readonly property string gaugeDetail: gaugeDetailValue(
+        (typeof BEAGLEY_GAUGE_DETAIL !== "undefined" && BEAGLEY_GAUGE_DETAIL)
+            ? String(BEAGLEY_GAUGE_DETAIL)
+            : "safe"
+    )
+    readonly property bool gaugeRichDetail: gaugeDetail === "rich"
+    readonly property bool gaugeDemo: (typeof BEAGLEY_GAUGE_DEMO !== "undefined")
+        ? boolEnvValue(BEAGLEY_GAUGE_DEMO)
+        : false
+    readonly property string gaugeEffectLevel: gaugeRichDetail ? "high" : effectLevel
+    readonly property bool gaugeLowEffectMode: gaugeEffectLevel === "low" || gaugeEffectLevel === "off"
+    readonly property bool gaugeEffectsOff: gaugeEffectLevel === "off"
+    readonly property bool gaugeMatrixRainEnabled: !gaugeEffectsOff
+    readonly property int gaugeIndicatorCascadeCycleMs: gaugeLowEffectMode ? 2600 : 2200
     readonly property string mapRenderer: (typeof BEAGLEY_MAP_RENDERER !== "undefined" && BEAGLEY_MAP_RENDERER)
         ? String(BEAGLEY_MAP_RENDERER)
         : "native"
@@ -80,7 +104,6 @@ Window {
     readonly property bool embeddedHighEffectBudgetMode: renderProfile === "embedded" && effectLevel === "high"
     readonly property bool embeddedDirectMapCamera: renderProfile === "embedded"
     readonly property bool embeddedGaugeMatrixRainMode: renderProfile === "embedded"
-    readonly property bool gaugeMatrixRainEnabled: !effectsOff
     readonly property real gaugeMatrixRainSharedPhase: (gaugeMatrixRainEnabled && !embeddedGaugeMatrixRainMode)
         ? sharedEffectPhase
         : NaN
@@ -146,7 +169,7 @@ Window {
     property bool displayLeftIndicator: false
     property bool displayRightIndicator: false
     readonly property bool indicatorCascadeActive: displayLeftIndicator || displayRightIndicator
-    readonly property int indicatorCascadeCycleMs: lowEffectMode ? 2600 : 2200
+    readonly property int indicatorCascadeCycleMs: gaugeIndicatorCascadeCycleMs
     property real indicatorCascadePhase: 0.0
     readonly property real displayMapLat: stressMapMotionEnabled
         ? (root.defaultMapLat + 0.0028 * Math.sin(stressPhase * 0.12))
@@ -1117,9 +1140,9 @@ Window {
 
             W.GaugeLensShell {
                 anchors.fill: parent
-                visible: !root.lowEffectMode
+                visible: !root.gaugeLowEffectMode
                 theme: appTheme
-                effectLevel: root.effectLevel
+                effectLevel: root.gaugeEffectLevel
                 gaugeColor: appTheme.speedColor(root.displaySpeedValue)
                 chromeColor: appTheme.pearlLow
                 podSize: root.gaugePodSize
@@ -1157,7 +1180,9 @@ Window {
                 maxSpeed: 140
                 speed: displaySpeedValue
                 coolantC: displayCoolantValue
-                effectLevel: root.effectLevel
+                effectLevel: root.gaugeEffectLevel
+                detailMode: root.gaugeDetail
+                demoReadouts: root.gaugeDemo
                 stressScene: root.stressScene
                 stressPhase: root.stressPhase
                 matrixRainEnabled: root.gaugeMatrixRainEnabled
@@ -1169,18 +1194,18 @@ Window {
                 height: root.gaugeFaceSize
                 anchors.centerIn: parent
                 z: 240
-                visible: !root.effectsOff
+                visible: !root.gaugeEffectsOff
                 active: root.displayLeftIndicator
                 side: "left"
-                simplified: root.lowEffectMode
-                chevrons: root.lowEffectMode ? 4 : 7
+                simplified: root.gaugeLowEffectMode
+                chevrons: root.gaugeLowEffectMode ? 4 : 7
                 cycleMs: root.indicatorCascadeCycleMs
                 phaseOverride: root.indicatorCascadePhase
                 orbitRadius: width * 0.315
-                chevronSize: root.lowEffectMode ? width * 0.038 : width * 0.044
-                strokeWidth: root.lowEffectMode ? 4.8 : 5.2
+                chevronSize: root.gaugeLowEffectMode ? width * 0.038 : width * 0.044
+                strokeWidth: root.gaugeLowEffectMode ? 4.8 : 5.2
                 strokeBoost: 1.8
-                tailSpacingPhase: root.lowEffectMode ? 0.12 : 0.08
+                tailSpacingPhase: root.gaugeLowEffectMode ? 0.12 : 0.08
                 onColor: "#52FFE1"
             }
         }
@@ -1205,9 +1230,9 @@ Window {
 
             W.GaugeLensShell {
                 anchors.fill: parent
-                visible: !root.lowEffectMode
+                visible: !root.gaugeLowEffectMode
                 theme: appTheme
-                effectLevel: root.effectLevel
+                effectLevel: root.gaugeEffectLevel
                 gaugeColor: appTheme.rpmColor(root.displayRpmValue)
                 chromeColor: appTheme.pearlLow
                 podSize: root.gaugePodSize
@@ -1244,7 +1269,9 @@ Window {
                 vehicleState: hub
                 rpm: displayRpmValue
                 fuelPct: displayFuelValue
-                effectLevel: root.effectLevel
+                effectLevel: root.gaugeEffectLevel
+                detailMode: root.gaugeDetail
+                demoTelltales: root.gaugeDemo
                 stressScene: root.stressScene
                 stressPhase: root.stressPhase
                 matrixRainEnabled: root.gaugeMatrixRainEnabled
@@ -1256,18 +1283,18 @@ Window {
                 height: root.gaugeFaceSize
                 anchors.centerIn: parent
                 z: 240
-                visible: !root.effectsOff
+                visible: !root.gaugeEffectsOff
                 active: root.displayRightIndicator
                 side: "right"
-                simplified: root.lowEffectMode
-                chevrons: root.lowEffectMode ? 4 : 7
+                simplified: root.gaugeLowEffectMode
+                chevrons: root.gaugeLowEffectMode ? 4 : 7
                 cycleMs: root.indicatorCascadeCycleMs
                 phaseOverride: root.indicatorCascadePhase
                 orbitRadius: width * 0.315
-                chevronSize: root.lowEffectMode ? width * 0.038 : width * 0.044
-                strokeWidth: root.lowEffectMode ? 4.8 : 5.2
+                chevronSize: root.gaugeLowEffectMode ? width * 0.038 : width * 0.044
+                strokeWidth: root.gaugeLowEffectMode ? 4.8 : 5.2
                 strokeBoost: 1.8
-                tailSpacingPhase: root.lowEffectMode ? 0.12 : 0.08
+                tailSpacingPhase: root.gaugeLowEffectMode ? 0.12 : 0.08
                 onColor: "#52FFE1"
             }
         }

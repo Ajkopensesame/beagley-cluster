@@ -353,6 +353,24 @@ void WiFiSetupService::setHasIpLease(bool value)
     emit connectionChanged();
 }
 
+void WiFiSetupService::setIpv4Address(const QString &value)
+{
+    if (m_ipv4Address == value) {
+        return;
+    }
+    m_ipv4Address = value;
+    emit connectionChanged();
+}
+
+void WiFiSetupService::setSignalDbm(double value)
+{
+    if (qFuzzyCompare(m_signalDbm, value)) {
+        return;
+    }
+    m_signalDbm = value;
+    emit connectionChanged();
+}
+
 void WiFiSetupService::setInternetReachable(bool value)
 {
     if (m_internetReachable == value) {
@@ -412,23 +430,24 @@ void WiFiSetupService::updateSetupMessaging()
     QString shortMessage;
     QString detailMessage;
 
-    if (required) {
-        if (!m_hasSavedConfig) {
-            shortMessage = QStringLiteral("Set up Wi-Fi");
-            detailMessage = QStringLiteral("No saved hotspot profile. Select your hotspot and enter the password.");
-        } else if (m_networkState == QLatin1String("no_internet")) {
-            shortMessage = QStringLiteral("Connected, no internet");
-            detailMessage = QStringLiteral("Hotspot is connected but internet is unavailable.");
-        } else if (m_networkState == QLatin1String("associated_no_ip")) {
-            shortMessage = QStringLiteral("Connected, waiting for IP");
-            detailMessage = QStringLiteral("Hotspot associated. Waiting for DHCP to finish.");
-        } else {
-            shortMessage = QStringLiteral("Waiting for hotspot");
-            detailMessage = QStringLiteral("Turn on your hotspot and keep it nearby.");
-        }
-    } else {
+    if (!m_hasSavedConfig) {
+        shortMessage = QStringLiteral("Set up Wi-Fi");
+        detailMessage = QStringLiteral("No saved hotspot profile. Select your hotspot and enter the password.");
+    } else if (m_networkState == QLatin1String("waiting_for_hotspot")) {
+        shortMessage = QStringLiteral("Waiting for hotspot");
+        detailMessage = QStringLiteral("Turn on your hotspot and keep it nearby.");
+    } else if (m_networkState == QLatin1String("associated_no_ip")) {
+        shortMessage = QStringLiteral("Connected, waiting for IP");
+        detailMessage = QStringLiteral("Hotspot associated. Waiting for DHCP to finish.");
+    } else if (m_networkState == QLatin1String("no_internet")) {
+        shortMessage = QStringLiteral("Connected, no internet");
+        detailMessage = QStringLiteral("Hotspot is connected but internet is unavailable.");
+    } else if (m_networkState == QLatin1String("online")) {
         shortMessage = QStringLiteral("Hotspot online");
         detailMessage = QStringLiteral("Wi-Fi is connected and ready.");
+    } else {
+        shortMessage = m_status;
+        detailMessage = m_statusDetail;
     }
 
     setSetupRequired(required);
@@ -515,6 +534,8 @@ void WiFiSetupService::refreshSavedConfig()
     const QString path = wpaFileForInterface(m_interfaceName);
     QFileInfo info(path);
     bool hasConfig = false;
+    const bool previousHasConfig = m_hasSavedConfig;
+    const int previousProfileCount = m_savedProfiles.size();
     m_savedProfiles.clear();
 
     if (info.exists() && info.isFile()) {
@@ -527,6 +548,9 @@ void WiFiSetupService::refreshSavedConfig()
     }
 
     setHasSavedConfig(hasConfig);
+    if (previousHasConfig == hasConfig && previousProfileCount != m_savedProfiles.size()) {
+        emit savedConfigChanged();
+    }
 }
 
 bool WiFiSetupService::refreshStatusInternal(bool forceProbe)
@@ -550,6 +574,14 @@ bool WiFiSetupService::refreshStatusInternal(bool forceProbe)
         bool stateChanged = false;
         if (m_connected) {
             m_connected = false;
+            stateChanged = true;
+        }
+        if (!m_ipv4Address.isEmpty()) {
+            m_ipv4Address.clear();
+            stateChanged = true;
+        }
+        if (!qFuzzyCompare(m_signalDbm, -999.0)) {
+            m_signalDbm = -999.0;
             stateChanged = true;
         }
         if (!m_currentSsid.isEmpty()) {
@@ -600,10 +632,13 @@ bool WiFiSetupService::refreshStatusInternal(bool forceProbe)
                                             QStringLiteral("ip -4 -br a show ") + shellQuote(m_interfaceName)});
     static const QRegularExpression upRe(QStringLiteral("\\bUP\\b"));
     static const QRegularExpression cidrIpv4Re(QStringLiteral("\\b\\d{1,3}(?:\\.\\d{1,3}){3}/\\d+\\b"));
+    const QRegularExpressionMatch ipMatch = cidrIpv4Re.match(ipResult.stdOut);
+    const QString ipv4Now = ipMatch.hasMatch() ? ipMatch.captured(0) : QString();
     const bool ipCommandHasLease = ipResult.exitCode == 0
         && upRe.match(ipResult.stdOut).hasMatch()
-        && cidrIpv4Re.match(ipResult.stdOut).hasMatch();
+        && !ipv4Now.isEmpty();
     setHasIpLease(ipCommandHasLease || supplicantHasIp);
+    setIpv4Address(!ipv4Now.isEmpty() ? ipv4Now : (supplicantHasIp ? supplicantIp : QString()));
 
     const ExecResult linkResult = runCommand(QStringLiteral("bash"),
                                              {QStringLiteral("-lc"),
@@ -613,6 +648,10 @@ bool WiFiSetupService::refreshStatusInternal(bool forceProbe)
     const QRegularExpression ssidRe(QStringLiteral("^\\s*SSID:\\s*(.+)\\s*$"),
                                     QRegularExpression::MultilineOption);
     const QRegularExpressionMatch ssidMatch = ssidRe.match(linkText);
+    const QRegularExpression signalRe(QStringLiteral("\\bsignal:\\s*(-?\\d+(?:\\.\\d+)?)\\s*dBm"),
+                                      QRegularExpression::CaseInsensitiveOption);
+    const QRegularExpressionMatch signalMatch = signalRe.match(linkText);
+    setSignalDbm(signalMatch.hasMatch() ? signalMatch.captured(1).toDouble() : -999.0);
 
     bool connectedNow = false;
     QString ssidNow;
@@ -642,10 +681,16 @@ bool WiFiSetupService::refreshStatusInternal(bool forceProbe)
         emit connectionChanged();
     }
 
+    const QString previousActiveProfileId = m_activeProfileId;
+    const QString previousActiveFallbackAddress = m_activeFallbackAddress;
     const WiFiHotspotProfiles::SavedProfile activeProfile =
         WiFiHotspotProfiles::findProfileForSsid(m_savedProfiles, m_currentSsid);
     m_activeProfileId = activeProfile.id;
     m_activeFallbackAddress = activeProfile.fallbackAddress;
+    if (m_activeProfileId != previousActiveProfileId
+        || m_activeFallbackAddress != previousActiveFallbackAddress) {
+        emit connectionChanged();
+    }
 
     if (!m_connected || !m_hasIpLease) {
         if (m_internetReply) {
@@ -928,15 +973,20 @@ void WiFiSetupService::connectToNetwork(const QString &ssid,
         "RequiredForOnline=no\n"
         "\n"
         "[Network]\n"
+        "ConfigureWithoutCarrier=yes\n"
         "DHCP=ipv4\n"
         "\n"
         "[DHCPv4]\n"
+        "ClientIdentifier=mac\n"
         "RouteMetric=200\n"
+        "UseDNS=yes\n"
         "EOF\n"
         "ip link set \"$IFACE\" up || true\n"
         "systemctl daemon-reload\n"
         "systemctl enable \"wpa_supplicant@${IFACE}.service\"\n"
         "systemctl restart \"wpa_supplicant@${IFACE}.service\"\n"
+        "systemctl enable --now beagley-hotspot-watchdog.timer >/dev/null 2>&1 || true\n"
+        "systemctl enable --now beagley-hotspot-reconcile.timer >/dev/null 2>&1 || true\n"
         "wpa_cli -i \"$IFACE\" reconfigure >/dev/null 2>&1 || true\n"
         "systemctl restart systemd-networkd\n"
         "ASSOC_STATE=UNKNOWN\n"

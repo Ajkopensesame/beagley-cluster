@@ -37,6 +37,8 @@ Item {
     // Theme from Main.qml
     property var theme
     property string effectLevel: "high"
+    property string detailMode: "safe"
+    property bool demoReadouts: false
     property bool matrixRainEnabled: true
     property real matrixRainSharedPhase: NaN
 
@@ -126,7 +128,8 @@ Item {
     readonly property bool lowEffectMode: effectLevel === "low" || effectLevel === "off"
     readonly property bool embeddedSafeMode: Qt.platform.os === "linux"
     readonly property bool embeddedHighEffectBudgetMode: embeddedSafeMode && effectLevel === "high"
-    readonly property bool cheapAuxArcMode: true
+    readonly property bool richDetailMode: detailMode === "rich"
+    readonly property bool cheapAuxArcMode: !richDetailMode
     readonly property bool auxArcAnimationEnabled: !cheapAuxArcMode && !embeddedSafeMode && !lowEffectMode
     readonly property color chromeColor: theme?.pearlLow ?? Qt.color("#C7B7FF")
     readonly property real auxArcCanvasScale: embeddedHighEffectBudgetMode
@@ -168,14 +171,14 @@ Item {
     readonly property var stressGearSequence: ["P", "R", "N", "D", "2", "1", "L"]
     readonly property string displayGear: root.stressScene
         ? stressGearSequence[Math.floor(root.stressPhase / 1.05) % stressGearSequence.length]
-        : ((root.vehicleState && root.vehicleState.gear !== undefined) ? root.vehicleState.gear : "P")
+        : (root.demoReadouts ? "D" : ((root.vehicleState && root.vehicleState.gear !== undefined) ? root.vehicleState.gear : "P"))
     readonly property bool displayOverdrive: root.stressScene
         ? Math.sin(root.stressPhase * 0.95) > 0.0
-        : !!(root.vehicleState && root.vehicleState.overdrive === true)
+        : (root.demoReadouts ? true : !!(root.vehicleState && root.vehicleState.overdrive === true))
     readonly property real liveOdometerKm: liveOdometerKmValue()
     readonly property real displayOdometerKm: root.stressScene
         ? 284613 + Math.floor(root.stressPhase * 2.4)
-        : liveOdometerKm
+        : (root.demoReadouts ? 284613 : liveOdometerKm)
     readonly property string odometerText: isFinite(displayOdometerKm)
         ? formatOdometerKm(displayOdometerKm)
         : "------"
@@ -407,6 +410,7 @@ Item {
             z: 20
             theme: root.theme
             effectLevel: root.effectLevel
+            detailMode: root.detailMode
             gaugeColor: root.gaugeColor
             chromeColor: root.chromeColor
             progress: root.progress

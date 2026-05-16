@@ -1,0 +1,11 @@
+[Unit]
+Description=Periodic Beagley hotspot gateway watchdog
+
+[Timer]
+OnBootSec=35s
+OnUnitActiveSec=15s
+AccuracySec=1s
+Unit=beagley-hotspot-watchdog.service
+
+[Install]
+WantedBy=timers.target

@@ -154,6 +154,22 @@ static QString normalizedSetting(const QByteArray &rawValue, const QString &fall
     return trimmed.isEmpty() ? fallback : trimmed;
 }
 
+static QString normalizedGaugeDetail(const QByteArray &rawValue, const QString &fallback)
+{
+    const QString value = normalizedSetting(rawValue, fallback);
+    if (value == QLatin1String("rich")
+        || value == QLatin1String("full")
+        || value == QLatin1String("high")) {
+        return QStringLiteral("rich");
+    }
+    if (value == QLatin1String("safe")
+        || value == QLatin1String("simple")
+        || value == QLatin1String("low")) {
+        return QStringLiteral("safe");
+    }
+    return fallback;
+}
+
 static bool envEnabled(const char *name, bool fallback)
 {
     if (!qEnvironmentVariableIsSet(name)) {
@@ -299,6 +315,10 @@ int main(int argc, char *argv[])
                                              renderProfile == QLatin1String("embedded")
                                                  ? QStringLiteral("embedded")
                                                  : QStringLiteral("desktop"));
+    const QString gaugeDetail = normalizedGaugeDetail(
+        qgetenv("BEAGLEY_GAUGE_DETAIL"),
+        renderProfile == QLatin1String("embedded") ? QStringLiteral("safe") : QStringLiteral("rich"));
+    const bool gaugeDemo = envEnabled("BEAGLEY_GAUGE_DEMO", false);
     const bool stressScene =
         qEnvironmentVariableIsSet("BEAGLEY_STRESS_SCENE") &&
         qEnvironmentVariableIntValue("BEAGLEY_STRESS_SCENE") != 0;
@@ -345,6 +365,8 @@ int main(int argc, char *argv[])
     qputenv("BEAGLEY_RENDER_PROFILE", renderProfile.toUtf8());
     qputenv("BEAGLEY_EFFECT_LEVEL", effectLevel.toUtf8());
     qputenv("BEAGLEY_MAP_RENDERER", mapRenderer.toUtf8());
+    qputenv("BEAGLEY_GAUGE_DETAIL", gaugeDetail.toUtf8());
+    qputenv("BEAGLEY_GAUGE_DEMO", gaugeDemo ? QByteArrayLiteral("1") : QByteArrayLiteral("0"));
 
 #ifdef WITH_WEBENGINE
     if (!noMap && !preferSnapshotMap) {
@@ -425,6 +447,8 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("BEAGLEY_RENDER_PROFILE", renderProfile);
     engine.rootContext()->setContextProperty("BEAGLEY_EFFECT_LEVEL", effectLevel);
     engine.rootContext()->setContextProperty("BEAGLEY_MAP_RENDERER", mapRenderer);
+    engine.rootContext()->setContextProperty("BEAGLEY_GAUGE_DETAIL", gaugeDetail);
+    engine.rootContext()->setContextProperty("BEAGLEY_GAUGE_DEMO", gaugeDemo);
     engine.rootContext()->setContextProperty(
         "BEAGLEY_INITIAL_WEATHER_EXPANDED_MODE",
         QString::fromUtf8(qgetenv("BEAGLEY_INITIAL_WEATHER_EXPANDED_MODE")).trimmed());
@@ -451,6 +475,8 @@ int main(int argc, char *argv[])
             << "gpuGateFile =" << gpuGateFile
             << "renderProfile =" << renderProfile
             << "effectLevel =" << effectLevel
+            << "gaugeDetail =" << gaugeDetail
+            << "gaugeDemo =" << gaugeDemo
             << "mapRenderer =" << mapRenderer
             << "mapLibreNativeAvailable =" << mapLibreNativeAvailable
             << "mapLibreNativeAllowUntestedStyles =" << mapLibreNativeAllowUntestedStyles

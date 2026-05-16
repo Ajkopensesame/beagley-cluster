@@ -14,6 +14,8 @@ bridge repair remains a diagnostics workflow only.
 
 - `BEAGLEY_RENDER_PROFILE=embedded`
 - `BEAGLEY_EFFECT_LEVEL=low`
+- `BEAGLEY_GAUGE_DETAIL=safe`
+- `BEAGLEY_GAUGE_DEMO=0`
 - `BEAGLEY_MAP_RENDERER=maplibre-native`
 - `QSG_RENDER_LOOP=basic`
 - `BEAGLEY_MAPLIBRE_NATIVE_STYLE_URL=https://tiles.openfreemap.org/styles/positron`

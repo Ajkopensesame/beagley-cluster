@@ -4,6 +4,8 @@ QSG_RENDER_LOOP=basic
 BEAGLEY_UI_VARIANT=embedded
 BEAGLEY_RENDER_PROFILE=embedded
 BEAGLEY_EFFECT_LEVEL=low
+BEAGLEY_GAUGE_DETAIL=safe
+BEAGLEY_GAUGE_DEMO=0
 BEAGLEY_MAP_RENDERER=maplibre-native
 # Verified on the real BeagleY display by tools/maplibre/probe_beagley_style.sh.
 # Keep untested styles disabled; change the URL only after a successful probe.

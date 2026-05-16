@@ -1,0 +1,4 @@
+interface:
+  display_name: "GitHub Sync"
+  short_description: "Keep repo branches aligned with GitHub safely."
+  default_prompt: "Check this repository against GitHub, report drift, and perform only the explicitly requested safe sync steps."
