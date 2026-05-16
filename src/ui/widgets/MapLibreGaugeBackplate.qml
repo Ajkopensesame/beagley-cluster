@@ -17,6 +17,7 @@ Item {
     property real labelDivisor: 1
     property string auxStartLabel: ""
     property string auxEndLabel: ""
+    property bool drawFaceBackground: true
 
     readonly property real startAngleDeg: 225
     readonly property real sweepAngleDeg: 210
@@ -54,6 +55,7 @@ Item {
         width: parent.width * 0.996
         height: width
         radius: width / 2
+        visible: root.drawFaceBackground
         color: "#03060D"
         opacity: 0.96
         border.width: Math.max(2, width * 0.004)

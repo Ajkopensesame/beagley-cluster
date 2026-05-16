@@ -1134,6 +1134,7 @@ Window {
                 width: root.gaugeFaceSize + 18
                 height: width
                 radius: width / 2
+                z: 0
                 visible: root.mapLibreSafeCompositor
                 color: "#010309"
             }
@@ -1153,8 +1154,9 @@ Window {
                 anchors.centerIn: parent
                 width: root.gaugeFaceSize
                 height: root.gaugeFaceSize
-                z: -1
+                z: root.mapLibreSafeCompositor ? 120 : -1
                 visible: root.mapLibreNativeActive
+                drawFaceBackground: !root.mapLibreSafeCompositor
                 theme: appTheme
                 primaryColor: appTheme.speedColor(root.displaySpeedValue)
                 auxColor: root.displayCoolantValue >= 100 ? appTheme.danger : (root.displayCoolantValue < 40 ? "#63C9FF" : appTheme.pearlLow)
@@ -1180,6 +1182,7 @@ Window {
                 maxSpeed: 140
                 speed: displaySpeedValue
                 coolantC: displayCoolantValue
+                z: 20
                 effectLevel: root.gaugeEffectLevel
                 detailMode: root.gaugeDetail
                 demoReadouts: root.gaugeDemo
@@ -1224,6 +1227,7 @@ Window {
                 width: root.gaugeFaceSize + 18
                 height: width
                 radius: width / 2
+                z: 0
                 visible: root.mapLibreSafeCompositor
                 color: "#010309"
             }
@@ -1243,8 +1247,9 @@ Window {
                 anchors.centerIn: parent
                 width: root.gaugeFaceSize
                 height: root.gaugeFaceSize
-                z: -1
+                z: root.mapLibreSafeCompositor ? 120 : -1
                 visible: root.mapLibreNativeActive
+                drawFaceBackground: !root.mapLibreSafeCompositor
                 theme: appTheme
                 primaryColor: appTheme.rpmColor(root.displayRpmValue)
                 auxColor: root.displayFuelValue <= 12 ? appTheme.danger : appTheme.pearlLow
@@ -1269,6 +1274,7 @@ Window {
                 vehicleState: hub
                 rpm: displayRpmValue
                 fuelPct: displayFuelValue
+                z: 20
                 effectLevel: root.gaugeEffectLevel
                 detailMode: root.gaugeDetail
                 demoTelltales: root.gaugeDemo
