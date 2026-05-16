@@ -99,7 +99,7 @@ ssh "${ssh_opts[@]}" "$elitebook_target" bash -s -- \
   "$SOURCE_BRANCH" \
   "$canonical_commit" \
   "$YOCTO_BUILD_DIR" \
-  "${remote_build_args[@]}" <<'REMOTE'
+  ${remote_build_args[@]+"${remote_build_args[@]}"} <<'REMOTE'
 set -euo pipefail
 
 repo="$1"
