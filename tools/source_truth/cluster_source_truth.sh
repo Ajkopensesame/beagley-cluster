@@ -109,7 +109,7 @@ done
   echo "[source-truth] --branch cannot be empty" >&2
   exit 2
 }
-[[ -d "$ROOT/.git" ]] || {
+git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1 || {
   echo "[source-truth] not a git checkout: $ROOT" >&2
   exit 2
 }
