@@ -100,6 +100,7 @@ Window {
     readonly property bool hotspotIpLease: !!((typeof wifiSetup !== "undefined") && wifiSetup && wifiSetup.hasIpLease)
     readonly property bool internetOk: !!((typeof wifiSetup !== "undefined") && wifiSetup && wifiSetup.internetReachable)
     readonly property string hotspotState: (typeof wifiSetup !== "undefined") && wifiSetup ? String(wifiSetup.networkState || "waiting_for_hotspot") : "waiting_for_hotspot"
+    readonly property string hotspotSsid: (typeof wifiSetup !== "undefined") && wifiSetup && wifiSetup.currentSsid ? String(wifiSetup.currentSsid) : ""
     readonly property bool gpsFixOk: !!(hub && hub.gpsFixValid)
     readonly property bool gpsEverValid: !!(hub && hub.gpsEverValid)
     readonly property bool liveMapPoseValid: !!(hub
@@ -1642,7 +1643,7 @@ Window {
 
                             Text {
                                 text: hotspotState === "online"
-                                    ? "ONLINE"
+                                    ? (hotspotSsid.length > 0 ? hotspotSsid : "ONLINE")
                                     : (hotspotState === "no_internet"
                                         ? "NO INTERNET"
                                         : (hotspotState === "associated_no_ip"
@@ -1712,13 +1713,12 @@ Window {
                         radius: 18
                         color: "#0B1720"
                         border.width: 1
-                        border.color: hotspotState === "online" ? "#3B5665" : "#456A7D"
-                        visible: hotspotState !== "online"
+                        border.color: hotspotState === "online" ? "#2E8B67" : "#456A7D"
 
                         Text {
                             anchors.centerIn: parent
-                            text: "SET UP WI-FI"
-                            color: "#F5FBFF"
+                            text: hotspotState === "online" ? "WI-FI DETAILS" : "SET UP WI-FI"
+                            color: hotspotState === "online" ? "#8AF0B7" : "#F5FBFF"
                             font.family: appTheme.fontMono
                             font.pixelSize: 16
                             font.weight: Font.Bold
@@ -1728,8 +1728,7 @@ Window {
                         MouseArea {
                             anchors.fill: parent
                             onClicked: {
-                                if (typeof wifiSetup !== "undefined")
-                                    wifiSetup.showPrompt()
+                                wifiOverlay.openPrompt()
                                 root.navControlsOpen = false
                             }
                         }

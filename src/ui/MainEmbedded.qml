@@ -2,6 +2,7 @@ import QtQuick 2.15
 import QtQuick.Window 2.15
 
 import BeagleY 1.0
+import "widgets" as W
 
 Window {
     id: root
@@ -17,6 +18,7 @@ Window {
     visibility: Window.Windowed
 
     readonly property var cluster: clusterRenderModel
+    readonly property var wifi: (typeof wifiSetup !== "undefined") ? wifiSetup : null
     readonly property bool stressScene: (typeof BEAGLEY_STRESS_SCENE !== "undefined" && BEAGLEY_STRESS_SCENE) ? true : false
     property real stressPhase: 0.0
     readonly property string uiFontFamily: embeddedUiFont.name.length > 0 ? embeddedUiFont.name : "sans-serif"
@@ -64,7 +66,9 @@ Window {
         anchors.top: parent.top
         height: 78
         cluster: root.cluster
+        wifi: root.wifi
         fontFamily: root.uiFontFamily
+        onWifiRequested: wifiOverlay.openPrompt()
     }
 
     Row {
@@ -119,5 +123,12 @@ Window {
         fillColor: root.warningFill
         strokeColor: root.warningStroke
         fontFamily: root.uiFontFamily
+    }
+
+    W.WiFiSetupOverlay {
+        id: wifiOverlay
+        anchors.fill: parent
+        wifi: root.wifi
+        theme: null
     }
 }

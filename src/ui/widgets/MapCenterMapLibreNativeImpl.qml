@@ -99,6 +99,7 @@ Item {
     property bool nativeVehicleVisible: vehicleVisibleResolved
     property var nativeRoutePath: resolvedRoutePath
     property string nativeStyleUrl: resolvedStyleUrl
+    property int lastLoggedNativeRoutePointCount: -1
     readonly property int nativeZoomAnimationMs: {
         const hinted = Number(resolvedCameraBucket.zoomAnimationMs)
         if (isFinite(hinted))
@@ -106,7 +107,12 @@ Item {
         return embeddedMapThrottle ? 760 : 420
     }
     readonly property real vehicleAnchorY: guidanceCameraActive ? 0.84 : 0.5
-    readonly property var routeFeatureCollection: routeGeoJson(nativeRoutePath)
+    readonly property var nativeRouteCoordinates: routeCoordinates(nativeRoutePath)
+    readonly property var nativeDestination: destinationPoint(nativeRoutePath)
+    readonly property real nativeDestinationLat: Number(nativeDestination.lat)
+    readonly property real nativeDestinationLng: Number(nativeDestination.lng)
+    readonly property bool nativeRouteVisible: nativeRouteCoordinates.length >= 2
+    readonly property bool nativeDestinationVisible: isFinite(nativeDestinationLat) && isFinite(nativeDestinationLng)
 
     function hasKeys(value) {
         return !!value && Object.keys(value).length > 0
@@ -226,27 +232,40 @@ Item {
         return path
     }
 
-    function routeGeoJson(path) {
+    function routeCoordinates(path) {
         var coordinates = []
         for (var i = 0; i < path.length; ++i) {
             const point = path[i] || ({})
             const latValue = Number(point.lat)
             const lngValue = Number(point.lng)
             if (isFinite(latValue) && isFinite(lngValue))
-                coordinates.push([lngValue, latValue])
+                coordinates.push(QtPositioning.coordinate(latValue, lngValue))
         }
+        return coordinates
+    }
 
-        return {
-            type: "FeatureCollection",
-            features: coordinates.length >= 2 ? [{
-                type: "Feature",
-                properties: {},
-                geometry: {
-                    type: "LineString",
-                    coordinates: coordinates
-                }
-            }] : []
-        }
+    function destinationPoint(path) {
+        const destination = resolvedRouteBucket.destination || ({})
+        const destinationLat = Number(destination.lat)
+        const destinationLng = Number(destination.lng)
+        if (isFinite(destinationLat) && isFinite(destinationLng))
+            return {
+                lat: destinationLat,
+                lng: destinationLng
+            }
+
+        if (path.length < 1)
+            return ({})
+
+        const fallback = path[path.length - 1] || ({})
+        const fallbackLat = Number(fallback.lat)
+        const fallbackLng = Number(fallback.lng)
+        return isFinite(fallbackLat) && isFinite(fallbackLng)
+            ? {
+                lat: fallbackLat,
+                lng: fallbackLng
+            }
+            : ({})
     }
 
     function searchAddress(query) {
@@ -262,6 +281,14 @@ Item {
     function setFollowEnabled(enabled) {
         if (typeof navigation !== "undefined" && navigation && navigation.setFollowEnabled)
             navigation.setFollowEnabled(enabled)
+    }
+
+    function logNativeRoutePointCount() {
+        const count = nativeRoutePath.length
+        if (count === lastLoggedNativeRoutePointCount)
+            return
+        lastLoggedNativeRoutePointCount = count
+        console.info("[MapCenterMapLibreNative] route points", count)
     }
 
     function needsEmbeddedViewSync() {
@@ -345,7 +372,10 @@ Item {
         else
             syncNativeView(false)
     }
-    onResolvedRoutePathChanged: nativeRoutePath = resolvedRoutePath
+    onResolvedRoutePathChanged: {
+        nativeRoutePath = resolvedRoutePath
+        logNativeRoutePointCount()
+    }
     onResolvedStyleUrlChanged: {
         nativeStyleUrl = resolvedStyleUrl
     }
@@ -361,6 +391,7 @@ Item {
         nativeRoutePath = resolvedRoutePath
         nativeStyleUrl = resolvedStyleUrl
         syncNativeView(true)
+        logNativeRoutePointCount()
     }
 
     Timer {
@@ -425,6 +456,68 @@ Item {
         }
 
         MapLibre.style: Style {}
+
+        MapPolyline {
+            id: routeCasing
+            visible: root.nativeRouteVisible
+            path: root.nativeRouteCoordinates
+            line.width: 9
+            line.color: "#07101B"
+            opacity: 0.82
+        }
+
+        MapPolyline {
+            id: routeLine
+            visible: root.nativeRouteVisible
+            path: root.nativeRouteCoordinates
+            line.width: 5
+            line.color: "#25B8FF"
+            opacity: 0.96
+        }
+
+        MapQuickItem {
+            id: destinationMarker
+            visible: root.nativeDestinationVisible
+            coordinate: QtPositioning.coordinate(root.nativeDestinationLat, root.nativeDestinationLng)
+            anchorPoint.x: 14
+            anchorPoint.y: 32
+            z: 30
+
+            sourceItem: Item {
+                width: 28
+                height: 34
+
+                Rectangle {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    y: 3
+                    width: 22
+                    height: 22
+                    radius: 11
+                    color: "#25B8FF"
+                    border.color: "#07101B"
+                    border.width: 3
+                }
+
+                Rectangle {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    y: 25
+                    width: 6
+                    height: 8
+                    radius: 3
+                    color: "#07101B"
+                    opacity: 0.9
+                }
+
+                Rectangle {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    y: 9
+                    width: 8
+                    height: 8
+                    radius: 4
+                    color: "#F7FAFF"
+                }
+            }
+        }
     }
 
     Connections {

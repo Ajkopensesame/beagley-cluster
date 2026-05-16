@@ -10,19 +10,30 @@ Item {
     property Item activeField: null
     property bool upperCase: false
     property bool showDetails: false
+    property bool manuallyOpened: false
+    property bool networkPickerOpen: false
+    property string fallbackNetworkSsid: ""
+    property string fallbackNetworkSignal: ""
+    property string fallbackNetworkSecurity: "Secure"
     readonly property bool canProvision: !!wifi && wifi.onboardingEnabled
     readonly property bool modalMode: !!wifi && wifi.setupRequired
+    readonly property bool hasSelection: String(selectedSsid || "").trim().length > 0
+    readonly property bool canSubmit: canProvision && !!wifi && !wifi.busy && hasSelection && passInput.text.length >= 8
+    readonly property bool keyboardVisible: activeField === passInput || passInput.text.length > 0
+    readonly property string primaryNetworkSsid: primaryNetworkValue("ssid")
+    readonly property string primaryNetworkSignal: primaryNetworkValue("signal")
+    readonly property string primaryNetworkSecurity: primaryNetworkValue("security")
     readonly property var keyboardRows: [
         ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
         ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"],
         ["a", "s", "d", "f", "g", "h", "j", "k", "l"],
         ["SHIFT", "z", "x", "c", "v", "b", "n", "m", "BKSP"],
-        ["SPACE", ".", "-", "_", "@", "!", "/", "CLEAR"]
+        ["SPACE", ".", "-", "_", "@", "!", "/", "ENTER"]
     ]
 
     anchors.fill: parent
     z: 9500
-    visible: !!wifi && wifi.promptVisible
+    visible: !!wifi && (manuallyOpened || (wifi.promptVisible && String(wifi.networkState || "") === "no_config"))
 
     function focusField(field) {
         if (!field) {
@@ -33,6 +44,11 @@ Item {
     }
 
     function applyKey(key) {
+        if (key === "ENTER") {
+            connectNow()
+            return
+        }
+
         if (!activeField) {
             return
         }
@@ -74,18 +90,88 @@ Item {
         wifi.scanNetworks()
     }
 
+    function openNetworkPicker() {
+        networkPickerOpen = true
+        activeField = null
+        if (wifi && !wifi.busy) {
+            wifi.scanNetworks()
+        }
+    }
+
+    function showNetworkPickerWithFallback(ssid, signal, security) {
+        fallbackNetworkSsid = String(ssid || "")
+        fallbackNetworkSignal = String(signal || "")
+        fallbackNetworkSecurity = String(security || "Secure")
+        openNetworkPicker()
+    }
+
+    function primaryNetworkValue(field) {
+        var row = null
+        if (wifi && wifi.networks && typeof wifi.networks.length === "number" && wifi.networks.length > 0) {
+            row = wifi.networks[0]
+        }
+
+        if (field === "ssid") {
+            if (fallbackNetworkSsid.length > 0) {
+                return fallbackNetworkSsid
+            }
+            if (wifi && wifi.currentSsid) {
+                return String(wifi.currentSsid)
+            }
+            if (row && row.ssid) {
+                return String(row.ssid)
+            }
+            return ""
+        }
+
+        if (field === "signal") {
+            if (fallbackNetworkSignal.length > 0) {
+                return fallbackNetworkSignal
+            }
+            if (wifi && Number(wifi.signalDbm) > -998) {
+                return Math.round(Number(wifi.signalDbm)) + " dBm"
+            }
+            if (row && Number(row.signalDbm) > -998) {
+                return Math.round(Number(row.signalDbm)) + " dBm"
+            }
+            return ""
+        }
+
+        if (fallbackNetworkSecurity.length > 0) {
+            return fallbackNetworkSecurity
+        }
+        if (row && row.secure === false) {
+            return "Open"
+        }
+        return "Secure"
+    }
+
     function selectNetwork(ssid) {
-        selectedSsid = String(ssid || "")
+        selectedSsid = String(ssid || "").trim()
+        if (selectedSsid.length === 0) {
+            return
+        }
+        networkPickerOpen = false
+        passInput.forceActiveFocus()
+        activeField = passInput
     }
 
     function connectNow() {
-        if (!wifi || !canProvision || wifi.busy) {
+        if (!wifi || !canSubmit) {
             return
         }
-        wifi.connectToNetwork(selectedSsid.trim(), passInput.text, countryCode)
+        wifi.connectToNetwork(String(selectedSsid || "").trim(), passInput.text, countryCode)
+    }
+
+    function openPrompt() {
+        manuallyOpened = true
+        if (wifi) {
+            wifi.showPrompt()
+        }
     }
 
     function skipWizard() {
+        manuallyOpened = false
         if (wifi) {
             wifi.dismissPrompt()
         }
@@ -93,10 +179,17 @@ Item {
 
     onVisibleChanged: {
         if (visible && wifi) {
-            showDetails = false
             activeField = null
+            networkPickerOpen = false
+            selectedSsid = wifi.currentSsid ? String(wifi.currentSsid) : selectedSsid
             wifi.refreshStatus()
             wifi.scanNetworks()
+        } else if (!visible) {
+            manuallyOpened = false
+            networkPickerOpen = false
+            fallbackNetworkSsid = ""
+            fallbackNetworkSignal = ""
+            fallbackNetworkSecurity = "Secure"
         }
     }
 
@@ -104,19 +197,8 @@ Item {
         target: wifi
 
         function onNetworksChanged() {
-            if (!wifi || wifi.networks.length === 0) {
+            if (!wifi || !wifi.networks) {
                 return
-            }
-
-            var keepCurrent = false
-            for (var i = 0; i < wifi.networks.length; ++i) {
-                if (wifi.networks[i].ssid === root.selectedSsid) {
-                    keepCurrent = true
-                    break
-                }
-            }
-            if (!keepCurrent) {
-                root.selectedSsid = wifi.networks[0].ssid
             }
         }
 
@@ -129,470 +211,384 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        color: root.modalMode ? "#B0000000" : "#00000000"
+        color: root.modalMode ? "#C0020509" : "#94020509"
     }
 
     Rectangle {
         id: panel
         anchors.centerIn: parent
-        width: Math.min(parent.width - 44, 1240)
-        height: Math.min(parent.height - 40, 680)
-        radius: 22
-        color: "#09131CEE"
+        width: Math.min(parent.width - 360, 760)
+        height: Math.min(parent.height - 64, root.keyboardVisible ? 568 : (root.networkPickerOpen ? 500 : 408))
+        radius: 14
+        color: "#0B1118"
         border.width: 1
-        border.color: "#3A7A9F"
+        border.color: "#31404A"
+
+        Behavior on height {
+            NumberAnimation { duration: 130; easing.type: Easing.OutCubic }
+        }
     }
 
     Column {
         anchors.fill: panel
-        anchors.margins: 16
-        spacing: 10
+        anchors.margins: 28
+        spacing: 18
 
         Row {
             width: parent.width
-            spacing: 10
+            height: 54
+            spacing: 14
 
-            Text {
-                text: "Set Up Wi-Fi"
-                color: "#F4FBFF"
-                font.pixelSize: 32
-                font.family: theme ? theme.fontDisplay : "Sans Serif"
-                font.weight: Font.DemiBold
+            Column {
+                width: parent.width - closeButton.width - 14
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 4
+
+                Text {
+                    text: "Wi-Fi"
+                    color: "#F6FAFC"
+                    font.pixelSize: 31
+                    font.family: theme ? theme.fontDisplay : "Sans Serif"
+                    font.weight: Font.DemiBold
+                }
+
+                Text {
+                    width: parent.width
+                    text: root.networkPickerOpen ? "Select an available network." : "Choose a network and connect."
+                    color: "#94AAB5"
+                    font.pixelSize: 15
+                    font.family: theme ? theme.fontDisplay : "Sans Serif"
+                    elide: Text.ElideRight
+                }
             }
 
             Rectangle {
+                id: closeButton
+                width: 82
+                height: 38
                 anchors.verticalCenter: parent.verticalCenter
-                radius: 10
-                height: 30
-                width: Math.min(360, statusLabel.implicitWidth + 20)
-                color: "#0E1E2B"
+                radius: 8
+                color: closeArea.pressed ? "#182530" : "#111A22"
                 border.width: 1
-                border.color: wifi && wifi.networkState === "online" ? "#3D8E65" : "#456A7D"
+                border.color: "#334855"
 
                 Text {
-                    id: statusLabel
                     anchors.centerIn: parent
-                    text: {
-                        if (!wifi) {
-                            return "Wi-Fi unavailable"
-                        }
-                        if (wifi.setupMessageShort && wifi.setupMessageShort.length > 0) {
-                            return wifi.setupMessageShort
-                        }
-                        return wifi.status
-                    }
-                    color: wifi && wifi.networkState === "online" ? "#83F3A8" : "#F2BE6C"
+                    text: "Close"
+                    color: "#D8E6EC"
                     font.pixelSize: 14
                     font.family: theme ? theme.fontMono : "monospace"
                     font.bold: true
                 }
+
+                MouseArea {
+                    id: closeArea
+                    anchors.fill: parent
+                    onClicked: root.skipWizard()
+                }
             }
         }
 
-        Text {
+        Column {
             width: parent.width
-            text: {
-                if (!wifi) {
-                    return ""
-                }
-                if (!canProvision) {
-                    return "Wi-Fi setup is disabled on this device image."
-                }
-                if (wifi.setupMessageDetail && wifi.setupMessageDetail.length > 0) {
-                    return wifi.setupMessageDetail
-                }
-                return "Pick your hotspot, enter the password, then tap Connect."
-            }
-            color: "#A9C6D8"
-            font.pixelSize: 16
-            font.family: theme ? theme.fontMono : "monospace"
-            wrapMode: Text.WordWrap
-        }
-
-        Row {
-            width: parent.width
-            height: 244
             spacing: 12
 
+            Text {
+                text: "Network"
+                color: "#91A4AE"
+                font.pixelSize: 13
+                font.family: theme ? theme.fontMono : "monospace"
+            }
+
             Rectangle {
-                width: Math.floor((parent.width - 12) * 0.54)
-                height: parent.height
-                radius: 14
-                color: "#071019"
+                id: networkField
+                width: parent.width
+                height: 52
+                radius: 9
+                color: "#0F171F"
                 border.width: 1
-                border.color: "#2E556E"
+                border.color: root.networkPickerOpen ? "#80C7E8" : "#2A3C48"
 
-                Column {
+                Text {
                     anchors.fill: parent
-                    anchors.margins: 10
-                    spacing: 8
+                    anchors.leftMargin: 14
+                    anchors.rightMargin: pickerChevron.width + 24
+                    verticalAlignment: Text.AlignVCenter
+                    text: root.hasSelection ? root.selectedSsid : "Select network"
+                    color: root.hasSelection ? "#F6FAFC" : "#647984"
+                    font.pixelSize: 20
+                    font.family: theme ? theme.fontDisplay : "Sans Serif"
+                    elide: Text.ElideRight
+                }
 
-                    Row {
-                        width: parent.width
-                        spacing: 8
+                Text {
+                    id: pickerChevron
+                    anchors.right: parent.right
+                    anchors.rightMargin: 14
+                    anchors.verticalCenter: parent.verticalCenter
+                    verticalAlignment: Text.AlignVCenter
+                    text: root.networkPickerOpen ? "^" : "v"
+                    color: "#8AA3B0"
+                    font.pixelSize: 18
+                    font.family: theme ? theme.fontMono : "monospace"
+                    font.bold: true
+                }
 
-                        Text {
-                            text: "Networks"
-                            color: "#EAF5FB"
-                            font.pixelSize: 20
-                            font.family: theme ? theme.fontDisplay : "Sans Serif"
-                        }
-
-                        Item {
-                            width: Math.max(0, parent.width - 250)
-                            height: 1
-                        }
-
-                        Rectangle {
-                            width: 110
-                            height: 36
-                            radius: 10
-                            color: "#102230"
-                            border.width: 1
-                            border.color: "#3C6B85"
-
-                            Text {
-                                anchors.centerIn: parent
-                                text: wifi && wifi.busy ? "..." : "REFRESH"
-                                color: "#E9F6FF"
-                                font.pixelSize: 14
-                                font.family: theme ? theme.fontMono : "monospace"
-                                font.bold: true
-                            }
-
-                            MouseArea {
-                                anchors.fill: parent
-                                enabled: wifi && !wifi.busy
-                                onClicked: root.refreshNetworks()
-                            }
-                        }
-                    }
-
-                    Rectangle {
-                        width: parent.width
-                        height: parent.height - 44
-                        radius: 12
-                        color: "#0A1823"
-                        border.width: 1
-                        border.color: "#27465B"
-                        clip: true
-
-                        Text {
-                            anchors.centerIn: parent
-                            visible: !wifi || wifi.networks.length === 0
-                            text: wifi && wifi.busy ? "Scanning..." : "No networks yet. Tap Refresh."
-                            color: "#9AB9CC"
-                            font.pixelSize: 18
-                            font.family: theme ? theme.fontDisplay : "Sans Serif"
-                        }
-
-                        ListView {
-                            anchors.fill: parent
-                            anchors.margins: 8
-                            clip: true
-                            spacing: 6
-                            model: wifi ? wifi.networks : []
-
-                            delegate: Rectangle {
-                                readonly property var rowData: modelData
-                                readonly property bool selected: rowData.ssid === root.selectedSsid
-                                width: ListView.view ? ListView.view.width : 0
-                                height: 48
-                                radius: 10
-                                color: selected ? "#13384D" : "#0C202D"
-                                border.width: 1
-                                border.color: selected ? "#83D9FF" : "#2C5268"
-
-                                Row {
-                                    anchors.fill: parent
-                                    anchors.margins: 10
-                                    spacing: 10
-
-                                    Text {
-                                        width: parent.width - 200
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        text: rowData.ssid
-                                        color: "#F3FAFF"
-                                        font.pixelSize: 17
-                                        font.family: theme ? theme.fontDisplay : "Sans Serif"
-                                        elide: Text.ElideRight
-                                    }
-
-                                    Text {
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        text: rowData.secure ? "LOCK" : "OPEN"
-                                        color: rowData.secure ? "#F0C977" : "#8EE6AE"
-                                        font.pixelSize: 12
-                                        font.family: theme ? theme.fontMono : "monospace"
-                                    }
-
-                                    Text {
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        text: Math.round(rowData.signalDbm) + " dBm"
-                                        color: "#8AB3CA"
-                                        font.pixelSize: 12
-                                        font.family: theme ? theme.fontMono : "monospace"
-                                    }
-                                }
-
-                                MouseArea {
-                                    anchors.fill: parent
-                                    onClicked: root.selectNetwork(rowData.ssid)
-                                }
-                            }
-                        }
-                    }
+                MouseArea {
+                    anchors.fill: parent
+                    onClicked: root.openNetworkPicker()
                 }
             }
 
             Rectangle {
-                width: parent.width - (Math.floor((parent.width - 12) * 0.54))
-                height: parent.height
-                radius: 14
-                color: "#071019"
+                width: parent.width
+                height: root.networkPickerOpen ? 64 : 0
+                visible: height > 1
+                radius: 9
+                color: "#0F171F"
                 border.width: 1
-                border.color: "#2E556E"
+                border.color: "#314655"
 
                 Column {
                     anchors.fill: parent
-                    anchors.margins: 12
-                    spacing: 10
+                    anchors.margins: 8
+                    spacing: 4
 
-                    Text {
-                        text: "Selected Network"
-                        color: "#9AB9CC"
-                        font.pixelSize: 13
-                        font.family: theme ? theme.fontMono : "monospace"
-                    }
-
-                    Rectangle {
+                    Item {
                         width: parent.width
-                        height: 42
-                        radius: 10
-                        color: "#0A1823"
-                        border.width: 1
-                        border.color: "#2C5268"
+                        height: 48
+                        visible: root.primaryNetworkSsid.length > 0
 
                         Text {
-                            anchors.fill: parent
+                            anchors.left: parent.left
                             anchors.leftMargin: 12
+                            anchors.right: networkSecurity.left
                             anchors.rightMargin: 12
-                            verticalAlignment: Text.AlignVCenter
-                            text: root.selectedSsid.length > 0 ? root.selectedSsid : "Tap a network on the left"
-                            color: "#F5FBFF"
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: root.primaryNetworkSsid
+                            color: "#F1F7FA"
                             font.pixelSize: 17
-                            font.family: theme ? theme.fontDisplay : "Sans Serif"
+                            font.family: "Sans Serif"
                             elide: Text.ElideRight
                         }
-                    }
 
-                    Text {
-                        text: "Password"
-                        color: "#9AB9CC"
-                        font.pixelSize: 13
-                        font.family: theme ? theme.fontMono : "monospace"
-                    }
-
-                    Rectangle {
-                        width: parent.width
-                        height: 50
-                        radius: 12
-                        color: "#0A1823"
-                        border.width: 1
-                        border.color: passInput.activeFocus ? "#7DD9FF" : "#2C5268"
-
-                        TextInput {
-                            id: passInput
-                            anchors.fill: parent
-                            anchors.leftMargin: 12
+                        Text {
+                            id: networkSignal
+                            width: 74
+                            anchors.right: parent.right
                             anchors.rightMargin: 12
-                            verticalAlignment: Text.AlignVCenter
-                            color: "#F5FBFF"
-                            font.pixelSize: 20
-                            font.family: theme ? theme.fontDisplay : "Sans Serif"
-                            echoMode: TextInput.Password
-                            onActiveFocusChanged: if (activeFocus) root.activeField = passInput
+                            anchors.verticalCenter: parent.verticalCenter
+                            horizontalAlignment: Text.AlignRight
+                            text: root.primaryNetworkSignal
+                            color: "#78909C"
+                            font.pixelSize: 12
+                            font.family: theme ? theme.fontMono : "monospace"
                         }
 
                         Text {
-                            anchors.fill: parent
-                            anchors.leftMargin: 12
-                            anchors.rightMargin: 12
-                            verticalAlignment: Text.AlignVCenter
-                            text: "Enter Wi-Fi password"
-                            visible: passInput.text.length === 0 && !passInput.activeFocus
-                            color: "#7290A6"
-                            font.pixelSize: 17
-                            font.family: theme ? theme.fontDisplay : "Sans Serif"
+                            id: networkSecurity
+                            width: 62
+                            anchors.right: networkSignal.left
+                            anchors.rightMargin: 10
+                            anchors.verticalCenter: parent.verticalCenter
+                            horizontalAlignment: Text.AlignRight
+                            text: root.primaryNetworkSecurity
+                            color: root.primaryNetworkSecurity === "Open" ? "#82C99B" : "#A8BAC4"
+                            font.pixelSize: 12
+                            font.family: theme ? theme.fontMono : "monospace"
                         }
 
                         MouseArea {
+                            id: networkRowMouse
                             anchors.fill: parent
-                            onClicked: root.focusField(passInput)
+                            hoverEnabled: true
+                            onClicked: root.selectNetwork(root.primaryNetworkSsid)
                         }
                     }
 
-                    Row {
-                        width: parent.width
-                        spacing: 8
-
-                        Rectangle {
-                            width: (parent.width - 16) / 3
-                            height: 42
-                            radius: 12
-                            color: wifi && !wifi.busy && root.selectedSsid.trim().length > 0 ? "#1A658F" : "#1A2A37"
-                            border.width: 1
-                            border.color: wifi && !wifi.busy && root.selectedSsid.trim().length > 0 ? "#8CE3FF" : "#405A6A"
-
-                            Text {
-                                anchors.centerIn: parent
-                                text: wifi && wifi.busy ? "WORKING..." : "CONNECT"
-                                color: "#F5FBFF"
-                                font.pixelSize: 14
-                                font.family: theme ? theme.fontMono : "monospace"
-                                font.bold: true
-                            }
-
-                            MouseArea {
-                                anchors.fill: parent
-                                enabled: root.canProvision
-                                    && wifi
-                                    && !wifi.busy
-                                    && root.selectedSsid.trim().length > 0
-                                onClicked: root.connectNow()
-                            }
-                        }
-
-                        Rectangle {
-                            width: (parent.width - 16) / 3
-                            height: 42
-                            radius: 12
-                            color: "#0D1D28"
-                            border.width: 1
-                            border.color: "#3F6278"
-
-                            Text {
-                                anchors.centerIn: parent
-                                text: "REFRESH"
-                                color: "#ECF7FF"
-                                font.pixelSize: 14
-                                font.family: theme ? theme.fontMono : "monospace"
-                                font.bold: true
-                            }
-
-                            MouseArea {
-                                anchors.fill: parent
-                                enabled: wifi && !wifi.busy
-                                onClicked: root.refreshNetworks()
-                            }
-                        }
-
-                        Rectangle {
-                            width: (parent.width - 16) / 3
-                            height: 42
-                            radius: 12
-                            color: "#0D1D28"
-                            border.width: 1
-                            border.color: "#3F6278"
-
-                            Text {
-                                anchors.centerIn: parent
-                                text: "SKIP"
-                                color: "#ECF7FF"
-                                font.pixelSize: 14
-                                font.family: theme ? theme.fontMono : "monospace"
-                                font.bold: true
-                            }
-
-                            MouseArea {
-                                anchors.fill: parent
-                                onClicked: root.skipWizard()
-                            }
-                        }
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        visible: root.primaryNetworkSsid.length === 0
+                        text: wifi && wifi.busy ? "Scanning..." : "No networks found"
+                        color: "#78909C"
+                        font.pixelSize: 15
+                        font.family: theme ? theme.fontDisplay : "Sans Serif"
                     }
                 }
             }
-        }
-
-        Rectangle {
-            width: parent.width
-            height: 36
-            radius: 10
-            color: "#0A1823"
-            border.width: 1
-            border.color: "#30556D"
 
             Text {
-                anchors.verticalCenter: parent.verticalCenter
-                anchors.left: parent.left
-                anchors.leftMargin: 12
-                text: showDetails ? "Hide Details" : "Details"
-                color: "#D5E9F5"
-                font.pixelSize: 14
+                text: "Password"
+                color: "#91A4AE"
+                font.pixelSize: 13
                 font.family: theme ? theme.fontMono : "monospace"
-                font.bold: true
             }
 
-            MouseArea {
-                anchors.fill: parent
-                onClicked: root.showDetails = !root.showDetails
-            }
-        }
+            Rectangle {
+                width: parent.width
+                height: 52
+                radius: 9
+                color: "#0F171F"
+                border.width: 1
+                border.color: passInput.activeFocus ? "#80C7E8" : "#2A3C48"
 
-        Rectangle {
-            width: parent.width
-            height: 64
-            radius: 10
-            color: "#071019"
-            border.width: 1
-            border.color: "#2E556E"
-            visible: root.showDetails
+                TextInput {
+                    id: passInput
+                    anchors.fill: parent
+                    anchors.leftMargin: 14
+                    anchors.rightMargin: 14
+                    verticalAlignment: Text.AlignVCenter
+                    color: "#F6FAFC"
+                    selectedTextColor: "#081017"
+                    selectionColor: "#80C7E8"
+                    font.pixelSize: 20
+                    font.family: theme ? theme.fontDisplay : "Sans Serif"
+                    echoMode: TextInput.Password
+                    onActiveFocusChanged: if (activeFocus) root.activeField = passInput
+                    Keys.onReturnPressed: root.connectNow()
+                    Keys.onEnterPressed: root.connectNow()
+                }
+
+                Text {
+                    anchors.fill: parent
+                    anchors.leftMargin: 14
+                    anchors.rightMargin: 14
+                    verticalAlignment: Text.AlignVCenter
+                    text: "Password"
+                    visible: passInput.text.length === 0 && !passInput.activeFocus
+                    color: "#647984"
+                    font.pixelSize: 17
+                    font.family: theme ? theme.fontDisplay : "Sans Serif"
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    onClicked: root.focusField(passInput)
+                }
+            }
+
+            Row {
+                width: parent.width
+                height: 46
+                spacing: 10
+
+                Rectangle {
+                    width: Math.floor((parent.width - 20) * 0.54)
+                    height: parent.height
+                    radius: 9
+                    color: root.canSubmit ? (connectArea.pressed ? "#227BA4" : "#1A688C") : "#17232C"
+                    border.width: 1
+                    border.color: root.canSubmit ? "#79C9E8" : "#2F414C"
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: wifi && wifi.busy ? "Working..." : "Connect"
+                        color: root.canSubmit ? "#F8FCFD" : "#667A84"
+                        font.pixelSize: 15
+                        font.family: theme ? theme.fontMono : "monospace"
+                        font.bold: true
+                    }
+
+                    MouseArea {
+                        id: connectArea
+                        anchors.fill: parent
+                        enabled: root.canSubmit
+                        onClicked: root.connectNow()
+                    }
+                }
+
+                Rectangle {
+                    width: Math.floor((parent.width - 20) * 0.23)
+                    height: parent.height
+                    radius: 9
+                    color: scanArea.pressed ? "#182936" : "#101B24"
+                    border.width: 1
+                    border.color: "#365365"
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: wifi && wifi.busy ? "..." : "Scan"
+                        color: "#D8E8EF"
+                        font.pixelSize: 15
+                        font.family: theme ? theme.fontMono : "monospace"
+                        font.bold: true
+                    }
+
+                    MouseArea {
+                        id: scanArea
+                        anchors.fill: parent
+                        enabled: wifi && !wifi.busy
+                        onClicked: root.refreshNetworks()
+                    }
+                }
+
+                Rectangle {
+                    width: parent.width - Math.floor((parent.width - 20) * 0.54)
+                        - Math.floor((parent.width - 20) * 0.23)
+                        - 20
+                    height: parent.height
+                    radius: 9
+                    color: skipArea.pressed ? "#182530" : "#111A22"
+                    border.width: 1
+                    border.color: "#334855"
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "Skip"
+                        color: "#D8E6EC"
+                        font.pixelSize: 15
+                        font.family: theme ? theme.fontMono : "monospace"
+                        font.bold: true
+                    }
+
+                    MouseArea {
+                        id: skipArea
+                        anchors.fill: parent
+                        onClicked: root.skipWizard()
+                    }
+                }
+            }
 
             Text {
-                anchors.fill: parent
-                anchors.margins: 8
+                width: parent.width
                 text: {
                     if (!wifi) {
                         return ""
                     }
-                    if (wifi.statusDetail && wifi.statusDetail.length > 0 && wifi.statusDetail !== wifi.status) {
-                        return wifi.status + "\n" + wifi.statusDetail
+                    if (wifi.currentSsid && wifi.ipv4Address) {
+                        return "Current: " + wifi.currentSsid + "  " + String(wifi.ipv4Address).split("/")[0]
                     }
-                    return wifi.status
+                    if (wifi.currentSsid) {
+                        return "Current: " + wifi.currentSsid
+                    }
+                    return ""
                 }
-                color: "#A6C9DC"
+                visible: text.length > 0
+                color: "#78909C"
                 font.pixelSize: 13
                 font.family: theme ? theme.fontMono : "monospace"
-                wrapMode: Text.WordWrap
                 elide: Text.ElideRight
             }
         }
 
         Rectangle {
             width: parent.width
-            height: 250
-            radius: 14
-            color: "#071019"
+            height: root.keyboardVisible ? 174 : 0
+            visible: height > 1
+            radius: 12
+            color: "#0D151D"
             border.width: 1
-            border.color: "#2E556E"
+            border.color: "#263844"
 
             Column {
-                anchors.fill: parent
-                anchors.margins: 10
-                spacing: 8
-
-                Text {
-                    text: "Keyboard"
-                    color: "#EAF5FB"
-                    font.pixelSize: 16
-                    font.family: theme ? theme.fontDisplay : "Sans Serif"
-                }
+                anchors.centerIn: parent
+                spacing: 7
 
                 Repeater {
                     model: root.keyboardRows
 
                     delegate: Row {
-                        spacing: 8
+                        spacing: 7
                         anchors.horizontalCenter: parent.horizontalCenter
                         property var rowData: modelData
 
@@ -601,13 +597,15 @@ Item {
 
                             delegate: Rectangle {
                                 readonly property string keyName: modelData
-                                width: keyName === "SPACE" ? 300
-                                     : (keyName === "SHIFT" || keyName === "BKSP" || keyName === "CLEAR" ? 104 : 56)
-                                height: 34
-                                radius: 10
-                                color: keyName === "SHIFT" && root.upperCase ? "#2D7FA8" : "#102332"
+                                readonly property bool submitKey: keyName === "ENTER"
+                                width: keyName === "SPACE" ? 250
+                                     : (keyName === "SHIFT" || keyName === "BKSP" || keyName === "ENTER" ? 84 : 48)
+                                height: 25
+                                radius: 7
+                                color: submitKey && root.canSubmit ? "#1A688C"
+                                     : (keyName === "SHIFT" && root.upperCase ? "#216486" : "#111F2A")
                                 border.width: 1
-                                border.color: "#376683"
+                                border.color: submitKey && root.canSubmit ? "#79C9E8" : "#355365"
 
                                 Text {
                                     anchors.centerIn: parent
@@ -622,8 +620,8 @@ Item {
                                         }
                                         return parent.keyName
                                     }
-                                    color: "#F6FBFF"
-                                    font.pixelSize: 14
+                                    color: parent.submitKey && !root.canSubmit ? "#7C8F98" : "#E9F3F7"
+                                    font.pixelSize: 13
                                     font.family: theme ? theme.fontMono : "monospace"
                                     font.bold: true
                                 }
