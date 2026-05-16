@@ -1,4 +1,5 @@
 import QtQuick 2.15
+import QtQuick.Shapes 1.15
 
 Item {
     id: root
@@ -6,202 +7,168 @@ Item {
     property bool scared: false
     property bool lowEffectMode: false
     property real headRadius: 11.5
-    readonly property bool embeddedSafeMode: Qt.platform.os === "linux"
 
-    readonly property real padding: Math.max(8, headRadius * 1.05)
-    readonly property real canvasExtent: Math.ceil((headRadius + padding) * 2)
+    readonly property real padding: Math.max(6, headRadius * 0.36)
+    readonly property real badgeExtent: Math.ceil((headRadius + padding) * 2)
+    readonly property color faceColor: Qt.color("#FFD84A")
+    readonly property color faceEdge: Qt.color("#4A2300")
+    readonly property color inkColor: Qt.color("#070A0F")
+    readonly property color tearColor: Qt.color("#63C9FF")
 
-    width: canvasExtent
-    height: canvasExtent
+    width: badgeExtent
+    height: badgeExtent
     visible: headRadius > 0.1
 
-    // Keep the production Linux target visible, but avoid the extra FBO layer on EGLFS/KMS.
-    layer.enabled: visible && !embeddedSafeMode
-    layer.smooth: true
-
-    function requestHeadPaint() {
-        canvas.requestPaint()
+    Rectangle {
+        anchors.centerIn: parent
+        width: root.headRadius * 2.58
+        height: width
+        radius: width / 2
+        color: root.scared ? "#FF394A" : root.faceColor
+        opacity: root.lowEffectMode ? 0.16 : 0.24
     }
 
-    onScaredChanged: requestHeadPaint()
-    onHeadRadiusChanged: requestHeadPaint()
-    onLowEffectModeChanged: requestHeadPaint()
+    Rectangle {
+        id: face
+        anchors.centerIn: parent
+        width: root.headRadius * 2
+        height: width
+        radius: width / 2
+        color: root.faceColor
+        border.width: Math.max(1.2, root.headRadius * 0.12)
+        border.color: root.faceEdge
 
-    Component.onCompleted: requestHeadPaint()
+        Rectangle {
+            width: parent.width * 0.42
+            height: parent.height * 0.18
+            x: parent.width * 0.12
+            y: parent.height * 0.27
+            radius: height * 0.34
+            visible: !root.scared
+            color: root.inkColor
+        }
 
-    Canvas {
-        id: canvas
-        anchors.fill: parent
-        antialiasing: true
-        smooth: true
-        renderTarget: root.embeddedSafeMode ? Canvas.Image : Canvas.FramebufferObject
+        Rectangle {
+            width: parent.width * 0.42
+            height: parent.height * 0.18
+            x: parent.width * 0.46
+            y: parent.height * 0.27
+            radius: height * 0.34
+            visible: !root.scared
+            color: root.inkColor
+        }
 
-        onPaint: {
-            const ctx = getContext("2d")
-            ctx.clearRect(0, 0, width, height)
+        Rectangle {
+            width: parent.width * 0.20
+            height: Math.max(1.2, parent.height * 0.055)
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: parent.height * 0.34
+            radius: height / 2
+            visible: !root.scared
+            color: root.inkColor
+        }
 
-            const size = root.headRadius
-            const cx = width / 2
-            const cy = height / 2
-
-            function rgba(color, alpha) {
-                return "rgba("
-                    + Math.round(color.r * 255) + ","
-                    + Math.round(color.g * 255) + ","
-                    + Math.round(color.b * 255) + ","
-                    + alpha + ")"
+        Shape {
+            width: parent.width * 0.74
+            height: parent.height * 0.36
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: parent.height * 0.43
+            visible: !root.scared
+            ShapePath {
+                fillColor: "transparent"
+                strokeColor: root.faceEdge
+                strokeWidth: Math.max(1.2, root.headRadius * 0.13)
+                capStyle: ShapePath.RoundCap
+                startX: parent.width * 0.18
+                startY: parent.height * 0.42
+                PathCubic {
+                    control1X: parent.width * 0.32
+                    control1Y: parent.height * 0.78
+                    control2X: parent.width * 0.68
+                    control2Y: parent.height * 0.78
+                    x: parent.width * 0.82
+                    y: parent.height * 0.42
+                }
             }
+        }
 
-            function roundedRect(x, y, w, h, radius) {
-                ctx.beginPath()
-                ctx.moveTo(x + radius, y)
-                ctx.lineTo(x + w - radius, y)
-                ctx.quadraticCurveTo(x + w, y, x + w, y + radius)
-                ctx.lineTo(x + w, y + h - radius)
-                ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h)
-                ctx.lineTo(x + radius, y + h)
-                ctx.quadraticCurveTo(x, y + h, x, y + h - radius)
-                ctx.lineTo(x, y + radius)
-                ctx.quadraticCurveTo(x, y, x + radius, y)
-                ctx.closePath()
+        Rectangle {
+            width: parent.width * 0.40
+            height: Math.max(1.2, parent.height * 0.065)
+            x: parent.width * 0.14
+            y: parent.height * 0.22
+            radius: height / 2
+            visible: root.scared
+            color: root.faceEdge
+            rotation: 17
+        }
+
+        Rectangle {
+            width: parent.width * 0.40
+            height: Math.max(1.2, parent.height * 0.065)
+            x: parent.width * 0.46
+            y: parent.height * 0.22
+            radius: height / 2
+            visible: root.scared
+            color: root.faceEdge
+            rotation: -17
+        }
+
+        Rectangle {
+            width: parent.width * 0.24
+            height: width
+            radius: width / 2
+            x: parent.width * 0.22
+            y: parent.height * 0.33
+            visible: root.scared
+            color: "#FFFFFF"
+
+            Rectangle {
+                anchors.centerIn: parent
+                width: parent.width * 0.42
+                height: width
+                radius: width / 2
+                color: root.inkColor
             }
+        }
 
-            function drawSunglassesHead() {
-                const face = Qt.color("#FFD54A")
-                const outline = Qt.color("#4A2300")
-                const lens = Qt.color("#070A0F")
-                const shine = Qt.color("#FFFFFF")
+        Rectangle {
+            width: parent.width * 0.24
+            height: width
+            radius: width / 2
+            x: parent.width * 0.54
+            y: parent.height * 0.33
+            visible: root.scared
+            color: "#FFFFFF"
 
-                ctx.save()
-                ctx.translate(cx, cy)
-
-                ctx.shadowColor = rgba(face, root.lowEffectMode ? 0.28 : 0.34)
-                ctx.shadowBlur = size * (root.lowEffectMode ? 0.50 : 0.70)
-
-                const faceGrad = ctx.createRadialGradient(-size * 0.26, -size * 0.34, size * 0.10, 0, 0, size)
-                faceGrad.addColorStop(0.00, "rgba(255,255,255,0.78)")
-                faceGrad.addColorStop(0.18, "rgba(255,230,102,1.00)")
-                faceGrad.addColorStop(1.00, "rgba(244,156,28,1.00)")
-                ctx.fillStyle = faceGrad
-                ctx.beginPath()
-                ctx.arc(0, 0, size, 0, Math.PI * 2)
-                ctx.fill()
-
-                ctx.shadowBlur = 0
-                ctx.strokeStyle = rgba(outline, 0.44)
-                ctx.lineWidth = Math.max(1.2, size * 0.10)
-                ctx.stroke()
-
-                ctx.fillStyle = rgba(lens, 0.94)
-                roundedRect(-size * 0.72, -size * 0.34, size * 0.58, size * 0.36, size * 0.10)
-                ctx.fill()
-                roundedRect(size * 0.14, -size * 0.34, size * 0.58, size * 0.36, size * 0.10)
-                ctx.fill()
-
-                ctx.strokeStyle = rgba(lens, 0.94)
-                ctx.lineWidth = Math.max(1.2, size * 0.11)
-                ctx.lineCap = "round"
-                ctx.beginPath()
-                ctx.moveTo(-size * 0.14, -size * 0.18)
-                ctx.lineTo(size * 0.14, -size * 0.18)
-                ctx.stroke()
-
-                ctx.strokeStyle = rgba(shine, 0.42)
-                ctx.lineWidth = Math.max(0.8, size * 0.055)
-                ctx.beginPath()
-                ctx.moveTo(-size * 0.60, -size * 0.26)
-                ctx.lineTo(-size * 0.38, -size * 0.18)
-                ctx.moveTo(size * 0.26, -size * 0.26)
-                ctx.lineTo(size * 0.48, -size * 0.18)
-                ctx.stroke()
-
-                ctx.strokeStyle = rgba(outline, 0.68)
-                ctx.lineWidth = Math.max(1.2, size * 0.12)
-                ctx.beginPath()
-                ctx.arc(0, size * 0.12, size * 0.43, Math.PI * 0.18, Math.PI * 0.82)
-                ctx.stroke()
-                ctx.restore()
+            Rectangle {
+                anchors.centerIn: parent
+                width: parent.width * 0.42
+                height: width
+                radius: width / 2
+                color: root.inkColor
             }
+        }
 
-            function drawScaredHead() {
-                const face = Qt.color("#FFD54A")
-                const outline = Qt.color("#4A2300")
-                const eye = Qt.color("#FFFFFF")
-                const dark = Qt.color("#071018")
-                const blue = Qt.color("#63C9FF")
+        Rectangle {
+            width: parent.width * 0.28
+            height: parent.height * 0.34
+            radius: width / 2
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: parent.height * 0.56
+            visible: root.scared
+            color: root.inkColor
+        }
 
-                ctx.save()
-                ctx.translate(cx, cy)
-
-                ctx.shadowColor = rgba(face, root.lowEffectMode ? 0.28 : 0.34)
-                ctx.shadowBlur = size * (root.lowEffectMode ? 0.50 : 0.70)
-
-                const faceGrad = ctx.createRadialGradient(-size * 0.24, -size * 0.32, size * 0.10, 0, 0, size)
-                faceGrad.addColorStop(0.00, "rgba(255,255,255,0.78)")
-                faceGrad.addColorStop(0.20, "rgba(255,231,102,1.00)")
-                faceGrad.addColorStop(1.00, "rgba(244,156,28,1.00)")
-                ctx.fillStyle = faceGrad
-                ctx.beginPath()
-                ctx.arc(0, 0, size, 0, Math.PI * 2)
-                ctx.fill()
-
-                ctx.shadowBlur = 0
-                ctx.strokeStyle = rgba(outline, 0.44)
-                ctx.lineWidth = Math.max(1.2, size * 0.10)
-                ctx.stroke()
-
-                ctx.fillStyle = rgba(blue, 0.34)
-                ctx.beginPath()
-                ctx.arc(0, -size * 0.18, size * 0.78, Math.PI * 1.05, Math.PI * 1.95)
-                ctx.fill()
-
-                ctx.strokeStyle = rgba(outline, 0.70)
-                ctx.lineWidth = Math.max(1.0, size * 0.08)
-                ctx.lineCap = "round"
-                ctx.beginPath()
-                ctx.moveTo(-size * 0.56, -size * 0.42)
-                ctx.lineTo(-size * 0.20, -size * 0.30)
-                ctx.moveTo(size * 0.56, -size * 0.42)
-                ctx.lineTo(size * 0.20, -size * 0.30)
-                ctx.stroke()
-
-                ctx.fillStyle = rgba(eye, 0.98)
-                ctx.beginPath()
-                ctx.arc(-size * 0.34, -size * 0.14, size * 0.23, 0, Math.PI * 2)
-                ctx.arc(size * 0.34, -size * 0.14, size * 0.23, 0, Math.PI * 2)
-                ctx.fill()
-
-                ctx.fillStyle = rgba(dark, 0.96)
-                ctx.beginPath()
-                ctx.arc(-size * 0.34, -size * 0.10, size * 0.095, 0, Math.PI * 2)
-                ctx.arc(size * 0.34, -size * 0.10, size * 0.095, 0, Math.PI * 2)
-                ctx.fill()
-
-                ctx.save()
-                ctx.translate(0, size * 0.36)
-                ctx.scale(0.72, 1.0)
-                ctx.fillStyle = rgba(dark, 0.94)
-                ctx.beginPath()
-                ctx.arc(0, 0, size * 0.28, 0, Math.PI * 2)
-                ctx.fill()
-                ctx.restore()
-
-                ctx.fillStyle = rgba(blue, 0.74)
-                ctx.beginPath()
-                ctx.moveTo(size * 0.66, -size * 0.12)
-                ctx.quadraticCurveTo(size * 0.92, size * 0.18, size * 0.64, size * 0.44)
-                ctx.quadraticCurveTo(size * 0.38, size * 0.18, size * 0.66, -size * 0.12)
-                ctx.fill()
-                ctx.restore()
-            }
-
-            if (root.scared)
-                drawScaredHead()
-            else
-                drawSunglassesHead()
-
-            if (typeof performanceMetrics !== "undefined" && performanceMetrics)
-                performanceMetrics.recordPaint("gauge.arcHead")
+        Rectangle {
+            width: parent.width * 0.18
+            height: parent.height * 0.28
+            radius: width / 2
+            x: parent.width * 0.72
+            y: parent.height * 0.47
+            visible: root.scared
+            color: root.tearColor
+            rotation: -18
         }
     }
 }

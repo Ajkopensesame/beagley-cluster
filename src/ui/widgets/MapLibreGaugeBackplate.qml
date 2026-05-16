@@ -21,6 +21,9 @@ Item {
     property bool showArcHeads: true
     property bool primaryScared: false
     property bool auxScared: false
+    property bool matrixRainVisible: false
+    property color matrixRainColor: theme?.pearlLow ?? Qt.color("#C7B7FF")
+    property real matrixPhase: 0
 
     readonly property real startAngleDeg: 225
     readonly property real sweepAngleDeg: 210
@@ -32,8 +35,8 @@ Item {
     readonly property real clampedAux: clamp(auxProgress, 0, 1)
     readonly property real primaryHeadDeg: startAngleDeg + sweepAngleDeg * clampedPrimary
     readonly property real auxHeadDeg: auxStartDeg + auxSweepDeg * clampedAux
-    readonly property real primaryHeadRadius: Math.max(14, width * 0.026)
-    readonly property real auxHeadRadius: Math.max(12, width * 0.022)
+    readonly property real primaryHeadRadius: Math.max(26, width * 0.043)
+    readonly property real auxHeadRadius: Math.max(24, width * 0.038)
     readonly property color chromeColor: theme?.pearlLow ?? Qt.color("#C7B7FF")
     readonly property color textColor: theme?.text ?? Qt.color("#F7FBFF")
 
@@ -57,6 +60,18 @@ Item {
         return String(Math.round(value / Math.max(1e-6, labelDivisor)))
     }
 
+    function matrixGlyph(seed) {
+        const glyphs = ["0", "1", "0", "1", "7", "K", "M", "R", "A", "N"]
+        return glyphs[Math.abs(seed) % glyphs.length]
+    }
+
+    Timer {
+        interval: 360
+        running: root.matrixRainVisible
+        repeat: true
+        onTriggered: root.matrixPhase += 1
+    }
+
     Rectangle {
         anchors.centerIn: parent
         width: parent.width * 0.996
@@ -67,6 +82,42 @@ Item {
         opacity: 0.96
         border.width: Math.max(2, width * 0.004)
         border.color: Qt.rgba(root.chromeColor.r, root.chromeColor.g, root.chromeColor.b, 0.16)
+    }
+
+    Item {
+        anchors.fill: parent
+        z: -1
+        visible: root.matrixRainVisible
+        opacity: 0.58
+
+        Repeater {
+            model: 72
+
+            delegate: Text {
+                readonly property int col: index % 9
+                readonly property int row: Math.floor(index / 9)
+                readonly property real phase: root.matrixPhase * 0.66 + index * 0.71
+                readonly property real px: root.width * (0.18 + col * 0.078 + 0.010 * Math.sin(phase))
+                readonly property real py: root.height * (0.18 + row * 0.078 + 0.006 * ((root.matrixPhase + col * 2) % 5))
+                readonly property real dx: px - root.width / 2
+                readonly property real dy: py - root.height / 2
+                readonly property real maskR: root.width * 0.31
+
+                visible: dx * dx + dy * dy < maskR * maskR
+                x: px
+                y: py
+                width: 24
+                height: 24
+                text: root.matrixGlyph(index + Math.floor(root.matrixPhase))
+                color: root.matrixRainColor
+                opacity: 0.22 + 0.38 * (0.5 + 0.5 * Math.sin(phase))
+                font.family: root.theme?.fontMono ?? "monospace"
+                font.pixelSize: Math.max(15, root.width * 0.024)
+                font.bold: true
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+            }
+        }
     }
 
     Shape {
