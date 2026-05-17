@@ -367,7 +367,7 @@ QSGNode *NativeGaugeInstrumentItem::updatePaintNode(QSGNode *oldNode, UpdatePain
                    stroke * (major ? 0.18 : 0.115));
     }
 
-    setGeometry(node->background, backgroundVertices, QColor(QStringLiteral("#010309")));
+    setGeometry(node->background, backgroundVertices, withAlpha(QColor(QStringLiteral("#010309")), 254));
     setGeometry(node->track, trackVertices, withAlpha(m_chromeColor, m_lowEffectMode ? 48 : 62));
     setGeometry(node->auxTrack, auxTrackVertices, withAlpha(m_chromeColor, m_lowEffectMode ? 44 : 58));
     setGeometry(node->ticks, tickVertices, withAlpha(m_chromeColor, m_lowEffectMode ? 132 : 160));

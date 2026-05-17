@@ -1215,9 +1215,9 @@ Window {
                 width: root.gaugeFaceSize + 18
                 height: width
                 radius: width / 2
-                z: 0
+                z: root.mapLibreSafeCompositor ? 110 : 0
                 visible: root.mapLibreSafeCompositor
-                color: "#010309"
+                color: "#010309FE"
             }
 
             NativeGaugeInstrument {
@@ -1225,7 +1225,7 @@ Window {
                 anchors.centerIn: parent
                 width: root.gaugeFaceSize
                 height: root.gaugeFaceSize
-                z: 20
+                z: root.mapLibreSafeCompositor ? 120 : 20
                 kind: "speed"
                 value: root.displaySpeedValue
                 maxValue: 140
@@ -1238,7 +1238,7 @@ Window {
 
             Item {
                 anchors.fill: speedGauge
-                z: 30
+                z: root.mapLibreSafeCompositor ? 130 : 30
 
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
@@ -1367,9 +1367,9 @@ Window {
                 width: root.gaugeFaceSize + 18
                 height: width
                 radius: width / 2
-                z: 0
+                z: root.mapLibreSafeCompositor ? 110 : 0
                 visible: root.mapLibreSafeCompositor
-                color: "#010309"
+                color: "#010309FE"
             }
 
             NativeGaugeInstrument {
@@ -1377,7 +1377,7 @@ Window {
                 anchors.centerIn: parent
                 width: root.gaugeFaceSize
                 height: root.gaugeFaceSize
-                z: 20
+                z: root.mapLibreSafeCompositor ? 120 : 20
                 kind: "tach"
                 value: root.displayRpmValue
                 maxValue: 8000
@@ -1390,7 +1390,7 @@ Window {
 
             Item {
                 anchors.fill: tachGauge
-                z: 30
+                z: root.mapLibreSafeCompositor ? 130 : 30
 
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
