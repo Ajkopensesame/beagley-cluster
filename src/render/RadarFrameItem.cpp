@@ -168,13 +168,16 @@ QImage renderRadarFrameImage(const QImage &source,
                              bool guidesVisible)
 {
     QImage output(targetSize, QImage::Format_ARGB32_Premultiplied);
-    output.fill(backgroundVisible ? QColor(3, 4, 10) : Qt::transparent);
+    output.fill(circular ? Qt::transparent : (backgroundVisible ? QColor(3, 4, 10) : Qt::transparent));
 
     QPainter painter(&output);
     if (circular) {
         QPainterPath path;
         path.addEllipse(QRectF(0, 0, targetSize.width(), targetSize.height()));
         painter.setClipPath(path);
+    }
+    if (circular && backgroundVisible) {
+        painter.fillRect(QRectF(0, 0, targetSize.width(), targetSize.height()), QColor(3, 4, 10));
     }
     if (guidesVisible) {
         drawRadarGuides(painter, targetSize);

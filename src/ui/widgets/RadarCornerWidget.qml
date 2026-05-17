@@ -28,24 +28,21 @@ Item {
         effectLevel: root.effectLevel
         active: root.live
 
-        Rectangle {
+        Item {
             id: radarFace
             anchors.fill: parent
             anchors.margins: frame.faceInset
-            radius: width / 2
-            color: "#010307"
-            clip: true
 
             RadarFrameItem {
                 id: radarPreview
                 anchors.fill: parent
-                anchors.margins: -Math.round(parent.width * 0.12)
+                anchors.margins: 0
                 source: root.frameReady ? root.frameUrl : ""
                 circular: true
-                backgroundVisible: false
+                backgroundVisible: true
                 guidesVisible: true
                 visible: ready
-                opacity: 0.96
+                opacity: 1.0
             }
 
             Rectangle {
