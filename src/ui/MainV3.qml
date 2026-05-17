@@ -211,6 +211,12 @@ Window {
             text = "0" + text
         return text
     }
+    function formatSpeedValue(value) {
+        return String(Math.max(0, Math.round(Number(value) || 0)))
+    }
+    function formatRpmValue(value) {
+        return (Math.max(0, Math.round((Number(value) || 0) / 100)) / 10).toFixed(1)
+    }
     readonly property int indicatorVisualHoldMs: clusterSimulation ? 450 : 1850
     readonly property int simulationIndicatorStep: Math.floor(clusterSimulationDiscretePhase / 1.8) % 4
     readonly property bool rawLeftIndicator: clusterSimulation
@@ -1228,11 +1234,102 @@ Window {
                 auxColor: root.displayCoolantValue >= 100 ? appTheme.danger : (root.displayCoolantValue < 40 ? "#63C9FF" : appTheme.pearlLow)
                 chromeColor: appTheme.pearlLow
                 lowEffectMode: root.gaugeLowEffectMode
-                centerText: root.displayGearValue
-                statusText: root.displayOverdriveValue ? "O/D" : ""
-                bottomText: root.displayOdometerText
-                bottomSubText: "KM"
-                overdrive: root.displayOverdriveValue
+            }
+
+            Item {
+                anchors.fill: speedGauge
+                z: 30
+
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.top: parent.top
+                    anchors.topMargin: parent.height * 0.18
+                    text: root.displayGearValue
+                    color: appTheme.speedColor(root.displaySpeedValue)
+                    font.family: "Oxanium"
+                    font.pixelSize: parent.width * 0.072
+                    font.bold: true
+                    renderType: root.menuTextRenderType
+                    horizontalAlignment: Text.AlignHCenter
+                }
+
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.verticalCenterOffset: -parent.height * 0.030
+                    text: root.formatSpeedValue(root.displaySpeedValue)
+                    color: "#F6F0FF"
+                    font.family: "Oxanium"
+                    font.pixelSize: parent.width * 0.160
+                    font.bold: true
+                    renderType: root.menuTextRenderType
+                    horizontalAlignment: Text.AlignHCenter
+                }
+
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.top: parent.verticalCenter
+                    anchors.topMargin: parent.height * 0.052
+                    text: "KPH"
+                    color: appTheme.pearlLow
+                    opacity: 0.82
+                    font.family: "Oxanium"
+                    font.pixelSize: parent.width * 0.040
+                    font.bold: true
+                    renderType: root.menuTextRenderType
+                    horizontalAlignment: Text.AlignHCenter
+                }
+
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.top: parent.verticalCenter
+                    anchors.topMargin: parent.height * 0.155
+                    text: root.displayOdometerText
+                    color: appTheme.pearlLow
+                    opacity: 0.86
+                    font.family: "Oxanium"
+                    font.pixelSize: parent.width * 0.034
+                    font.bold: true
+                    renderType: root.menuTextRenderType
+                    horizontalAlignment: Text.AlignHCenter
+                }
+
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.top: parent.verticalCenter
+                    anchors.topMargin: parent.height * 0.245
+                    text: root.displayOverdriveValue ? "O/D" : ""
+                    color: appTheme.speedColor(root.displaySpeedValue)
+                    font.family: "Oxanium"
+                    font.pixelSize: parent.width * 0.034
+                    font.bold: true
+                    renderType: root.menuTextRenderType
+                    horizontalAlignment: Text.AlignHCenter
+                }
+
+                Text {
+                    x: parent.width * 0.205
+                    y: parent.height * 0.662
+                    text: "C"
+                    color: appTheme.pearlLow
+                    opacity: 0.66
+                    font.family: "Oxanium"
+                    font.pixelSize: parent.width * 0.028
+                    font.bold: true
+                    renderType: root.menuTextRenderType
+                }
+
+                Text {
+                    x: parent.width * 0.765
+                    y: parent.height * 0.662
+                    text: "H"
+                    color: appTheme.pearlLow
+                    opacity: 0.66
+                    font.family: "Oxanium"
+                    font.pixelSize: parent.width * 0.028
+                    font.bold: true
+                    renderType: root.menuTextRenderType
+                }
             }
 
             W.GaugeChevronOrbit {
@@ -1289,9 +1386,123 @@ Window {
                 auxColor: root.displayFuelValue <= 12 ? appTheme.danger : appTheme.pearlLow
                 chromeColor: appTheme.pearlLow
                 lowEffectMode: root.gaugeLowEffectMode
-                centerText: "DRIVE"
-                driveModeText: root.displayDriveModeText
-                highBeam: root.displayHighBeamValue
+            }
+
+            Item {
+                anchors.fill: tachGauge
+                z: 30
+
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.top: parent.top
+                    anchors.topMargin: parent.height * 0.185
+                    text: "DRIVE"
+                    color: appTheme.pearlLow
+                    opacity: 0.82
+                    font.family: "Oxanium"
+                    font.pixelSize: parent.width * 0.038
+                    font.bold: true
+                    renderType: root.menuTextRenderType
+                    horizontalAlignment: Text.AlignHCenter
+                }
+
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.verticalCenterOffset: -parent.height * 0.030
+                    text: root.formatRpmValue(root.displayRpmValue)
+                    color: "#F6F0FF"
+                    font.family: "Oxanium"
+                    font.pixelSize: parent.width * 0.145
+                    font.bold: true
+                    renderType: root.menuTextRenderType
+                    horizontalAlignment: Text.AlignHCenter
+                }
+
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.top: parent.verticalCenter
+                    anchors.topMargin: parent.height * 0.052
+                    text: "RPM x1000"
+                    color: appTheme.pearlLow
+                    opacity: 0.82
+                    font.family: "Oxanium"
+                    font.pixelSize: parent.width * 0.037
+                    font.bold: true
+                    renderType: root.menuTextRenderType
+                    horizontalAlignment: Text.AlignHCenter
+                }
+
+                Rectangle {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.top: parent.verticalCenter
+                    anchors.topMargin: parent.height * 0.162
+                    width: parent.width * 0.245
+                    height: Math.max(3, parent.height * 0.006)
+                    radius: height / 2
+                    color: appTheme.pearlLow
+                    opacity: 0.46
+                }
+
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.top: parent.verticalCenter
+                    anchors.topMargin: parent.height * 0.186
+                    text: root.displayDriveModeText
+                    color: appTheme.rpmColor(root.displayRpmValue)
+                    font.family: "Oxanium"
+                    font.pixelSize: parent.width * 0.036
+                    font.bold: true
+                    renderType: root.menuTextRenderType
+                    horizontalAlignment: Text.AlignHCenter
+                }
+
+                Rectangle {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.top: parent.verticalCenter
+                    anchors.topMargin: parent.height * 0.262
+                    width: parent.width * 0.086
+                    height: width
+                    radius: width / 2
+                    visible: root.displayHighBeamValue
+                    color: "#143642"
+                    border.width: Math.max(2, parent.width * 0.005)
+                    border.color: "#59D8FF"
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "HI"
+                        color: "#C7F3FF"
+                        font.family: "Oxanium"
+                        font.pixelSize: parent.width * 0.36
+                        font.bold: true
+                        renderType: root.menuTextRenderType
+                    }
+                }
+
+                Text {
+                    x: parent.width * 0.205
+                    y: parent.height * 0.662
+                    text: "E"
+                    color: appTheme.pearlLow
+                    opacity: 0.66
+                    font.family: "Oxanium"
+                    font.pixelSize: parent.width * 0.028
+                    font.bold: true
+                    renderType: root.menuTextRenderType
+                }
+
+                Text {
+                    x: parent.width * 0.765
+                    y: parent.height * 0.662
+                    text: "F"
+                    color: appTheme.pearlLow
+                    opacity: 0.66
+                    font.family: "Oxanium"
+                    font.pixelSize: parent.width * 0.028
+                    font.bold: true
+                    renderType: root.menuTextRenderType
+                }
             }
 
             W.GaugeChevronOrbit {
