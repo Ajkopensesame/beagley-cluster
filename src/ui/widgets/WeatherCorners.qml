@@ -63,10 +63,10 @@ Item {
         ? String(nowPlayingService.statusDetail)
         : "Spotify not connected"
     readonly property int weatherRefreshIntervalMs: expandedMode === "temp"
-        ? (lowEffectMode ? 12 * 60 * 1000 : 8 * 60 * 1000)
-        : 30 * 60 * 1000
+        ? 5 * 60 * 1000
+        : 8 * 60 * 1000
     readonly property int forecastRefreshIntervalMs: expandedMode === "temp"
-        ? 45 * 60 * 1000
+        ? 30 * 60 * 1000
         : 2 * 60 * 60 * 1000
     readonly property int radarRefreshIntervalMs: 60 * 1000
     readonly property real radarMapZoom: 7.0
@@ -274,6 +274,15 @@ Item {
             return "TODAY"
         if (index === 1)
             return "TOMORROW"
+        const date = parseIsoDay(value)
+        return date ? Qt.formatDate(date, "ddd").toUpperCase() : "--"
+    }
+
+    function forecastCompactDayLabel(value, index) {
+        if (index === 0)
+            return "TODAY"
+        if (index === 1)
+            return "TMRW"
         const date = parseIsoDay(value)
         return date ? Qt.formatDate(date, "ddd").toUpperCase() : "--"
     }
@@ -619,7 +628,7 @@ Item {
             + "&longitude=" + Number(lngValue).toFixed(5)
             + "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max"
             + "&timezone=auto"
-            + "&forecast_days=5"
+            + "&forecast_days=7"
             + "&beagley=" + cacheBucket(forecastRefreshIntervalMs)
     }
 
@@ -703,7 +712,7 @@ Item {
         const lows = daily.temperature_2m_min || []
         const rain = daily.precipitation_probability_max || []
         const rows = []
-        const count = Math.min(5, times.length)
+        const count = Math.min(7, times.length)
 
         for (var i = 0; i < count; ++i) {
             const high = Number(highs[i])
@@ -712,6 +721,7 @@ Item {
                 continue
             const rainPct = Number(rain[i])
             rows.push({
+                date: times[i],
                 day: forecastDayLabel(times[i], i),
                 label: forecastConditionLabel(codes[i]),
                 high: isFinite(high) ? Math.round(high) : null,
@@ -829,7 +839,6 @@ Item {
         triggeredOnStart: false
         onTriggered: {
             root.refreshWeather()
-            root.refreshForecast()
         }
     }
 
@@ -1014,7 +1023,7 @@ Item {
                 ? Math.floor(Math.min(620, Math.max(500, parent.width * 0.38)))
                 : Math.floor(Math.min(452, Math.max(332, parent.width * 0.35)))
             height: root.expandedMode === "temp"
-                ? 330
+                ? 430
                 : root.tallDetailMode
                 ? Math.floor(Math.min(parent.height - 44, Math.max(560, parent.height * 0.92)))
                 : Math.floor(Math.min(360, Math.max(272, parent.height * 0.46)))
@@ -1394,12 +1403,11 @@ Item {
                     Row {
                         width: parent.width
                         height: 22
-                        visible: root.tallDetailMode
 
                         Text {
                             width: parent.width * 0.54
                             anchors.verticalCenter: parent.verticalCenter
-                            text: "THIS WEEK"
+                            text: "7 DAYS"
                             color: "#F7FBFF"
                             font.family: root.monoFont
                             font.pixelSize: 14
@@ -1421,18 +1429,18 @@ Item {
                         }
                     }
 
-                    Column {
-                        id: forecastList
+                    Row {
+                        id: forecastStrip
                         width: parent.width
-                        spacing: 0
-                        visible: root.tallDetailMode
+                        height: 78
+                        spacing: 6
 
                         Repeater {
                             model: root.forecastRows
 
                             Item {
-                                width: forecastList.width
-                                height: 43
+                                width: (forecastStrip.width - forecastStrip.spacing * 6) / 7
+                                height: forecastStrip.height
 
                                 NativePanel {
                                     anchors.fill: parent
@@ -1441,83 +1449,57 @@ Item {
                                     borderWidth: 1
                                 }
 
-                                Row {
+                                Column {
                                     anchors.fill: parent
-                                    anchors.leftMargin: 8
-                                    anchors.rightMargin: 8
-                                    spacing: 8
-
-                                    WeatherMoodIcon {
-                                        width: 30
-                                        height: 30
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        kind: root.weatherKind(modelData.label)
-                                        primaryColor: "#FFD36B"
-                                        secondaryColor: "#58FFE1"
-                                    }
+                                    anchors.margins: 6
+                                    spacing: 1
 
                                     Text {
-                                        width: 68
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        text: modelData.day
+                                        width: parent.width
+                                        text: root.forecastCompactDayLabel(modelData.date, index)
                                         color: index === 0 ? "#58FFE1" : "#F7FBFF"
                                         font.family: root.monoFont
-                                        font.pixelSize: 13
+                                        font.pixelSize: 10
                                         font.weight: Font.Bold
                                         font.letterSpacing: 0
+                                        horizontalAlignment: Text.AlignHCenter
                                         elide: Text.ElideRight
                                     }
 
-                                    Column {
-                                        width: parent.width - 224
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        spacing: 1
-
-                                        Text {
-                                            width: parent.width
-                                            text: modelData.label
-                                            color: "#F7FBFF"
-                                            font.family: root.monoFont
-                                            font.pixelSize: 13
-                                            font.weight: Font.Bold
-                                            font.letterSpacing: 0
-                                            elide: Text.ElideRight
-                                        }
-
-                                        Text {
-                                            width: parent.width
-                                            text: root.rainShortLine(modelData.rain) + " rain"
-                                            color: "#9DB4FF"
-                                            font.family: root.monoFont
-                                            font.pixelSize: 10
-                                            font.weight: Font.Bold
-                                            font.letterSpacing: 0
-                                            elide: Text.ElideRight
-                                        }
-                                    }
-
                                     Text {
-                                        width: 62
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        text: (modelData.high !== null ? modelData.high : "--") + "\u00B0/" + (modelData.low !== null ? modelData.low : "--") + "\u00B0"
+                                        width: parent.width
+                                        text: (modelData.high !== null ? modelData.high : "--") + "/" + (modelData.low !== null ? modelData.low : "--")
                                         color: "#F7FBFF"
                                         font.family: root.displayFont
-                                        font.pixelSize: 17
+                                        font.pixelSize: 18
                                         font.weight: Font.Bold
                                         font.letterSpacing: 0
-                                        horizontalAlignment: Text.AlignRight
+                                        horizontalAlignment: Text.AlignHCenter
+                                        elide: Text.ElideRight
                                     }
 
                                     Text {
-                                        width: 40
-                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: parent.width
+                                        text: modelData.label
+                                        color: "#9DB4FF"
+                                        font.family: root.monoFont
+                                        font.pixelSize: 8
+                                        font.weight: Font.Bold
+                                        font.letterSpacing: 0
+                                        horizontalAlignment: Text.AlignHCenter
+                                        elide: Text.ElideRight
+                                    }
+
+                                    Text {
+                                        width: parent.width
                                         text: modelData.rain !== null ? modelData.rain + "%" : "--%"
                                         color: "#FFD36B"
                                         font.family: root.monoFont
-                                        font.pixelSize: 12
+                                        font.pixelSize: 10
                                         font.weight: Font.Bold
                                         font.letterSpacing: 0
-                                        horizontalAlignment: Text.AlignRight
+                                        horizontalAlignment: Text.AlignHCenter
+                                        elide: Text.ElideRight
                                     }
                                 }
                             }
@@ -1525,6 +1507,7 @@ Item {
 
                         Text {
                             width: parent.width
+                            anchors.verticalCenter: parent.verticalCenter
                             visible: root.forecastRows.length === 0
                             text: root.forecastStatus
                             color: "#FFD36B"
