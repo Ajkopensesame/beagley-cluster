@@ -25,6 +25,7 @@ Item {
 
     // Heartbeat pulse
     property bool heartbeat: true
+    property real flashOpacity: 1.0
 
     // Base brightness
     property real glowOpacity: 0.80
@@ -51,7 +52,7 @@ Item {
     readonly property bool _shown: active || _latched
 
     // Fade in/out (but don't instantly drop)
-    opacity: _shown ? 1.0 : 0.0
+    opacity: _shown ? (heartbeat ? flashOpacity : 1.0) : 0.0
     visible: opacity > 0.001
     layer.enabled: visible && !root.embeddedSafeMode
     layer.smooth: !root.embeddedSafeMode
@@ -72,38 +73,36 @@ Item {
         running: root.heartbeat && root._shown
         loops: Animation.Infinite
 
-        // "lub"
         ParallelAnimation {
-            NumberAnimation { target: hbScale; property: "xScale"; to: 1.03; duration: 90 }
-            NumberAnimation { target: hbScale; property: "yScale"; to: 1.03; duration: 90 }
-            NumberAnimation { target: root; property: "opacity"; to: 1.0; duration: 90 }
+            NumberAnimation { target: hbScale; property: "xScale"; to: 1.035; duration: 120; easing.type: Easing.OutCubic }
+            NumberAnimation { target: hbScale; property: "yScale"; to: 1.035; duration: 120; easing.type: Easing.OutCubic }
+            NumberAnimation { target: root; property: "flashOpacity"; to: 1.0; duration: 120; easing.type: Easing.OutCubic }
         }
 
-        // quick relax
         ParallelAnimation {
-            NumberAnimation { target: hbScale; property: "xScale"; to: 1.00; duration: 110 }
-            NumberAnimation { target: hbScale; property: "yScale"; to: 1.00; duration: 110 }
-            NumberAnimation { target: root; property: "opacity"; to: 0.92; duration: 110 }
+            NumberAnimation { target: hbScale; property: "xScale"; to: 1.00; duration: 260; easing.type: Easing.InOutSine }
+            NumberAnimation { target: hbScale; property: "yScale"; to: 1.00; duration: 260; easing.type: Easing.InOutSine }
+            NumberAnimation { target: root; property: "flashOpacity"; to: 0.18; duration: 260; easing.type: Easing.InOutSine }
         }
 
-        PauseAnimation { duration: 170 }
-
-        // "dub"
         ParallelAnimation {
-            NumberAnimation { target: hbScale; property: "xScale"; to: 1.02; duration: 90 }
-            NumberAnimation { target: hbScale; property: "yScale"; to: 1.02; duration: 90 }
-            NumberAnimation { target: root; property: "opacity"; to: 0.98; duration: 90 }
+            NumberAnimation { target: hbScale; property: "xScale"; to: 1.035; duration: 180; easing.type: Easing.OutCubic }
+            NumberAnimation { target: hbScale; property: "yScale"; to: 1.035; duration: 180; easing.type: Easing.OutCubic }
+            NumberAnimation { target: root; property: "flashOpacity"; to: 1.0; duration: 180; easing.type: Easing.OutCubic }
         }
 
-        // relax again
         ParallelAnimation {
-            NumberAnimation { target: hbScale; property: "xScale"; to: 1.00; duration: 130 }
-            NumberAnimation { target: hbScale; property: "yScale"; to: 1.00; duration: 130 }
-            NumberAnimation { target: root; property: "opacity"; to: 0.90; duration: 130 }
+            NumberAnimation { target: hbScale; property: "xScale"; to: 1.00; duration: 300; easing.type: Easing.InOutSine }
+            NumberAnimation { target: hbScale; property: "yScale"; to: 1.00; duration: 300; easing.type: Easing.InOutSine }
+            NumberAnimation { target: root; property: "flashOpacity"; to: 0.18; duration: 300; easing.type: Easing.InOutSine }
         }
 
-        // gap between beats
-        PauseAnimation { duration: 420 }
+        PauseAnimation { duration: 220 }
+        onStopped: {
+            root.flashOpacity = 1.0
+            hbScale.xScale = 1.0
+            hbScale.yScale = 1.0
+        }
     }
 
     // Latch behavior: when active goes true, latch ON immediately.

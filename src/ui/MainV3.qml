@@ -168,6 +168,8 @@ Window {
     readonly property real fuelValue: truthOk && hub ? (hub.fuelPct || 0) : 0
     readonly property real coolantValue: truthOk && hub ? (hub.coolantC || 0) : 0
     readonly property bool gaugeReviewMode: gaugeDemo && !stressScene && !clusterSimulation
+    readonly property real gaugeAuxStartDeg: 87
+    readonly property real gaugeAuxSweepDeg: 126
     readonly property real displaySpeedValue: clusterSimulation
         ? simulationTriangle(clusterSimulationPhase, 8.0) * 140
         : (stressScene
@@ -193,8 +195,8 @@ Window {
         ? simulationGearSequence[Math.floor(clusterSimulationDiscretePhase / 1.25) % simulationGearSequence.length]
         : (gaugeReviewMode ? "D" : gearText)
     readonly property bool displayOverdriveValue: clusterSimulation
-        ? (Math.floor(clusterSimulationDiscretePhase / 2.6) % 2) === 0
-        : (gaugeReviewMode ? true : !!(hub && hub.overdrive))
+        ? (Math.floor(clusterSimulationDiscretePhase / 4.0) % 3) === 1
+        : (gaugeReviewMode ? false : truthOk && !!(hub && hub.overdrive))
     readonly property bool displayHighBeamValue: clusterSimulation
         ? (Math.floor(clusterSimulationDiscretePhase / 1.4) % 2) === 0
         : (gaugeReviewMode ? true : !!(hub && hub.highBeam))
@@ -1461,27 +1463,35 @@ Window {
                 }
 
                 Text {
-                    x: parent.width * 0.205
-                    y: parent.height * 0.662
+                    width: parent.width * 0.042
+                    height: parent.height * 0.034
+                    x: root.gaugePointX(parent.width, root.gaugeAuxStartDeg + root.gaugeAuxSweepDeg, parent.width * 0.36 + 24) - width / 2
+                    y: root.gaugePointY(parent.height, root.gaugeAuxStartDeg + root.gaugeAuxSweepDeg, parent.width * 0.36 + 24) - height / 2
                     text: "C"
                     color: appTheme.pearlLow
-                    opacity: 0.66
+                    opacity: 0.78
                     font.family: "Oxanium"
-                    font.pixelSize: parent.width * 0.028
+                    font.pixelSize: parent.width * 0.025
                     font.bold: true
                     renderType: root.menuTextRenderType
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
                 }
 
                 Text {
-                    x: parent.width * 0.765
-                    y: parent.height * 0.662
+                    width: parent.width * 0.042
+                    height: parent.height * 0.034
+                    x: root.gaugePointX(parent.width, root.gaugeAuxStartDeg, parent.width * 0.36 + 24) - width / 2
+                    y: root.gaugePointY(parent.height, root.gaugeAuxStartDeg, parent.width * 0.36 + 24) - height / 2
                     text: "H"
                     color: appTheme.pearlLow
-                    opacity: 0.66
+                    opacity: 0.78
                     font.family: "Oxanium"
-                    font.pixelSize: parent.width * 0.028
+                    font.pixelSize: parent.width * 0.025
                     font.bold: true
                     renderType: root.menuTextRenderType
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
                 }
             }
 
@@ -1490,7 +1500,7 @@ Window {
                 height: root.gaugeFaceSize
                 anchors.centerIn: parent
                 z: 240
-                visible: !root.gaugeEffectsOff
+                visible: root.displayLeftIndicator || !root.gaugeEffectsOff
                 active: root.displayLeftIndicator
                 side: "left"
                 simplified: root.gaugeLowEffectMode
@@ -1599,32 +1609,40 @@ Window {
                     ringThickness: 16
                     gapPx: 3
                     holdMs: 1100
-                    heartbeat: !root.gaugeEffectsOff
+                    heartbeat: true
                     active: root.displayHighBeamValue
                 }
 
                 Text {
-                    x: parent.width * 0.205
-                    y: parent.height * 0.662
+                    width: parent.width * 0.042
+                    height: parent.height * 0.034
+                    x: root.gaugePointX(parent.width, root.gaugeAuxStartDeg + root.gaugeAuxSweepDeg, parent.width * 0.36 + 24) - width / 2
+                    y: root.gaugePointY(parent.height, root.gaugeAuxStartDeg + root.gaugeAuxSweepDeg, parent.width * 0.36 + 24) - height / 2
                     text: "E"
                     color: appTheme.pearlLow
-                    opacity: 0.66
+                    opacity: 0.78
                     font.family: "Oxanium"
-                    font.pixelSize: parent.width * 0.028
+                    font.pixelSize: parent.width * 0.025
                     font.bold: true
                     renderType: root.menuTextRenderType
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
                 }
 
                 Text {
-                    x: parent.width * 0.765
-                    y: parent.height * 0.662
+                    width: parent.width * 0.042
+                    height: parent.height * 0.034
+                    x: root.gaugePointX(parent.width, root.gaugeAuxStartDeg, parent.width * 0.36 + 24) - width / 2
+                    y: root.gaugePointY(parent.height, root.gaugeAuxStartDeg, parent.width * 0.36 + 24) - height / 2
                     text: "F"
                     color: appTheme.pearlLow
-                    opacity: 0.66
+                    opacity: 0.78
                     font.family: "Oxanium"
-                    font.pixelSize: parent.width * 0.028
+                    font.pixelSize: parent.width * 0.025
                     font.bold: true
                     renderType: root.menuTextRenderType
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
                 }
             }
 
@@ -1633,7 +1651,7 @@ Window {
                 height: root.gaugeFaceSize
                 anchors.centerIn: parent
                 z: 240
-                visible: !root.gaugeEffectsOff
+                visible: root.displayRightIndicator || !root.gaugeEffectsOff
                 active: root.displayRightIndicator
                 side: "right"
                 simplified: root.gaugeLowEffectMode
