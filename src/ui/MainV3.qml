@@ -1317,9 +1317,9 @@ Window {
                         y: root.gaugePointY(parent.height, labelAngle, parent.height * 0.322) - height / 2
                         text: modelData.label
                         color: appTheme.pearlLow
-                        opacity: 0.94
+                        opacity: 0.84
                         font.family: "Oxanium"
-                        font.pixelSize: parent.width * 0.031
+                        font.pixelSize: parent.width * 0.0275
                         font.bold: true
                         renderType: root.menuTextRenderType
                         horizontalAlignment: Text.AlignHCenter
@@ -1471,9 +1471,9 @@ Window {
                     y: root.gaugePointY(parent.height, root.gaugeAuxStartDeg + root.gaugeAuxSweepDeg, parent.width * 0.36 + 24) - height / 2
                     text: "C"
                     color: appTheme.pearlLow
-                    opacity: 0.94
+                    opacity: 0.86
                     font.family: "Oxanium"
-                    font.pixelSize: parent.width * 0.031
+                    font.pixelSize: parent.width * 0.026
                     font.bold: true
                     renderType: root.menuTextRenderType
                     horizontalAlignment: Text.AlignHCenter
@@ -1487,9 +1487,9 @@ Window {
                     y: root.gaugePointY(parent.height, root.gaugeAuxStartDeg, parent.width * 0.36 + 24) - height / 2
                     text: "H"
                     color: appTheme.pearlLow
-                    opacity: 0.94
+                    opacity: 0.86
                     font.family: "Oxanium"
-                    font.pixelSize: parent.width * 0.031
+                    font.pixelSize: parent.width * 0.026
                     font.bold: true
                     renderType: root.menuTextRenderType
                     horizontalAlignment: Text.AlignHCenter
@@ -1580,9 +1580,9 @@ Window {
                         y: root.gaugePointY(parent.height, labelAngle, parent.height * 0.322) - height / 2
                         text: modelData.label
                         color: appTheme.pearlLow
-                        opacity: 0.94
+                        opacity: 0.84
                         font.family: "Oxanium"
-                        font.pixelSize: parent.width * 0.031
+                        font.pixelSize: parent.width * 0.0275
                         font.bold: true
                         renderType: root.menuTextRenderType
                         horizontalAlignment: Text.AlignHCenter
@@ -1627,9 +1627,9 @@ Window {
                     y: root.gaugePointY(parent.height, root.gaugeAuxStartDeg + root.gaugeAuxSweepDeg, parent.width * 0.36 + 24) - height / 2
                     text: "E"
                     color: appTheme.pearlLow
-                    opacity: 0.94
+                    opacity: 0.86
                     font.family: "Oxanium"
-                    font.pixelSize: parent.width * 0.031
+                    font.pixelSize: parent.width * 0.026
                     font.bold: true
                     renderType: root.menuTextRenderType
                     horizontalAlignment: Text.AlignHCenter
@@ -1643,9 +1643,9 @@ Window {
                     y: root.gaugePointY(parent.height, root.gaugeAuxStartDeg, parent.width * 0.36 + 24) - height / 2
                     text: "F"
                     color: appTheme.pearlLow
-                    opacity: 0.94
+                    opacity: 0.86
                     font.family: "Oxanium"
-                    font.pixelSize: parent.width * 0.031
+                    font.pixelSize: parent.width * 0.026
                     font.bold: true
                     renderType: root.menuTextRenderType
                     horizontalAlignment: Text.AlignHCenter

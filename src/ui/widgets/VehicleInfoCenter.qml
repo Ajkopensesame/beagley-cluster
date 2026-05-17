@@ -62,8 +62,8 @@ Item {
     readonly property real cx: width / 2
     readonly property real cy: height / 2
     readonly property real haloRadius: s * 0.42
-    readonly property real haloThickness: Math.max(7, s * 0.036)
-    readonly property real haloInner: haloRadius - haloThickness - s * 0.028
+    readonly property real haloThickness: Math.max(5, s * 0.028)
+    readonly property real haloInner: haloRadius - haloThickness - s * 0.032
     readonly property bool embeddedSafeMode: Qt.platform.os === "linux"
     readonly property color activeColor:
         hasWarning ? warningColors.haloColor(currentWarningKey, tDanger) : tLow
@@ -149,12 +149,12 @@ Item {
                 ctx.restore()
             }
 
-            drawArc(mainStart, mainEnd, stroke * 1.70, root.neonDeep, root.simplified ? 0.28 : 0.34)
-            drawArc(mainStart, mainEnd, stroke * 0.92, root.tLow, root.simplified ? 0.42 : 0.46)
-            drawArc(mainStart, mainEnd, stroke * 0.56, base, root.simplified ? 0.78 : 0.95)
+            drawArc(mainStart, mainEnd, stroke * 1.58, root.neonDeep, root.simplified ? 0.22 : 0.28)
+            drawArc(mainStart, mainEnd, stroke * 0.84, root.tLow, root.simplified ? 0.34 : 0.38)
+            drawArc(mainStart, mainEnd, stroke * 0.50, base, root.simplified ? 0.68 : 0.86)
 
             if (!root.simplified) {
-                drawArc(mainStart - 0.08, mainEnd + 0.08, stroke * 2.15 + warningPulse * 4.0, base, (root.hasWarning ? 0.28 : 0.12) + warningPulse * 0.18)
+                drawArc(mainStart - 0.08, mainEnd + 0.08, stroke * 1.95 + warningPulse * 3.0, base, (root.hasWarning ? 0.22 : 0.10) + warningPulse * 0.14)
 
                 const grad = ctx.createLinearGradient(root.cx - r, root.cy - r, root.cx + r, root.cy + r)
                 grad.addColorStop(0.0, withAlpha(root.neonCyan, 0.16))
@@ -191,7 +191,7 @@ Item {
     Item {
         id: center
         anchors.centerIn: parent
-        width: root.haloInner * 2 * 1.08
+        width: root.haloInner * 2 * 1.02
         height: width
         layer.enabled: !root.embeddedSafeMode
         layer.smooth: !root.embeddedSafeMode
@@ -254,7 +254,7 @@ Item {
                 Icons.DriveStateIcon {
                     id: driveGlyph
                     anchors.horizontalCenter: parent.horizontalCenter
-                    width: 128
+                    width: 118
                     height: width
                     color: root.tLow
                     mode: root.driveModeKey === "2wd" ? "2wd" : "4wd"
@@ -266,7 +266,7 @@ Item {
                     text: root.normalSubtitle(root.driveModeKey)
                     color: root.tLow
                     font.family: root.fontUi
-                    font.pixelSize: 24
+                    font.pixelSize: 21
                     font.bold: true
                     font.letterSpacing: 4
                     horizontalAlignment: Text.AlignHCenter
@@ -287,17 +287,17 @@ Item {
                 id: warningStack
                 width: parent.width
                 anchors.centerIn: parent
-                spacing: 10
+                spacing: 7
 
                 OemTellTaleIcon {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    width: Math.min(root.s * 0.58, warningLayer.width * 0.78)
+                    width: Math.min(root.s * 0.48, warningLayer.width * 0.70)
                     height: width
                     icon: root.currentWarningKey
                     color: root.activeColor
                     accentColor: root.activeColor
                     cutoutColor: "#020409"
-                    strokeWidth: Math.max(8, width * 0.070)
+                    strokeWidth: Math.max(5, width * 0.056)
                 }
 
                 Text {
@@ -305,9 +305,9 @@ Item {
                     text: root.warningLabel(root.currentWarningKey)
                     color: root.activeColor
                     font.family: root.fontUi
-                    font.pixelSize: 23
+                    font.pixelSize: 20
                     font.bold: true
-                    font.letterSpacing: 3
+                    font.letterSpacing: 2
                     horizontalAlignment: Text.AlignHCenter
                     style: Text.Outline
                     styleColor: "#F0000000"

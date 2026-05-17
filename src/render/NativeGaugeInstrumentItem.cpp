@@ -142,6 +142,8 @@ void appendTick(std::vector<QPointF> &vertices,
     const QPointF p3 = outer - tangent;
     appendTriangle(vertices, p2, p0, p3);
     appendTriangle(vertices, p3, p0, p1);
+    appendDisc(vertices, inner, halfWidth, 12);
+    appendDisc(vertices, outer, halfWidth, 12);
 }
 
 QSGGeometryNode *createGeometryNode(const QColor &color)
@@ -357,8 +359,8 @@ QSGNode *NativeGaugeInstrumentItem::updatePaintNode(QSGNode *oldNode, UpdatePain
 
     const QPointF center(itemWidth * 0.5, itemHeight * 0.5);
     const qreal radius = side * 0.405;
-    const qreal stroke = side * (m_lowEffectMode ? 0.026 : 0.030);
-    const qreal auxStroke = side * 0.019;
+    const qreal stroke = side * (m_lowEffectMode ? 0.022 : 0.026);
+    const qreal auxStroke = side * 0.0155;
     const qreal auxRadius = side * 0.360;
     const int arcSegments = m_lowEffectMode ? 96 : 128;
     if (staticChanged) {
@@ -369,7 +371,7 @@ QSGNode *NativeGaugeInstrumentItem::updatePaintNode(QSGNode *oldNode, UpdatePain
         std::vector<QPointF> centerVertices;
 
         if (m_backgroundOpacity > 0.001) {
-            appendDisc(backgroundVertices, center, side * 0.414, 64);
+            appendDisc(backgroundVertices, center, side * 0.470, 96);
         }
         appendArcBand(trackVertices, center, radius, stroke, kPrimaryStartDeg, kPrimarySweepDeg, 0.0, 1.0, arcSegments, true);
         appendArcBand(auxTrackVertices, center, auxRadius, auxStroke, kAuxStartDeg, kAuxSweepDeg, 0.0, 1.0, 64, true);
@@ -384,19 +386,19 @@ QSGNode *NativeGaugeInstrumentItem::updatePaintNode(QSGNode *oldNode, UpdatePain
             appendTick(tickVertices,
                        center,
                        angle,
-                       radius - stroke * (major ? 2.70 : 1.72),
-                       radius + stroke * (major ? 2.20 : 1.45),
-                       stroke * (major ? 0.30 : 0.17));
+                       radius - stroke * (major ? 1.85 : 1.05),
+                       radius + stroke * (major ? 2.10 : 1.20),
+                       stroke * (major ? 0.16 : 0.085));
         }
 
         setGeometry(node->background,
                     backgroundVertices,
                     withAlpha(QColor(QStringLiteral("#010309")),
                               int(qRound(254.0 * clampProgress(m_backgroundOpacity)))));
-        setGeometry(node->track, trackVertices, withAlpha(m_chromeColor, m_lowEffectMode ? 82 : 96));
-        setGeometry(node->auxTrack, auxTrackVertices, withAlpha(m_chromeColor, m_lowEffectMode ? 74 : 88));
-        setGeometry(node->ticks, tickVertices, withAlpha(m_chromeColor, m_lowEffectMode ? 218 : 238));
-        setGeometry(node->centerDot, centerVertices, withAlpha(m_chromeColor, 208));
+        setGeometry(node->track, trackVertices, withAlpha(m_chromeColor, m_lowEffectMode ? 64 : 78));
+        setGeometry(node->auxTrack, auxTrackVertices, withAlpha(m_chromeColor, m_lowEffectMode ? 56 : 70));
+        setGeometry(node->ticks, tickVertices, withAlpha(m_chromeColor, m_lowEffectMode ? 176 : 196));
+        setGeometry(node->centerDot, centerVertices, withAlpha(m_chromeColor, 168));
         node->staticRevision = m_staticRevision;
     }
 
@@ -407,8 +409,8 @@ QSGNode *NativeGaugeInstrumentItem::updatePaintNode(QSGNode *oldNode, UpdatePain
 
         appendArcBand(primaryVertices, center, radius, stroke, kPrimaryStartDeg, kPrimarySweepDeg, 0.0, mainProgress, arcSegments, true);
         appendArcBand(auxVertices, center, auxRadius, auxStroke, kAuxStartDeg, kAuxSweepDeg, 1.0 - m_auxProgress, 1.0, 64, true);
-        setGeometry(node->primaryArc, primaryVertices, withAlpha(m_primaryColor, 252));
-        setGeometry(node->auxArc, auxVertices, withAlpha(m_auxColor, 246));
+        setGeometry(node->primaryArc, primaryVertices, withAlpha(m_primaryColor, 242));
+        setGeometry(node->auxArc, auxVertices, withAlpha(m_auxColor, 232));
         node->dynamicRevision = m_dynamicRevision;
     }
 
