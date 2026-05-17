@@ -165,7 +165,16 @@ Item {
         requestSpeedPaint(force);
         requestCoolantPaint();
     }
+    function applySimulationValues() {
+        root.displaySpeed = clamp(root.speed, 0, root.maxSpeed);
+        root.displayCoolantC = root.coolantC;
+        requestGaugeDynamicPaint();
+    }
     function kickSmoother() {
+        if (root.simulationActive) {
+            applySimulationValues();
+            return;
+        }
         if (!smoothingTimer.running) smoothingTimer.start();
     }
 
@@ -291,6 +300,12 @@ Item {
     onSpeedChanged: kickSmoother()
     onCoolantCChanged: kickSmoother()
     onMaxSpeedChanged: kickSmoother()
+    onSimulationActiveChanged: {
+        if (simulationActive)
+            applySimulationValues()
+        else
+            kickSmoother()
+    }
     onThemeChanged: {
         requestGaugeStaticPaint()
         requestGaugeDynamicPaint(true)
@@ -313,7 +328,8 @@ Item {
         displayCoolantC = coolantC
         requestGaugeStaticPaint()
         requestGaugeDynamicPaint(true)
-        kickSmoother()
+        if (!simulationActive)
+            kickSmoother()
     }
 
     SequentialAnimation {

@@ -64,10 +64,10 @@ Window {
     readonly property bool clusterSimulation: (typeof BEAGLEY_CLUSTER_SIMULATION !== "undefined")
         ? boolEnvValue(BEAGLEY_CLUSTER_SIMULATION)
         : false
-    readonly property string gaugeEffectLevel: gaugeRichDetail ? "high" : effectLevel
+    readonly property string gaugeEffectLevel: effectLevel
     readonly property bool gaugeLowEffectMode: gaugeEffectLevel === "low" || gaugeEffectLevel === "off"
     readonly property bool gaugeEffectsOff: gaugeEffectLevel === "off"
-    readonly property bool gaugeMatrixRainEnabled: !gaugeEffectsOff
+    readonly property bool gaugeMatrixRainEnabled: gaugeEffectLevel === "high" && !clusterSimulation
     readonly property int gaugeIndicatorCascadeCycleMs: gaugeLowEffectMode ? 2600 : 2200
     readonly property string mapRenderer: (typeof BEAGLEY_MAP_RENDERER !== "undefined" && BEAGLEY_MAP_RENDERER)
         ? String(BEAGLEY_MAP_RENDERER)

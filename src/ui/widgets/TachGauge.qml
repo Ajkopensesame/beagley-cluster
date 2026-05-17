@@ -122,7 +122,16 @@ Item {
         requestRpmPaint(force);
         requestFuelPaint();
     }
+    function applySimulationValues() {
+        root.displayRpm = clamp(root.rpm, 0, root.maxRpm);
+        root.displayFuel = clamp(root.fuelPct, 0, 100);
+        requestGaugeDynamicPaint();
+    }
     function kickSmoother() {
+        if (root.simulationActive) {
+            applySimulationValues();
+            return;
+        }
         if (!smoothingTimer.running) smoothingTimer.start();
     }
 
@@ -271,6 +280,12 @@ Item {
     onRpmChanged: kickSmoother()
     onFuelPctChanged: kickSmoother()
     onMaxRpmChanged: kickSmoother()
+    onSimulationActiveChanged: {
+        if (simulationActive)
+            applySimulationValues()
+        else
+            kickSmoother()
+    }
     onHighRpmChanged: requestGaugeDynamicPaint(true)
     onThemeChanged: {
         requestGaugeStaticPaint()
@@ -294,7 +309,8 @@ Item {
         displayFuel = clamp(fuelPct, 0, 100)
         requestGaugeStaticPaint()
         requestGaugeDynamicPaint(true)
-        kickSmoother()
+        if (!simulationActive)
+            kickSmoother()
     }
 
     SequentialAnimation {
