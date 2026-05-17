@@ -111,9 +111,7 @@ Item {
         requestStaticPaint()
         requestDynamicPaint(true)
     }
-    onGaugeColorChanged: {
-        requestDynamicPaint()
-    }
+    // Native arcs bind color directly; progress changes drive geometry updates.
     onChromeColorChanged: {
         requestStaticPaint()
         requestDynamicPaint(true)

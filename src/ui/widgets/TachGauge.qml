@@ -109,7 +109,8 @@ Item {
     }
     function requestRpmPaint() {
         const force = arguments.length > 0 && arguments[0] === true;
-        dialChrome.requestDynamicPaint(force);
+        if (force)
+            dialChrome.requestDynamicPaint(true);
         root.lastPaintedRpm = root.displayRpm;
     }
     function requestFuelPaint() {

@@ -152,7 +152,8 @@ Item {
     }
     function requestSpeedPaint() {
         const force = arguments.length > 0 && arguments[0] === true;
-        dialChrome.requestDynamicPaint(force);
+        if (force)
+            dialChrome.requestDynamicPaint(true);
         root.lastPaintedSpeed = root.displaySpeed;
     }
     function requestCoolantPaint() {
