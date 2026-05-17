@@ -104,6 +104,7 @@ Item {
     readonly property bool radarServiceAvailable: typeof radarImage !== "undefined" && radarImage !== null
     readonly property bool radarServiceReady: radarServiceAvailable && radarImage.ready && String(radarImage.imageUrl).length > 0
     readonly property url radarFrameUrl: radarServiceReady ? radarImage.imageUrl : ""
+    readonly property url radarMapUrl: radarServiceReady && String(radarImage.mapUrl).length > 0 ? radarImage.mapUrl : ""
 
     opacity: active ? 1 : 0
     visible: opacity > 0.01
@@ -954,6 +955,7 @@ Item {
         effectLevel: root.effectLevel
         bleedFraction: root.podBleedFraction
         frameUrl: root.radarFrameUrl
+        mapUrl: root.radarMapUrl
         status: root.radarStatus
         frameLabel: root.radarFrameDisplayLabel()
         onClicked: root.expandedMode = root.expandedMode === "radar" ? "" : "radar"
@@ -1578,6 +1580,7 @@ Item {
                             anchors.fill: parent
                             anchors.margins: 8
                             source: root.expandedMode === "radar" ? root.radarFrameUrl : ""
+                            mapSource: root.expandedMode === "radar" ? root.radarMapUrl : ""
                             circular: false
                             backgroundVisible: true
                             guidesVisible: true

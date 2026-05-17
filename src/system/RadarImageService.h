@@ -16,6 +16,7 @@ class RadarImageService : public QObject
     Q_OBJECT
 
     Q_PROPERTY(QUrl imageUrl READ imageUrl NOTIFY imageChanged)
+    Q_PROPERTY(QUrl mapUrl READ mapUrl NOTIFY mapChanged)
     Q_PROPERTY(QString status READ status NOTIFY statusChanged)
     Q_PROPERTY(QString frameTime READ frameTime NOTIFY frameTimeChanged)
     Q_PROPERTY(QString frameLabel READ frameLabel NOTIFY frameLabelChanged)
@@ -27,6 +28,7 @@ public:
     explicit RadarImageService(const QByteArray &userAgent, QObject *parent = nullptr);
 
     QUrl imageUrl() const { return m_imageUrl; }
+    QUrl mapUrl() const { return m_mapUrl; }
     QString status() const { return m_status; }
     QString frameTime() const { return m_frameTime; }
     QString frameLabel() const { return m_frameLabel; }
@@ -39,6 +41,7 @@ public:
 
 signals:
     void imageChanged();
+    void mapChanged();
     void statusChanged();
     void frameTimeChanged();
     void frameLabelChanged();
@@ -76,6 +79,7 @@ private:
     struct ComposedFrame {
         RadarFrame frame;
         QUrl imageUrl;
+        QUrl mapUrl;
         bool ready = false;
     };
 
@@ -96,6 +100,8 @@ private:
     QNetworkReply *get(const QUrl &url);
     QString compositeKey(const RadarFrame &frame, const CenterTile &center) const;
     QString compositePath(const RadarFrame &frame, const CenterTile &center) const;
+    QString mapCompositePath(const RadarFrame &frame, const CenterTile &center) const;
+    QString mapCompositePathForRadarPath(const QString &radarPath) const;
     bool tryPublishLatestCachedFrame(const QString &status);
     QList<RadarFrame> parseRadarFrames(const QByteArray &payload) const;
     QString formatFrameTime(qint64 epochSeconds) const;
@@ -105,11 +111,13 @@ private:
     void setFrameTime(const QString &frameTime);
     void setFrameLabel(const QString &frameLabel);
     void setImageUrl(const QUrl &url);
+    void setMapUrl(const QUrl &url);
 
     QNetworkAccessManager m_network;
     QTimer m_refreshTimer;
     QByteArray m_userAgent;
     QUrl m_imageUrl;
+    QUrl m_mapUrl;
     QString m_status = QStringLiteral("SYNC");
     QString m_frameTime;
     QString m_frameLabel;

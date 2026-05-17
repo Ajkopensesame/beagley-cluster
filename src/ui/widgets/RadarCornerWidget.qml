@@ -10,6 +10,7 @@ Item {
     property string effectLevel: "high"
     property real bleedFraction: 0.18
     property url frameUrl: ""
+    property url mapUrl: ""
     property string status: "SYNC"
     property string frameLabel: ""
 
@@ -38,6 +39,7 @@ Item {
                 anchors.fill: parent
                 anchors.margins: 0
                 source: root.frameReady ? root.frameUrl : ""
+                mapSource: root.frameReady ? root.mapUrl : ""
                 circular: true
                 backgroundVisible: true
                 guidesVisible: true

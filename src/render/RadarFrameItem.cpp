@@ -23,6 +23,7 @@ public:
     }
 
     int revision = -1;
+    int mapRevision = -1;
     int geometryRevision = -1;
     QSize size;
     QSGSimpleTextureNode *imageNode = nullptr;
@@ -194,6 +195,7 @@ void drawGpsMarker(QPainter &painter, const QSize &targetSize)
 }
 
 QImage renderRadarFrameImage(const QImage &source,
+                             const QImage &mapSource,
                              const QSize &targetSize,
                              bool circular,
                              bool backgroundVisible,
@@ -211,8 +213,8 @@ QImage renderRadarFrameImage(const QImage &source,
     if (circular && backgroundVisible) {
         painter.fillRect(QRectF(0, 0, targetSize.width(), targetSize.height()), QColor(3, 4, 10));
     }
-    if (backgroundVisible) {
-        drawMapBackground(painter, source, targetSize);
+    if (backgroundVisible && !mapSource.isNull()) {
+        drawMapBackground(painter, mapSource, targetSize);
     }
     if (guidesVisible) {
         drawRadarGuides(painter, targetSize);
@@ -247,6 +249,17 @@ void RadarFrameItem::setSource(const QUrl &source)
     m_source = source;
     emit sourceChanged();
     loadSource();
+}
+
+void RadarFrameItem::setMapSource(const QUrl &source)
+{
+    if (m_mapSource == source) {
+        return;
+    }
+
+    m_mapSource = source;
+    emit mapSourceChanged();
+    loadMapSource();
 }
 
 void RadarFrameItem::setCircular(bool circular)
@@ -324,6 +337,43 @@ void RadarFrameItem::loadSource()
     update();
 }
 
+void RadarFrameItem::loadMapSource()
+{
+    ++m_mapRevision;
+    m_mapImage = QImage();
+
+    if (m_mapSource.isEmpty()) {
+        update();
+        return;
+    }
+
+    if (!m_mapSource.isLocalFile()) {
+        qWarning().noquote() << "[RadarFrameItem] unsupported non-local map source" << m_mapSource;
+        update();
+        return;
+    }
+
+    const QString path = m_mapSource.toLocalFile();
+    if (!QFileInfo::exists(path)) {
+        qWarning().noquote() << "[RadarFrameItem] map source missing" << path;
+        update();
+        return;
+    }
+
+    QImageReader reader(path);
+    reader.setAutoTransform(true);
+    QImage image = reader.read();
+    if (image.isNull()) {
+        qWarning().noquote() << "[RadarFrameItem] failed to read map" << path << reader.errorString();
+        update();
+        return;
+    }
+
+    m_mapImage = image.convertToFormat(QImage::Format_ARGB32);
+    qInfo().noquote() << "[RadarFrameItem] loaded map" << path << m_mapImage.width() << "x" << m_mapImage.height();
+    update();
+}
+
 void RadarFrameItem::setReady(bool ready)
 {
     if (m_ready == ready) {
@@ -354,6 +404,7 @@ QSGNode *RadarFrameItem::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *
     auto *root = static_cast<RadarTextureRoot *>(oldNode);
     const bool rebuild = !root
         || root->revision != m_sourceRevision
+        || root->mapRevision != m_mapRevision
         || root->geometryRevision != m_geometryRevision
         || root->size != targetSize;
     if (!rebuild) {
@@ -363,10 +414,12 @@ QSGNode *RadarFrameItem::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *
     delete root;
     root = new RadarTextureRoot;
     root->revision = m_sourceRevision;
+    root->mapRevision = m_mapRevision;
     root->geometryRevision = m_geometryRevision;
     root->size = targetSize;
 
     const QImage frame = renderRadarFrameImage(m_image,
+                                               m_mapImage,
                                                targetSize,
                                                m_circular,
                                                m_backgroundVisible,
