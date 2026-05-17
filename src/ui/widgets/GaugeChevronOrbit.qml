@@ -13,7 +13,7 @@ Item {
     property real centerY: height / 2
     property real orbitRadius: Math.min(width, height) * 0.47
     property real startAngleDeg: -90
-    property real travelSweepDeg: 180
+    property real travelSweepDeg: 360
 
     property real chevronSize: 22
     property real strokeWidth: 4.5

@@ -1511,7 +1511,7 @@ Window {
                 phaseOverride: root.indicatorCascadePhase
                 orbitRadius: width * 0.315
                 startAngleDeg: -90
-                travelSweepDeg: 180
+                travelSweepDeg: 360
                 chevronSize: root.gaugeLowEffectMode ? width * 0.038 : width * 0.044
                 strokeWidth: root.gaugeLowEffectMode ? 4.8 : 5.2
                 strokeBoost: 1.8
@@ -1667,7 +1667,7 @@ Window {
                 phaseOverride: root.indicatorCascadePhase
                 orbitRadius: width * 0.315
                 startAngleDeg: -90
-                travelSweepDeg: 180
+                travelSweepDeg: 360
                 chevronSize: root.gaugeLowEffectMode ? width * 0.038 : width * 0.044
                 strokeWidth: root.gaugeLowEffectMode ? 4.8 : 5.2
                 strokeBoost: 1.8
