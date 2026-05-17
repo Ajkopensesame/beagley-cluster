@@ -17,6 +17,7 @@ class NativeGaugeInstrumentItem : public QQuickItem
     Q_PROPERTY(QColor auxColor READ auxColor WRITE setAuxColor NOTIFY appearanceChanged)
     Q_PROPERTY(QColor chromeColor READ chromeColor WRITE setChromeColor NOTIFY appearanceChanged)
     Q_PROPERTY(bool lowEffectMode READ lowEffectMode WRITE setLowEffectMode NOTIFY appearanceChanged)
+    Q_PROPERTY(qreal backgroundOpacity READ backgroundOpacity WRITE setBackgroundOpacity NOTIFY appearanceChanged)
 
 public:
     explicit NativeGaugeInstrumentItem(QQuickItem *parent = nullptr);
@@ -46,6 +47,9 @@ public:
     bool lowEffectMode() const { return m_lowEffectMode; }
     void setLowEffectMode(bool value);
 
+    qreal backgroundOpacity() const { return m_backgroundOpacity; }
+    void setBackgroundOpacity(qreal value);
+
 signals:
     void valueChanged();
     void geometryInputChanged();
@@ -67,6 +71,7 @@ private:
     QColor m_auxColor = QColor(QStringLiteral("#C7B7FF"));
     QColor m_chromeColor = QColor(QStringLiteral("#C7B7FF"));
     bool m_lowEffectMode = true;
+    qreal m_backgroundOpacity = 1.0;
 
     int m_staticRevision = 0;
     int m_dynamicRevision = 0;

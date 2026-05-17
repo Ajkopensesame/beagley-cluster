@@ -300,6 +300,17 @@ void NativeGaugeInstrumentItem::setLowEffectMode(bool value)
     emit appearanceChanged();
 }
 
+void NativeGaugeInstrumentItem::setBackgroundOpacity(qreal value)
+{
+    value = clampProgress(value);
+    if (qFuzzyCompare(m_backgroundOpacity, value)) {
+        return;
+    }
+    m_backgroundOpacity = value;
+    invalidateStaticGeometry();
+    emit appearanceChanged();
+}
+
 void NativeGaugeInstrumentItem::geometryChange(const QRectF &newGeometry, const QRectF &oldGeometry)
 {
     QQuickItem::geometryChange(newGeometry, oldGeometry);
@@ -357,7 +368,9 @@ QSGNode *NativeGaugeInstrumentItem::updatePaintNode(QSGNode *oldNode, UpdatePain
         std::vector<QPointF> tickVertices;
         std::vector<QPointF> centerVertices;
 
-        appendDisc(backgroundVertices, center, side * 0.414, 64);
+        if (m_backgroundOpacity > 0.001) {
+            appendDisc(backgroundVertices, center, side * 0.414, 64);
+        }
         appendArcBand(trackVertices, center, radius, stroke, kPrimaryStartDeg, kPrimarySweepDeg, 0.0, 1.0, arcSegments, true);
         appendArcBand(auxTrackVertices, center, auxRadius, auxStroke, kAuxStartDeg, kAuxSweepDeg, 0.0, 1.0, 64, true);
         appendDisc(centerVertices, center, side * 0.0085, 18);
@@ -376,7 +389,10 @@ QSGNode *NativeGaugeInstrumentItem::updatePaintNode(QSGNode *oldNode, UpdatePain
                        stroke * (major ? 0.18 : 0.115));
         }
 
-        setGeometry(node->background, backgroundVertices, withAlpha(QColor(QStringLiteral("#010309")), 254));
+        setGeometry(node->background,
+                    backgroundVertices,
+                    withAlpha(QColor(QStringLiteral("#010309")),
+                              int(qRound(254.0 * clampProgress(m_backgroundOpacity)))));
         setGeometry(node->track, trackVertices, withAlpha(m_chromeColor, m_lowEffectMode ? 48 : 62));
         setGeometry(node->auxTrack, auxTrackVertices, withAlpha(m_chromeColor, m_lowEffectMode ? 44 : 58));
         setGeometry(node->ticks, tickVertices, withAlpha(m_chromeColor, m_lowEffectMode ? 132 : 160));

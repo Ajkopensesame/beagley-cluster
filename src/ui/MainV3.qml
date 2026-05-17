@@ -99,6 +99,7 @@ Window {
     readonly property bool mapLibreNativeFullUnderlay: (typeof BEAGLEY_MAPLIBRE_NATIVE_FULL_UNDERLAY !== "undefined")
         && BEAGLEY_MAPLIBRE_NATIVE_FULL_UNDERLAY
     readonly property bool mapLibreSafeCompositor: mapLibreNativeActive && !mapLibreNativeFullUnderlay
+    readonly property real gaugeFaceBackgroundOpacity: mapLibreNativeFullUnderlay ? 0.0 : 1.0
     readonly property int mapLibreSafeSideInset: mapLibreSafeCompositor
         ? Math.round(gaugeFaceSize * 0.54)
         : 0
@@ -1292,6 +1293,7 @@ Window {
                 auxColor: root.displayCoolantValue >= 100 ? appTheme.danger : (root.displayCoolantValue < 40 ? "#63C9FF" : appTheme.pearlLow)
                 chromeColor: appTheme.pearlLow
                 lowEffectMode: root.gaugeLowEffectMode
+                backgroundOpacity: root.gaugeFaceBackgroundOpacity
             }
 
             Item {
@@ -1553,6 +1555,7 @@ Window {
                 auxColor: root.displayFuelValue <= 12 ? appTheme.danger : appTheme.pearlLow
                 chromeColor: appTheme.pearlLow
                 lowEffectMode: root.gaugeLowEffectMode
+                backgroundOpacity: root.gaugeFaceBackgroundOpacity
             }
 
             Item {
