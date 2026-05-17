@@ -1006,7 +1006,7 @@ Item {
             onClicked: root.expandedMode = ""
         }
 
-        Rectangle {
+        Item {
             id: detailCard
             width: root.tallDetailMode
                 ? Math.floor(Math.min(620, Math.max(500, parent.width * 0.38)))
@@ -1016,19 +1016,22 @@ Item {
                 : Math.floor(Math.min(360, Math.max(272, parent.height * 0.46)))
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.verticalCenter: parent.verticalCenter
-            radius: root.tallDetailMode ? 4 : 8
-            color: root.expandedMode === "temp"
-                ? Qt.rgba(0.020, 0.018, 0.034, 0.97)
-                : root.expandedMode === "music"
-                ? Qt.rgba(0.004, 0.008, 0.031, 0.98)
-                : Qt.rgba(0.016, 0.020, 0.047, 0.96)
-            border.width: 1
-            border.color: root.expandedMode === "temp"
-                ? "#FF7AD9"
-                : root.tallDetailMode
-                ? "#58FFE1"
-                : (root.expandedMode === "music" ? "#58FFE1" : "#5C4B90")
             clip: true
+
+            NativePanel {
+                anchors.fill: parent
+                color: root.expandedMode === "temp"
+                    ? "#05060B"
+                    : root.expandedMode === "music"
+                    ? "#02040B"
+                    : "#050812"
+                borderColor: root.expandedMode === "temp"
+                    ? "#FF7AD9"
+                    : root.tallDetailMode
+                    ? "#58FFE1"
+                    : (root.expandedMode === "music" ? "#58FFE1" : "#5C4B90")
+                borderWidth: 1
+            }
 
             MouseArea {
                 anchors.fill: parent
@@ -1212,13 +1215,16 @@ Item {
                         }
                     }
 
-                    Rectangle {
+                    Item {
                         width: parent.width
                         height: 156
-                        radius: 8
-                        color: Qt.rgba(0.018, 0.020, 0.030, 0.94)
-                        border.width: 1
-                        border.color: Qt.rgba(0.36, 1.0, 0.88, 0.28)
+
+                        NativePanel {
+                            anchors.fill: parent
+                            color: "#05070D"
+                            borderColor: "#1D4C4A"
+                            borderWidth: 1
+                        }
 
                         Row {
                             anchors.fill: parent
@@ -1323,13 +1329,16 @@ Item {
                                 { "k": "WIND", "v": (root.weatherWindDir.length > 0 ? root.weatherWindDir + " " : "") + root.formatWind(root.windKph), "s": "km/h" }
                             ]
 
-                            Rectangle {
+                            Item {
                                 width: (metricsGrid.width - 20) / 3
                                 height: 54
-                                radius: 8
-                                color: Qt.rgba(0.030, 0.034, 0.052, 0.80)
-                                border.width: 1
-                                border.color: Qt.rgba(0.36, 1.0, 0.88, 0.18)
+
+                                NativePanel {
+                                    anchors.fill: parent
+                                    color: "#080B13"
+                                    borderColor: "#162F35"
+                                    borderWidth: 1
+                                }
 
                                 Column {
                                     anchors.fill: parent
@@ -1413,17 +1422,16 @@ Item {
                         Repeater {
                             model: root.forecastRows
 
-                            Rectangle {
+                            Item {
                                 width: forecastList.width
                                 height: 43
-                                radius: 6
-                                color: index === 0
-                                    ? Qt.rgba(0.050, 0.056, 0.080, 0.86)
-                                    : Qt.rgba(0.028, 0.032, 0.050, 0.74)
-                                border.width: 1
-                                border.color: index === 0
-                                    ? Qt.rgba(0.36, 1.0, 0.88, 0.24)
-                                    : Qt.rgba(0.36, 1.0, 0.88, 0.12)
+
+                                NativePanel {
+                                    anchors.fill: parent
+                                    color: index === 0 ? "#0B0E18" : "#060912"
+                                    borderColor: index === 0 ? "#244B4A" : "#13272E"
+                                    borderWidth: 1
+                                }
 
                                 Row {
                                     anchors.fill: parent
@@ -1562,14 +1570,17 @@ Item {
                         }
                     }
 
-                    Rectangle {
+                    Item {
                         width: parent.width
                         height: Math.max(360, parent.height - 122)
-                        radius: 8
-                        color: Qt.rgba(0.018, 0.020, 0.030, 0.94)
-                        border.width: 1
-                        border.color: Qt.rgba(0.36, 1.0, 0.88, 0.28)
                         clip: true
+
+                        NativePanel {
+                            anchors.fill: parent
+                            color: "#05070D"
+                            borderColor: "#1D4C4A"
+                            borderWidth: 1
+                        }
 
                         RadarFrameItem {
                             id: detailRadarFrame
@@ -1644,13 +1655,16 @@ Item {
                                 { "k": "STATUS", "v": root.radarStatus === "LIVE" ? "LIVE NOW" : root.radarStatus, "s": root.radarProduct.length > 0 ? root.radarProduct : root.radarSourceLabel() }
                             ]
 
-                            Rectangle {
+                            Item {
                                 width: (parent.width - 20) / 3
                                 height: parent.height
-                                radius: 8
-                                color: Qt.rgba(0.030, 0.034, 0.052, 0.80)
-                                border.width: 1
-                                border.color: Qt.rgba(0.36, 1.0, 0.88, 0.18)
+
+                                NativePanel {
+                                    anchors.fill: parent
+                                    color: "#080B13"
+                                    borderColor: "#162F35"
+                                    borderWidth: 1
+                                }
 
                                 Column {
                                     anchors.fill: parent

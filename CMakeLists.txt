@@ -87,6 +87,8 @@ qt_add_executable(beagley_cluster
     src/render/GaugeArcItem.h
     src/render/NativeGaugeInstrumentItem.cpp
     src/render/NativeGaugeInstrumentItem.h
+    src/render/NativePanelItem.cpp
+    src/render/NativePanelItem.h
     src/render/NativeRasterMapItem.cpp
     src/render/RasterFrameItem.cpp
     src/render/RasterFrameItem.h

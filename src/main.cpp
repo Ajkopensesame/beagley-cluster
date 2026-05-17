@@ -28,6 +28,7 @@
 #include "render/ClusterRenderModel.h"
 #include "render/GaugeArcItem.h"
 #include "render/NativeGaugeInstrumentItem.h"
+#include "render/NativePanelItem.h"
 #include "render/NativeRasterMapItem.h"
 #include "render/PerformanceMetrics.h"
 #include "render/RadarFrameItem.h"
@@ -400,6 +401,7 @@ int main(int argc, char *argv[])
     QGuiApplication app(argc, argv);
     qmlRegisterType<GaugeArcItem>("BeagleY", 1, 0, "GaugeArcItem");
     qmlRegisterType<NativeGaugeInstrumentItem>("BeagleY", 1, 0, "NativeGaugeInstrument");
+    qmlRegisterType<NativePanelItem>("BeagleY", 1, 0, "NativePanel");
     qmlRegisterType<NativeRasterMapItem>("BeagleY", 1, 0, "NativeRasterMapItem");
     qmlRegisterType<RadarFrameItem>("BeagleY", 1, 0, "RadarFrameItem");
     qmlRegisterType<RasterFrameItem>("BeagleY", 1, 0, "RasterFrameItem");
