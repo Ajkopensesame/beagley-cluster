@@ -205,7 +205,7 @@ echo "--- display-source"
 pid="$(systemctl show beagley_cluster -p MainPID --value 2>/dev/null || true)"
 if [ -n "${pid:-}" ] && [ "$pid" != "0" ] && [ -r "/proc/$pid/environ" ]; then
   tr '\0' '\n' <"/proc/$pid/environ" \
-    | grep -E '^(BEAGLEY_UI_VARIANT|BEAGLEY_RENDER_PROFILE|BEAGLEY_EFFECT_LEVEL|BEAGLEY_GAUGE_DETAIL|BEAGLEY_GAUGE_DEMO|BEAGLEY_MAP_RENDERER|BEAGLEY_QML_DEV_ROOT|BEAGLEY_STRESS_SCENE|QSG_RENDER_LOOP)=' \
+    | grep -E '^(BEAGLEY_UI_VARIANT|BEAGLEY_RENDER_PROFILE|BEAGLEY_EFFECT_LEVEL|BEAGLEY_GAUGE_DETAIL|BEAGLEY_GAUGE_DEMO|BEAGLEY_CLUSTER_SIMULATION|BEAGLEY_MAP_RENDERER|BEAGLEY_QML_DEV_ROOT|BEAGLEY_STRESS_SCENE|QSG_RENDER_LOOP)=' \
     | sort || true
   qml_root="$(tr '\0' '\n' <"/proc/$pid/environ" | sed -n 's/^BEAGLEY_QML_DEV_ROOT=//p' | tail -n 1)"
   if [ -n "${qml_root:-}" ]; then

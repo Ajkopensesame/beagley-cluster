@@ -50,6 +50,8 @@ Item {
     property var vehicleState
     property bool stressScene: false
     property real stressPhase: 0.0
+    property bool simulationActive: false
+    property real simulationPhase: 0.0
 
     // Defensive helper
     function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
@@ -156,37 +158,59 @@ Item {
                                && !vehicleState.linkStale
                                && !vehicleState.bbbStale
     readonly property bool telltaleDemoActive: root.stressScene || root.demoTelltales
+    readonly property int simulationWarningStep: Math.floor(root.simulationPhase / 1.15) % 10
+    readonly property int simulationDriveStep: Math.floor(root.simulationPhase / 2.0) % 3
 
-    readonly property bool displayHighBeam: root.telltaleDemoActive
+    readonly property bool displayHighBeam: root.simulationActive
+        ? ((Math.floor(root.simulationPhase / 0.8) % 2) === 0)
+        : (root.telltaleDemoActive
         ? Math.sin(root.stressPhase * 0.72) > 0.20
-        : root.linkOk && !!root.vehicleState && !!root.vehicleState.highBeam
-    readonly property bool displayWarnDoor: root.telltaleDemoActive
+        : root.linkOk && !!root.vehicleState && !!root.vehicleState.highBeam)
+    readonly property bool displayWarnDoor: root.simulationActive
+        ? (root.simulationWarningStep === 4 || root.simulationWarningStep === 8)
+        : (root.telltaleDemoActive
         ? true
-        : root.linkOk && !!root.vehicleState && !!root.vehicleState.warnDoor
-    readonly property bool displayWarnCharge: root.telltaleDemoActive
+        : root.linkOk && !!root.vehicleState && !!root.vehicleState.warnDoor)
+    readonly property bool displayWarnCharge: root.simulationActive
+        ? (root.simulationWarningStep === 3 || root.simulationWarningStep === 8)
+        : (root.telltaleDemoActive
         ? true
-        : root.linkOk && !!root.vehicleState && !!root.vehicleState.warnCharge
-    readonly property bool displayWarnBrake: root.telltaleDemoActive
+        : root.linkOk && !!root.vehicleState && !!root.vehicleState.warnCharge)
+    readonly property bool displayWarnBrake: root.simulationActive
+        ? (root.simulationWarningStep === 1 || root.simulationWarningStep === 8)
+        : (root.telltaleDemoActive
         ? true
-        : root.linkOk && !!root.vehicleState && !!root.vehicleState.warnBrake
-    readonly property bool displayWarnOil: root.telltaleDemoActive
+        : root.linkOk && !!root.vehicleState && !!root.vehicleState.warnBrake)
+    readonly property bool displayWarnOil: root.simulationActive
+        ? (root.simulationWarningStep === 2 || root.simulationWarningStep === 8)
+        : (root.telltaleDemoActive
         ? true
-        : root.linkOk && !!root.vehicleState && !!root.vehicleState.warnOil
-    readonly property bool displayWarnCheckEngine: root.telltaleDemoActive
+        : root.linkOk && !!root.vehicleState && !!root.vehicleState.warnOil)
+    readonly property bool displayWarnCheckEngine: root.simulationActive
+        ? (root.simulationWarningStep === 5 || root.simulationWarningStep === 8)
+        : (root.telltaleDemoActive
         ? true
-        : root.linkOk && !!root.vehicleState && !!root.vehicleState.warnCheckEngine
-    readonly property bool displayWarnAT: root.telltaleDemoActive
+        : root.linkOk && !!root.vehicleState && !!root.vehicleState.warnCheckEngine)
+    readonly property bool displayWarnAT: root.simulationActive
+        ? (root.simulationWarningStep === 6 || root.simulationWarningStep === 8)
+        : (root.telltaleDemoActive
         ? true
-        : root.linkOk && !!root.vehicleState && !!root.vehicleState.warnAT
-    readonly property bool displayWarnFuelLow: root.telltaleDemoActive
+        : root.linkOk && !!root.vehicleState && !!root.vehicleState.warnAT)
+    readonly property bool displayWarnFuelLow: root.simulationActive
+        ? (root.simulationWarningStep === 7 || root.simulationWarningStep === 8)
+        : (root.telltaleDemoActive
         ? true
-        : root.linkOk && !!root.vehicleState && !!root.vehicleState.warnFuelLow
-    readonly property string displayDrivetrainMode: root.telltaleDemoActive
+        : root.linkOk && !!root.vehicleState && !!root.vehicleState.warnFuelLow)
+    readonly property string displayDrivetrainMode: root.simulationActive
+        ? (root.simulationDriveStep === 0 ? "2wd" : "4wd")
+        : (root.telltaleDemoActive
         ? (Math.sin(root.stressPhase * 0.22) > 0.45 ? "4wd" : "2wd")
-        : (root.linkOk && !!root.vehicleState ? root.vehicleState.drivetrainMode : "2wd")
-    readonly property bool displayTransferLock: root.telltaleDemoActive
+        : (root.linkOk && !!root.vehicleState ? root.vehicleState.drivetrainMode : "2wd"))
+    readonly property bool displayTransferLock: root.simulationActive
+        ? root.simulationDriveStep === 2
+        : (root.telltaleDemoActive
         ? Math.sin(root.stressPhase * 0.18 + 1.1) > 0.78
-        : root.linkOk && !!root.vehicleState && !!root.vehicleState.transferLock
+        : root.linkOk && !!root.vehicleState && !!root.vehicleState.transferLock)
 
     // ===== Smooth RPM =====
     Timer {

@@ -23,6 +23,7 @@ Environment=BEAGLEY_MAPLIBRE_NATIVE_MAX_ZOOM=14.0
 Environment=BEAGLEY_EFFECT_LEVEL=low
 Environment=BEAGLEY_GAUGE_DETAIL=safe
 Environment=BEAGLEY_GAUGE_DEMO=0
+Environment=BEAGLEY_CLUSTER_SIMULATION=0
 EnvironmentFile=-/etc/default/beagley-cluster
 ExecStart=__PROJECT_ROOT__/tools/beagley_gpu/run_embedded_with_gate.sh
 Restart=on-failure

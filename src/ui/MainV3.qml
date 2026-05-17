@@ -46,6 +46,12 @@ Window {
             return "rich"
         return "safe"
     }
+    function simulationTriangle(phaseSeconds, periodSeconds) {
+        const period = Math.max(0.001, Number(periodSeconds) || 1.0)
+        const phase = ((Number(phaseSeconds) || 0) % period + period) % period
+        const unit = phase / period
+        return unit < 0.5 ? unit * 2.0 : (1.0 - unit) * 2.0
+    }
     readonly property string gaugeDetail: gaugeDetailValue(
         (typeof BEAGLEY_GAUGE_DETAIL !== "undefined" && BEAGLEY_GAUGE_DETAIL)
             ? String(BEAGLEY_GAUGE_DETAIL)
@@ -54,6 +60,9 @@ Window {
     readonly property bool gaugeRichDetail: gaugeDetail === "rich"
     readonly property bool gaugeDemo: (typeof BEAGLEY_GAUGE_DEMO !== "undefined")
         ? boolEnvValue(BEAGLEY_GAUGE_DEMO)
+        : false
+    readonly property bool clusterSimulation: (typeof BEAGLEY_CLUSTER_SIMULATION !== "undefined")
+        ? boolEnvValue(BEAGLEY_CLUSTER_SIMULATION)
         : false
     readonly property string gaugeEffectLevel: gaugeRichDetail ? "high" : effectLevel
     readonly property bool gaugeLowEffectMode: gaugeEffectLevel === "low" || gaugeEffectLevel === "off"
@@ -115,6 +124,7 @@ Window {
     readonly property int gaugeEdgeBleed: -48
     property real sharedEffectPhase: 0.0
     property real stressPhase: 0.0
+    property real clusterSimulationPhase: 0.0
 
     readonly property var hub: vehicleState
     readonly property bool linkOk: hub && hub.connected && !hub.linkStale
@@ -155,26 +165,39 @@ Window {
     readonly property real rpmValue: truthOk && hub ? (hub.rpm || 0) : 0
     readonly property real fuelValue: truthOk && hub ? (hub.fuelPct || 0) : 0
     readonly property real coolantValue: truthOk && hub ? (hub.coolantC || 0) : 0
-    readonly property bool gaugeReviewMode: gaugeDemo && !stressScene
-    readonly property real displaySpeedValue: stressScene
+    readonly property bool gaugeReviewMode: gaugeDemo && !stressScene && !clusterSimulation
+    readonly property real displaySpeedValue: clusterSimulation
+        ? simulationTriangle(clusterSimulationPhase, 8.0) * 140
+        : (stressScene
         ? (78 + 50 * Math.sin(stressPhase * 0.9))
-        : (gaugeReviewMode ? 118 : speedValue)
-    readonly property real displayRpmValue: stressScene
+        : (gaugeReviewMode ? 118 : speedValue))
+    readonly property real displayRpmValue: clusterSimulation
+        ? simulationTriangle(clusterSimulationPhase + 1.0, 7.2) * 8000
+        : (stressScene
         ? (2400 + 1800 * (0.5 + 0.5 * Math.sin(stressPhase * 1.15 + 0.4)))
-        : (gaugeReviewMode ? 4200 : rpmValue)
-    readonly property real displayFuelValue: stressScene
+        : (gaugeReviewMode ? 4200 : rpmValue))
+    readonly property real displayFuelValue: clusterSimulation
+        ? (100 - simulationTriangle(clusterSimulationPhase + 2.0, 9.5) * 100)
+        : (stressScene
         ? (18 + 11 * Math.sin(stressPhase * 0.30 - 1.2))
-        : (gaugeReviewMode ? 14 : fuelValue)
-    readonly property real displayCoolantValue: stressScene
+        : (gaugeReviewMode ? 14 : fuelValue))
+    readonly property real displayCoolantValue: clusterSimulation
+        ? (40 + simulationTriangle(clusterSimulationPhase + 3.0, 10.5) * 70)
+        : (stressScene
         ? (70 + 42 * Math.sin(stressPhase * 0.42 + 1.3))
-        : (gaugeReviewMode ? 104 : coolantValue)
-    readonly property int indicatorVisualHoldMs: 1850
-    readonly property bool rawLeftIndicator: stressScene
+        : (gaugeReviewMode ? 104 : coolantValue))
+    readonly property int indicatorVisualHoldMs: clusterSimulation ? 450 : 1850
+    readonly property int simulationIndicatorStep: Math.floor(clusterSimulationPhase / 1.8) % 4
+    readonly property bool rawLeftIndicator: clusterSimulation
+        ? (simulationIndicatorStep === 0 || simulationIndicatorStep === 2)
+        : (stressScene
         ? Math.sin(stressPhase * 1.35) > 0.68
-        : truthOk && !!hub.leftIndicator
-    readonly property bool rawRightIndicator: stressScene
+        : truthOk && !!hub.leftIndicator)
+    readonly property bool rawRightIndicator: clusterSimulation
+        ? (simulationIndicatorStep === 1 || simulationIndicatorStep === 2)
+        : (stressScene
         ? Math.sin(stressPhase * 1.12 + 2.4) > 0.68
-        : truthOk && !!hub.rightIndicator
+        : truthOk && !!hub.rightIndicator)
     property bool displayLeftIndicator: false
     property bool displayRightIndicator: false
     readonly property bool indicatorCascadeActive: displayLeftIndicator || displayRightIndicator
@@ -771,6 +794,14 @@ Window {
         onTriggered: root.stressPhase += interval / 1000.0
     }
 
+    Timer {
+        id: clusterSimulationClock
+        interval: 50
+        running: root.clusterSimulation
+        repeat: true
+        onTriggered: root.clusterSimulationPhase += interval / 1000.0
+    }
+
     function updateLeftIndicatorVisual() {
         if (root.rawLeftIndicator) {
             root.displayLeftIndicator = true
@@ -1202,6 +1233,8 @@ Window {
                 showArcHeads: !root.mapLibreSafeCompositor
                 stressScene: root.stressScene
                 stressPhase: root.stressPhase
+                simulationActive: root.clusterSimulation
+                simulationPhase: root.clusterSimulationPhase
                 matrixRainEnabled: root.gaugeMatrixRainEnabled
                 matrixRainSharedPhase: root.gaugeMatrixRainSharedPhase
             }
@@ -1299,6 +1332,8 @@ Window {
                 showArcHeads: !root.mapLibreSafeCompositor
                 stressScene: root.stressScene
                 stressPhase: root.stressPhase
+                simulationActive: root.clusterSimulation
+                simulationPhase: root.clusterSimulationPhase
                 matrixRainEnabled: root.gaugeMatrixRainEnabled
                 matrixRainSharedPhase: root.gaugeMatrixRainSharedPhase
             }

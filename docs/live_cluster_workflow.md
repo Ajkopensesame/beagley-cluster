@@ -21,6 +21,7 @@ BEAGLEY_RENDER_PROFILE=embedded
 BEAGLEY_EFFECT_LEVEL=low|high
 BEAGLEY_GAUGE_DETAIL=safe|rich
 BEAGLEY_GAUGE_DEMO=0|1
+BEAGLEY_CLUSTER_SIMULATION=0|1
 BEAGLEY_MAP_RENDERER=maplibre-native
 BEAGLEY_MAPLIBRE_NATIVE_STYLE_URL=https://tiles.openfreemap.org/styles/positron
 BEAGLEY_MAPLIBRE_NATIVE_TRUSTED_STYLES=https://tiles.openfreemap.org/styles/positron
@@ -40,6 +41,10 @@ VEHICLE_HUB_WS_URL=ws://10.24.0.7:8765
 `BEAGLEY_GAUGE_DEMO=1` is only for visual review of telltales and gauge
 readouts. It does not enable app replay or change the BBB vehicle-state source.
 
+`BEAGLEY_CLUSTER_SIMULATION=1` runs an app-local gauge/VIC sweep for visual QA:
+speed, RPM, fuel, coolant, indicators, gear, O/D, high-beam, drivetrain, and
+warning states cycle without changing the BBB vehicle-state source.
+
 Do not set `BEAGLEY_REPLAY_FILE` for live-cluster UI work. App-side replay and
 `BEAGLEY_STRESS_SCENE=1` are useful for demos, but they do not exercise the
 production data path.
@@ -56,6 +61,7 @@ The default is global `BEAGLEY_EFFECT_LEVEL=low` plus
 gauges show the full design.
 Use `--gauge-detail safe` when checking the conservative production gauge
 default. Use `--gauge-demo` only while visually reviewing telltales.
+Use `--simulation` when checking the full local gauge/VIC sweep.
 Use `--metrics` only while measuring FPS.
 
 ## Check What The Display Is Actually Running

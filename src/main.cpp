@@ -319,6 +319,7 @@ int main(int argc, char *argv[])
         qgetenv("BEAGLEY_GAUGE_DETAIL"),
         renderProfile == QLatin1String("embedded") ? QStringLiteral("safe") : QStringLiteral("rich"));
     const bool gaugeDemo = envEnabled("BEAGLEY_GAUGE_DEMO", false);
+    const bool clusterSimulation = envEnabled("BEAGLEY_CLUSTER_SIMULATION", false);
     const bool stressScene =
         qEnvironmentVariableIsSet("BEAGLEY_STRESS_SCENE") &&
         qEnvironmentVariableIntValue("BEAGLEY_STRESS_SCENE") != 0;
@@ -367,6 +368,7 @@ int main(int argc, char *argv[])
     qputenv("BEAGLEY_MAP_RENDERER", mapRenderer.toUtf8());
     qputenv("BEAGLEY_GAUGE_DETAIL", gaugeDetail.toUtf8());
     qputenv("BEAGLEY_GAUGE_DEMO", gaugeDemo ? QByteArrayLiteral("1") : QByteArrayLiteral("0"));
+    qputenv("BEAGLEY_CLUSTER_SIMULATION", clusterSimulation ? QByteArrayLiteral("1") : QByteArrayLiteral("0"));
 
 #ifdef WITH_WEBENGINE
     if (!noMap && !preferSnapshotMap) {
@@ -449,6 +451,7 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("BEAGLEY_MAP_RENDERER", mapRenderer);
     engine.rootContext()->setContextProperty("BEAGLEY_GAUGE_DETAIL", gaugeDetail);
     engine.rootContext()->setContextProperty("BEAGLEY_GAUGE_DEMO", gaugeDemo);
+    engine.rootContext()->setContextProperty("BEAGLEY_CLUSTER_SIMULATION", clusterSimulation);
     engine.rootContext()->setContextProperty(
         "BEAGLEY_INITIAL_WEATHER_EXPANDED_MODE",
         QString::fromUtf8(qgetenv("BEAGLEY_INITIAL_WEATHER_EXPANDED_MODE")).trimmed());

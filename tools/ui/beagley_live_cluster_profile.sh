@@ -7,6 +7,7 @@ HUB_URL="${VEHICLE_HUB_WS_URL:-ws://10.24.0.7:8765}"
 EFFECT_LEVEL="${BEAGLEY_EFFECT_LEVEL:-low}"
 GAUGE_DETAIL="${BEAGLEY_GAUGE_DETAIL:-rich}"
 GAUGE_DEMO="${BEAGLEY_GAUGE_DEMO:-0}"
+CLUSTER_SIMULATION="${BEAGLEY_CLUSTER_SIMULATION:-0}"
 MAP_RENDERER="${BEAGLEY_MAP_RENDERER:-maplibre-native}"
 MAPLIBRE_STYLE_URL="${BEAGLEY_MAPLIBRE_NATIVE_STYLE_URL:-https://tiles.openfreemap.org/styles/positron}"
 MAPLIBRE_TRUSTED_STYLES="${BEAGLEY_MAPLIBRE_NATIVE_TRUSTED_STYLES:-$MAPLIBRE_STYLE_URL}"
@@ -39,6 +40,8 @@ Options:
   --gauge-detail MODE     safe or rich. Default: rich
   --gauge-demo            Show telltales/gear review state without BeagleY replay.
   --no-gauge-demo         Disable gauge visual-review telltales. Default.
+  --simulation            Run the cluster gauge/VIC sweep simulation.
+  --no-simulation         Disable the cluster gauge/VIC sweep simulation. Default.
   --map-renderer MODE     maplibre-native or native-online. Default: maplibre-native
   --maplibre-style-url URL
                           Trusted MapLibre style. Default: OpenFreeMap Positron
@@ -77,6 +80,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --no-gauge-demo)
       GAUGE_DEMO=0
+      shift
+      ;;
+    --simulation)
+      CLUSTER_SIMULATION=1
+      shift
+      ;;
+    --no-simulation)
+      CLUSTER_SIMULATION=0
       shift
       ;;
     --map-renderer)
@@ -148,7 +159,21 @@ case "$GAUGE_DEMO_NORMALIZED" in
     ;;
 esac
 
-for value in "$HOST" "$HUB_URL" "$EFFECT_LEVEL" "$GAUGE_DETAIL" "$GAUGE_DEMO" "$MAP_RENDERER" "$MAPLIBRE_STYLE_URL" "$MAPLIBRE_TRUSTED_STYLES" "$MAPLIBRE_FULL_UNDERLAY" "$MAPLIBRE_MAX_ZOOM"; do
+CLUSTER_SIMULATION_NORMALIZED="$(printf '%s' "$CLUSTER_SIMULATION" | tr '[:upper:]' '[:lower:]')"
+case "$CLUSTER_SIMULATION_NORMALIZED" in
+  1|true|yes|on)
+    CLUSTER_SIMULATION=1
+    ;;
+  0|false|no|off)
+    CLUSTER_SIMULATION=0
+    ;;
+  *)
+    echo "[beagley-live] BEAGLEY_CLUSTER_SIMULATION must be 0 or 1: $CLUSTER_SIMULATION" >&2
+    exit 2
+    ;;
+esac
+
+for value in "$HOST" "$HUB_URL" "$EFFECT_LEVEL" "$GAUGE_DETAIL" "$GAUGE_DEMO" "$CLUSTER_SIMULATION" "$MAP_RENDERER" "$MAPLIBRE_STYLE_URL" "$MAPLIBRE_TRUSTED_STYLES" "$MAPLIBRE_FULL_UNDERLAY" "$MAPLIBRE_MAX_ZOOM"; do
   if [[ "$value" == *"'"* ]]; then
     echo "[beagley-live] values may not contain single quotes: $value" >&2
     exit 2
@@ -182,6 +207,7 @@ BEAGLEY_RENDER_PROFILE=embedded
 BEAGLEY_EFFECT_LEVEL=$EFFECT_LEVEL
 BEAGLEY_GAUGE_DETAIL=$GAUGE_DETAIL
 BEAGLEY_GAUGE_DEMO=$GAUGE_DEMO
+BEAGLEY_CLUSTER_SIMULATION=$CLUSTER_SIMULATION
 BEAGLEY_MAP_RENDERER=$MAP_RENDERER
 BEAGLEY_MAP_BOOT_MODE=staged
 BEAGLEY_MAP_STYLE_MODE=embedded

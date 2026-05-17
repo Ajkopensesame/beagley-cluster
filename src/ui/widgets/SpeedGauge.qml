@@ -46,6 +46,8 @@ Item {
     property var vehicleState
     property bool stressScene: false
     property real stressPhase: 0.0
+    property bool simulationActive: false
+    property real simulationPhase: 0.0
     // Public API
     property real speed: 0
     property real maxSpeed: 180
@@ -170,16 +172,22 @@ Item {
     readonly property bool speedHeadScared: displaySpeed > 115
     readonly property bool coolantHeadScared: displayCoolantC >= 100
     readonly property var stressGearSequence: ["P", "R", "N", "D", "2", "1", "L"]
-    readonly property string displayGear: root.stressScene
+    readonly property string displayGear: root.simulationActive
+        ? stressGearSequence[Math.floor(root.simulationPhase / 0.9) % stressGearSequence.length]
+        : (root.stressScene
         ? stressGearSequence[Math.floor(root.stressPhase / 1.05) % stressGearSequence.length]
-        : (root.demoReadouts ? "D" : ((root.vehicleState && root.vehicleState.gear !== undefined) ? root.vehicleState.gear : "P"))
-    readonly property bool displayOverdrive: root.stressScene
+        : (root.demoReadouts ? "D" : ((root.vehicleState && root.vehicleState.gear !== undefined) ? root.vehicleState.gear : "P")))
+    readonly property bool displayOverdrive: root.simulationActive
+        ? ((Math.floor(root.simulationPhase / 1.4) % 2) === 0)
+        : (root.stressScene
         ? Math.sin(root.stressPhase * 0.95) > 0.0
-        : (root.demoReadouts ? true : !!(root.vehicleState && root.vehicleState.overdrive === true))
+        : (root.demoReadouts ? true : !!(root.vehicleState && root.vehicleState.overdrive === true)))
     readonly property real liveOdometerKm: liveOdometerKmValue()
-    readonly property real displayOdometerKm: root.stressScene
+    readonly property real displayOdometerKm: root.simulationActive
+        ? 284613 + Math.floor(root.simulationPhase * 12)
+        : (root.stressScene
         ? 284613 + Math.floor(root.stressPhase * 2.4)
-        : (root.demoReadouts ? 284613 : liveOdometerKm)
+        : (root.demoReadouts ? 284613 : liveOdometerKm))
     readonly property string odometerText: isFinite(displayOdometerKm)
         ? formatOdometerKm(displayOdometerKm)
         : "------"
