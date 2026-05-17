@@ -509,7 +509,7 @@ bool RadarImageService::composeRadarImage(const QList<RadarTile> &tiles,
                             kTileDrawSize);
         painter.drawImage(target, tile.mapImage);
     }
-    painter.fillRect(mapOutput.rect(), QColor(2, 4, 10, 58));
+    painter.fillRect(mapOutput.rect(), QColor(2, 4, 10, 28));
     painter.end();
 
     QImage radarOutput(QSize(kOutputWidth, kOutputHeight), QImage::Format_ARGB32_Premultiplied);

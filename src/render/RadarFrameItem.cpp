@@ -118,10 +118,9 @@ void drawMapBackground(QPainter &painter, const QImage &image, const QSize &targ
     const QRectF sourceRect = croppedSourceRect(image, targetSize);
     painter.save();
     painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
-    painter.setOpacity(0.86);
-    painter.drawImage(QRectF(0, 0, targetSize.width(), targetSize.height()), image, sourceRect);
     painter.setOpacity(1.0);
-    painter.fillRect(QRectF(0, 0, targetSize.width(), targetSize.height()), QColor(2, 4, 10, 82));
+    painter.drawImage(QRectF(0, 0, targetSize.width(), targetSize.height()), image, sourceRect);
+    painter.fillRect(QRectF(0, 0, targetSize.width(), targetSize.height()), QColor(2, 4, 10, 24));
     painter.restore();
 }
 
