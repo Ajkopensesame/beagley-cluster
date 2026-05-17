@@ -276,7 +276,7 @@ Window {
     function gaugePointY(height, angleDeg, radius) {
         return height * 0.5 + Math.sin((angleDeg - 90) * Math.PI / 180) * radius
     }
-    readonly property int indicatorVisualHoldMs: clusterSimulation ? 450 : 1850
+    readonly property int indicatorVisualHoldMs: root.gaugeIndicatorCascadeCycleMs + 250
     readonly property int simulationIndicatorStep: Math.floor(clusterSimulationDiscretePhase / 1.8) % 4
     readonly property bool rawLeftIndicator: clusterSimulation
         ? (simulationIndicatorStep === 0 || simulationIndicatorStep === 2)

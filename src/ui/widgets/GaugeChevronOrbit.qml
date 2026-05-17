@@ -22,6 +22,7 @@ Item {
     property real tailGamma: 1.20
     property real gravityExponent: 1.85
     property real topHoldPhase: 0.08
+    property real mergePhase: 0.14
     property color onColor: "#52FFE1"
     property bool simplified: false
     property real phaseOverride: NaN
@@ -54,20 +55,35 @@ Item {
         return clamp01((p - hold) / Math.max(0.001, 1.0 - hold))
     }
 
-    function fallDistance() {
-        return Math.pow(fallClock(), Math.max(1.0, root.gravityExponent))
+    function releaseStartForIndex(index) {
+        return Math.min(0.80, Math.max(0.0, index * root.tailSpacingPhase))
+    }
+
+    function mergeStart() {
+        var lastRelease = releaseStartForIndex(Math.max(0, root.chevrons - 1))
+        return Math.max(lastRelease + 0.02, 1.0 - clamp01(root.mergePhase))
+    }
+
+    function mergeProgress() {
+        var start = mergeStart()
+        return clamp01((fallClock() - start) / Math.max(0.001, 1.0 - start))
     }
 
     function phaseForIndex(index) {
-        return clamp01(fallDistance() - index * root.tailSpacingPhase)
+        var start = releaseStartForIndex(index)
+        var end = mergeStart()
+        if (fallClock() <= start)
+            return 0.0
+
+        var released = clamp01((fallClock() - start) / Math.max(0.001, end - start))
+        return Math.pow(released, Math.max(1.0, root.gravityExponent))
     }
 
     function releaseForIndex(index) {
         if (index <= 0)
             return 1.0
 
-        var distancePastRelease = fallDistance() - index * root.tailSpacingPhase
-        return clamp01(distancePastRelease / 0.045)
+        return clamp01((fallClock() - releaseStartForIndex(index)) / 0.045)
     }
 
     function angleDegForPhase(phase) {
@@ -88,7 +104,9 @@ Item {
 
         var tailT = root.chevrons <= 1 ? 0.0 : index / (root.chevrons - 1.0)
         var trailAlpha = Math.pow(1.0 - tailT * 0.32, root.tailGamma)
-        return clamp01(trailAlpha * release)
+        var merge = root.mergeProgress()
+        var mergeAlpha = index <= 0 ? 1.0 : (1.0 - merge)
+        return clamp01(trailAlpha * release * mergeAlpha)
     }
 
     NumberAnimation on headPhase {
@@ -118,7 +136,7 @@ Item {
             readonly property real centerPosX: root.centerX + Math.cos(angleRad) * root.orbitRadius
             readonly property real centerPosY: root.centerY + Math.sin(angleRad) * root.orbitRadius
 
-            visible: root.active && chevronAlpha > 0.01
+            visible: root.active
             opacity: chevronAlpha
             width: root.chevronSize * 1.72
             height: root.chevronSize * 1.26
