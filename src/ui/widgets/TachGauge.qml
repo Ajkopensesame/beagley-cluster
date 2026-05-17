@@ -12,6 +12,7 @@ Item {
     property bool demoTelltales: false
     property bool matrixRainEnabled: true
     property real matrixRainSharedPhase: NaN
+    property bool showArcHeads: true
 
     // Public API
     property real rpm: 0
@@ -382,6 +383,7 @@ Item {
             chromeColor: root.chromeColor
             progress: root.progress
             scaredHead: root.tachHeadScared
+            showArcHead: root.showArcHeads
             maxValue: root.maxRpm
             startAngleDeg: root.startAngleDeg
             sweepAngleDeg: root.sweepAngleDeg
@@ -626,7 +628,7 @@ Item {
 
             GaugeArcHead {
                 z: 48
-                visible: fuelArcLayer.headVisible
+                visible: root.showArcHeads && fuelArcLayer.headVisible
                 lowEffectMode: root.lowEffectMode
                 scared: root.fuelHeadScared
                 headRadius: root.sideArcHeadRadius

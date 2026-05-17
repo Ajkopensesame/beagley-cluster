@@ -1199,6 +1199,7 @@ Window {
                 effectLevel: root.gaugeEffectLevel
                 detailMode: root.gaugeDetail
                 demoReadouts: root.gaugeDemo
+                showArcHeads: !root.mapLibreSafeCompositor
                 stressScene: root.stressScene
                 stressPhase: root.stressPhase
                 matrixRainEnabled: root.gaugeMatrixRainEnabled
@@ -1295,6 +1296,7 @@ Window {
                 effectLevel: root.gaugeEffectLevel
                 detailMode: root.gaugeDetail
                 demoTelltales: root.gaugeDemo
+                showArcHeads: !root.mapLibreSafeCompositor
                 stressScene: root.stressScene
                 stressPhase: root.stressPhase
                 matrixRainEnabled: root.gaugeMatrixRainEnabled

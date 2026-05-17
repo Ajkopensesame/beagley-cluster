@@ -34,9 +34,9 @@ Item {
     readonly property real clampedPrimary: clamp(primaryProgress, 0, 1)
     readonly property real clampedAux: clamp(auxProgress, 0, 1)
     readonly property real primaryHeadDeg: startAngleDeg + sweepAngleDeg * clampedPrimary
-    readonly property real auxHeadDeg: auxStartDeg + auxSweepDeg * clampedAux
-    readonly property real primaryHeadRadius: Math.max(26, width * 0.043)
-    readonly property real auxHeadRadius: Math.max(24, width * 0.038)
+    readonly property real auxHeadDeg: auxStartDeg + auxSweepDeg * (1.0 - clampedAux)
+    readonly property real primaryHeadRadius: Math.max(17, width * 0.027)
+    readonly property real auxHeadRadius: Math.max(15, width * 0.024)
     readonly property color chromeColor: theme?.pearlLow ?? Qt.color("#C7B7FF")
     readonly property color textColor: theme?.text ?? Qt.color("#F7FBFF")
 

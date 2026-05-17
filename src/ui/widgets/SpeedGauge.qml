@@ -41,6 +41,7 @@ Item {
     property bool demoReadouts: false
     property bool matrixRainEnabled: true
     property real matrixRainSharedPhase: NaN
+    property bool showArcHeads: true
 
     property var vehicleState
     property bool stressScene: false
@@ -415,6 +416,7 @@ Item {
             chromeColor: root.chromeColor
             progress: root.progress
             scaredHead: root.speedHeadScared
+            showArcHead: root.showArcHeads
             maxValue: root.maxSpeed
             startAngleDeg: root.startAngleDeg
             sweepAngleDeg: root.sweepAngleDeg
@@ -664,7 +666,7 @@ Item {
 
             GaugeArcHead {
                 z: 48
-                visible: coolantArcLayer.headVisible
+                visible: root.showArcHeads && coolantArcLayer.headVisible
                 lowEffectMode: root.lowEffectMode
                 scared: root.coolantHeadScared
                 headRadius: root.sideArcHeadRadius

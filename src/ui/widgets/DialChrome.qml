@@ -11,6 +11,7 @@ Item {
     property real progress: 0.0
     property real lavaPhase: 0.0
     property bool scaredHead: false
+    property bool showArcHead: true
     property real maxValue: 100
     property real startAngleDeg: 225
     property real sweepAngleDeg: 210
@@ -478,7 +479,7 @@ Item {
     GaugeArcHead {
         id: arcHead
         z: 24
-        visible: root.headVisible
+        visible: root.showArcHead && root.headVisible
         lowEffectMode: root.lowEffectMode
         scared: root.scaredHead
         headRadius: root.headScreenRadius
