@@ -125,6 +125,7 @@ Window {
     property real sharedEffectPhase: 0.0
     property real stressPhase: 0.0
     property real clusterSimulationPhase: 0.0
+    property real clusterSimulationDiscretePhase: 0.0
 
     readonly property var hub: vehicleState
     readonly property bool linkOk: hub && hub.connected && !hub.linkStale
@@ -187,7 +188,7 @@ Window {
         ? (70 + 42 * Math.sin(stressPhase * 0.42 + 1.3))
         : (gaugeReviewMode ? 104 : coolantValue))
     readonly property int indicatorVisualHoldMs: clusterSimulation ? 450 : 1850
-    readonly property int simulationIndicatorStep: Math.floor(clusterSimulationPhase / 1.8) % 4
+    readonly property int simulationIndicatorStep: Math.floor(clusterSimulationDiscretePhase / 1.8) % 4
     readonly property bool rawLeftIndicator: clusterSimulation
         ? (simulationIndicatorStep === 0 || simulationIndicatorStep === 2)
         : (stressScene
@@ -804,6 +805,14 @@ Window {
         easing.type: Easing.Linear
     }
 
+    Timer {
+        id: clusterSimulationDiscreteClock
+        interval: 200
+        running: root.clusterSimulation
+        repeat: true
+        onTriggered: root.clusterSimulationDiscretePhase = root.clusterSimulationPhase
+    }
+
     function updateLeftIndicatorVisual() {
         if (root.rawLeftIndicator) {
             root.displayLeftIndicator = true
@@ -1236,7 +1245,7 @@ Window {
                 stressScene: root.stressScene
                 stressPhase: root.stressPhase
                 simulationActive: root.clusterSimulation
-                simulationPhase: root.clusterSimulationPhase
+                simulationPhase: root.clusterSimulationDiscretePhase
                 matrixRainEnabled: root.gaugeMatrixRainEnabled
                 matrixRainSharedPhase: root.gaugeMatrixRainSharedPhase
             }
@@ -1335,7 +1344,7 @@ Window {
                 stressScene: root.stressScene
                 stressPhase: root.stressPhase
                 simulationActive: root.clusterSimulation
-                simulationPhase: root.clusterSimulationPhase
+                simulationPhase: root.clusterSimulationDiscretePhase
                 matrixRainEnabled: root.gaugeMatrixRainEnabled
                 matrixRainSharedPhase: root.gaugeMatrixRainSharedPhase
             }
