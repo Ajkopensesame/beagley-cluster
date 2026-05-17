@@ -199,6 +199,34 @@ Window {
         ? (Math.floor(clusterSimulationDiscretePhase / 1.4) % 2) === 0
         : (gaugeReviewMode ? true : !!(hub && hub.highBeam))
     readonly property int simulationDriveStep: Math.floor(clusterSimulationDiscretePhase / 2.2) % 3
+    readonly property int simulationWarningStep: Math.floor(clusterSimulationDiscretePhase / 1.15) % 10
+    readonly property bool displayWarnDoorValue: clusterSimulation
+        ? (simulationWarningStep === 4 || simulationWarningStep === 8)
+        : (gaugeReviewMode ? true : truthOk && !!(hub && hub.warnDoor))
+    readonly property bool displayWarnChargeValue: clusterSimulation
+        ? (simulationWarningStep === 3 || simulationWarningStep === 8)
+        : (gaugeReviewMode ? true : truthOk && !!(hub && hub.warnCharge))
+    readonly property bool displayWarnBrakeValue: clusterSimulation
+        ? (simulationWarningStep === 1 || simulationWarningStep === 8)
+        : (gaugeReviewMode ? true : truthOk && !!(hub && hub.warnBrake))
+    readonly property bool displayWarnOilValue: clusterSimulation
+        ? (simulationWarningStep === 2 || simulationWarningStep === 8)
+        : (gaugeReviewMode ? true : truthOk && !!(hub && hub.warnOil))
+    readonly property bool displayWarnCheckEngineValue: clusterSimulation
+        ? (simulationWarningStep === 5 || simulationWarningStep === 8)
+        : (gaugeReviewMode ? true : truthOk && !!(hub && hub.warnCheckEngine))
+    readonly property bool displayWarnATValue: clusterSimulation
+        ? (simulationWarningStep === 6 || simulationWarningStep === 8)
+        : (gaugeReviewMode ? true : truthOk && !!(hub && hub.warnAT))
+    readonly property bool displayWarnFuelLowValue: clusterSimulation
+        ? (simulationWarningStep === 7 || simulationWarningStep === 8)
+        : (gaugeReviewMode ? true : truthOk && !!(hub && hub.warnFuelLow))
+    readonly property string displayDrivetrainModeValue: clusterSimulation
+        ? (simulationDriveStep === 0 ? "2wd" : "4wd")
+        : (gaugeReviewMode ? "4wd" : ((hub && hub.drivetrainMode) ? String(hub.drivetrainMode).toLowerCase() : "2wd"))
+    readonly property bool displayTransferLockValue: clusterSimulation
+        ? simulationDriveStep === 2
+        : (gaugeReviewMode ? false : truthOk && !!(hub && hub.transferLock))
     readonly property string displayDriveModeText: clusterSimulation
         ? (simulationDriveStep === 0 ? "2WD" : (simulationDriveStep === 1 ? "4WD" : "LOCK"))
         : (gaugeReviewMode ? "4WD" : ((hub && hub.drivetrainMode) ? String(hub.drivetrainMode).toUpperCase() : "2WD"))
@@ -206,16 +234,44 @@ Window {
         ? formatOdometerKm(284613 + Math.floor(clusterSimulationDiscretePhase * 12))
         : "------"
     function formatOdometerKm(value) {
-        let text = String(Math.max(0, Math.floor(Number(value) || 0)))
-        while (text.length < 6)
-            text = "0" + text
-        return text
+        const text = String(Math.max(0, Math.round(Number(value) || 0)))
+        let out = ""
+        let count = 0
+        for (let i = text.length - 1; i >= 0; --i) {
+            out = text.charAt(i) + out
+            ++count
+            if (i > 0 && count % 3 === 0)
+                out = " " + out
+        }
+        return out
     }
     function formatSpeedValue(value) {
         return String(Math.max(0, Math.round(Number(value) || 0)))
     }
     function formatRpmValue(value) {
         return (Math.max(0, Math.round((Number(value) || 0) / 100)) / 10).toFixed(1)
+    }
+    function normGear(value) {
+        if (value === undefined || value === null)
+            return ""
+        return String(value).trim().toUpperCase()
+    }
+    function gearColorFor(value) {
+        const gear = normGear(value)
+        if (gear === "R")
+            return appTheme.danger
+        if (gear === "P" || gear === "N" || gear === "D" || gear === "2" || gear === "1" || gear === "L")
+            return appTheme.pearlLow
+        return appTheme.text
+    }
+    function gaugeAngleDeg(index, count) {
+        return 225 + 210 * (Number(index) / Number(count))
+    }
+    function gaugePointX(width, angleDeg, radius) {
+        return width * 0.5 + Math.cos((angleDeg - 90) * Math.PI / 180) * radius
+    }
+    function gaugePointY(height, angleDeg, radius) {
+        return height * 0.5 + Math.sin((angleDeg - 90) * Math.PI / 180) * radius
     }
     readonly property int indicatorVisualHoldMs: clusterSimulation ? 450 : 1850
     readonly property int simulationIndicatorStep: Math.floor(clusterSimulationDiscretePhase / 1.8) % 4
@@ -1240,71 +1296,168 @@ Window {
                 anchors.fill: speedGauge
                 z: root.mapLibreSafeCompositor ? 130 : 30
 
-                Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.top: parent.top
-                    anchors.topMargin: parent.height * 0.18
-                    text: root.displayGearValue
-                    color: appTheme.speedColor(root.displaySpeedValue)
-                    font.family: "Oxanium"
-                    font.pixelSize: parent.width * 0.072
-                    font.bold: true
-                    renderType: root.menuTextRenderType
-                    horizontalAlignment: Text.AlignHCenter
+                Repeater {
+                    model: [
+                        { "label": "20", "index": 2 },
+                        { "label": "40", "index": 4 },
+                        { "label": "60", "index": 6 },
+                        { "label": "80", "index": 8 },
+                        { "label": "100", "index": 10 },
+                        { "label": "120", "index": 12 },
+                        { "label": "140", "index": 14 }
+                    ]
+
+                    delegate: Text {
+                        readonly property real labelAngle: root.gaugeAngleDeg(modelData.index, 14)
+                        x: root.gaugePointX(parent.width, labelAngle, parent.width * 0.322) - width / 2
+                        y: root.gaugePointY(parent.height, labelAngle, parent.height * 0.322) - height / 2
+                        text: modelData.label
+                        color: appTheme.pearlLow
+                        opacity: 0.72
+                        font.family: "Oxanium"
+                        font.pixelSize: parent.width * 0.027
+                        font.bold: true
+                        renderType: root.menuTextRenderType
+                        horizontalAlignment: Text.AlignHCenter
+                    }
+                }
+
+                Item {
+                    id: odBadge
+                    z: 62
+                    visible: root.displayOverdriveValue
+                    anchors.horizontalCenter: speedValueText.horizontalCenter
+                    anchors.bottom: speedValueText.top
+                    anchors.bottomMargin: parent.height * 0.017
+                    width: parent.width * 0.235
+                    height: parent.height * 0.083
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: height / 2
+                        color: "#140A22"
+                        border.width: Math.max(1, parent.width * 0.012)
+                        border.color: appTheme.amber
+                        opacity: 0.94
+                    }
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: height / 2
+                        color: "transparent"
+                        border.width: parent.height * 0.23
+                        border.color: Qt.rgba(appTheme.amber.r, appTheme.amber.g, appTheme.amber.b, 0.17)
+                    }
+
+                    Rectangle {
+                        x: parent.width * 0.06
+                        y: parent.height * 0.17
+                        width: parent.width * 0.88
+                        height: parent.height * 0.66
+                        radius: height / 2
+                        color: "transparent"
+                        border.width: 1
+                        border.color: "#12FFFFFF"
+                    }
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "O/D"
+                        color: appTheme.amber
+                        font.family: "Oxanium"
+                        font.pixelSize: parent.height * 0.60
+                        font.bold: true
+                        font.letterSpacing: 4
+                        renderType: root.menuTextRenderType
+                    }
+
+                    SequentialAnimation on scale {
+                        running: odBadge.visible && !root.gaugeEffectsOff
+                        loops: Animation.Infinite
+                        NumberAnimation { from: 1.00; to: 1.04; duration: 420; easing.type: Easing.InOutQuad }
+                        NumberAnimation { from: 1.04; to: 1.00; duration: 420; easing.type: Easing.InOutQuad }
+                        PauseAnimation { duration: 260 }
+                    }
                 }
 
                 Text {
+                    id: speedValueText
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.verticalCenter: parent.verticalCenter
-                    anchors.verticalCenterOffset: -parent.height * 0.030
                     text: root.formatSpeedValue(root.displaySpeedValue)
-                    color: "#F6F0FF"
-                    font.family: "Oxanium"
-                    font.pixelSize: parent.width * 0.160
-                    font.bold: true
-                    renderType: root.menuTextRenderType
-                    horizontalAlignment: Text.AlignHCenter
-                }
-
-                Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.top: parent.verticalCenter
-                    anchors.topMargin: parent.height * 0.052
-                    text: "KPH"
-                    color: appTheme.pearlLow
-                    opacity: 0.82
-                    font.family: "Oxanium"
-                    font.pixelSize: parent.width * 0.040
-                    font.bold: true
-                    renderType: root.menuTextRenderType
-                    horizontalAlignment: Text.AlignHCenter
-                }
-
-                Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.top: parent.verticalCenter
-                    anchors.topMargin: parent.height * 0.155
-                    text: root.displayOdometerText
-                    color: appTheme.pearlLow
-                    opacity: 0.86
-                    font.family: "Oxanium"
-                    font.pixelSize: parent.width * 0.034
-                    font.bold: true
-                    renderType: root.menuTextRenderType
-                    horizontalAlignment: Text.AlignHCenter
-                }
-
-                Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.top: parent.verticalCenter
-                    anchors.topMargin: parent.height * 0.245
-                    text: root.displayOverdriveValue ? "O/D" : ""
                     color: appTheme.speedColor(root.displaySpeedValue)
                     font.family: "Oxanium"
-                    font.pixelSize: parent.width * 0.034
+                    font.pixelSize: parent.width * 0.166
                     font.bold: true
                     renderType: root.menuTextRenderType
                     horizontalAlignment: Text.AlignHCenter
+                    style: Text.Outline
+                    styleColor: "#F0000000"
+                }
+
+                Item {
+                    id: gearReadout
+                    z: 61
+                    anchors.top: speedValueText.bottom
+                    anchors.topMargin: parent.height * 0.006
+                    anchors.horizontalCenter: speedValueText.horizontalCenter
+                    width: parent.width * 0.132
+                    height: parent.height * 0.080
+
+                    Text {
+                        id: gearText
+                        anchors.centerIn: parent
+                        text: root.displayGearValue
+                        color: root.gearColorFor(text)
+                        font.family: "Oxanium"
+                        font.pixelSize: parent.parent.width * 0.075
+                        font.bold: true
+                        font.letterSpacing: 2
+                        renderType: root.menuTextRenderType
+                        horizontalAlignment: Text.AlignHCenter
+                        style: Text.Outline
+                        styleColor: "#F0000000"
+
+                        SequentialAnimation on opacity {
+                            running: root.normGear(gearText.text) === "R"
+                            loops: Animation.Infinite
+                            NumberAnimation { from: 1.0; to: 0.20; duration: 220 }
+                            NumberAnimation { from: 0.20; to: 1.0; duration: 220 }
+                        }
+                    }
+                }
+
+                Column {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.top: gearReadout.bottom
+                    anchors.topMargin: -parent.height * 0.006
+                    spacing: -2
+
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        text: root.displayOdometerText
+                        color: appTheme.pearlLow
+                        font.family: "Oxanium"
+                        font.pixelSize: speedGauge.width * 0.030
+                        font.bold: true
+                        renderType: root.menuTextRenderType
+                        horizontalAlignment: Text.AlignHCenter
+                        style: Text.Outline
+                        styleColor: "#F0000000"
+                    }
+
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        text: "KM"
+                        color: Qt.rgba(appTheme.pearlLow.r, appTheme.pearlLow.g, appTheme.pearlLow.b, 0.62)
+                        font.family: "Oxanium"
+                        font.pixelSize: speedGauge.width * 0.017
+                        font.bold: true
+                        renderType: root.menuTextRenderType
+                        horizontalAlignment: Text.AlignHCenter
+                        style: Text.Outline
+                        styleColor: "#D0000000"
+                    }
                 }
 
                 Text {
@@ -1392,92 +1545,62 @@ Window {
                 anchors.fill: tachGauge
                 z: root.mapLibreSafeCompositor ? 130 : 30
 
-                Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.top: parent.top
-                    anchors.topMargin: parent.height * 0.185
-                    text: "DRIVE"
-                    color: appTheme.pearlLow
-                    opacity: 0.82
-                    font.family: "Oxanium"
-                    font.pixelSize: parent.width * 0.038
-                    font.bold: true
-                    renderType: root.menuTextRenderType
-                    horizontalAlignment: Text.AlignHCenter
-                }
+                Repeater {
+                    model: [
+                        { "label": "1", "index": 2 },
+                        { "label": "2", "index": 4 },
+                        { "label": "3", "index": 6 },
+                        { "label": "4", "index": 8 },
+                        { "label": "5", "index": 10 },
+                        { "label": "6", "index": 12 },
+                        { "label": "7", "index": 14 },
+                        { "label": "8", "index": 16 }
+                    ]
 
-                Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.verticalCenter: parent.verticalCenter
-                    anchors.verticalCenterOffset: -parent.height * 0.030
-                    text: root.formatRpmValue(root.displayRpmValue)
-                    color: "#F6F0FF"
-                    font.family: "Oxanium"
-                    font.pixelSize: parent.width * 0.145
-                    font.bold: true
-                    renderType: root.menuTextRenderType
-                    horizontalAlignment: Text.AlignHCenter
-                }
-
-                Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.top: parent.verticalCenter
-                    anchors.topMargin: parent.height * 0.052
-                    text: "RPM x1000"
-                    color: appTheme.pearlLow
-                    opacity: 0.82
-                    font.family: "Oxanium"
-                    font.pixelSize: parent.width * 0.037
-                    font.bold: true
-                    renderType: root.menuTextRenderType
-                    horizontalAlignment: Text.AlignHCenter
-                }
-
-                Rectangle {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.top: parent.verticalCenter
-                    anchors.topMargin: parent.height * 0.162
-                    width: parent.width * 0.245
-                    height: Math.max(3, parent.height * 0.006)
-                    radius: height / 2
-                    color: appTheme.pearlLow
-                    opacity: 0.46
-                }
-
-                Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.top: parent.verticalCenter
-                    anchors.topMargin: parent.height * 0.186
-                    text: root.displayDriveModeText
-                    color: appTheme.rpmColor(root.displayRpmValue)
-                    font.family: "Oxanium"
-                    font.pixelSize: parent.width * 0.036
-                    font.bold: true
-                    renderType: root.menuTextRenderType
-                    horizontalAlignment: Text.AlignHCenter
-                }
-
-                Rectangle {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.top: parent.verticalCenter
-                    anchors.topMargin: parent.height * 0.262
-                    width: parent.width * 0.086
-                    height: width
-                    radius: width / 2
-                    visible: root.displayHighBeamValue
-                    color: "#143642"
-                    border.width: Math.max(2, parent.width * 0.005)
-                    border.color: "#59D8FF"
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "HI"
-                        color: "#C7F3FF"
+                    delegate: Text {
+                        readonly property real labelAngle: root.gaugeAngleDeg(modelData.index, 16)
+                        x: root.gaugePointX(parent.width, labelAngle, parent.width * 0.322) - width / 2
+                        y: root.gaugePointY(parent.height, labelAngle, parent.height * 0.322) - height / 2
+                        text: modelData.label
+                        color: appTheme.pearlLow
+                        opacity: 0.72
                         font.family: "Oxanium"
-                        font.pixelSize: parent.width * 0.36
+                        font.pixelSize: parent.width * 0.027
                         font.bold: true
                         renderType: root.menuTextRenderType
+                        horizontalAlignment: Text.AlignHCenter
                     }
+                }
+
+                W.VehicleInfoCenter {
+                    id: vicCenter
+                    anchors.centerIn: parent
+                    width: Math.min(parent.width, parent.height) * 0.50
+                    height: width
+                    z: 150
+                    theme: appTheme
+                    simplified: root.gaugeLowEffectMode
+                    pulseEnabled: !root.gaugeLowEffectMode
+                    warnDoor: root.displayWarnDoorValue
+                    warnCharge: root.displayWarnChargeValue
+                    warnBrake: root.displayWarnBrakeValue
+                    warnOil: root.displayWarnOilValue
+                    warnCheckEngine: root.displayWarnCheckEngineValue
+                    warnAT: root.displayWarnATValue
+                    warnFuelLow: root.displayWarnFuelLowValue
+                    drivetrainMode: root.displayDrivetrainModeValue
+                    transferLock: root.displayTransferLockValue
+                }
+
+                W.HighBeamHalo {
+                    anchors.centerIn: vicCenter
+                    z: 140
+                    vicDiameter: vicCenter.width
+                    ringThickness: 16
+                    gapPx: 3
+                    holdMs: 1100
+                    heartbeat: !root.gaugeEffectsOff
+                    active: root.displayHighBeamValue
                 }
 
                 Text {

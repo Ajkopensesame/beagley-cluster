@@ -11,9 +11,9 @@
 
 namespace {
 constexpr qreal kPrimaryStartDeg = 225.0;
-constexpr qreal kPrimarySweepDeg = 270.0;
-constexpr qreal kAuxStartDeg = 242.0;
-constexpr qreal kAuxSweepDeg = -124.0;
+constexpr qreal kPrimarySweepDeg = 210.0;
+constexpr qreal kAuxStartDeg = 87.0;
+constexpr qreal kAuxSweepDeg = 126.0;
 
 qreal finiteOr(qreal value, qreal fallback)
 {
@@ -348,6 +348,7 @@ QSGNode *NativeGaugeInstrumentItem::updatePaintNode(QSGNode *oldNode, UpdatePain
     const qreal radius = side * 0.405;
     const qreal stroke = side * (m_lowEffectMode ? 0.020 : 0.024);
     const qreal auxStroke = side * 0.014;
+    const qreal auxRadius = side * 0.360;
     const int arcSegments = m_lowEffectMode ? 96 : 128;
     if (staticChanged) {
         std::vector<QPointF> backgroundVertices;
@@ -358,11 +359,11 @@ QSGNode *NativeGaugeInstrumentItem::updatePaintNode(QSGNode *oldNode, UpdatePain
 
         appendDisc(backgroundVertices, center, side * 0.414, 64);
         appendArcBand(trackVertices, center, radius, stroke, kPrimaryStartDeg, kPrimarySweepDeg, 0.0, 1.0, arcSegments, true);
-        appendArcBand(auxTrackVertices, center, side * 0.270, auxStroke, kAuxStartDeg, kAuxSweepDeg, 0.0, 1.0, 64, true);
+        appendArcBand(auxTrackVertices, center, auxRadius, auxStroke, kAuxStartDeg, kAuxSweepDeg, 0.0, 1.0, 64, true);
         appendDisc(centerVertices, center, side * 0.0085, 18);
 
-        const int minorCount = m_kind == QLatin1String("tach") ? 40 : 28;
-        const int majorEvery = m_kind == QLatin1String("tach") ? 5 : 4;
+        const int minorCount = m_kind == QLatin1String("tach") ? 16 : 14;
+        const int majorEvery = 2;
         for (int i = 0; i <= minorCount; ++i) {
             const qreal progress = qreal(i) / qreal(minorCount);
             const qreal angle = angleRadians(kPrimaryStartDeg + kPrimarySweepDeg * progress);
@@ -389,7 +390,7 @@ QSGNode *NativeGaugeInstrumentItem::updatePaintNode(QSGNode *oldNode, UpdatePain
         std::vector<QPointF> auxVertices;
 
         appendArcBand(primaryVertices, center, radius, stroke, kPrimaryStartDeg, kPrimarySweepDeg, 0.0, mainProgress, arcSegments, true);
-        appendArcBand(auxVertices, center, side * 0.270, auxStroke, kAuxStartDeg, kAuxSweepDeg, 0.0, m_auxProgress, 64, true);
+        appendArcBand(auxVertices, center, auxRadius, auxStroke, kAuxStartDeg, kAuxSweepDeg, 1.0 - m_auxProgress, 1.0, 64, true);
         setGeometry(node->primaryArc, primaryVertices, withAlpha(m_primaryColor, 235));
         setGeometry(node->auxArc, auxVertices, withAlpha(m_auxColor, 224));
         node->dynamicRevision = m_dynamicRevision;
