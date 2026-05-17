@@ -484,7 +484,8 @@ Item {
                 radiusFactor: 0.36
                 strokeWidth: root.lowEffectMode ? 10 : 18
                 color: root.colorWithAlpha(fuelArcLayer.baseDark, root.lowEffectMode ? 0.10 : 0.08)
-                segments: 80
+                segments: root.lowEffectMode ? 20 : 32
+                roundedCaps: false
             }
 
             GaugeArcItem {
@@ -498,13 +499,14 @@ Item {
                 radiusFactor: 0.36
                 strokeWidth: root.lowEffectMode ? 7 : 12
                 color: root.colorWithAlpha(fuelArcLayer.fuelColor, root.lowEffectMode ? 0.76 : 0.82)
-                segments: 80
+                segments: root.lowEffectMode ? 20 : 32
+                roundedCaps: false
             }
 
             GaugeArcItem {
                 anchors.fill: parent
                 z: 46
-                visible: root.paintedFuelNorm > 0.002
+                visible: false
                 startAngleDeg: fuelArcLayer.startDeg
                 sweepAngleDeg: fuelArcLayer.sweepDeg
                 startProgress: 1.0 - root.paintedFuelNorm
@@ -512,7 +514,8 @@ Item {
                 radiusFactor: 0.36
                 strokeWidth: root.lowEffectMode ? 2.0 : 2.8
                 color: root.colorWithAlpha(fuelArcLayer.fuelBright, root.lowEffectMode ? 0.22 : 0.26)
-                segments: 80
+                segments: root.lowEffectMode ? 16 : 24
+                roundedCaps: false
             }
 
             Canvas {

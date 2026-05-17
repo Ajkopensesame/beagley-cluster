@@ -500,7 +500,8 @@ Item {
                 radiusFactor: 0.36
                 strokeWidth: root.lowEffectMode ? 10 : 18
                 color: root.colorWithAlpha(coolantArcLayer.baseDark, root.lowEffectMode ? 0.10 : 0.08)
-                segments: 80
+                segments: root.lowEffectMode ? 20 : 32
+                roundedCaps: false
             }
 
             GaugeArcItem {
@@ -514,13 +515,14 @@ Item {
                 radiusFactor: 0.36
                 strokeWidth: root.lowEffectMode ? 7 : 12
                 color: root.colorWithAlpha(coolantArcLayer.coolantColor, root.lowEffectMode ? 0.76 : 0.82)
-                segments: 80
+                segments: root.lowEffectMode ? 20 : 32
+                roundedCaps: false
             }
 
             GaugeArcItem {
                 anchors.fill: parent
                 z: 46
-                visible: root.paintedCoolantVisualNorm > 0.002
+                visible: false
                 startAngleDeg: coolantArcLayer.startDeg
                 sweepAngleDeg: coolantArcLayer.sweepDeg
                 startProgress: 1.0 - root.paintedCoolantVisualNorm
@@ -528,7 +530,8 @@ Item {
                 radiusFactor: 0.36
                 strokeWidth: root.lowEffectMode ? 2.0 : 2.8
                 color: root.colorWithAlpha(coolantArcLayer.coolantBright, root.lowEffectMode ? 0.22 : 0.26)
-                segments: 80
+                segments: root.lowEffectMode ? 16 : 24
+                roundedCaps: false
             }
 
             Canvas {

@@ -249,7 +249,8 @@ Item {
         radiusFactor: root.arcRadiusFactor
         strokeWidth: root.lowEffectMode ? 13 : 18
         color: root.colorWithAlpha(root.chromeColor, root.lowEffectMode ? 0.08 : 0.07)
-        segments: 96
+        segments: root.lowEffectMode ? 32 : 48
+        roundedCaps: false
     }
 
     GaugeArcItem {
@@ -262,7 +263,8 @@ Item {
         radiusFactor: root.arcRadiusFactor
         strokeWidth: root.lowEffectMode ? 5.5 : 7.0
         color: root.colorWithAlpha(root.chromeColor, root.lowEffectMode ? 0.26 : 0.30)
-        segments: 96
+        segments: root.lowEffectMode ? 32 : 48
+        roundedCaps: false
     }
 
     GaugeArcItem {
@@ -275,7 +277,8 @@ Item {
         radiusFactor: root.arcRadiusFactor
         strokeWidth: root.lowEffectMode ? 1.7 : 2.2
         color: root.colorWithAlpha(root.blendToward(root.chromeColor, Qt.color("#FFFFFF"), 0.28, 0.98), root.lowEffectMode ? 0.10 : 0.12)
-        segments: 96
+        segments: root.lowEffectMode ? 24 : 36
+        roundedCaps: false
     }
 
     GaugeArcItem {
@@ -289,13 +292,14 @@ Item {
         radiusFactor: root.arcRadiusFactor
         strokeWidth: root.lowEffectMode ? 7.5 : 10.5
         color: root.colorWithAlpha(root.gaugeColor, root.lowEffectMode ? 0.78 : 0.84)
-        segments: 96
+        segments: root.lowEffectMode ? 32 : 48
+        roundedCaps: false
     }
 
     GaugeArcItem {
         anchors.fill: parent
         z: 24
-        visible: root.paintedProgress > 0.002
+        visible: false
         startAngleDeg: root.startAngleDeg
         sweepAngleDeg: root.sweepAngleDeg
         startProgress: 0.0
@@ -303,7 +307,8 @@ Item {
         radiusFactor: root.arcRadiusFactor
         strokeWidth: root.lowEffectMode ? 2.0 : 2.8
         color: root.colorWithAlpha(root.blendToward(root.gaugeColor, Qt.color("#FFFFFF"), 0.34, 0.98), root.lowEffectMode ? 0.22 : 0.26)
-        segments: 96
+        segments: root.lowEffectMode ? 20 : 32
+        roundedCaps: false
     }
 
     Canvas {
