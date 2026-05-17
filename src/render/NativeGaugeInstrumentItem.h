@@ -56,7 +56,8 @@ protected:
     void geometryChange(const QRectF &newGeometry, const QRectF &oldGeometry) override;
 
 private:
-    void invalidateGeometry();
+    void invalidateStaticGeometry();
+    void invalidateDynamicGeometry();
 
     QString m_kind = QStringLiteral("speed");
     qreal m_value = 0.0;
@@ -67,5 +68,6 @@ private:
     QColor m_chromeColor = QColor(QStringLiteral("#C7B7FF"));
     bool m_lowEffectMode = true;
 
-    int m_geometryRevision = 0;
+    int m_staticRevision = 0;
+    int m_dynamicRevision = 0;
 };

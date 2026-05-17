@@ -200,7 +200,8 @@ public:
     QSGGeometryNode *auxArc = nullptr;
     QSGGeometryNode *centerDot = nullptr;
     QSizeF geometrySize;
-    int geometryRevision = -1;
+    int staticRevision = -1;
+    int dynamicRevision = -1;
 };
 } // namespace
 
@@ -220,7 +221,8 @@ void NativeGaugeInstrumentItem::setKind(const QString &value)
         return;
     }
     m_kind = next;
-    invalidateGeometry();
+    invalidateStaticGeometry();
+    invalidateDynamicGeometry();
     emit appearanceChanged();
 }
 
@@ -231,7 +233,7 @@ void NativeGaugeInstrumentItem::setValue(qreal value)
         return;
     }
     m_value = value;
-    invalidateGeometry();
+    invalidateDynamicGeometry();
     emit valueChanged();
 }
 
@@ -242,7 +244,7 @@ void NativeGaugeInstrumentItem::setMaxValue(qreal value)
         return;
     }
     m_maxValue = value;
-    invalidateGeometry();
+    invalidateDynamicGeometry();
     emit geometryInputChanged();
 }
 
@@ -253,7 +255,7 @@ void NativeGaugeInstrumentItem::setAuxProgress(qreal value)
         return;
     }
     m_auxProgress = value;
-    invalidateGeometry();
+    invalidateDynamicGeometry();
     emit geometryInputChanged();
 }
 
@@ -263,7 +265,7 @@ void NativeGaugeInstrumentItem::setPrimaryColor(const QColor &value)
         return;
     }
     m_primaryColor = value;
-    invalidateGeometry();
+    invalidateDynamicGeometry();
     emit appearanceChanged();
 }
 
@@ -273,7 +275,7 @@ void NativeGaugeInstrumentItem::setAuxColor(const QColor &value)
         return;
     }
     m_auxColor = value;
-    invalidateGeometry();
+    invalidateDynamicGeometry();
     emit appearanceChanged();
 }
 
@@ -283,7 +285,7 @@ void NativeGaugeInstrumentItem::setChromeColor(const QColor &value)
         return;
     }
     m_chromeColor = value;
-    invalidateGeometry();
+    invalidateStaticGeometry();
     emit appearanceChanged();
 }
 
@@ -293,7 +295,8 @@ void NativeGaugeInstrumentItem::setLowEffectMode(bool value)
         return;
     }
     m_lowEffectMode = value;
-    invalidateGeometry();
+    invalidateStaticGeometry();
+    invalidateDynamicGeometry();
     emit appearanceChanged();
 }
 
@@ -301,13 +304,20 @@ void NativeGaugeInstrumentItem::geometryChange(const QRectF &newGeometry, const 
 {
     QQuickItem::geometryChange(newGeometry, oldGeometry);
     if (newGeometry.size() != oldGeometry.size()) {
-        invalidateGeometry();
+        invalidateStaticGeometry();
+        invalidateDynamicGeometry();
     }
 }
 
-void NativeGaugeInstrumentItem::invalidateGeometry()
+void NativeGaugeInstrumentItem::invalidateStaticGeometry()
 {
-    ++m_geometryRevision;
+    ++m_staticRevision;
+    update();
+}
+
+void NativeGaugeInstrumentItem::invalidateDynamicGeometry()
+{
+    ++m_dynamicRevision;
     update();
 }
 
@@ -327,7 +337,10 @@ QSGNode *NativeGaugeInstrumentItem::updatePaintNode(QSGNode *oldNode, UpdatePain
     }
 
     const QSizeF itemSize(itemWidth, itemHeight);
-    if (node->geometryRevision == m_geometryRevision && node->geometrySize == itemSize) {
+    const bool sizeChanged = node->geometrySize != itemSize;
+    const bool staticChanged = sizeChanged || node->staticRevision != m_staticRevision;
+    const bool dynamicChanged = sizeChanged || node->dynamicRevision != m_dynamicRevision;
+    if (!staticChanged && !dynamicChanged) {
         return node;
     }
 
@@ -336,46 +349,52 @@ QSGNode *NativeGaugeInstrumentItem::updatePaintNode(QSGNode *oldNode, UpdatePain
     const qreal stroke = side * (m_lowEffectMode ? 0.020 : 0.024);
     const qreal auxStroke = side * 0.014;
     const int arcSegments = m_lowEffectMode ? 96 : 128;
-    const qreal mainProgress = clampProgress(m_value / qMax(1.0, m_maxValue));
+    if (staticChanged) {
+        std::vector<QPointF> backgroundVertices;
+        std::vector<QPointF> trackVertices;
+        std::vector<QPointF> auxTrackVertices;
+        std::vector<QPointF> tickVertices;
+        std::vector<QPointF> centerVertices;
 
-    std::vector<QPointF> backgroundVertices;
-    std::vector<QPointF> trackVertices;
-    std::vector<QPointF> auxTrackVertices;
-    std::vector<QPointF> tickVertices;
-    std::vector<QPointF> primaryVertices;
-    std::vector<QPointF> auxVertices;
-    std::vector<QPointF> centerVertices;
+        appendDisc(backgroundVertices, center, side * 0.414, 64);
+        appendArcBand(trackVertices, center, radius, stroke, kPrimaryStartDeg, kPrimarySweepDeg, 0.0, 1.0, arcSegments, true);
+        appendArcBand(auxTrackVertices, center, side * 0.270, auxStroke, kAuxStartDeg, kAuxSweepDeg, 0.0, 1.0, 64, true);
+        appendDisc(centerVertices, center, side * 0.0085, 18);
 
-    appendDisc(backgroundVertices, center, side * 0.414, 64);
-    appendArcBand(trackVertices, center, radius, stroke, kPrimaryStartDeg, kPrimarySweepDeg, 0.0, 1.0, arcSegments, true);
-    appendArcBand(auxTrackVertices, center, side * 0.270, auxStroke, kAuxStartDeg, kAuxSweepDeg, 0.0, 1.0, 64, true);
-    appendArcBand(primaryVertices, center, radius, stroke, kPrimaryStartDeg, kPrimarySweepDeg, 0.0, mainProgress, arcSegments, true);
-    appendArcBand(auxVertices, center, side * 0.270, auxStroke, kAuxStartDeg, kAuxSweepDeg, 0.0, m_auxProgress, 64, true);
-    appendDisc(centerVertices, center, side * 0.0085, 18);
+        const int minorCount = m_kind == QLatin1String("tach") ? 40 : 28;
+        const int majorEvery = m_kind == QLatin1String("tach") ? 5 : 4;
+        for (int i = 0; i <= minorCount; ++i) {
+            const qreal progress = qreal(i) / qreal(minorCount);
+            const qreal angle = angleRadians(kPrimaryStartDeg + kPrimarySweepDeg * progress);
+            const bool major = (i % majorEvery) == 0;
+            appendTick(tickVertices,
+                       center,
+                       angle,
+                       radius - stroke * (major ? 2.25 : 1.50),
+                       radius + stroke * (major ? 1.75 : 1.15),
+                       stroke * (major ? 0.18 : 0.115));
+        }
 
-    const int minorCount = m_kind == QLatin1String("tach") ? 40 : 28;
-    const int majorEvery = m_kind == QLatin1String("tach") ? 5 : 4;
-    for (int i = 0; i <= minorCount; ++i) {
-        const qreal progress = qreal(i) / qreal(minorCount);
-        const qreal angle = angleRadians(kPrimaryStartDeg + kPrimarySweepDeg * progress);
-        const bool major = (i % majorEvery) == 0;
-        appendTick(tickVertices,
-                   center,
-                   angle,
-                   radius - stroke * (major ? 2.25 : 1.50),
-                   radius + stroke * (major ? 1.75 : 1.15),
-                   stroke * (major ? 0.18 : 0.115));
+        setGeometry(node->background, backgroundVertices, withAlpha(QColor(QStringLiteral("#010309")), 254));
+        setGeometry(node->track, trackVertices, withAlpha(m_chromeColor, m_lowEffectMode ? 48 : 62));
+        setGeometry(node->auxTrack, auxTrackVertices, withAlpha(m_chromeColor, m_lowEffectMode ? 44 : 58));
+        setGeometry(node->ticks, tickVertices, withAlpha(m_chromeColor, m_lowEffectMode ? 132 : 160));
+        setGeometry(node->centerDot, centerVertices, withAlpha(m_chromeColor, 150));
+        node->staticRevision = m_staticRevision;
     }
 
-    setGeometry(node->background, backgroundVertices, withAlpha(QColor(QStringLiteral("#010309")), 254));
-    setGeometry(node->track, trackVertices, withAlpha(m_chromeColor, m_lowEffectMode ? 48 : 62));
-    setGeometry(node->auxTrack, auxTrackVertices, withAlpha(m_chromeColor, m_lowEffectMode ? 44 : 58));
-    setGeometry(node->ticks, tickVertices, withAlpha(m_chromeColor, m_lowEffectMode ? 132 : 160));
-    setGeometry(node->primaryArc, primaryVertices, withAlpha(m_primaryColor, 235));
-    setGeometry(node->auxArc, auxVertices, withAlpha(m_auxColor, 224));
-    setGeometry(node->centerDot, centerVertices, withAlpha(m_chromeColor, 150));
+    if (dynamicChanged) {
+        const qreal mainProgress = clampProgress(m_value / qMax(1.0, m_maxValue));
+        std::vector<QPointF> primaryVertices;
+        std::vector<QPointF> auxVertices;
+
+        appendArcBand(primaryVertices, center, radius, stroke, kPrimaryStartDeg, kPrimarySweepDeg, 0.0, mainProgress, arcSegments, true);
+        appendArcBand(auxVertices, center, side * 0.270, auxStroke, kAuxStartDeg, kAuxSweepDeg, 0.0, m_auxProgress, 64, true);
+        setGeometry(node->primaryArc, primaryVertices, withAlpha(m_primaryColor, 235));
+        setGeometry(node->auxArc, auxVertices, withAlpha(m_auxColor, 224));
+        node->dynamicRevision = m_dynamicRevision;
+    }
 
     node->geometrySize = itemSize;
-    node->geometryRevision = m_geometryRevision;
     return node;
 }
