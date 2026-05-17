@@ -145,6 +145,7 @@ Item {
     readonly property real coolantRepaintThreshold: simulationActive ? 0.0 : (lowEffectMode ? 0.30 : (embeddedHighEffectBudgetMode ? 2.0 : 1e-4))
     property real lastPaintedSpeed: 0
     property real lastPaintedCoolantC: 70
+    property bool simulationApplyPending: false
 
     function requestGaugeStaticPaint() {
         dialChrome.requestStaticPaint();
@@ -166,13 +167,20 @@ Item {
         requestCoolantPaint();
     }
     function applySimulationValues() {
+        root.simulationApplyPending = false;
         root.displaySpeed = clamp(root.speed, 0, root.maxSpeed);
         root.displayCoolantC = root.coolantC;
         requestGaugeDynamicPaint();
     }
+    function queueSimulationApply() {
+        if (root.simulationApplyPending)
+            return;
+        root.simulationApplyPending = true;
+        Qt.callLater(root.applySimulationValues);
+    }
     function kickSmoother() {
         if (root.simulationActive) {
-            applySimulationValues();
+            queueSimulationApply();
             return;
         }
         if (!smoothingTimer.running) smoothingTimer.start();
@@ -301,6 +309,7 @@ Item {
     onCoolantCChanged: kickSmoother()
     onMaxSpeedChanged: kickSmoother()
     onSimulationActiveChanged: {
+        simulationApplyPending = false
         if (simulationActive)
             applySimulationValues()
         else

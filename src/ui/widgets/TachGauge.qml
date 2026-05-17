@@ -102,6 +102,7 @@ Item {
     readonly property real fuelRepaintThreshold: simulationActive ? 0.0 : (lowEffectMode ? 0.30 : (embeddedHighEffectBudgetMode ? 2.0 : 1e-4))
     property real lastPaintedRpm: 0
     property real lastPaintedFuel: 100
+    property bool simulationApplyPending: false
 
     function requestGaugeStaticPaint() {
         dialChrome.requestStaticPaint();
@@ -123,13 +124,20 @@ Item {
         requestFuelPaint();
     }
     function applySimulationValues() {
+        root.simulationApplyPending = false;
         root.displayRpm = clamp(root.rpm, 0, root.maxRpm);
         root.displayFuel = clamp(root.fuelPct, 0, 100);
         requestGaugeDynamicPaint();
     }
+    function queueSimulationApply() {
+        if (root.simulationApplyPending)
+            return;
+        root.simulationApplyPending = true;
+        Qt.callLater(root.applySimulationValues);
+    }
     function kickSmoother() {
         if (root.simulationActive) {
-            applySimulationValues();
+            queueSimulationApply();
             return;
         }
         if (!smoothingTimer.running) smoothingTimer.start();
@@ -281,6 +289,7 @@ Item {
     onFuelPctChanged: kickSmoother()
     onMaxRpmChanged: kickSmoother()
     onSimulationActiveChanged: {
+        simulationApplyPending = false
         if (simulationActive)
             applySimulationValues()
         else

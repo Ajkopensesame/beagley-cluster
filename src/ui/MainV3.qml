@@ -794,12 +794,14 @@ Window {
         onTriggered: root.stressPhase += interval / 1000.0
     }
 
-    Timer {
+    NumberAnimation on clusterSimulationPhase {
         id: clusterSimulationClock
-        interval: 16
         running: root.clusterSimulation
-        repeat: true
-        onTriggered: root.clusterSimulationPhase += 1.0 / 60.0
+        loops: Animation.Infinite
+        from: 0.0
+        to: 3600.0
+        duration: 3600000
+        easing.type: Easing.Linear
     }
 
     function updateLeftIndicatorVisual() {
