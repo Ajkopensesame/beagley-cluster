@@ -1,6 +1,7 @@
 import QtQuick 2.15
 import QtQuick.Window 2.15
 import Qt.labs.settings
+import BeagleY 1.0
 
 import "./theme" as Theme
 import "widgets" as W
@@ -187,6 +188,29 @@ Window {
         : (stressScene
         ? (70 + 42 * Math.sin(stressPhase * 0.42 + 1.3))
         : (gaugeReviewMode ? 104 : coolantValue))
+    readonly property var simulationGearSequence: ["P", "R", "N", "D", "2", "1", "L"]
+    readonly property string displayGearValue: clusterSimulation
+        ? simulationGearSequence[Math.floor(clusterSimulationDiscretePhase / 1.25) % simulationGearSequence.length]
+        : (gaugeReviewMode ? "D" : gearText)
+    readonly property bool displayOverdriveValue: clusterSimulation
+        ? (Math.floor(clusterSimulationDiscretePhase / 2.6) % 2) === 0
+        : (gaugeReviewMode ? true : !!(hub && hub.overdrive))
+    readonly property bool displayHighBeamValue: clusterSimulation
+        ? (Math.floor(clusterSimulationDiscretePhase / 1.4) % 2) === 0
+        : (gaugeReviewMode ? true : !!(hub && hub.highBeam))
+    readonly property int simulationDriveStep: Math.floor(clusterSimulationDiscretePhase / 2.2) % 3
+    readonly property string displayDriveModeText: clusterSimulation
+        ? (simulationDriveStep === 0 ? "2WD" : (simulationDriveStep === 1 ? "4WD" : "LOCK"))
+        : (gaugeReviewMode ? "4WD" : ((hub && hub.drivetrainMode) ? String(hub.drivetrainMode).toUpperCase() : "2WD"))
+    readonly property string displayOdometerText: clusterSimulation
+        ? formatOdometerKm(284613 + Math.floor(clusterSimulationDiscretePhase * 12))
+        : "------"
+    function formatOdometerKm(value) {
+        let text = String(Math.max(0, Math.floor(Number(value) || 0)))
+        while (text.length < 6)
+            text = "0" + text
+        return text
+    }
     readonly property int indicatorVisualHoldMs: clusterSimulation ? 450 : 1850
     readonly property int simulationIndicatorStep: Math.floor(clusterSimulationDiscretePhase / 1.8) % 4
     readonly property bool rawLeftIndicator: clusterSimulation
@@ -1190,64 +1214,25 @@ Window {
                 color: "#010309"
             }
 
-            W.GaugeLensShell {
-                anchors.fill: parent
-                visible: !root.gaugeLowEffectMode
-                theme: appTheme
-                effectLevel: root.gaugeEffectLevel
-                gaugeColor: appTheme.speedColor(root.displaySpeedValue)
-                chromeColor: appTheme.pearlLow
-                podSize: root.gaugePodSize
-                faceSize: root.gaugeFaceSize
-            }
-
-            W.MapLibreGaugeBackplate {
-                anchors.centerIn: parent
-                width: root.gaugeFaceSize
-                height: root.gaugeFaceSize
-                z: root.mapLibreSafeCompositor ? 120 : -1
-                visible: root.mapLibreNativeActive
-                drawFaceBackground: !root.mapLibreSafeCompositor
-                theme: appTheme
-                primaryColor: appTheme.speedColor(root.displaySpeedValue)
-                auxColor: root.displayCoolantValue >= 100 ? appTheme.danger : (root.displayCoolantValue < 40 ? "#63C9FF" : appTheme.pearlLow)
-                primaryProgress: Math.max(0, Math.min(1, root.displaySpeedValue / 140))
-                auxProgress: Math.max(0.14, Math.min(1, (root.displayCoolantValue - 40) / 70))
-                primaryScared: root.displaySpeedValue > 115
-                auxScared: root.displayCoolantValue >= 100
-                matrixRainVisible: root.gaugeMatrixRainEnabled && root.gaugeReviewMode
-                matrixRainColor: appTheme.speedColor(root.displaySpeedValue)
-                maxValue: 140
-                minorStep: 10
-                majorStep: 20
-                labelStep: 20
-                labelStart: 20
-                labelDivisor: 1
-                auxStartLabel: "H"
-                auxEndLabel: "C"
-            }
-
-            W.SpeedGauge {
+            NativeGaugeInstrument {
                 id: speedGauge
                 anchors.centerIn: parent
                 width: root.gaugeFaceSize
                 height: root.gaugeFaceSize
-                theme: appTheme
-                vehicleState: hub
-                maxSpeed: 140
-                speed: displaySpeedValue
-                coolantC: displayCoolantValue
                 z: 20
-                effectLevel: root.gaugeEffectLevel
-                detailMode: root.gaugeDetail
-                demoReadouts: root.gaugeDemo
-                showArcHeads: false
-                stressScene: root.stressScene
-                stressPhase: root.stressPhase
-                simulationActive: root.clusterSimulation
-                simulationPhase: root.clusterSimulationDiscretePhase
-                matrixRainEnabled: root.gaugeMatrixRainEnabled
-                matrixRainSharedPhase: root.gaugeMatrixRainSharedPhase
+                kind: "speed"
+                value: root.displaySpeedValue
+                maxValue: 140
+                auxProgress: Math.max(0.14, Math.min(1, (root.displayCoolantValue - 40) / 70))
+                primaryColor: appTheme.speedColor(root.displaySpeedValue)
+                auxColor: root.displayCoolantValue >= 100 ? appTheme.danger : (root.displayCoolantValue < 40 ? "#63C9FF" : appTheme.pearlLow)
+                chromeColor: appTheme.pearlLow
+                lowEffectMode: root.gaugeLowEffectMode
+                centerText: root.displayGearValue
+                statusText: root.displayOverdriveValue ? "O/D" : ""
+                bottomText: root.displayOdometerText
+                bottomSubText: "KM"
+                overdrive: root.displayOverdriveValue
             }
 
             W.GaugeChevronOrbit {
@@ -1290,63 +1275,23 @@ Window {
                 color: "#010309"
             }
 
-            W.GaugeLensShell {
-                anchors.fill: parent
-                visible: !root.gaugeLowEffectMode
-                theme: appTheme
-                effectLevel: root.gaugeEffectLevel
-                gaugeColor: appTheme.rpmColor(root.displayRpmValue)
-                chromeColor: appTheme.pearlLow
-                podSize: root.gaugePodSize
-                faceSize: root.gaugeFaceSize
-            }
-
-            W.MapLibreGaugeBackplate {
-                anchors.centerIn: parent
-                width: root.gaugeFaceSize
-                height: root.gaugeFaceSize
-                z: root.mapLibreSafeCompositor ? 120 : -1
-                visible: root.mapLibreNativeActive
-                drawFaceBackground: !root.mapLibreSafeCompositor
-                theme: appTheme
-                primaryColor: appTheme.rpmColor(root.displayRpmValue)
-                auxColor: root.displayFuelValue <= 12 ? appTheme.danger : appTheme.pearlLow
-                primaryProgress: Math.max(0, Math.min(1, root.displayRpmValue / 8000))
-                auxProgress: Math.max(0, Math.min(1, root.displayFuelValue / 100))
-                primaryScared: root.displayRpmValue > 3500
-                auxScared: root.displayFuelValue <= 15
-                matrixRainVisible: root.gaugeMatrixRainEnabled && root.gaugeReviewMode
-                matrixRainColor: appTheme.rpmColor(root.displayRpmValue)
-                maxValue: 8
-                minorStep: 0.5
-                majorStep: 1
-                labelStep: 1
-                labelStart: 1
-                labelDivisor: 1
-                auxStartLabel: "F"
-                auxEndLabel: "E"
-            }
-
-            W.TachGauge {
+            NativeGaugeInstrument {
                 id: tachGauge
                 anchors.centerIn: parent
                 width: root.gaugeFaceSize
                 height: root.gaugeFaceSize
-                theme: appTheme
-                vehicleState: hub
-                rpm: displayRpmValue
-                fuelPct: displayFuelValue
                 z: 20
-                effectLevel: root.gaugeEffectLevel
-                detailMode: root.gaugeDetail
-                demoTelltales: root.gaugeDemo
-                showArcHeads: false
-                stressScene: root.stressScene
-                stressPhase: root.stressPhase
-                simulationActive: root.clusterSimulation
-                simulationPhase: root.clusterSimulationDiscretePhase
-                matrixRainEnabled: root.gaugeMatrixRainEnabled
-                matrixRainSharedPhase: root.gaugeMatrixRainSharedPhase
+                kind: "tach"
+                value: root.displayRpmValue
+                maxValue: 8000
+                auxProgress: Math.max(0, Math.min(1, root.displayFuelValue / 100))
+                primaryColor: appTheme.rpmColor(root.displayRpmValue)
+                auxColor: root.displayFuelValue <= 12 ? appTheme.danger : appTheme.pearlLow
+                chromeColor: appTheme.pearlLow
+                lowEffectMode: root.gaugeLowEffectMode
+                centerText: "DRIVE"
+                driveModeText: root.displayDriveModeText
+                highBeam: root.displayHighBeamValue
             }
 
             W.GaugeChevronOrbit {
