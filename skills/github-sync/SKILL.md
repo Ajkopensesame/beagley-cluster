@@ -20,10 +20,10 @@ skills/github-sync/scripts/check.sh --fetch
 
 - `up_to_date`: no GitHub action needed.
 - `dirty`: local uncommitted work exists. Do not hide it or overwrite it.
-- `ahead`: local commits are not on GitHub. Push only if the user asked to publish.
+- `ahead`: local commits are not on GitHub. Push focused commits when they are part of the current task.
 - `behind`: GitHub has commits not local. Use `--pull-ff-only` only when the worktree is clean.
 - `diverged`: stop and inspect; do not merge, rebase, or force-push without explicit direction.
-- `no_upstream`: set/push upstream only after confirming the intended remote branch.
+- `no_upstream`: set/push upstream when the current branch is clearly the task branch; otherwise report the exact push command.
 
 3. If the user explicitly asks to sync from GitHub and the tree is clean:
 
@@ -31,18 +31,34 @@ skills/github-sync/scripts/check.sh --fetch
 skills/github-sync/scripts/check.sh --fetch --pull-ff-only
 ```
 
-4. If the user explicitly asks to publish current commits:
+4. To publish current commits:
 
 ```bash
 skills/github-sync/scripts/check.sh --fetch --push
 ```
 
+## Autonomous Commit Policy
+
+For this `beagley-cluster` workflow, the standing user preference is:
+
+- Make focused commits and push them as needed while implementing, verifying,
+  or deploying repo work.
+- Do not stop only to ask for commit or push permission when the intended scope
+  is clear from the task and the changed files are yours.
+- Choose a terse commit message that describes the actual change.
+- If the current task touches only a subset of a dirty worktree, stage explicit
+  paths for that subset and leave unrelated files alone.
+- If dirty state makes scope ambiguous, inspect `git status` and the relevant
+  diffs first. Ask only when you cannot confidently separate task changes from
+  unrelated user work.
+
 ## Guardrails
 
 - Never run `git reset --hard`, `git checkout --`, `git clean`, force-push, or
   history rewrites from this skill unless the user explicitly names that action.
-- Never commit broad dirty work automatically. First group the change set,
-  separate unrelated changes, and ask for or infer a focused commit message.
+- Never commit broad dirty work automatically. First group the change set and
+  separate unrelated changes. Infer a focused commit message when scope is
+  clear.
 - If the worktree has unrelated user changes, leave them alone.
 - Prefer `git pull --ff-only` over merge pulls.
 - Prefer pushing the current branch to its configured upstream. If no upstream
