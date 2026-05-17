@@ -13,14 +13,15 @@ Item {
     property real centerY: height / 2
     property real orbitRadius: Math.min(width, height) * 0.47
     property real startAngleDeg: -90
-    property real travelSweepDeg: 360
+    property real travelSweepDeg: 180
 
     property real chevronSize: 22
     property real strokeWidth: 4.5
     property real strokeBoost: 2.0
-    property real tailSpacingPhase: 0.08
+    property real tailSpacingPhase: 0.115
     property real tailGamma: 1.20
-    property real gravityWarp: 0.42
+    property real gravityExponent: 1.85
+    property real topHoldPhase: 0.08
     property color onColor: "#52FFE1"
     property bool simplified: false
     property real phaseOverride: NaN
@@ -45,21 +46,32 @@ Item {
         return clamp01(isFinite(external) ? external : root.headPhase)
     }
 
-    function cascadeSpread() {
-        return Math.sin(cyclePhase() * Math.PI)
+    function fallClock() {
+        var hold = clamp01(root.topHoldPhase)
+        var p = cyclePhase()
+        if (p <= hold)
+            return 0.0
+        return clamp01((p - hold) / Math.max(0.001, 1.0 - hold))
+    }
+
+    function fallDistance() {
+        return Math.pow(fallClock(), Math.max(1.0, root.gravityExponent))
     }
 
     function phaseForIndex(index) {
-        return clamp01(cyclePhase() - index * root.tailSpacingPhase * cascadeSpread())
+        return clamp01(fallDistance() - index * root.tailSpacingPhase)
     }
 
-    function gravityPhase(phase) {
-        var p = wrap01(phase)
-        return wrap01(p + (root.gravityWarp / (2.0 * Math.PI)) * (1.0 - Math.cos(p * Math.PI * 2.0)))
+    function releaseForIndex(index) {
+        if (index <= 0)
+            return 1.0
+
+        var distancePastRelease = fallDistance() - index * root.tailSpacingPhase
+        return clamp01(distancePastRelease / 0.045)
     }
 
     function angleDegForPhase(phase) {
-        return root.startAngleDeg + root.directionSign() * root.travelSweepDeg * gravityPhase(phase)
+        return root.startAngleDeg + root.directionSign() * root.travelSweepDeg * clamp01(phase)
     }
 
     function tangentDegForAngle(angleDeg) {
@@ -70,10 +82,13 @@ Item {
         if (!root.active)
             return 0.0
 
+        var release = releaseForIndex(index)
+        if (release <= 0.0)
+            return 0.0
+
         var tailT = root.chevrons <= 1 ? 0.0 : index / (root.chevrons - 1.0)
-        var trailAlpha = Math.pow(1.0 - tailT, root.tailGamma)
-        var mergeAlpha = index === 0 ? 1.0 : clamp01(cascadeSpread() * 1.35)
-        return clamp01((0.16 + trailAlpha * 0.84) * mergeAlpha)
+        var trailAlpha = Math.pow(1.0 - tailT * 0.32, root.tailGamma)
+        return clamp01(trailAlpha * release)
     }
 
     NumberAnimation on headPhase {
@@ -98,8 +113,8 @@ Item {
             readonly property real angleDeg: root.angleDegForPhase(phase)
             readonly property real angleRad: angleDeg * Math.PI / 180.0
             readonly property real tailT: root.chevrons <= 1 ? 0.0 : index / (root.chevrons - 1.0)
-            readonly property real sizeScale: 1.02 - tailT * 0.12 + chevronAlpha * 0.08
-            readonly property real lineWidth: root.strokeWidth + chevronAlpha * root.strokeBoost
+            readonly property real sizeScale: 1.02 - tailT * 0.10
+            readonly property real lineWidth: root.strokeWidth + (1.0 - tailT) * root.strokeBoost * 0.42
             readonly property real centerPosX: root.centerX + Math.cos(angleRad) * root.orbitRadius
             readonly property real centerPosY: root.centerY + Math.sin(angleRad) * root.orbitRadius
 

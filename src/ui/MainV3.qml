@@ -69,7 +69,7 @@ Window {
     readonly property bool gaugeLowEffectMode: gaugeEffectLevel === "low" || gaugeEffectLevel === "off"
     readonly property bool gaugeEffectsOff: gaugeEffectLevel === "off"
     readonly property bool gaugeMatrixRainEnabled: gaugeEffectLevel === "high" && !clusterSimulation
-    readonly property int gaugeIndicatorCascadeCycleMs: gaugeLowEffectMode ? 2600 : 2200
+    readonly property int gaugeIndicatorCascadeCycleMs: gaugeLowEffectMode ? 2300 : 2100
     readonly property string mapRenderer: (typeof BEAGLEY_MAP_RENDERER !== "undefined" && BEAGLEY_MAP_RENDERER)
         ? String(BEAGLEY_MAP_RENDERER)
         : "native"
@@ -1504,14 +1504,18 @@ Window {
                 active: root.displayLeftIndicator
                 side: "left"
                 simplified: root.gaugeLowEffectMode
-                chevrons: root.gaugeLowEffectMode ? 4 : 7
+                chevrons: 6
                 cycleMs: root.indicatorCascadeCycleMs
                 phaseOverride: root.indicatorCascadePhase
                 orbitRadius: width * 0.315
+                startAngleDeg: -90
+                travelSweepDeg: 180
                 chevronSize: root.gaugeLowEffectMode ? width * 0.038 : width * 0.044
                 strokeWidth: root.gaugeLowEffectMode ? 4.8 : 5.2
                 strokeBoost: 1.8
-                tailSpacingPhase: root.gaugeLowEffectMode ? 0.12 : 0.08
+                tailSpacingPhase: 0.115
+                gravityExponent: 1.85
+                topHoldPhase: 0.08
                 onColor: "#52FFE1"
             }
         }
@@ -1655,14 +1659,18 @@ Window {
                 active: root.displayRightIndicator
                 side: "right"
                 simplified: root.gaugeLowEffectMode
-                chevrons: root.gaugeLowEffectMode ? 4 : 7
+                chevrons: 6
                 cycleMs: root.indicatorCascadeCycleMs
                 phaseOverride: root.indicatorCascadePhase
                 orbitRadius: width * 0.315
+                startAngleDeg: -90
+                travelSweepDeg: 180
                 chevronSize: root.gaugeLowEffectMode ? width * 0.038 : width * 0.044
                 strokeWidth: root.gaugeLowEffectMode ? 4.8 : 5.2
                 strokeBoost: 1.8
-                tailSpacingPhase: root.gaugeLowEffectMode ? 0.12 : 0.08
+                tailSpacingPhase: 0.115
+                gravityExponent: 1.85
+                topHoldPhase: 0.08
                 onColor: "#52FFE1"
             }
         }
