@@ -22,7 +22,7 @@ Item {
     readonly property string displayFont: theme && theme.fontDisplay ? theme.fontDisplay : "Oxanium"
     readonly property string monoFont: theme && theme.fontMono ? theme.fontMono : "Oxanium"
     readonly property bool embeddedSafeMode: Qt.platform.os === "linux"
-    readonly property bool tallDetailMode: expandedMode === "temp" || expandedMode === "radar"
+    readonly property bool tallDetailMode: expandedMode === "radar"
     readonly property int podSize: Math.floor(Math.min(164, Math.max(142, height * 0.228)))
     readonly property int cornerBleed: Math.round(podSize * 0.17)
     readonly property int cornerInset: -cornerBleed
@@ -1008,15 +1008,19 @@ Item {
 
         Item {
             id: detailCard
-            width: root.tallDetailMode
+            width: root.expandedMode === "temp"
+                ? Math.floor(Math.min(560, Math.max(500, parent.width * 0.30)))
+                : root.tallDetailMode
                 ? Math.floor(Math.min(620, Math.max(500, parent.width * 0.38)))
                 : Math.floor(Math.min(452, Math.max(332, parent.width * 0.35)))
-            height: root.tallDetailMode
+            height: root.expandedMode === "temp"
+                ? 330
+                : root.tallDetailMode
                 ? Math.floor(Math.min(parent.height - 44, Math.max(560, parent.height * 0.92)))
                 : Math.floor(Math.min(360, Math.max(272, parent.height * 0.46)))
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.verticalCenter: parent.verticalCenter
-            clip: true
+            clip: false
 
             NativePanel {
                 anchors.fill: parent
@@ -1231,13 +1235,15 @@ Item {
                             anchors.margins: 16
                             spacing: 18
 
-                            WeatherMoodIcon {
-                                width: 116
-                                height: 116
+                            OemIcon {
+                                width: 96
+                                height: 96
                                 anchors.verticalCenter: parent.verticalCenter
-                                kind: root.weatherKind(root.currentConditionLabel())
-                                primaryColor: "#FFD36B"
-                                secondaryColor: "#58FFE1"
+                                icon: "weather"
+                                color: "#F7FBFF"
+                                accentColor: "#FFD36B"
+                                strokeWidth: 6.0
+                                active: true
                             }
 
                             Column {
@@ -1388,6 +1394,7 @@ Item {
                     Row {
                         width: parent.width
                         height: 22
+                        visible: root.tallDetailMode
 
                         Text {
                             width: parent.width * 0.54
@@ -1418,6 +1425,7 @@ Item {
                         id: forecastList
                         width: parent.width
                         spacing: 0
+                        visible: root.tallDetailMode
 
                         Repeater {
                             model: root.forecastRows
@@ -1573,7 +1581,7 @@ Item {
                     Item {
                         width: parent.width
                         height: Math.max(360, parent.height - 122)
-                        clip: true
+                        clip: false
 
                         NativePanel {
                             anchors.fill: parent

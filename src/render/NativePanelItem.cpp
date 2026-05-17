@@ -43,7 +43,9 @@ void setRect(QSGGeometryNode *node, const QRectF &rect, const QColor &color)
     vertices[4].set(x1, y1);
     vertices[5].set(x0, y1);
 
-    static_cast<QSGFlatColorMaterial *>(node->material())->setColor(color);
+    auto *material = static_cast<QSGFlatColorMaterial *>(node->material());
+    material->setColor(color);
+    material->setFlag(QSGMaterial::Blending, true);
     node->markDirty(QSGNode::DirtyGeometry | QSGNode::DirtyMaterial);
 }
 
