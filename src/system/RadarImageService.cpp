@@ -39,8 +39,9 @@ constexpr auto kTileOptions = "1_1";
 constexpr int kPastFramesWithNowcast = 1;
 constexpr int kPastFramesFallback = 1;
 constexpr int kNowcastFrames = 0;
-constexpr auto kRadarFrameCachePrefix = "radar-map-v2-radar";
-constexpr auto kRadarUnderlayCachePrefix = "radar-map-v2-map";
+constexpr auto kRadarFrameCachePrefix = "radar-map-v3-radar";
+constexpr auto kRadarUnderlayCachePrefix = "radar-map-v3-map";
+constexpr auto kDarkRadarFrameCachePrefix = "radar-map-v2-radar";
 constexpr auto kCombinedRadarMapCachePrefix = "radar-map-v1";
 constexpr auto kLegacyRadarCachePrefix = "radar-basic-v2";
 
@@ -491,7 +492,7 @@ bool RadarImageService::composeRadarImage(const QList<RadarTile> &tiles,
     }
 
     QImage mapOutput(QSize(kOutputWidth, kOutputHeight), QImage::Format_ARGB32_Premultiplied);
-    mapOutput.fill(QColor(3, 4, 10));
+    mapOutput.fill(QColor(229, 232, 229));
 
     QPainter painter(&mapOutput);
     painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
@@ -509,7 +510,7 @@ bool RadarImageService::composeRadarImage(const QList<RadarTile> &tiles,
                             kTileDrawSize);
         painter.drawImage(target, tile.mapImage);
     }
-    painter.fillRect(mapOutput.rect(), QColor(2, 4, 10, 28));
+    painter.fillRect(mapOutput.rect(), QColor(2, 4, 10, 16));
     painter.end();
 
     QImage radarOutput(QSize(kOutputWidth, kOutputHeight), QImage::Format_ARGB32_Premultiplied);
@@ -648,7 +649,7 @@ RadarImageService::CenterTile RadarImageService::centerTile() const
 QUrl RadarImageService::mapTileUrl(int row, int col) const
 {
     const int tilesPerAxis = 1 << kTileZoom;
-    const QString urlText = QStringLiteral("https://a.basemaps.cartocdn.com/dark_nolabels/%1/%2/%3.png")
+    const QString urlText = QStringLiteral("https://a.basemaps.cartocdn.com/light_nolabels/%1/%2/%3.png")
         .arg(QString::number(kTileZoom),
              QString::number(wrapTileX(col, tilesPerAxis)),
              QString::number(row));
@@ -693,7 +694,7 @@ QString RadarImageService::compositePath(const RadarFrame &frame, const CenterTi
              QString::number(center.col),
              frame.path,
              QString::number(frame.epochSeconds))
-        .append(QLatin1String(":radar-map-v2"))
+        .append(QLatin1String(":radar-map-v3"))
         .toUtf8();
     const QString digest = QString::fromLatin1(
         QCryptographicHash::hash(key, QCryptographicHash::Sha1).toHex().left(16));
@@ -724,6 +725,8 @@ bool RadarImageService::tryPublishLatestCachedFrame(const QString &status)
     const QFileInfoList candidates = dir.entryInfoList({
                                                            QStringLiteral("%1-*.png")
                                                                .arg(QString::fromLatin1(kRadarFrameCachePrefix)),
+                                                           QStringLiteral("%1-*.png")
+                                                               .arg(QString::fromLatin1(kDarkRadarFrameCachePrefix)),
                                                            QStringLiteral("%1-*.png")
                                                                .arg(QString::fromLatin1(kCombinedRadarMapCachePrefix)),
                                                            QStringLiteral("%1-*.png")
