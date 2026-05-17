@@ -306,7 +306,11 @@ REMOTE
       if [[ "$qml_source" == "compiled-binary" ]]; then
         ok "BeagleY is running compiled binary"
       else
-        warn "BeagleY display source is ${qml_source:-unknown}"
+        if [[ "$STRICT" == 1 ]]; then
+          fail "BeagleY display source is ${qml_source:-unknown}; disable QML-dev before trusting production UI"
+        else
+          warn "BeagleY display source is ${qml_source:-unknown}"
+        fi
       fi
     fi
   fi

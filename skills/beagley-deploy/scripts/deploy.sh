@@ -1,11 +1,11 @@
 #!/bin/bash
 set -euo pipefail
 
-BASE="/Users/joshkomant/projects/beagley-cluster"
 REMOTE_TMP="/var/volatile/beagley_cluster.new"
 REMOTE_ROLLBACK="/var/volatile/beagley_cluster.rollback"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BASE="${BEAGLEY_CLUSTER_REPO_ROOT:-$(cd "$SCRIPT_DIR/../../.." && pwd)}"
 source "$SCRIPT_DIR/../../beagley-common/scripts/ssh.sh"
 
 echo "[DEPLOY] Step 1: Build Linux aarch64 target..."
@@ -14,6 +14,14 @@ cd "$BASE"
 if [[ -n "${BEAGLEY_DEPLOY_BIN:-}" ]]; then
   BIN="$BEAGLEY_DEPLOY_BIN"
 else
+  branch="$(git -C "$BASE" branch --show-current 2>/dev/null || true)"
+  dirty_count="$(git -C "$BASE" status --porcelain=v1 2>/dev/null | sed '/^$/d' | wc -l | tr -d ' ')"
+  if [[ "$branch" != "codex/maplibre-native-yocto-build" || "${dirty_count:-1}" != "0" ]]; then
+    echo "[DEPLOY] Refusing to build/deploy from non-canonical or dirty checkout." >&2
+    echo "[DEPLOY] repo=$BASE branch=${branch:-detached} dirty=${dirty_count:-unknown}" >&2
+    echo "[DEPLOY] Use tools/source_truth/build_canonical_yocto_app.sh, then set BEAGLEY_DEPLOY_BIN to the Yocto aarch64 binary." >&2
+    exit 2
+  fi
   "$BASE/tools/beagley_gpu/build_aarch64.sh"
   BUILD_DIR="${BEAGLEY_AARCH64_BUILD_DIR:-$BASE/build-beagley-aarch64}"
   BIN=$(find "$BUILD_DIR" -type f -name beagley_cluster | head -n 1)

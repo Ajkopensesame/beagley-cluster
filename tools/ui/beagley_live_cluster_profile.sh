@@ -222,6 +222,13 @@ BEAGLEY_MAPLIBRE_NATIVE_FULL_UNDERLAY=$MAPLIBRE_FULL_UNDERLAY
 BEAGLEY_MAPLIBRE_NATIVE_MAX_ZOOM=$MAPLIBRE_MAX_ZOOM
 REMOTE_ENV
     chmod 0644 /etc/default/beagley-cluster.local
+    dropin_dir=/etc/systemd/system/beagley_cluster.service.d
+    mkdir -p \"\$dropin_dir\"
+    for drop in \"\$dropin_dir/ui-dev.conf\" \"\$dropin_dir/panel-test.conf\"; do
+      if [ -f \"\$drop\" ]; then
+        mv \"\$drop\" \"\$drop.disabled.$STAMP\"
+      fi
+    done
     rm -rf /root/.cache/Beagley/BeagleyCluster/qmlcache
     echo \"\$backup\""
 )"

@@ -33,8 +33,27 @@ Rules:
 - A clean commit on GitHub is the continuous-build source.
 - EliteBook must build that exact commit.
 - BeagleY must report that exact commit in its `[BUILD]` line after deploy.
+- BeagleY must report `qml_source=compiled-binary` for production visual
+  verification. If it reports `qml_source=qml-dev`, disable the active
+  `/etc/systemd/system/beagley_cluster.service.d/ui-dev.conf` drop-in and
+  restart before trusting the display.
 - Dirty Mac worktrees are allowed only as visible development queues; they are
   not the production source until committed and published.
+
+New-conversation checklist:
+
+1. Work from the canonical worktree/branch, not an older dirty Mac checkout:
+   `codex/maplibre-native-yocto-build`.
+2. Run `skills/cluster-source-truth/scripts/check.sh --strict` before changing
+   or judging the live display.
+3. If the check shows a dirty `/Users/joshkomant/projects/beagley-cluster`
+   worktree, treat it as a development queue only. Do not deploy from it.
+4. If the check shows `qml_source=qml-dev`, run the live profile from the
+   canonical checkout to return the board to compiled-binary mode:
+
+```bash
+tools/ui/beagley_live_cluster_profile.sh --host root@192.168.0.92 --simulation --effect-level off --gauge-detail rich
+```
 
 Useful commands:
 
