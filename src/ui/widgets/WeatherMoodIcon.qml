@@ -40,7 +40,8 @@ Item {
     }
 
     function requestCanvasPaint() {
-        moodCanvas.requestPaint()
+        if (!embeddedSafeMode)
+            moodCanvas.requestPaint()
     }
 
     onKindChanged: requestCanvasPaint()
@@ -52,189 +53,175 @@ Item {
     Component.onCompleted: requestCanvasPaint()
 
     Item {
-        id: embeddedIcon
+        id: simpleEmbeddedIcon
         anchors.fill: parent
-        visible: false
+        visible: root.embeddedSafeMode
 
         readonly property string weatherKind: root.normalizedKind()
-        readonly property real side: Math.min(width, height)
+        readonly property real side: Math.max(1, Math.min(width, height))
+        readonly property real cx: width / 2
+        readonly property real cy: height / 2
+        readonly property real sunSize: side * 0.34
+        readonly property real cloudW: side * 0.66
+        readonly property real cloudH: side * 0.34
 
         Item {
-            id: embeddedSun
-            width: embeddedIcon.side * 0.72
+            id: simpleSun
+            width: simpleEmbeddedIcon.side * 0.70
             height: width
-            anchors.centerIn: parent
-            anchors.horizontalCenterOffset: embeddedIcon.weatherKind === "cloud" ? -embeddedIcon.side * 0.10 : 0
-            anchors.verticalCenterOffset: embeddedIcon.weatherKind === "cloud" ? -embeddedIcon.side * 0.10 : 0
-            visible: embeddedIcon.weatherKind === "clear" || embeddedIcon.weatherKind === "cloud"
-            opacity: embeddedIcon.weatherKind === "cloud" ? 0.72 : 1.0
+            x: simpleEmbeddedIcon.cx - width / 2
+                + (simpleEmbeddedIcon.weatherKind === "cloud" ? simpleEmbeddedIcon.side * 0.10 : 0)
+            y: simpleEmbeddedIcon.cy - height / 2
+                - (simpleEmbeddedIcon.weatherKind === "cloud" ? simpleEmbeddedIcon.side * 0.16 : 0)
+            visible: simpleEmbeddedIcon.weatherKind === "clear" || simpleEmbeddedIcon.weatherKind === "cloud"
+            opacity: simpleEmbeddedIcon.weatherKind === "cloud" ? 0.76 : 1.0
 
-            Repeater {
-                model: 12
-                Rectangle {
-                    width: Math.max(3, embeddedSun.width * 0.045)
-                    height: embeddedSun.height * 0.18
-                    radius: width / 2
-                    x: embeddedSun.width / 2 - width / 2
-                    y: embeddedSun.height * 0.02
-                    color: root.primaryColor
-                    opacity: 0.82
-                    antialiasing: true
-                    transform: Rotation {
-                        origin.x: width / 2
-                        origin.y: embeddedSun.height * 0.48
-                        angle: index * 30
-                    }
-                }
+            readonly property real rayW: Math.max(2, width * 0.060)
+            readonly property real rayL: width * 0.18
+
+            Rectangle {
+                width: simpleSun.rayW
+                height: simpleSun.rayL
+                radius: width / 2
+                anchors.horizontalCenter: parent.horizontalCenter
+                y: 0
+                color: root.primaryColor
             }
 
             Rectangle {
-                width: embeddedSun.width * 0.58
+                width: simpleSun.rayW
+                height: simpleSun.rayL
+                radius: width / 2
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.bottom: parent.bottom
+                color: root.primaryColor
+            }
+
+            Rectangle {
+                width: simpleSun.rayL
+                height: simpleSun.rayW
+                radius: height / 2
+                anchors.verticalCenter: parent.verticalCenter
+                x: 0
+                color: root.primaryColor
+            }
+
+            Rectangle {
+                width: simpleSun.rayL
+                height: simpleSun.rayW
+                radius: height / 2
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.right: parent.right
+                color: root.primaryColor
+            }
+
+            Rectangle {
+                width: simpleEmbeddedIcon.sunSize
                 height: width
                 radius: width / 2
                 anchors.centerIn: parent
                 color: root.faceColor
-                border.width: Math.max(1, embeddedSun.width * 0.022)
+                border.width: Math.max(1, simpleEmbeddedIcon.side * 0.018)
                 border.color: Qt.rgba(1.0, 0.72, 0.18, 0.92)
-                antialiasing: true
-            }
-
-            Rectangle {
-                width: embeddedSun.width * 0.17
-                height: embeddedSun.height * 0.10
-                radius: height * 0.28
-                x: embeddedSun.width * 0.29
-                y: embeddedSun.height * 0.43
-                color: root.darkColor
-                antialiasing: true
-            }
-
-            Rectangle {
-                width: embeddedSun.width * 0.17
-                height: embeddedSun.height * 0.10
-                radius: height * 0.28
-                x: embeddedSun.width * 0.54
-                y: embeddedSun.height * 0.43
-                color: root.darkColor
-                antialiasing: true
-            }
-
-            Rectangle {
-                width: embeddedSun.width * 0.14
-                height: Math.max(2, embeddedSun.height * 0.025)
-                radius: height / 2
-                anchors.horizontalCenter: parent.horizontalCenter
-                y: embeddedSun.height * 0.47
-                color: root.darkColor
-                antialiasing: true
             }
         }
 
         Item {
-            id: embeddedCloud
-            width: embeddedIcon.side * 0.78
-            height: embeddedIcon.side * 0.54
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.verticalCenter: parent.verticalCenter
-            anchors.verticalCenterOffset: embeddedIcon.weatherKind === "cloud" ? embeddedIcon.side * 0.08 : -embeddedIcon.side * 0.02
-            visible: embeddedIcon.weatherKind !== "clear"
+            id: simpleCloud
+            width: simpleEmbeddedIcon.cloudW
+            height: simpleEmbeddedIcon.cloudH
+            x: simpleEmbeddedIcon.cx - width / 2
+            y: simpleEmbeddedIcon.cy - height * 0.42
+                + (simpleEmbeddedIcon.weatherKind === "clear" ? simpleEmbeddedIcon.side * 0.08 : 0)
+            visible: simpleEmbeddedIcon.weatherKind !== "clear"
 
             Rectangle {
-                width: parent.width * 0.98
-                height: parent.height * 0.45
-                radius: height * 0.42
+                width: parent.width
+                height: parent.height * 0.48
+                radius: height * 0.40
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.bottom: parent.bottom
                 color: root.cloudColor
-                antialiasing: true
             }
 
             Rectangle {
-                width: parent.width * 0.40
+                width: parent.width * 0.38
                 height: width
                 radius: width / 2
                 x: parent.width * 0.10
-                y: parent.height * 0.24
+                y: parent.height * 0.22
                 color: root.cloudColor
-                antialiasing: true
             }
 
             Rectangle {
-                width: parent.width * 0.48
+                width: parent.width * 0.46
                 height: width
                 radius: width / 2
                 anchors.horizontalCenter: parent.horizontalCenter
-                y: parent.height * 0.03
+                y: parent.height * 0.02
                 color: root.cloudColor
-                antialiasing: true
             }
 
             Rectangle {
-                width: parent.width * 0.40
+                width: parent.width * 0.34
                 height: width
                 radius: width / 2
-                x: parent.width * 0.50
-                y: parent.height * 0.20
+                x: parent.width * 0.56
+                y: parent.height * 0.24
                 color: root.cloudColor
-                antialiasing: true
             }
         }
 
-        Item {
-            id: embeddedDrops
-            width: embeddedIcon.side * 0.58
-            height: embeddedIcon.side * 0.28
+        Row {
+            width: simpleEmbeddedIcon.side * 0.48
+            height: simpleEmbeddedIcon.side * 0.22
             anchors.horizontalCenter: parent.horizontalCenter
-            anchors.top: embeddedCloud.bottom
-            anchors.topMargin: -embeddedIcon.side * 0.02
-            visible: embeddedIcon.weatherKind === "rain" || embeddedIcon.weatherKind === "storm"
+            anchors.top: simpleCloud.bottom
+            anchors.topMargin: -simpleEmbeddedIcon.side * 0.015
+            spacing: width * 0.16
+            visible: simpleEmbeddedIcon.weatherKind === "rain" || simpleEmbeddedIcon.weatherKind === "storm"
 
             Repeater {
-                model: 4
+                model: 3
+
                 Rectangle {
-                    width: Math.max(3, embeddedDrops.width * 0.055)
-                    height: embeddedDrops.height * 0.62
+                    width: Math.max(2, simpleEmbeddedIcon.side * 0.045)
+                    height: simpleEmbeddedIcon.side * 0.18
                     radius: width / 2
-                    x: embeddedDrops.width * (0.18 + index * 0.21)
-                    y: (index % 2) * embeddedDrops.height * 0.16
-                    rotation: 18
                     color: root.secondaryColor
-                    opacity: 0.92
-                    antialiasing: true
+                    y: index === 1 ? simpleEmbeddedIcon.side * 0.04 : 0
                 }
             }
         }
 
         Rectangle {
-            width: embeddedIcon.side * 0.16
-            height: embeddedIcon.side * 0.46
+            width: simpleEmbeddedIcon.side * 0.13
+            height: simpleEmbeddedIcon.side * 0.36
+            radius: width * 0.16
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.verticalCenter: parent.verticalCenter
-            anchors.verticalCenterOffset: embeddedIcon.side * 0.25
-            visible: embeddedIcon.weatherKind === "storm"
+            anchors.verticalCenterOffset: simpleEmbeddedIcon.side * 0.26
+            visible: simpleEmbeddedIcon.weatherKind === "storm"
             color: root.primaryColor
-            rotation: 24
-            radius: width * 0.12
-            antialiasing: true
         }
 
         Column {
-            width: embeddedIcon.side * 0.62
+            width: simpleEmbeddedIcon.side * 0.56
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.verticalCenter: parent.verticalCenter
-            anchors.verticalCenterOffset: embeddedIcon.side * 0.22
-            spacing: embeddedIcon.side * 0.08
-            visible: embeddedIcon.weatherKind === "fog" || embeddedIcon.weatherKind === "snow"
+            anchors.verticalCenterOffset: simpleEmbeddedIcon.side * 0.26
+            spacing: simpleEmbeddedIcon.side * 0.06
+            visible: simpleEmbeddedIcon.weatherKind === "fog" || simpleEmbeddedIcon.weatherKind === "snow"
 
             Repeater {
-                model: embeddedIcon.weatherKind === "fog" ? 3 : 2
+                model: simpleEmbeddedIcon.weatherKind === "fog" ? 3 : 2
+
                 Rectangle {
                     width: parent.width
-                    height: Math.max(2, embeddedIcon.side * 0.035)
+                    height: Math.max(2, simpleEmbeddedIcon.side * 0.030)
                     radius: height / 2
                     color: root.secondaryColor
-                    opacity: embeddedIcon.weatherKind === "fog" ? 0.62 : 0.92
-                    antialiasing: true
+                    opacity: simpleEmbeddedIcon.weatherKind === "fog" ? 0.68 : 0.95
                 }
             }
         }
@@ -243,8 +230,8 @@ Item {
     Canvas {
         id: moodCanvas
         anchors.fill: parent
-        visible: true
-        renderTarget: root.embeddedSafeMode ? Canvas.Image : Canvas.FramebufferObject
+        visible: !root.embeddedSafeMode
+        renderTarget: Canvas.FramebufferObject
         antialiasing: true
         smooth: true
 
