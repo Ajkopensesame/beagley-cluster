@@ -50,7 +50,9 @@ private:
     struct RadarTile {
         int dx = 0;
         int dy = 0;
+        QImage mapImage;
         QImage radarImage;
+        bool mapOk = false;
         bool radarOk = false;
     };
 
@@ -83,11 +85,13 @@ private:
     void fetchNextTimelineFrame();
     void startTileFetch(const RadarFrame &frame);
     void handleTileReply(QNetworkReply *reply, int sequence, int dx, int dy);
+    void handleMapTileReply(QNetworkReply *reply, int sequence, int dx, int dy);
     void finishTileFetch(int sequence);
     bool composeRadarImage(const QList<RadarTile> &tiles, const CenterTile &center, const RadarFrame &frame);
     void publishTimelineFrames();
     void advanceAnimationFrame();
     CenterTile centerTile() const;
+    QUrl mapTileUrl(int row, int col) const;
     QUrl tileUrl(const RadarFrame &frame, int row, int col) const;
     QNetworkReply *get(const QUrl &url);
     QString compositeKey(const RadarFrame &frame, const CenterTile &center) const;

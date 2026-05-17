@@ -112,6 +112,18 @@ void drawRadarGuides(QPainter &painter, const QSize &targetSize)
     painter.restore();
 }
 
+void drawMapBackground(QPainter &painter, const QImage &image, const QSize &targetSize)
+{
+    const QRectF sourceRect = croppedSourceRect(image, targetSize);
+    painter.save();
+    painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+    painter.setOpacity(0.86);
+    painter.drawImage(QRectF(0, 0, targetSize.width(), targetSize.height()), image, sourceRect);
+    painter.setOpacity(1.0);
+    painter.fillRect(QRectF(0, 0, targetSize.width(), targetSize.height()), QColor(2, 4, 10, 82));
+    painter.restore();
+}
+
 int drawRadarSamples(QPainter &painter, const QImage &image, const QSize &targetSize, bool circular)
 {
     const QRectF sourceRect = croppedSourceRect(image, targetSize);
@@ -161,6 +173,26 @@ int drawRadarSamples(QPainter &painter, const QImage &image, const QSize &target
     return totalSamples;
 }
 
+void drawGpsMarker(QPainter &painter, const QSize &targetSize)
+{
+    const QPointF center(targetSize.width() * 0.5, targetSize.height() * 0.5);
+    const qreal shortSide = qMin(targetSize.width(), targetSize.height());
+    const qreal dotRadius = qBound<qreal>(3.8, shortSide * 0.018, 10.0);
+
+    painter.save();
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setPen(QPen(QColor(88, 255, 225, 136), qMax<qreal>(1.2, dotRadius * 0.28)));
+    painter.setBrush(Qt::NoBrush);
+    painter.drawEllipse(center, dotRadius * 2.15, dotRadius * 2.15);
+    painter.setPen(QPen(QColor(247, 251, 255, 220), qMax<qreal>(1.0, dotRadius * 0.20)));
+    painter.setBrush(QColor(88, 255, 225, 235));
+    painter.drawEllipse(center, dotRadius, dotRadius);
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QColor(247, 251, 255, 245));
+    painter.drawEllipse(center, dotRadius * 0.42, dotRadius * 0.42);
+    painter.restore();
+}
+
 QImage renderRadarFrameImage(const QImage &source,
                              const QSize &targetSize,
                              bool circular,
@@ -179,10 +211,14 @@ QImage renderRadarFrameImage(const QImage &source,
     if (circular && backgroundVisible) {
         painter.fillRect(QRectF(0, 0, targetSize.width(), targetSize.height()), QColor(3, 4, 10));
     }
+    if (backgroundVisible) {
+        drawMapBackground(painter, source, targetSize);
+    }
     if (guidesVisible) {
         drawRadarGuides(painter, targetSize);
     }
     const int totalSamples = drawRadarSamples(painter, source, targetSize, circular);
+    drawGpsMarker(painter, targetSize);
     painter.end();
 
     qInfo().noquote() << "[RadarFrameItem] palette samples" << totalSamples

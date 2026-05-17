@@ -18,6 +18,7 @@
 #include <QTimeZone>
 #include <QUrl>
 
+#include <algorithm>
 #include <cmath>
 
 namespace {
@@ -38,7 +39,8 @@ constexpr auto kTileOptions = "1_1";
 constexpr int kPastFramesWithNowcast = 1;
 constexpr int kPastFramesFallback = 1;
 constexpr int kNowcastFrames = 0;
-constexpr auto kBasicRadarCachePrefix = "radar-basic-v2";
+constexpr auto kRadarMapCachePrefix = "radar-map-v1";
+constexpr auto kLegacyRadarCachePrefix = "radar-basic-v2";
 
 bool coordValid(double value, double minValue, double maxValue)
 {
@@ -348,6 +350,12 @@ void RadarImageService::startTileFetch(const RadarFrame &frame)
             m_currentTiles.insert(tileKey, tile);
 
             ++m_pendingTiles;
+            QNetworkReply *mapReply = get(mapTileUrl(row, col));
+            connect(mapReply, &QNetworkReply::finished, this, [this, mapReply, sequence, dx, dy]() {
+                handleMapTileReply(mapReply, sequence, dx, dy);
+            });
+
+            ++m_pendingTiles;
             QNetworkReply *radarReply = get(tileUrl(m_currentFrame, row, col));
             connect(radarReply, &QNetworkReply::finished, this, [this, radarReply, sequence, dx, dy]() {
                 handleTileReply(radarReply, sequence, dx, dy);
@@ -380,6 +388,34 @@ void RadarImageService::handleTileReply(QNetworkReply *reply, int sequence, int 
         tile.radarImage = image;
     } else {
         qWarning().noquote() << "[RadarImage] radar tile fetch failed:" << reply->errorString();
+    }
+    reply->deleteLater();
+
+    m_currentTiles.insert(tileKey, tile);
+    --m_pendingTiles;
+    if (m_pendingTiles <= 0) {
+        finishTileFetch(sequence);
+    }
+}
+
+void RadarImageService::handleMapTileReply(QNetworkReply *reply, int sequence, int dx, int dy)
+{
+    if (sequence != m_sequence) {
+        reply->deleteLater();
+        return;
+    }
+
+    const int tileKey = (dy + kTileRadius) * kTileSpan + (dx + kTileRadius);
+    RadarTile tile = m_currentTiles.value(tileKey);
+    tile.dx = dx;
+    tile.dy = dy;
+    if (reply->error() == QNetworkReply::NoError) {
+        QImage image;
+        const bool ok = image.loadFromData(reply->readAll());
+        tile.mapOk = ok;
+        tile.mapImage = image;
+    } else {
+        qWarning().noquote() << "[RadarImage] map tile fetch failed:" << reply->errorString();
     }
     reply->deleteLater();
 
@@ -456,6 +492,18 @@ bool RadarImageService::composeRadarImage(const QList<RadarTile> &tiles,
     const double centerTileLeft = kOutputWidth / 2.0 - center.fracX * kTileDrawSize;
     const double centerTileTop = kOutputHeight / 2.0 - center.fracY * kTileDrawSize;
     for (const RadarTile &tile : tiles) {
+        if (!tile.mapOk || tile.mapImage.isNull()) {
+            continue;
+        }
+        const QRectF target(centerTileLeft + tile.dx * kTileDrawSize,
+                            centerTileTop + tile.dy * kTileDrawSize,
+                            kTileDrawSize,
+                            kTileDrawSize);
+        painter.drawImage(target, tile.mapImage);
+    }
+    painter.fillRect(output.rect(), QColor(2, 4, 10, 74));
+
+    for (const RadarTile &tile : tiles) {
         if (!tile.radarOk || tile.radarImage.isNull()) {
             continue;
         }
@@ -478,7 +526,10 @@ bool RadarImageService::composeRadarImage(const QList<RadarTile> &tiles,
                       << "time" << formatFrameTime(frame.epochSeconds)
                       << "label" << formatFrameLabel(frame)
                       << "tile" << center.row << center.col
-                      << "layers" << tiles.size();
+                      << "layers" << tiles.size()
+                      << "map" << std::any_of(tiles.cbegin(), tiles.cend(), [](const RadarTile &tile) {
+                             return tile.mapOk;
+                         });
     return true;
 }
 
@@ -571,6 +622,16 @@ RadarImageService::CenterTile RadarImageService::centerTile() const
     return center;
 }
 
+QUrl RadarImageService::mapTileUrl(int row, int col) const
+{
+    const int tilesPerAxis = 1 << kTileZoom;
+    const QString urlText = QStringLiteral("https://a.basemaps.cartocdn.com/dark_nolabels/%1/%2/%3.png")
+        .arg(QString::number(kTileZoom),
+             QString::number(wrapTileX(col, tilesPerAxis)),
+             QString::number(row));
+    return QUrl(urlText);
+}
+
 QUrl RadarImageService::tileUrl(const RadarFrame &frame, int row, int col) const
 {
     const int tilesPerAxis = 1 << kTileZoom;
@@ -609,19 +670,23 @@ QString RadarImageService::compositePath(const RadarFrame &frame, const CenterTi
              QString::number(center.col),
              frame.path,
              QString::number(frame.epochSeconds))
-        .append(QLatin1String(":basic-radar-v2"))
+        .append(QLatin1String(":radar-map-v1"))
         .toUtf8();
     const QString digest = QString::fromLatin1(
         QCryptographicHash::hash(key, QCryptographicHash::Sha1).toHex().left(16));
     return QDir(m_cacheDirectory).filePath(QStringLiteral("%1-%2.png")
-                                               .arg(QString::fromLatin1(kBasicRadarCachePrefix), digest));
+                                               .arg(QString::fromLatin1(kRadarMapCachePrefix), digest));
 }
 
 bool RadarImageService::tryPublishLatestCachedFrame(const QString &status)
 {
     QDir dir(m_cacheDirectory);
-    const QFileInfoList candidates = dir.entryInfoList({QStringLiteral("%1-*.png")
-                                                            .arg(QString::fromLatin1(kBasicRadarCachePrefix))},
+    const QFileInfoList candidates = dir.entryInfoList({
+                                                           QStringLiteral("%1-*.png")
+                                                               .arg(QString::fromLatin1(kRadarMapCachePrefix)),
+                                                           QStringLiteral("%1-*.png")
+                                                               .arg(QString::fromLatin1(kLegacyRadarCachePrefix)),
+                                                       },
                                                        QDir::Files | QDir::Readable,
                                                        QDir::Time);
     for (const QFileInfo &info : candidates) {
