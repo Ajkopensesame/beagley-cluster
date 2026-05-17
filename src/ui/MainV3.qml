@@ -99,7 +99,7 @@ Window {
     readonly property bool mapLibreNativeFullUnderlay: (typeof BEAGLEY_MAPLIBRE_NATIVE_FULL_UNDERLAY !== "undefined")
         && BEAGLEY_MAPLIBRE_NATIVE_FULL_UNDERLAY
     readonly property bool mapLibreSafeCompositor: mapLibreNativeActive && !mapLibreNativeFullUnderlay
-    readonly property real gaugeFaceBackgroundOpacity: mapLibreNativeFullUnderlay ? 0.0 : 1.0
+    readonly property real gaugeFaceBackgroundOpacity: 1.0
     readonly property int mapLibreSafeSideInset: mapLibreSafeCompositor
         ? Math.round(gaugeFaceSize * 0.54)
         : 0
@@ -1317,9 +1317,9 @@ Window {
                         y: root.gaugePointY(parent.height, labelAngle, parent.height * 0.322) - height / 2
                         text: modelData.label
                         color: appTheme.pearlLow
-                        opacity: 0.72
+                        opacity: 0.94
                         font.family: "Oxanium"
-                        font.pixelSize: parent.width * 0.027
+                        font.pixelSize: parent.width * 0.031
                         font.bold: true
                         renderType: root.menuTextRenderType
                         horizontalAlignment: Text.AlignHCenter
@@ -1471,9 +1471,9 @@ Window {
                     y: root.gaugePointY(parent.height, root.gaugeAuxStartDeg + root.gaugeAuxSweepDeg, parent.width * 0.36 + 24) - height / 2
                     text: "C"
                     color: appTheme.pearlLow
-                    opacity: 0.78
+                    opacity: 0.94
                     font.family: "Oxanium"
-                    font.pixelSize: parent.width * 0.025
+                    font.pixelSize: parent.width * 0.031
                     font.bold: true
                     renderType: root.menuTextRenderType
                     horizontalAlignment: Text.AlignHCenter
@@ -1487,9 +1487,9 @@ Window {
                     y: root.gaugePointY(parent.height, root.gaugeAuxStartDeg, parent.width * 0.36 + 24) - height / 2
                     text: "H"
                     color: appTheme.pearlLow
-                    opacity: 0.78
+                    opacity: 0.94
                     font.family: "Oxanium"
-                    font.pixelSize: parent.width * 0.025
+                    font.pixelSize: parent.width * 0.031
                     font.bold: true
                     renderType: root.menuTextRenderType
                     horizontalAlignment: Text.AlignHCenter
@@ -1580,9 +1580,9 @@ Window {
                         y: root.gaugePointY(parent.height, labelAngle, parent.height * 0.322) - height / 2
                         text: modelData.label
                         color: appTheme.pearlLow
-                        opacity: 0.72
+                        opacity: 0.94
                         font.family: "Oxanium"
-                        font.pixelSize: parent.width * 0.027
+                        font.pixelSize: parent.width * 0.031
                         font.bold: true
                         renderType: root.menuTextRenderType
                         horizontalAlignment: Text.AlignHCenter
@@ -1627,9 +1627,9 @@ Window {
                     y: root.gaugePointY(parent.height, root.gaugeAuxStartDeg + root.gaugeAuxSweepDeg, parent.width * 0.36 + 24) - height / 2
                     text: "E"
                     color: appTheme.pearlLow
-                    opacity: 0.78
+                    opacity: 0.94
                     font.family: "Oxanium"
-                    font.pixelSize: parent.width * 0.025
+                    font.pixelSize: parent.width * 0.031
                     font.bold: true
                     renderType: root.menuTextRenderType
                     horizontalAlignment: Text.AlignHCenter
@@ -1643,9 +1643,9 @@ Window {
                     y: root.gaugePointY(parent.height, root.gaugeAuxStartDeg, parent.width * 0.36 + 24) - height / 2
                     text: "F"
                     color: appTheme.pearlLow
-                    opacity: 0.78
+                    opacity: 0.94
                     font.family: "Oxanium"
-                    font.pixelSize: parent.width * 0.025
+                    font.pixelSize: parent.width * 0.031
                     font.bold: true
                     renderType: root.menuTextRenderType
                     horizontalAlignment: Text.AlignHCenter

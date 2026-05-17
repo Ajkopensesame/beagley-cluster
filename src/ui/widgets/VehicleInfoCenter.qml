@@ -62,8 +62,8 @@ Item {
     readonly property real cx: width / 2
     readonly property real cy: height / 2
     readonly property real haloRadius: s * 0.42
-    readonly property real haloThickness: Math.max(4, s * 0.024)
-    readonly property real haloInner: haloRadius - haloThickness - s * 0.036
+    readonly property real haloThickness: Math.max(7, s * 0.036)
+    readonly property real haloInner: haloRadius - haloThickness - s * 0.028
     readonly property bool embeddedSafeMode: Qt.platform.os === "linux"
     readonly property color activeColor:
         hasWarning ? warningColors.haloColor(currentWarningKey, tDanger) : tLow
@@ -149,12 +149,12 @@ Item {
                 ctx.restore()
             }
 
-            drawArc(mainStart, mainEnd, stroke * 1.55, root.neonDeep, root.simplified ? 0.16 : 0.22)
-            drawArc(mainStart, mainEnd, stroke * 0.82, root.tLow, root.simplified ? 0.28 : 0.24)
-            drawArc(mainStart, mainEnd, stroke * 0.48, base, root.simplified ? 0.60 : 0.78)
+            drawArc(mainStart, mainEnd, stroke * 1.70, root.neonDeep, root.simplified ? 0.28 : 0.34)
+            drawArc(mainStart, mainEnd, stroke * 0.92, root.tLow, root.simplified ? 0.42 : 0.46)
+            drawArc(mainStart, mainEnd, stroke * 0.56, base, root.simplified ? 0.78 : 0.95)
 
             if (!root.simplified) {
-                drawArc(mainStart - 0.08, mainEnd + 0.08, stroke * 2.15 + warningPulse * 3.0, base, (root.hasWarning ? 0.18 : 0.10) + warningPulse * 0.10)
+                drawArc(mainStart - 0.08, mainEnd + 0.08, stroke * 2.15 + warningPulse * 4.0, base, (root.hasWarning ? 0.28 : 0.12) + warningPulse * 0.18)
 
                 const grad = ctx.createLinearGradient(root.cx - r, root.cy - r, root.cx + r, root.cy + r)
                 grad.addColorStop(0.0, withAlpha(root.neonCyan, 0.16))
@@ -191,7 +191,7 @@ Item {
     Item {
         id: center
         anchors.centerIn: parent
-        width: root.haloInner * 2 * 0.98
+        width: root.haloInner * 2 * 1.08
         height: width
         layer.enabled: !root.embeddedSafeMode
         layer.smooth: !root.embeddedSafeMode
@@ -200,17 +200,18 @@ Item {
             anchors.fill: parent
             radius: width / 2
             gradient: Gradient {
-                GradientStop { position: 0.00; color: Qt.rgba(16 / 255, 20 / 255, 34 / 255, root.hasWarning ? 0.40 : 0.24) }
-                GradientStop { position: 0.55; color: Qt.rgba(8 / 255, 10 / 255, 18 / 255, root.hasWarning ? 0.28 : 0.16) }
-                GradientStop { position: 1.00; color: Qt.rgba(2 / 255, 4 / 255, 9 / 255, root.hasWarning ? 0.34 : 0.20) }
+                GradientStop { position: 0.00; color: Qt.rgba(8 / 255, 10 / 255, 17 / 255, root.hasWarning ? 0.98 : 0.94) }
+                GradientStop { position: 0.55; color: Qt.rgba(3 / 255, 5 / 255, 10 / 255, root.hasWarning ? 0.96 : 0.92) }
+                GradientStop { position: 1.00; color: Qt.rgba(1 / 255, 2 / 255, 6 / 255, root.hasWarning ? 0.99 : 0.95) }
             }
-            border.width: 0
+            border.width: Math.max(2, width * 0.012)
+            border.color: Qt.rgba(root.activeColor.r, root.activeColor.g, root.activeColor.b, root.hasWarning ? 0.52 : 0.28)
         }
 
         Canvas {
             anchors.fill: parent
-            visible: !root.simplified
-            opacity: 0.32
+            visible: false
+            opacity: 0.0
             renderTarget: root.embeddedSafeMode ? Canvas.Image : Canvas.FramebufferObject
             onPaint: {
                 const ctx = getContext("2d")
@@ -253,7 +254,7 @@ Item {
                 Icons.DriveStateIcon {
                     id: driveGlyph
                     anchors.horizontalCenter: parent.horizontalCenter
-                    width: 112
+                    width: 128
                     height: width
                     color: root.tLow
                     mode: root.driveModeKey === "2wd" ? "2wd" : "4wd"
@@ -265,7 +266,7 @@ Item {
                     text: root.normalSubtitle(root.driveModeKey)
                     color: root.tLow
                     font.family: root.fontUi
-                    font.pixelSize: 20
+                    font.pixelSize: 24
                     font.bold: true
                     font.letterSpacing: 4
                     horizontalAlignment: Text.AlignHCenter
@@ -286,17 +287,17 @@ Item {
                 id: warningStack
                 width: parent.width
                 anchors.centerIn: parent
-                spacing: 6
+                spacing: 10
 
                 OemTellTaleIcon {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    width: Math.min(root.s * 0.44, warningLayer.width * 0.68)
+                    width: Math.min(root.s * 0.58, warningLayer.width * 0.78)
                     height: width
                     icon: root.currentWarningKey
                     color: root.activeColor
                     accentColor: root.activeColor
-                    cutoutColor: "#070A12"
-                    strokeWidth: Math.max(4, width * 0.055)
+                    cutoutColor: "#020409"
+                    strokeWidth: Math.max(8, width * 0.070)
                 }
 
                 Text {
@@ -304,10 +305,12 @@ Item {
                     text: root.warningLabel(root.currentWarningKey)
                     color: root.activeColor
                     font.family: root.fontUi
-                    font.pixelSize: 18
+                    font.pixelSize: 23
                     font.bold: true
-                    font.letterSpacing: 2
+                    font.letterSpacing: 3
                     horizontalAlignment: Text.AlignHCenter
+                    style: Text.Outline
+                    styleColor: "#F0000000"
                 }
             }
 
