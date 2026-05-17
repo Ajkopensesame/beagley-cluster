@@ -1,4 +1,5 @@
 import QtQuick 2.15
+import BeagleY 1.0
 
 Item {
     id: root
@@ -140,8 +141,8 @@ Item {
         : ((lowEffectMode && !embeddedSafeMode) ? 0.44 : 1.0)
     readonly property real auxArcStrokeTune: auxArcCanvasScale < 1.0 ? auxArcCanvasScale : 1.0
     readonly property real sideArcHeadRadius: lowEffectMode ? 10.5 : (embeddedHighEffectBudgetMode ? 12.0 : 15.5)
-    readonly property real speedRepaintThreshold: lowEffectMode ? 0.60 : (embeddedHighEffectBudgetMode ? 2.8 : 1e-4)
-    readonly property real coolantRepaintThreshold: lowEffectMode ? 0.30 : (embeddedHighEffectBudgetMode ? 2.0 : 1e-4)
+    readonly property real speedRepaintThreshold: simulationActive ? 0.0 : (lowEffectMode ? 0.60 : (embeddedHighEffectBudgetMode ? 2.8 : 1e-4))
+    readonly property real coolantRepaintThreshold: simulationActive ? 0.0 : (lowEffectMode ? 0.30 : (embeddedHighEffectBudgetMode ? 2.0 : 1e-4))
     property real lastPaintedSpeed: 0
     property real lastPaintedCoolantC: 70
 
@@ -154,8 +155,10 @@ Item {
         root.lastPaintedSpeed = root.displaySpeed;
     }
     function requestCoolantPaint() {
-        coolantArcCanvas.requestPaint();
+        root.paintedCoolantVisualNorm = root.coolantVisualNorm;
         root.lastPaintedCoolantC = root.displayCoolantC;
+        if (typeof performanceMetrics !== "undefined" && performanceMetrics)
+            performanceMetrics.recordCounter("speedGauge.nativeCoolantArc")
     }
     function requestGaugeDynamicPaint() {
         const force = arguments.length > 0 && arguments[0] === true;
@@ -200,6 +203,7 @@ Item {
         0, 1
     )
     readonly property real coolantVisualNorm: displayCoolantC < coolantColdC ? 0.14 : coolantNorm
+    property real paintedCoolantVisualNorm: coolantVisualNorm
 
     // Keep the dial geometry stable so the speed and tach arcs stay optically matched.
     readonly property real faceScale: 1.0
@@ -235,7 +239,7 @@ Item {
     // Smooth animation
     Timer {
         id: smoothingTimer
-        interval: root.lowEffectMode ? 50 : 16
+        interval: root.simulationActive ? 16 : (root.lowEffectMode ? 50 : 16)
         running: false
         repeat: true
         onTriggered: {
@@ -470,11 +474,53 @@ Item {
                 return height / 2 + Math.sin(angleRad(deg)) * radius - itemHeight / 2
             }
 
+            GaugeArcItem {
+                anchors.fill: parent
+                z: 44
+                startAngleDeg: coolantArcLayer.startDeg
+                sweepAngleDeg: coolantArcLayer.sweepDeg
+                startProgress: 0.0
+                endProgress: 1.0
+                radiusFactor: 0.36
+                strokeWidth: root.lowEffectMode ? 10 : 18
+                color: root.colorWithAlpha(coolantArcLayer.baseDark, root.lowEffectMode ? 0.10 : 0.08)
+                segments: 80
+            }
+
+            GaugeArcItem {
+                anchors.fill: parent
+                z: 45
+                visible: root.paintedCoolantVisualNorm > 0.002
+                startAngleDeg: coolantArcLayer.startDeg
+                sweepAngleDeg: coolantArcLayer.sweepDeg
+                startProgress: 1.0 - root.paintedCoolantVisualNorm
+                endProgress: 1.0
+                radiusFactor: 0.36
+                strokeWidth: root.lowEffectMode ? 7 : 12
+                color: root.colorWithAlpha(coolantArcLayer.coolantColor, root.lowEffectMode ? 0.76 : 0.82)
+                segments: 80
+            }
+
+            GaugeArcItem {
+                anchors.fill: parent
+                z: 46
+                visible: root.paintedCoolantVisualNorm > 0.002
+                startAngleDeg: coolantArcLayer.startDeg
+                sweepAngleDeg: coolantArcLayer.sweepDeg
+                startProgress: 1.0 - root.paintedCoolantVisualNorm
+                endProgress: 1.0
+                radiusFactor: 0.36
+                strokeWidth: root.lowEffectMode ? 2.0 : 2.8
+                color: root.colorWithAlpha(coolantArcLayer.coolantBright, root.lowEffectMode ? 0.22 : 0.26)
+                segments: 80
+            }
+
             Canvas {
                 id: coolantArcCanvas
                 anchors.centerIn: parent
                 width: parent.width * root.auxArcCanvasScale
                 height: parent.height * root.auxArcCanvasScale
+                visible: false
                 scale: root.auxArcCanvasScale < 1.0 ? (1.0 / root.auxArcCanvasScale) : 1.0
                 renderTarget: root.embeddedSafeMode ? Canvas.Image : Canvas.FramebufferObject
                 antialiasing: !root.lowEffectMode
@@ -674,7 +720,7 @@ Item {
 
             GaugeArcHead {
                 z: 48
-                visible: root.showArcHeads && coolantArcLayer.headVisible
+                visible: false
                 lowEffectMode: root.lowEffectMode
                 scared: root.coolantHeadScared
                 headRadius: root.sideArcHeadRadius

@@ -1,4 +1,5 @@
 import QtQuick 2.15
+import BeagleY 1.0
 
 Item {
     id: root
@@ -41,9 +42,11 @@ Item {
         ? 0.50
         : ((root.lowEffectMode && !root.embeddedSafeMode) ? root.lowEffectArcScale : 1.0)
     readonly property real dynamicArcTune: dynamicArcCanvasScale < 1.0 ? dynamicArcCanvasScale : 1.0
-    readonly property real progressRepaintThreshold: lowEffectMode
+    readonly property real progressRepaintThreshold: embeddedSafeMode
+        ? 0.0
+        : (lowEffectMode
         ? 0.004
-        : (embeddedHighEffectBudgetMode ? 0.012 : 0.0)
+        : (embeddedHighEffectBudgetMode ? 0.012 : 0.0))
     readonly property real sweepRad: root.sweepAngleDeg * Math.PI / 180
     readonly property real clampedProgress: root.clamp(root.progress, 0, 1)
     readonly property real arcRadiusOnScreen: width * root.arcRadiusFactor
@@ -53,6 +56,7 @@ Item {
         : 11.5
     readonly property bool headVisible: root.clampedProgress > 0.002
     property real lastPaintedProgress: -1.0
+    property real paintedProgress: 0.0
 
     function clamp(v, lo, hi) {
         return Math.max(lo, Math.min(hi, v));
@@ -97,7 +101,10 @@ Item {
                 && Math.abs(root.clampedProgress - root.lastPaintedProgress) < root.progressRepaintThreshold) {
             return;
         }
-        arcCanvas.requestPaint();
+        root.paintedProgress = root.clampedProgress;
+        root.lastPaintedProgress = root.clampedProgress;
+        if (typeof performanceMetrics !== "undefined" && performanceMetrics)
+            performanceMetrics.recordCounter("gauge.nativeDialArc")
     }
 
     onThemeChanged: {
@@ -232,12 +239,80 @@ Item {
         }
     }
 
+    GaugeArcItem {
+        anchors.fill: parent
+        z: 20
+        startAngleDeg: root.startAngleDeg
+        sweepAngleDeg: root.sweepAngleDeg
+        startProgress: 0.0
+        endProgress: 1.0
+        radiusFactor: root.arcRadiusFactor
+        strokeWidth: root.lowEffectMode ? 13 : 18
+        color: root.colorWithAlpha(root.chromeColor, root.lowEffectMode ? 0.08 : 0.07)
+        segments: 96
+    }
+
+    GaugeArcItem {
+        anchors.fill: parent
+        z: 21
+        startAngleDeg: root.startAngleDeg
+        sweepAngleDeg: root.sweepAngleDeg
+        startProgress: 0.0
+        endProgress: 1.0
+        radiusFactor: root.arcRadiusFactor
+        strokeWidth: root.lowEffectMode ? 5.5 : 7.0
+        color: root.colorWithAlpha(root.chromeColor, root.lowEffectMode ? 0.26 : 0.30)
+        segments: 96
+    }
+
+    GaugeArcItem {
+        anchors.fill: parent
+        z: 22
+        startAngleDeg: root.startAngleDeg
+        sweepAngleDeg: root.sweepAngleDeg
+        startProgress: 0.0
+        endProgress: 1.0
+        radiusFactor: root.arcRadiusFactor
+        strokeWidth: root.lowEffectMode ? 1.7 : 2.2
+        color: root.colorWithAlpha(root.blendToward(root.chromeColor, Qt.color("#FFFFFF"), 0.28, 0.98), root.lowEffectMode ? 0.10 : 0.12)
+        segments: 96
+    }
+
+    GaugeArcItem {
+        anchors.fill: parent
+        z: 23
+        visible: root.paintedProgress > 0.002
+        startAngleDeg: root.startAngleDeg
+        sweepAngleDeg: root.sweepAngleDeg
+        startProgress: 0.0
+        endProgress: root.paintedProgress
+        radiusFactor: root.arcRadiusFactor
+        strokeWidth: root.lowEffectMode ? 7.5 : 10.5
+        color: root.colorWithAlpha(root.gaugeColor, root.lowEffectMode ? 0.78 : 0.84)
+        segments: 96
+    }
+
+    GaugeArcItem {
+        anchors.fill: parent
+        z: 24
+        visible: root.paintedProgress > 0.002
+        startAngleDeg: root.startAngleDeg
+        sweepAngleDeg: root.sweepAngleDeg
+        startProgress: 0.0
+        endProgress: root.paintedProgress
+        radiusFactor: root.arcRadiusFactor
+        strokeWidth: root.lowEffectMode ? 2.0 : 2.8
+        color: root.colorWithAlpha(root.blendToward(root.gaugeColor, Qt.color("#FFFFFF"), 0.34, 0.98), root.lowEffectMode ? 0.22 : 0.26)
+        segments: 96
+    }
+
     Canvas {
         id: arcCanvas
         anchors.centerIn: parent
         width: parent.width * root.dynamicArcCanvasScale
         height: parent.height * root.dynamicArcCanvasScale
         z: 20
+        visible: false
         scale: root.dynamicArcCanvasScale < 1.0 ? (1.0 / root.dynamicArcCanvasScale) : 1.0
         renderTarget: root.embeddedSafeMode ? Canvas.Image : Canvas.FramebufferObject
         antialiasing: !root.lowEffectMode && !root.embeddedSafeMode
@@ -479,7 +554,7 @@ Item {
     GaugeArcHead {
         id: arcHead
         z: 24
-        visible: root.showArcHead && root.headVisible
+        visible: false
         lowEffectMode: root.lowEffectMode
         scared: root.scaredHead
         headRadius: root.headScreenRadius

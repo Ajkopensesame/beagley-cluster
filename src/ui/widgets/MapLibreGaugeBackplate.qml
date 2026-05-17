@@ -257,7 +257,7 @@ Item {
 
     GaugeArcHead {
         z: 90
-        visible: root.showArcHeads && root.clampedPrimary > 0.002
+        visible: false
         lowEffectMode: false
         scared: root.primaryScared
         headRadius: root.primaryHeadRadius
@@ -267,7 +267,7 @@ Item {
 
     GaugeArcHead {
         z: 92
-        visible: root.showArcHeads && root.clampedAux > 0.002
+        visible: false
         lowEffectMode: false
         scared: root.auxScared
         headRadius: root.auxHeadRadius

@@ -25,6 +25,7 @@
 #include "data/VehicleStateClient.h"
 #include "navigation/NavigationService.h"
 #include "render/ClusterRenderModel.h"
+#include "render/GaugeArcItem.h"
 #include "render/NativeRasterMapItem.h"
 #include "render/PerformanceMetrics.h"
 #include "render/RadarFrameItem.h"
@@ -395,6 +396,7 @@ int main(int argc, char *argv[])
 #endif
 
     QGuiApplication app(argc, argv);
+    qmlRegisterType<GaugeArcItem>("BeagleY", 1, 0, "GaugeArcItem");
     qmlRegisterType<NativeRasterMapItem>("BeagleY", 1, 0, "NativeRasterMapItem");
     qmlRegisterType<RadarFrameItem>("BeagleY", 1, 0, "RadarFrameItem");
     qmlRegisterType<RasterFrameItem>("BeagleY", 1, 0, "RasterFrameItem");

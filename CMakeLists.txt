@@ -83,6 +83,8 @@ qt_add_executable(beagley_cluster
     src/navigation/OpenNavigationProvider.cpp
     src/navigation/NavigationService.cpp
     src/render/ClusterRenderModel.cpp
+    src/render/GaugeArcItem.cpp
+    src/render/GaugeArcItem.h
     src/render/NativeRasterMapItem.cpp
     src/render/RasterFrameItem.cpp
     src/render/RasterFrameItem.h

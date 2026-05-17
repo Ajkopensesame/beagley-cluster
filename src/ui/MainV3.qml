@@ -796,10 +796,10 @@ Window {
 
     Timer {
         id: clusterSimulationClock
-        interval: 50
+        interval: 16
         running: root.clusterSimulation
         repeat: true
-        onTriggered: root.clusterSimulationPhase += interval / 1000.0
+        onTriggered: root.clusterSimulationPhase += 1.0 / 60.0
     }
 
     function updateLeftIndicatorVisual() {
@@ -1230,7 +1230,7 @@ Window {
                 effectLevel: root.gaugeEffectLevel
                 detailMode: root.gaugeDetail
                 demoReadouts: root.gaugeDemo
-                showArcHeads: !root.mapLibreSafeCompositor
+                showArcHeads: false
                 stressScene: root.stressScene
                 stressPhase: root.stressPhase
                 simulationActive: root.clusterSimulation
@@ -1329,7 +1329,7 @@ Window {
                 effectLevel: root.gaugeEffectLevel
                 detailMode: root.gaugeDetail
                 demoTelltales: root.gaugeDemo
-                showArcHeads: !root.mapLibreSafeCompositor
+                showArcHeads: false
                 stressScene: root.stressScene
                 stressPhase: root.stressPhase
                 simulationActive: root.clusterSimulation

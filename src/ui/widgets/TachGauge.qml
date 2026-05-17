@@ -1,4 +1,5 @@
 import QtQuick 2.15
+import BeagleY 1.0
 
 Item {
     id: root
@@ -97,8 +98,8 @@ Item {
         : ((lowEffectMode && !embeddedSafeMode) ? 0.44 : 1.0)
     readonly property real auxArcStrokeTune: auxArcCanvasScale < 1.0 ? auxArcCanvasScale : 1.0
     readonly property real sideArcHeadRadius: lowEffectMode ? 10.5 : (embeddedHighEffectBudgetMode ? 12.0 : 15.5)
-    readonly property real rpmRepaintThreshold: lowEffectMode ? 35.0 : (embeddedHighEffectBudgetMode ? 260.0 : 1e-4)
-    readonly property real fuelRepaintThreshold: lowEffectMode ? 0.30 : (embeddedHighEffectBudgetMode ? 2.0 : 1e-4)
+    readonly property real rpmRepaintThreshold: simulationActive ? 0.0 : (lowEffectMode ? 35.0 : (embeddedHighEffectBudgetMode ? 260.0 : 1e-4))
+    readonly property real fuelRepaintThreshold: simulationActive ? 0.0 : (lowEffectMode ? 0.30 : (embeddedHighEffectBudgetMode ? 2.0 : 1e-4))
     property real lastPaintedRpm: 0
     property real lastPaintedFuel: 100
 
@@ -111,8 +112,10 @@ Item {
         root.lastPaintedRpm = root.displayRpm;
     }
     function requestFuelPaint() {
-        fuelArcCanvas.requestPaint();
+        root.paintedFuelNorm = clamp(root.displayFuel / 100.0, 0, 1);
         root.lastPaintedFuel = root.displayFuel;
+        if (typeof performanceMetrics !== "undefined" && performanceMetrics)
+            performanceMetrics.recordCounter("tachGauge.nativeFuelArc")
     }
     function requestGaugeDynamicPaint() {
         const force = arguments.length > 0 && arguments[0] === true;
@@ -138,6 +141,7 @@ Item {
     readonly property real rainFaceRadius: width * 0.496
     property real flashLevel: 0.0
     property real fuelLavaPhase: 0.0
+    property real paintedFuelNorm: clamp(displayFuel / 100.0, 0, 1)
 
     function fallbackRpmColor(v) {
         return (v >= redlineStart) ? "#FF3B3B" : "#5E35B1";
@@ -215,7 +219,7 @@ Item {
     // ===== Smooth RPM =====
     Timer {
         id: smoothingTimer
-        interval: root.lowEffectMode ? 50 : 16
+        interval: root.simulationActive ? 16 : (root.lowEffectMode ? 50 : 16)
         running: false
         repeat: true
         onTriggered: {
@@ -454,11 +458,53 @@ Item {
                 return height / 2 + Math.sin(angleRad(deg)) * radius - itemHeight / 2
             }
 
+            GaugeArcItem {
+                anchors.fill: parent
+                z: 44
+                startAngleDeg: fuelArcLayer.startDeg
+                sweepAngleDeg: fuelArcLayer.sweepDeg
+                startProgress: 0.0
+                endProgress: 1.0
+                radiusFactor: 0.36
+                strokeWidth: root.lowEffectMode ? 10 : 18
+                color: root.colorWithAlpha(fuelArcLayer.baseDark, root.lowEffectMode ? 0.10 : 0.08)
+                segments: 80
+            }
+
+            GaugeArcItem {
+                anchors.fill: parent
+                z: 45
+                visible: root.paintedFuelNorm > 0.002
+                startAngleDeg: fuelArcLayer.startDeg
+                sweepAngleDeg: fuelArcLayer.sweepDeg
+                startProgress: 1.0 - root.paintedFuelNorm
+                endProgress: 1.0
+                radiusFactor: 0.36
+                strokeWidth: root.lowEffectMode ? 7 : 12
+                color: root.colorWithAlpha(fuelArcLayer.fuelColor, root.lowEffectMode ? 0.76 : 0.82)
+                segments: 80
+            }
+
+            GaugeArcItem {
+                anchors.fill: parent
+                z: 46
+                visible: root.paintedFuelNorm > 0.002
+                startAngleDeg: fuelArcLayer.startDeg
+                sweepAngleDeg: fuelArcLayer.sweepDeg
+                startProgress: 1.0 - root.paintedFuelNorm
+                endProgress: 1.0
+                radiusFactor: 0.36
+                strokeWidth: root.lowEffectMode ? 2.0 : 2.8
+                color: root.colorWithAlpha(fuelArcLayer.fuelBright, root.lowEffectMode ? 0.22 : 0.26)
+                segments: 80
+            }
+
             Canvas {
                 id: fuelArcCanvas
                 anchors.centerIn: parent
                 width: parent.width * root.auxArcCanvasScale
                 height: parent.height * root.auxArcCanvasScale
+                visible: false
                 scale: root.auxArcCanvasScale < 1.0 ? (1.0 / root.auxArcCanvasScale) : 1.0
                 renderTarget: root.embeddedSafeMode ? Canvas.Image : Canvas.FramebufferObject
                 antialiasing: !root.lowEffectMode
@@ -652,7 +698,7 @@ Item {
 
             GaugeArcHead {
                 z: 48
-                visible: root.showArcHeads && fuelArcLayer.headVisible
+                visible: false
                 lowEffectMode: root.lowEffectMode
                 scared: root.fuelHeadScared
                 headRadius: root.sideArcHeadRadius
