@@ -2,6 +2,7 @@ import QtQuick 2.15
 
 Item {
     id: root
+    clip: true
 
     property string kind: "clear"
     property color primaryColor: "#FFD36B"
@@ -39,8 +40,7 @@ Item {
     }
 
     function requestCanvasPaint() {
-        if (!embeddedSafeMode)
-            moodCanvas.requestPaint()
+        moodCanvas.requestPaint()
     }
 
     onKindChanged: requestCanvasPaint()
@@ -54,7 +54,7 @@ Item {
     Item {
         id: embeddedIcon
         anchors.fill: parent
-        visible: root.embeddedSafeMode
+        visible: false
 
         readonly property string weatherKind: root.normalizedKind()
         readonly property real side: Math.min(width, height)
@@ -243,8 +243,8 @@ Item {
     Canvas {
         id: moodCanvas
         anchors.fill: parent
-        visible: !root.embeddedSafeMode
-        renderTarget: Canvas.FramebufferObject
+        visible: true
+        renderTarget: root.embeddedSafeMode ? Canvas.Image : Canvas.FramebufferObject
         antialiasing: true
         smooth: true
 
