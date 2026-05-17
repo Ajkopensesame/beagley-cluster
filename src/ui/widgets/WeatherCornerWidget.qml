@@ -27,19 +27,6 @@ Item {
         effectLevel: root.effectLevel
         active: root.live
 
-        WeatherMoodIcon {
-            width: Math.round(frame.side * 0.34)
-            height: width
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.top: parent.top
-            anchors.topMargin: Math.round(frame.side * 0.18)
-            kind: root.conditionKind
-            primaryColor: "#FFD36B"
-            secondaryColor: "#58FFE1"
-            visible: root.live
-            opacity: 0.95
-        }
-
         OemIcon {
             width: Math.round(frame.side * 0.32)
             height: width
@@ -50,8 +37,9 @@ Item {
             color: "#F7FBFF"
             accentColor: "#FFD36B"
             strokeWidth: Math.max(3, frame.side * 0.035)
-            active: false
-            visible: !root.live
+            active: root.live
+            opacity: root.live ? 0.96 : 0.68
+            visible: true
         }
 
         Column {

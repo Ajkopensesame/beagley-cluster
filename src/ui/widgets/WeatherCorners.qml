@@ -97,6 +97,8 @@ Item {
     property string radarProduct: ""
     property real radarSiteDistanceKm: NaN
     property string radarFrameLabel: ""
+    property int radarFrameCount: 0
+    property int radarFrameIndex: -1
     property string expandedMode: ""
 
     signal mapMenuRequested()
@@ -220,6 +222,12 @@ Item {
         if (label.length > 0)
             return label
         return time.length > 0 ? time : radarStatus
+    }
+
+    function radarLoopDisplayLabel() {
+        if (radarFrameCount <= 1)
+            return radarStatus === "LIVE" ? "1/1" : "--"
+        return (Math.max(0, radarFrameIndex) + 1).toString() + "/" + radarFrameCount.toString()
     }
 
     function weatherLabel() {
@@ -811,10 +819,14 @@ Item {
             radarStatus = radarImage.status
             radarFrameTime = radarImage.frameTime
             radarFrameLabel = radarImage.frameLabel
+            radarFrameCount = radarImage.frameCount
+            radarFrameIndex = radarImage.frameIndex
         } else {
             radarStatus = "UNAVAILABLE"
             radarFrameTime = ""
             radarFrameLabel = ""
+            radarFrameCount = 0
+            radarFrameIndex = -1
         }
     }
 
@@ -893,6 +905,8 @@ Item {
             root.radarStatus = radarImage.status
             root.radarFrameTime = radarImage.frameTime
             root.radarFrameLabel = radarImage.frameLabel
+            root.radarFrameCount = radarImage.frameCount
+            root.radarFrameIndex = radarImage.frameIndex
         }
 
         function onStatusChanged() {
@@ -905,6 +919,14 @@ Item {
 
         function onFrameLabelChanged() {
             root.radarFrameLabel = radarImage.frameLabel
+        }
+
+        function onFrameCountChanged() {
+            root.radarFrameCount = radarImage.frameCount
+        }
+
+        function onFrameIndexChanged() {
+            root.radarFrameIndex = radarImage.frameIndex
         }
     }
 
@@ -1646,7 +1668,7 @@ Item {
                             model: [
                                 { "k": "FRAME", "v": root.radarFrameDisplayLabel(), "s": "time" },
                                 { "k": "SOURCE", "v": root.radarSiteName.length > 0 ? root.radarSiteName : "GPS", "s": root.formatDistanceKm(root.radarSiteDistanceKm) },
-                                { "k": "STATUS", "v": root.radarStatus === "LIVE" ? "LIVE NOW" : root.radarStatus, "s": root.radarProduct.length > 0 ? root.radarProduct : root.radarSourceLabel() }
+                                { "k": "LOOP", "v": root.radarLoopDisplayLabel(), "s": root.radarStatus === "LIVE" ? "snapshots" : root.radarStatus }
                             ]
 
                             Item {

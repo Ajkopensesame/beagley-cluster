@@ -20,6 +20,7 @@ Item {
     readonly property string monoFont: theme && theme.fontMono ? theme.fontMono : "Oxanium"
     readonly property bool live: root.status === "LIVE"
     readonly property bool frameReady: root.live && String(root.frameUrl).length > 0
+    readonly property int radarFaceInset: Math.round(frame.side * 0.135)
 
     CornerPodFrame {
         id: frame
@@ -32,7 +33,7 @@ Item {
         Item {
             id: radarFace
             anchors.fill: parent
-            anchors.margins: frame.faceInset
+            anchors.margins: root.radarFaceInset
 
             RadarFrameItem {
                 id: radarPreview
@@ -51,7 +52,7 @@ Item {
                 anchors.fill: parent
                 radius: width / 2
                 color: "transparent"
-                border.width: Math.max(3, Math.round(frame.side * 0.024))
+                border.width: Math.max(2, Math.round(frame.side * 0.014))
                 border.color: "#010307"
             }
 

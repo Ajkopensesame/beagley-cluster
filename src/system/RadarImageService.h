@@ -102,6 +102,7 @@ private:
     QString compositePath(const RadarFrame &frame, const CenterTile &center) const;
     QString mapCompositePath(const RadarFrame &frame, const CenterTile &center) const;
     QString mapCompositePathForRadarPath(const QString &radarPath) const;
+    QString latestMapCompositePath() const;
     bool tryPublishLatestCachedFrame(const QString &status);
     QList<RadarFrame> parseRadarFrames(const QByteArray &payload) const;
     QString formatFrameTime(qint64 epochSeconds) const;
