@@ -683,6 +683,9 @@ double addressDistanceScore(double distanceMeters)
     if (distanceMeters <= 5000.0) {
         return 46.0;
     }
+    if (distanceMeters <= 10000.0) {
+        return 44.0;
+    }
     if (distanceMeters <= 15000.0) {
         return 34.0;
     }

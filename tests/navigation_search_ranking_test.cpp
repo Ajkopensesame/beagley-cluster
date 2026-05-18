@@ -327,6 +327,62 @@ void testPartialAddressRankingPrefersNearbyStreetPrediction()
     expectTrue(results.first().label.contains(QStringLiteral("Peregian Beach")), "nearby street prediction should rank before farther high-importance road");
 }
 
+void testPartialAddressMergeKeepsCloserAutocompleteFirst()
+{
+    qputenv("BEAGLEY_NAV_SEARCH_COUNTRYCODE", "AU");
+    OpenNavigationProvider provider;
+    const QByteArray photonPayload = R"JSON(
+{
+  "features": [
+    {
+      "properties": {
+        "name": "David Low Way",
+        "city": "Peregian Beach",
+        "state": "Queensland",
+        "country": "Australia",
+        "countrycode": "AU",
+        "osm_key": "highway",
+        "osm_value": "primary",
+        "type": "street"
+      },
+      "geometry": { "type": "Point", "coordinates": [153.0956146, -26.4787904] }
+    }
+  ]
+}
+)JSON";
+    const QByteArray nominatimPayload = R"JSON(
+[
+  {
+    "display_name": "David Low Way, Yaroomba, Coolum Beach, Queensland, 4573, Australia",
+    "lat": "-26.5583100",
+    "lon": "153.0954100",
+    "category": "highway",
+    "type": "primary",
+    "addresstype": "road",
+    "importance": 0.95,
+    "address": {
+      "road": "David Low Way",
+      "suburb": "Yaroomba",
+      "city": "Coolum Beach",
+      "state": "Queensland",
+      "country": "Australia",
+      "country_code": "au"
+    }
+  }
+]
+)JSON";
+
+    const QList<SearchResultData> primary = provider.parseSearchResponse(photonPayload, QStringLiteral("David Low"), -26.4593, 152.9990);
+    expectTrue(provider.shouldRunFallbackSearch(primary, QStringLiteral("David Low")), "partial address autocomplete should run local refinement");
+    const QList<SearchResultData> fallback = provider.parseSearchResponse(nominatimPayload, QStringLiteral("David Low"), -26.4593, 152.9990);
+    const QList<SearchResultData> merged = provider.mergeSearchResults(primary, fallback);
+    expectTrue(!merged.isEmpty(), "merged partial address results should not be empty");
+    if (merged.isEmpty()) {
+        return;
+    }
+    expectTrue(merged.first().label.contains(QStringLiteral("Peregian Beach")), "closer autocomplete result should stay first after fallback merge");
+}
+
 void testWeakCategorySearchRefinesWithFallbackMerge()
 {
     qputenv("BEAGLEY_NAV_SEARCH_COUNTRYCODE", "AU");
@@ -395,6 +451,7 @@ int main()
     testAddressRankingPrefersClosestMatchingRoad();
     testPartialAddressPredictionUsesLocalAddressFallback();
     testPartialAddressRankingPrefersNearbyStreetPrediction();
+    testPartialAddressMergeKeepsCloserAutocompleteFirst();
     testWeakCategorySearchRefinesWithFallbackMerge();
 
     if (g_failures == 0) {

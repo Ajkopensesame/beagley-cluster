@@ -1139,6 +1139,17 @@ Window {
         return Math.round(value) + " m"
     }
 
+    function searchResultSubtitle(item) {
+        const secondary = String((item && item.secondary) || "")
+        const distance = Number(item && item.distanceMeters)
+        const distanceText = isFinite(distance) && distance > 0
+            ? root.formatDistanceMeters(distance)
+            : ""
+        if (distanceText.length > 0 && secondary.length > 0)
+            return distanceText + " - " + secondary
+        return secondary.length > 0 ? secondary : distanceText
+    }
+
     function formatDurationSeconds(seconds) {
         const value = Number(seconds)
         if (!isFinite(value) || value <= 0)
@@ -2922,10 +2933,7 @@ Window {
 
                                                     Text {
                                                         width: parent.width
-                                                        text: String(itemData.secondary
-                                                            || (isFinite(Number(itemData.distanceMeters))
-                                                                ? root.formatDistanceMeters(itemData.distanceMeters)
-                                                                : ""))
+                                                        text: root.searchResultSubtitle(itemData)
                                                         textFormat: Text.PlainText
                                                         color: root.menuTextSecondaryColor
                                                         font.family: appTheme.fontMono
