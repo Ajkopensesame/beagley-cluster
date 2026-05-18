@@ -414,6 +414,9 @@ Window {
         && BEAGLEY_INITIAL_MAP_SEARCH_QUERY)
         ? String(BEAGLEY_INITIAL_MAP_SEARCH_QUERY).trim()
         : ""
+    readonly property bool initialMapSearchKeyboard: (typeof BEAGLEY_INITIAL_MAP_SEARCH_KEYBOARD !== "undefined")
+        ? boolEnvValue(BEAGLEY_INITIAL_MAP_SEARCH_KEYBOARD)
+        : false
     property var pendingDestination: ({})
     property int selectedRouteIndex: 0
     property bool awaitingRoutePreview: false
@@ -1184,13 +1187,16 @@ Window {
         if (bootStage.length > 0 || root.initialMapSearchQuery.length > 0) {
             root.mapMenuStage = bootStage.length > 0 ? bootStage : "search"
             root.mapMenuOpen = true
-            root.searchKeyboardOpen = false
+            root.searchKeyboardOpen = root.initialMapSearchKeyboard && root.mapMenuStage === "search"
         }
         if (root.initialMapSearchQuery.length > 0) {
             searchInput.text = root.initialMapSearchQuery
             searchInput.cursorPosition = searchInput.text.length
             root.mapMenuStage = "search"
+            root.searchKeyboardOpen = root.initialMapSearchKeyboard
             Qt.callLater(function() {
+                if (root.searchKeyboardOpen)
+                    searchInput.forceActiveFocus()
                 root.fetchSearchSuggestions(searchInput.text)
             })
         }
