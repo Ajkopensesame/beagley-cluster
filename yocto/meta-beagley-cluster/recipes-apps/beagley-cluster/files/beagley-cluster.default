@@ -30,3 +30,9 @@ BEAGLEY_WIFI_ONBOARDING=1
 BEAGLEY_WIFI_WIZARD_TRIGGER=offline
 VEHICLE_HUB_WS_URL=ws://10.24.0.7:8765
 BEAGLEY_PROFILE_METRICS=0
+# Real Spotify playback source. Secrets belong in /etc/default/beagley-cluster.local,
+# not in this image default file. Required scopes for a refresh token:
+# user-read-playback-state user-read-currently-playing user-modify-playback-state
+BEAGLEY_NOW_PLAYING_BACKEND=spotify-web
+BEAGLEY_NOW_PLAYING_SOURCE_LABEL=Spotify
+BEAGLEY_NOW_PLAYING_REFRESH_MS=5000

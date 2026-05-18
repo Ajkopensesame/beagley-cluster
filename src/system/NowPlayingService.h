@@ -1,5 +1,8 @@
 #pragma once
 
+#include <QDateTime>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
 #include <QObject>
 #include <QProcess>
 #include <QTimer>
@@ -18,6 +21,20 @@ class NowPlayingService : public QObject
     Q_PROPERTY(QString statusDetail READ statusDetail NOTIFY nowPlayingChanged)
 
 public:
+    enum class Backend {
+        Playerctl,
+        SpotifyWeb
+    };
+
+    enum class SpotifyAction {
+        None,
+        RefreshPlayback,
+        Play,
+        Pause,
+        Next,
+        Previous
+    };
+
     explicit NowPlayingService(QObject *parent = nullptr);
     ~NowPlayingService() override;
 
@@ -42,6 +59,17 @@ private:
     QString sourceLabel() const;
     QStringList playerctlBaseArgs() const;
     void runControlCommand(const QString &action);
+    void refreshPlayerctl();
+    void refreshSpotifyPlayback(bool retriedAfterTokenRefresh = false);
+    void refreshSpotifyAccessToken();
+    void runSpotifyAction(SpotifyAction action, bool retriedAfterTokenRefresh = false);
+    bool spotifyBackendActive() const;
+    bool spotifyTokenUsable() const;
+    bool spotifyRefreshConfigured() const;
+    void handleSpotifyPlaybackReply(QNetworkReply *reply, bool retriedAfterTokenRefresh);
+    void handleSpotifyTokenReply(QNetworkReply *reply);
+    void handleSpotifyControlReply(QNetworkReply *reply, SpotifyAction action, bool retriedAfterTokenRefresh);
+    void setSpotifyAuthRequired(const QString &detail);
     void finishProcess(QProcess *process, bool commandFailed, const QString &fallbackDetail = QString());
     void setNowPlaying(bool available,
                        bool playing,
@@ -53,9 +81,20 @@ private:
                        const QString &statusDetail);
 
     QProcess *m_process = nullptr;
+    QNetworkAccessManager m_network;
+    QNetworkReply *m_networkReply = nullptr;
     QTimer m_refreshTimer;
     QTimer m_timeoutTimer;
+    Backend m_backend = Backend::Playerctl;
+    SpotifyAction m_pendingSpotifyAction = SpotifyAction::None;
     QString m_playerName;
+    QString m_spotifyAccessToken;
+    QString m_spotifyRefreshToken;
+    QString m_spotifyClientId;
+    QString m_spotifyClientSecret;
+    QString m_spotifyDeviceId;
+    QString m_spotifyMarket;
+    QDateTime m_spotifyAccessTokenExpiresAt;
     bool m_available = false;
     bool m_playing = false;
     QString m_source;
