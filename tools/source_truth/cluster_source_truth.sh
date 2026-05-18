@@ -15,6 +15,7 @@ CHECK_BEAGLEY=1
 CHECK_ELITEBOOK=1
 FAILURES=0
 WARNINGS=0
+EXPECT_FULL_MAP_UNDERLAY="${BEAGLEY_EXPECT_FULL_MAP_UNDERLAY:-1}"
 
 usage() {
   cat <<'EOF'
@@ -38,6 +39,7 @@ Options:
 Environment:
   ELITEBOOK_TARGETS, ELITEBOOK_HOST, ELITEBOOK_SSH_KEY, ELITEBOOK_REPO
   BEAGLEY_TARGETS, BEAGLEY_HOST, BEAGLEY_TARGET_ENV
+  BEAGLEY_EXPECT_FULL_MAP_UNDERLAY=0 to skip the full-map-under-gauges guard
 EOF
 }
 
@@ -283,7 +285,7 @@ echo "n_restarts=$(systemctl show beagley_cluster -p NRestarts --value 2>/dev/nu
 if [[ -n "${pid:-}" && "$pid" != "0" && -r "/proc/$pid/environ" ]]; then
   env="$(tr '\0' '\n' <"/proc/$pid/environ")"
   printf '%s\n' "$env" \
-    | grep -E '^(BEAGLEY_UI_VARIANT|BEAGLEY_RENDER_PROFILE|BEAGLEY_EFFECT_LEVEL|BEAGLEY_GAUGE_DETAIL|BEAGLEY_GAUGE_DEMO|BEAGLEY_CLUSTER_SIMULATION|BEAGLEY_MAP_RENDERER|BEAGLEY_QML_DEV_ROOT|QSG_RENDER_LOOP)=' \
+    | grep -E '^(BEAGLEY_UI_VARIANT|BEAGLEY_RENDER_PROFILE|BEAGLEY_EFFECT_LEVEL|BEAGLEY_GAUGE_DETAIL|BEAGLEY_GAUGE_DEMO|BEAGLEY_CLUSTER_SIMULATION|BEAGLEY_MAP_RENDERER|BEAGLEY_MAPLIBRE_NATIVE_FULL_UNDERLAY|BEAGLEY_QML_DEV_ROOT|QSG_RENDER_LOOP)=' \
     | sort || true
   qml_root="$(printf '%s\n' "$env" | sed -n 's/^BEAGLEY_QML_DEV_ROOT=//p' | tail -n 1)"
   if [[ -n "${qml_root:-}" ]]; then
@@ -303,6 +305,8 @@ REMOTE
       beagley_commit="$(printf '%s\n' "$beagley_info" | awk -F= '$1 == "build_commit" { print $2; exit }')"
       beagley_branch="$(printf '%s\n' "$beagley_info" | awk -F= '$1 == "build_branch" { print $2; exit }')"
       qml_source="$(printf '%s\n' "$beagley_info" | awk -F= '$1 == "qml_source" { print $2; exit }')"
+      beagley_renderer="$(printf '%s\n' "$beagley_info" | awk -F= '$1 == "BEAGLEY_MAP_RENDERER" { print $2; exit }')"
+      beagley_full_underlay="$(printf '%s\n' "$beagley_info" | awk -F= '$1 == "BEAGLEY_MAPLIBRE_NATIVE_FULL_UNDERLAY" { print $2; exit }')"
       if [[ -n "$canonical_commit" && "$beagley_commit" == "$(short_commit "$canonical_commit")"* ]]; then
         ok "BeagleY BUILD commit matches canonical source"
       else
@@ -320,6 +324,17 @@ REMOTE
           fail "BeagleY display source is ${qml_source:-unknown}; disable QML-dev before trusting production UI"
         else
           warn "BeagleY display source is ${qml_source:-unknown}"
+        fi
+      fi
+      if [[ "$EXPECT_FULL_MAP_UNDERLAY" == "1" && "$beagley_renderer" == "maplibre-native" ]]; then
+        if [[ "$beagley_full_underlay" == "1" ]]; then
+          ok "BeagleY full-map underlay enabled"
+        else
+          if [[ "$STRICT" == 1 ]]; then
+            fail "BeagleY full-map underlay is ${beagley_full_underlay:-unset}; normal display will show black side bands"
+          else
+            warn "BeagleY full-map underlay is ${beagley_full_underlay:-unset}; normal display will show black side bands"
+          fi
         fi
       fi
     fi

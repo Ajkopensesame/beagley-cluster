@@ -26,6 +26,7 @@ The helper checks:
 - local branch and all Mac worktrees, including dirty/uncommitted counts
 - EliteBook builder repo branch, commit, and dirty state
 - live BeagleY `[BUILD]` journal line and display source (`compiled-binary` vs QML-dev)
+- live BeagleY full-map-under-gauges visual mode when MapLibre Native is active
 
 Rules:
 
@@ -37,6 +38,11 @@ Rules:
   verification. If it reports `qml_source=qml-dev`, disable the active
   `/etc/systemd/system/beagley_cluster.service.d/ui-dev.conf` drop-in and
   restart before trusting the display.
+- BeagleY must report `BEAGLEY_MAPLIBRE_NATIVE_FULL_UNDERLAY=1` when
+  `BEAGLEY_MAP_RENDERER=maplibre-native`; otherwise the normal display can
+  regress to black side bands around the gauges. Use
+  `BEAGLEY_EXPECT_FULL_MAP_UNDERLAY=0` only when intentionally testing the
+  conservative center-map compositor path.
 - Dirty Mac worktrees are allowed only as visible development queues; they are
   not the production source until committed and published.
 
@@ -54,6 +60,10 @@ New-conversation checklist:
 ```bash
 tools/ui/beagley_live_cluster_profile.sh --host root@192.168.0.92 --simulation --effect-level off --gauge-detail rich
 ```
+
+That live profile defaults to full-map-under-gauges mode. If a menu/window is
+open, the QML shell hides the native map behind the overlay so the fix for menu
+triangles does not require disabling full underlay globally.
 
 Useful commands:
 

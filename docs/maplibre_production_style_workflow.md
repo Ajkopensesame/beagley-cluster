@@ -32,7 +32,7 @@ BEAGLEY_MAP_RENDERER=maplibre-native
 BEAGLEY_MAPLIBRE_NATIVE_STYLE_URL=https://tiles.openfreemap.org/styles/positron
 BEAGLEY_MAPLIBRE_NATIVE_TRUSTED_STYLES=https://tiles.openfreemap.org/styles/positron
 BEAGLEY_MAPLIBRE_NATIVE_ALLOW_UNTESTED_STYLES=0
-BEAGLEY_MAPLIBRE_NATIVE_FULL_UNDERLAY=0
+BEAGLEY_MAPLIBRE_NATIVE_FULL_UNDERLAY=1
 BEAGLEY_MAPLIBRE_NATIVE_MAX_ZOOM=14.0
 ```
 
@@ -43,9 +43,14 @@ BEAGLEY_MAP_RENDERER=maplibre-native
 BEAGLEY_MAPLIBRE_NATIVE_STYLE_URL=<verified style URL>
 BEAGLEY_MAPLIBRE_NATIVE_TRUSTED_STYLES=<verified style URL>
 BEAGLEY_MAPLIBRE_NATIVE_ALLOW_UNTESTED_STYLES=0
-BEAGLEY_MAPLIBRE_NATIVE_FULL_UNDERLAY=0
+BEAGLEY_MAPLIBRE_NATIVE_FULL_UNDERLAY=1
 BEAGLEY_MAPLIBRE_NATIVE_MAX_ZOOM=<verified source maxzoom>
 ```
+
+The style probe keeps full-underlay enabled by default so promoted styles keep
+the normal cluster composition: full-screen map around the opaque black gauges.
+Use `--maplibre-safe-compositor` only when intentionally isolating the map
+renderer in the conservative center region.
 
 The QML runtime also has a guard. If MapLibre Native is requested with a style
 that is not in `BEAGLEY_MAPLIBRE_NATIVE_TRUSTED_STYLES`, it falls back to the

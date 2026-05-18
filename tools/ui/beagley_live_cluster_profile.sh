@@ -11,7 +11,7 @@ CLUSTER_SIMULATION="${BEAGLEY_CLUSTER_SIMULATION:-0}"
 MAP_RENDERER="${BEAGLEY_MAP_RENDERER:-maplibre-native}"
 MAPLIBRE_STYLE_URL="${BEAGLEY_MAPLIBRE_NATIVE_STYLE_URL:-https://tiles.openfreemap.org/styles/positron}"
 MAPLIBRE_TRUSTED_STYLES="${BEAGLEY_MAPLIBRE_NATIVE_TRUSTED_STYLES:-$MAPLIBRE_STYLE_URL}"
-MAPLIBRE_FULL_UNDERLAY="${BEAGLEY_MAPLIBRE_NATIVE_FULL_UNDERLAY:-0}"
+MAPLIBRE_FULL_UNDERLAY="${BEAGLEY_MAPLIBRE_NATIVE_FULL_UNDERLAY:-1}"
 MAPLIBRE_MAX_ZOOM="${BEAGLEY_MAPLIBRE_NATIVE_MAX_ZOOM:-14.0}"
 METRICS=0
 RESTART=1
@@ -24,7 +24,7 @@ Usage:
 
 Puts the BeagleY into the live production-like UI path:
 - V3 shell on the real BeagleY display
-- MapLibre Native maps in the safe compositor path
+- MapLibre Native maps behind the full cluster shell
 - live BBB vehicle_state hub
 - no BeagleY app replay file
 - no BeagleY stress scene
@@ -47,7 +47,9 @@ Options:
                           Trusted MapLibre style. Default: OpenFreeMap Positron
   --maplibre-full-underlay
                           Let MapLibre draw under the full cluster shell.
-                          Experimental; unsafe on the BeagleY EGLFS display.
+                          Default; menu overlays hide the native map while open.
+  --maplibre-safe-compositor
+                          Keep MapLibre in the conservative center-only region.
   --maplibre-max-zoom Z   Max MapLibre zoom. Default: 14.0
   --metrics               Enable BeagleY perf metrics.
   --no-restart            Write env without restarting.
@@ -101,6 +103,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --maplibre-full-underlay)
       MAPLIBRE_FULL_UNDERLAY=1
+      shift
+      ;;
+    --maplibre-safe-compositor)
+      MAPLIBRE_FULL_UNDERLAY=0
       shift
       ;;
     --maplibre-max-zoom)

@@ -10,6 +10,7 @@ KEEP_RUNNING=0
 DELAY_MS=14000
 MAX_ZOOM=""
 RENDER_LOOP="basic"
+MAPLIBRE_FULL_UNDERLAY="${BEAGLEY_MAPLIBRE_NATIVE_FULL_UNDERLAY:-1}"
 REMOTE_ENV="/etc/default/beagley-cluster.local"
 OUT_DIR="$BASE/build/maplibre-probes"
 USER_AGENT="BeagleyCluster/1.0 (MapLibre probe)"
@@ -28,6 +29,8 @@ Usage: $0 --style-url URL [--label NAME] [--host HOST] [--promote] [--keep-runni
 
 Probes a MapLibre Native style on the real BeagleY display. The previous
 BeagleY environment is restored unless --promote or --keep-running is used.
+MapLibre full-underlay defaults to on so promoted styles keep maps around the
+black gauges. Use --maplibre-safe-compositor only for renderer isolation tests.
 EOF
 }
 
@@ -56,6 +59,14 @@ while [[ $# -gt 0 ]]; do
     --render-loop)
       RENDER_LOOP="${2:-}"
       shift 2
+      ;;
+    --maplibre-full-underlay)
+      MAPLIBRE_FULL_UNDERLAY=1
+      shift
+      ;;
+    --maplibre-safe-compositor)
+      MAPLIBRE_FULL_UNDERLAY=0
+      shift
       ;;
     --promote)
       PROMOTE=1
@@ -172,7 +183,7 @@ write_remote_env() {
   local screenshot_exit="$4"
 
   ssh_probe \
-    "STYLE_URL=$(remote_quote "$STYLE_URL") TRUSTED_STYLES=$(remote_quote "$trusted_styles") ALLOW_UNTESTED=$(remote_quote "$allow_untested") MAX_ZOOM=$(remote_quote "$MAX_ZOOM") RENDER_LOOP=$(remote_quote "$RENDER_LOOP") SCREENSHOT_PATH=$(remote_quote "$screenshot_path") SCREENSHOT_DELAY_MS=$(remote_quote "$DELAY_MS") SCREENSHOT_EXIT=$(remote_quote "$screenshot_exit") REMOTE_ENV=$(remote_quote "$REMOTE_ENV") bash -s" <<'REMOTE'
+    "STYLE_URL=$(remote_quote "$STYLE_URL") TRUSTED_STYLES=$(remote_quote "$trusted_styles") ALLOW_UNTESTED=$(remote_quote "$allow_untested") FULL_UNDERLAY=$(remote_quote "$MAPLIBRE_FULL_UNDERLAY") MAX_ZOOM=$(remote_quote "$MAX_ZOOM") RENDER_LOOP=$(remote_quote "$RENDER_LOOP") SCREENSHOT_PATH=$(remote_quote "$screenshot_path") SCREENSHOT_DELAY_MS=$(remote_quote "$DELAY_MS") SCREENSHOT_EXIT=$(remote_quote "$screenshot_exit") REMOTE_ENV=$(remote_quote "$REMOTE_ENV") bash -s" <<'REMOTE'
 set -euo pipefail
 touch "$REMOTE_ENV"
 tmp="$(mktemp)"
@@ -189,7 +200,7 @@ BEGIN {
   printf 'BEAGLEY_MAPLIBRE_NATIVE_STYLE_URL=%s\n' "$STYLE_URL"
   printf 'BEAGLEY_MAPLIBRE_NATIVE_TRUSTED_STYLES=%s\n' "$TRUSTED_STYLES"
   printf 'BEAGLEY_MAPLIBRE_NATIVE_ALLOW_UNTESTED_STYLES=%s\n' "$ALLOW_UNTESTED"
-  printf 'BEAGLEY_MAPLIBRE_NATIVE_FULL_UNDERLAY=0\n'
+  printf 'BEAGLEY_MAPLIBRE_NATIVE_FULL_UNDERLAY=%s\n' "$FULL_UNDERLAY"
   printf 'BEAGLEY_MAPLIBRE_NATIVE_MAX_ZOOM=%s\n' "$MAX_ZOOM"
   if [ -n "$RENDER_LOOP" ]; then
     printf 'QSG_RENDER_LOOP=%s\n' "$RENDER_LOOP"
