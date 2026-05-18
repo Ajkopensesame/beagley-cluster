@@ -2838,6 +2838,7 @@ Window {
                         }
 
                         Rectangle {
+                            id: mapMenuContentPanel
                             width: parent.width
                             height: root.mapMenuStage === "routes"
                                 ? 244
@@ -2845,7 +2846,7 @@ Window {
                                     ? 126
                                     : (root.mapMenuStage === "settings"
                                         ? 350
-                                        : (root.searchKeyboardOpen ? 110 : 218)))
+                                        : (root.searchKeyboardOpen ? 190 : 258)))
                             radius: 22
                             color: root.menuSurfaceColor
                             border.width: 1
@@ -2877,70 +2878,94 @@ Window {
                                     width: parent.width
                                     height: parent.height - 30
                                     readonly property var results: root.menuResultsModel()
-                                    readonly property int maxVisibleResults: root.searchKeyboardOpen ? 1 : 3
+                                    readonly property int rowHeight: root.searchKeyboardOpen ? 48 : 64
 
-                                    Column {
-                                        id: searchResultsColumn
+                                    ListView {
+                                        id: searchResultsList
                                         anchors.left: parent.left
                                         anchors.right: parent.right
                                         anchors.top: parent.top
-                                        spacing: 8
+                                        anchors.bottom: parent.bottom
+                                        clip: true
+                                        boundsBehavior: Flickable.StopAtBounds
+                                        flickDeceleration: 2600
+                                        maximumFlickVelocity: 2600
+                                        interactive: contentHeight > height
+                                        model: searchResultsSurface.results
+                                        spacing: 6
 
-                                        Repeater {
-                                            model: Math.min(searchResultsSurface.results.length,
-                                                searchResultsSurface.maxVisibleResults)
+                                        delegate: Rectangle {
+                                            readonly property var itemData: modelData
+                                            width: searchResultsList.width - (searchResultsList.contentHeight > searchResultsList.height ? 10 : 0)
+                                            height: searchResultsSurface.rowHeight
+                                            radius: 12
+                                            antialiasing: false
+                                            color: suggestionMouse.containsMouse ? root.menuSurfaceSelectedColor : root.menuSurfaceAltColor
+                                            border.width: 1
+                                            border.color: suggestionMouse.containsMouse ? root.menuAccentColor : root.menuBorderColor
 
-                                            delegate: Rectangle {
-                                                readonly property var itemData: searchResultsSurface.results[index]
-                                                width: searchResultsColumn.width
-                                                height: 64
-                                                radius: 12
-                                                antialiasing: false
-                                                color: suggestionMouse.containsMouse ? root.menuSurfaceSelectedColor : root.menuSurfaceAltColor
-                                                border.width: 1
-                                                border.color: suggestionMouse.containsMouse ? root.menuAccentColor : root.menuBorderColor
+                                            Column {
+                                                anchors.left: parent.left
+                                                anchors.right: parent.right
+                                                anchors.verticalCenter: parent.verticalCenter
+                                                anchors.leftMargin: 12
+                                                anchors.rightMargin: 12
+                                                spacing: root.searchKeyboardOpen ? 2 : 4
 
-                                                Column {
-                                                    anchors.left: parent.left
-                                                    anchors.right: parent.right
-                                                    anchors.verticalCenter: parent.verticalCenter
-                                                    anchors.leftMargin: 12
-                                                    anchors.rightMargin: 12
-                                                    spacing: 4
-
-                                                    Text {
-                                                        width: parent.width
-                                                        text: String(itemData.primary || itemData.label || "")
-                                                        textFormat: Text.PlainText
-                                                        color: root.menuTextPrimaryColor
-                                                        font.family: appTheme.fontDisplay
-                                                        font.pixelSize: 17
-                                                        font.hintingPreference: root.menuTextHintingPreference
-                                                        renderType: root.menuTextRenderType
-                                                        elide: Text.ElideRight
-                                                    }
-
-                                                    Text {
-                                                        width: parent.width
-                                                        text: root.searchResultSubtitle(itemData)
-                                                        textFormat: Text.PlainText
-                                                        color: root.menuTextSecondaryColor
-                                                        font.family: appTheme.fontMono
-                                                        font.pixelSize: 11
-                                                        font.hintingPreference: root.menuTextHintingPreference
-                                                        renderType: root.menuTextRenderType
-                                                        elide: Text.ElideRight
-                                                        visible: text.length > 0
-                                                    }
+                                                Text {
+                                                    width: parent.width
+                                                    text: String(itemData.primary || itemData.label || "")
+                                                    textFormat: Text.PlainText
+                                                    color: root.menuTextPrimaryColor
+                                                    font.family: appTheme.fontDisplay
+                                                    font.pixelSize: root.searchKeyboardOpen ? 15 : 17
+                                                    font.hintingPreference: root.menuTextHintingPreference
+                                                    renderType: root.menuTextRenderType
+                                                    elide: Text.ElideRight
                                                 }
 
-                                                MouseArea {
-                                                    id: suggestionMouse
-                                                    anchors.fill: parent
-                                                    hoverEnabled: true
-                                                    onClicked: root.chooseSearchResult(itemData)
+                                                Text {
+                                                    width: parent.width
+                                                    text: root.searchResultSubtitle(itemData)
+                                                    textFormat: Text.PlainText
+                                                    color: root.menuTextSecondaryColor
+                                                    font.family: appTheme.fontMono
+                                                    font.pixelSize: root.searchKeyboardOpen ? 10 : 11
+                                                    font.hintingPreference: root.menuTextHintingPreference
+                                                    renderType: root.menuTextRenderType
+                                                    elide: Text.ElideRight
+                                                    visible: text.length > 0
                                                 }
                                             }
+
+                                            MouseArea {
+                                                id: suggestionMouse
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                onClicked: root.chooseSearchResult(itemData)
+                                            }
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        visible: searchResultsList.contentHeight > searchResultsList.height
+                                        anchors.right: parent.right
+                                        anchors.top: parent.top
+                                        anchors.bottom: parent.bottom
+                                        width: 3
+                                        radius: 2
+                                        color: root.menuBorderColor
+                                        opacity: 0.55
+
+                                        Rectangle {
+                                            width: parent.width
+                                            radius: 2
+                                            color: root.menuAccentColor
+                                            height: Math.max(18, parent.height * searchResultsList.height / Math.max(searchResultsList.contentHeight, 1))
+                                            y: Math.min(parent.height - height,
+                                                (parent.height - height)
+                                                * searchResultsList.contentY
+                                                / Math.max(searchResultsList.contentHeight - searchResultsList.height, 1))
                                         }
                                     }
                                 }
@@ -3427,7 +3452,7 @@ Window {
                         Column {
                             visible: root.searchKeyboardOpen
                             width: parent.width
-                            spacing: 6
+                            spacing: 5
 
                             Repeater {
                                 model: root.keyboardRows
@@ -3443,8 +3468,8 @@ Window {
                                         delegate: Rectangle {
                                             readonly property string keyValue: modelData
                                             width: keyValue === "SPACE" ? 220 : (keyValue === "BACKSPACE" || keyValue === "CLEAR" ? 100 : 50)
-                                            height: 34
-                                            radius: 11
+                                            height: 30
+                                            radius: 10
                                             color: keyMouse.pressed ? "#2A7FAF" : "#0F2230"
                                             border.width: 1
                                             border.color: keyMouse.pressed ? "#B2EBFF" : "#35627F"
@@ -3454,7 +3479,7 @@ Window {
                                                 text: keyValue === "BACKSPACE" ? "BKSP" : keyValue
                                                 color: "#F4FBFF"
                                                 font.family: appTheme.fontMono
-                                                font.pixelSize: 15
+                                                font.pixelSize: 14
                                                 font.weight: Font.DemiBold
                                                 font.letterSpacing: 1
                                             }
