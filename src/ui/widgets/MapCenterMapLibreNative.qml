@@ -31,6 +31,7 @@ Item {
         && BEAGLEY_MAPLIBRE_NATIVE_TRUSTED_STYLES)
         ? String(BEAGLEY_MAPLIBRE_NATIVE_TRUSTED_STYLES)
         : "https://demotiles.maplibre.org/style.json"
+    readonly property string appTrustedStyleUrls: "https://tiles.openfreemap.org/styles/positron https://tiles.openfreemap.org/styles/liberty https://tiles.openfreemap.org/styles/dark https://tiles.openfreemap.org/styles/bright https://demotiles.maplibre.org/style.json"
     readonly property bool styleTrusted: mapLibreStyleTrusted(styleUrl)
     readonly property bool shouldUseMapLibre: mapLibreNativeAvailable && styleTrusted
     readonly property bool nativeImplFailed: mapLibreLoader.status === Loader.Error
@@ -46,7 +47,7 @@ Item {
             return true
 
         const style = String(url || "").trim().toLowerCase()
-        const trusted = String(root.trustedStyleUrls || "").split(/[\s,]+/)
+        const trusted = (String(root.appTrustedStyleUrls || "") + " " + String(root.trustedStyleUrls || "")).split(/[\s,]+/)
         for (var i = 0; i < trusted.length; ++i) {
             const candidate = String(trusted[i] || "").trim().toLowerCase()
             if (candidate.length > 0 && candidate === style)

@@ -464,6 +464,12 @@ int main(int argc, char *argv[])
         "BEAGLEY_INITIAL_WEATHER_EXPANDED_MODE",
         QString::fromUtf8(qgetenv("BEAGLEY_INITIAL_WEATHER_EXPANDED_MODE")).trimmed());
     engine.rootContext()->setContextProperty(
+        "BEAGLEY_INITIAL_MAP_MENU_STAGE",
+        QString::fromUtf8(qgetenv("BEAGLEY_INITIAL_MAP_MENU_STAGE")).trimmed());
+    engine.rootContext()->setContextProperty(
+        "BEAGLEY_INITIAL_MAP_SEARCH_QUERY",
+        QString::fromUtf8(qgetenv("BEAGLEY_INITIAL_MAP_SEARCH_QUERY")).trimmed());
+    engine.rootContext()->setContextProperty(
         "BEAGLEY_WEBENGINE_SOFTWARE",
         qEnvironmentVariableIsSet("BEAGLEY_WEBENGINE_SOFTWARE")
             && qEnvironmentVariableIntValue("BEAGLEY_WEBENGINE_SOFTWARE") != 0);

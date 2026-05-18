@@ -24,7 +24,8 @@ Window {
     Settings {
         id: clusterUiSettings
         category: "beagley_cluster_ui"
-        property string mapTheme: "roads"
+        property string mapTheme: "light"
+        property bool mapThemeUserSelected: false
     }
 
     color: "#02060B"
@@ -73,7 +74,8 @@ Window {
     readonly property string mapRenderer: (typeof BEAGLEY_MAP_RENDERER !== "undefined" && BEAGLEY_MAP_RENDERER)
         ? String(BEAGLEY_MAP_RENDERER)
         : "native"
-    readonly property string defaultMapLibreNativeTrustedStyles: "https://demotiles.maplibre.org/style.json"
+    readonly property string appMapLibreTrustedStyles: "https://tiles.openfreemap.org/styles/positron https://tiles.openfreemap.org/styles/liberty https://tiles.openfreemap.org/styles/dark https://tiles.openfreemap.org/styles/bright https://demotiles.maplibre.org/style.json"
+    readonly property string defaultMapLibreNativeTrustedStyles: appMapLibreTrustedStyles
     readonly property string mapLibreNativeStyleOverride: (typeof BEAGLEY_MAPLIBRE_NATIVE_STYLE_URL !== "undefined"
         && BEAGLEY_MAPLIBRE_NATIVE_STYLE_URL)
         ? String(BEAGLEY_MAPLIBRE_NATIVE_STYLE_URL).trim()
@@ -91,8 +93,11 @@ Window {
     readonly property bool mapLibreNativeRequested: mapRenderer === "maplibre-native"
     readonly property bool mapLibreNativeAllowUntestedStyles: (typeof BEAGLEY_MAPLIBRE_NATIVE_ALLOW_UNTESTED_STYLES !== "undefined")
         && BEAGLEY_MAPLIBRE_NATIVE_ALLOW_UNTESTED_STYLES
+    readonly property bool mapLibreNativeStyleOverrideActive: mapLibreNativeStyleOverride.length > 0
+        && !clusterUiSettings.mapThemeUserSelected
     readonly property bool mapLibreNativeStyleTrusted: mapLibreStyleTrusted(activeMapStyleUrl)
-    readonly property string effectiveMapRenderer: mapLibreNativeRequested && !mapLibreNativeStyleTrusted
+    readonly property string effectiveMapRenderer: mapLibreNativeRequested
+        && (!activeMapThemeUsesMapLibre || !mapLibreNativeStyleTrusted)
         ? "native-online"
         : mapRenderer
     readonly property bool mapLibreNativeActive: effectiveMapRenderer === "maplibre-native"
@@ -366,6 +371,14 @@ Window {
     property bool navControlsOpen: false
     property bool searchKeyboardOpen: false
     property string mapMenuStage: "search"
+    readonly property string initialMapMenuStage: (typeof BEAGLEY_INITIAL_MAP_MENU_STAGE !== "undefined"
+        && BEAGLEY_INITIAL_MAP_MENU_STAGE)
+        ? String(BEAGLEY_INITIAL_MAP_MENU_STAGE).trim().toLowerCase()
+        : ""
+    readonly property string initialMapSearchQuery: (typeof BEAGLEY_INITIAL_MAP_SEARCH_QUERY !== "undefined"
+        && BEAGLEY_INITIAL_MAP_SEARCH_QUERY)
+        ? String(BEAGLEY_INITIAL_MAP_SEARCH_QUERY).trim()
+        : ""
     property var pendingDestination: ({})
     property int selectedRouteIndex: 0
     property bool awaitingRoutePreview: false
@@ -373,41 +386,45 @@ Window {
     readonly property var effectiveMapCameraHints: buildEffectiveMapCameraHints()
     readonly property var mapThemeOptions: [
         {
-            id: "roads",
-            label: "Roads",
-            detail: "OpenStreetMap",
-            tileUrlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-            styleUrl: "https://tiles.openfreemap.org/styles/liberty",
-            maxZoom: 19,
-            swatchA: "#F2EFE9",
-            swatchB: "#91B3C5"
-        },
-        {
             id: "light",
             label: "Light",
             detail: "Positron",
             tileUrlTemplate: "https://a.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}.png",
-            styleUrl: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+            styleUrl: "https://tiles.openfreemap.org/styles/positron",
+            mapLibre: true,
             maxZoom: 19,
             swatchA: "#F7F8F3",
             swatchB: "#ADBFD1"
         },
         {
-            id: "drive",
-            label: "Drive",
-            detail: "Voyager",
-            tileUrlTemplate: "https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png",
-            styleUrl: "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json",
+            id: "street",
+            label: "Street",
+            detail: "Liberty",
+            tileUrlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+            styleUrl: "https://tiles.openfreemap.org/styles/liberty",
+            mapLibre: true,
             maxZoom: 19,
-            swatchA: "#F2F0E8",
-            swatchB: "#77A0B8"
+            swatchA: "#F2EFE9",
+            swatchB: "#91B3C5"
+        },
+        {
+            id: "dark",
+            label: "Dark",
+            detail: "Night",
+            tileUrlTemplate: "https://a.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png",
+            styleUrl: "https://tiles.openfreemap.org/styles/dark",
+            mapLibre: true,
+            maxZoom: 19,
+            swatchA: "#172132",
+            swatchB: "#406179"
         },
         {
             id: "terrain",
             label: "Terrain",
             detail: "Topo",
             tileUrlTemplate: "https://a.tile.opentopomap.org/{z}/{x}/{y}.png",
-            styleUrl: "https://tiles.openfreemap.org/styles/liberty",
+            styleUrl: "",
+            mapLibre: false,
             maxZoom: 17,
             swatchA: "#C4D6A0",
             swatchB: "#8A7A55"
@@ -415,10 +432,12 @@ Window {
     ]
     readonly property var activeMapThemeOption: mapThemeOption(clusterUiSettings.mapTheme)
     readonly property string activeMapTileUrlTemplate: String(activeMapThemeOption.tileUrlTemplate || "")
-    readonly property string activeMapStyleUrl: mapLibreNativeStyleOverride.length > 0
+    readonly property bool activeMapThemeUsesMapLibre: activeMapThemeOption.mapLibre !== false
+        && String(activeMapThemeOption.styleUrl || "").length > 0
+    readonly property string activeMapStyleUrl: mapLibreNativeStyleOverrideActive
         ? mapLibreNativeStyleOverride
-        : String(activeMapThemeOption.styleUrl || "")
-    readonly property real activeMapMaxZoom: mapLibreNativeRequested
+        : (activeMapThemeUsesMapLibre ? String(activeMapThemeOption.styleUrl || "") : "")
+    readonly property real activeMapMaxZoom: mapLibreNativeRequested && activeMapThemeUsesMapLibre
         ? Math.min(Number(activeMapThemeOption.maxZoom || 19), mapLibreNativeMaxZoom)
         : Number(activeMapThemeOption.maxZoom || 19)
     readonly property bool routeLookupInProgress: navigation
@@ -535,7 +554,8 @@ Window {
     }
 
     function mapThemeOption(themeId) {
-        const wanted = String(themeId || "roads") === "dark" ? "drive" : String(themeId || "roads")
+        const raw = String(themeId || "light")
+        const wanted = raw === "roads" || raw === "drive" ? "street" : raw
         for (var i = 0; i < root.mapThemeOptions.length; ++i) {
             const option = root.mapThemeOptions[i]
             if (option.id === wanted)
@@ -547,17 +567,15 @@ Window {
     function selectMapTheme(themeId) {
         const option = root.mapThemeOption(themeId)
         clusterUiSettings.mapTheme = option.id
+        clusterUiSettings.mapThemeUserSelected = true
     }
 
-    function mapLibreStyleTrusted(styleUrl) {
-        if (!root.mapLibreNativeRequested)
-            return false
-        if (root.mapLibreNativeAllowUntestedStyles)
-            return true
-
+    function mapLibreStyleTrustedByList(styleUrl, trustedList) {
         const url = String(styleUrl || "").trim().toLowerCase()
-        const trusted = String(root.mapLibreNativeTrustedStyles || "")
-            .split(/[\s,]+/)
+        if (url.length <= 0)
+            return false
+
+        const trusted = String(trustedList || "").split(/[\s,]+/)
         for (var i = 0; i < trusted.length; ++i) {
             const candidate = String(trusted[i] || "").trim().toLowerCase()
             if (candidate.length > 0 && candidate === url)
@@ -566,13 +584,48 @@ Window {
         return false
     }
 
+    function mapLibreThemeStyleTrusted(styleUrl) {
+        const url = String(styleUrl || "").trim().toLowerCase()
+        if (url.length <= 0)
+            return false
+        for (var i = 0; i < root.mapThemeOptions.length; ++i) {
+            const option = root.mapThemeOptions[i]
+            const candidate = String(option.styleUrl || "").trim().toLowerCase()
+            if (option.mapLibre !== false && candidate.length > 0 && candidate === url)
+                return true
+        }
+        return root.mapLibreStyleTrustedByList(url, root.appMapLibreTrustedStyles)
+    }
+
+    function mapLibreStyleTrusted(styleUrl) {
+        if (!root.mapLibreNativeRequested)
+            return false
+        if (root.mapLibreNativeAllowUntestedStyles)
+            return true
+        if (root.mapLibreThemeStyleTrusted(styleUrl))
+            return true
+
+        return root.mapLibreStyleTrustedByList(styleUrl, root.mapLibreNativeTrustedStyles)
+    }
+
     function logMapLibreFallbackIfNeeded() {
         if (root.mapLibreNativeAllowUntestedStyles)
             return
+        if (root.mapLibreNativeRequested && !root.activeMapThemeUsesMapLibre) {
+            console.info("[MainV3] Map theme uses native raster fallback", root.activeMapThemeOption.id)
+            return
+        }
         if (root.mapLibreNativeRequested && root.effectiveMapRenderer !== "maplibre-native") {
             console.warn("[MainV3] MapLibre Native requested but style is not allowlisted; using native raster map",
                          root.activeMapStyleUrl)
         }
+    }
+
+    function normalizedMapMenuStage(stage) {
+        const value = String(stage || "").trim().toLowerCase()
+        if (value === "search" || value === "settings" || value === "routes" || value === "routing")
+            return value
+        return ""
     }
 
     function suggestionOrigin() {
@@ -651,11 +704,96 @@ Window {
             suggestionDebounce.restart()
     }
 
+    function menuNormalizedText(value) {
+        return String(value || "")
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, " ")
+            .trim()
+    }
+
+    function menuResultKey(item) {
+        if (!item)
+            return ""
+        const lat = Number(item.lat)
+        const lng = Number(item.lng)
+        if (isFinite(lat) && isFinite(lng))
+            return Math.round(lat * 100000) + "," + Math.round(lng * 100000)
+        return root.menuNormalizedText(String(item.label || item.primary || ""))
+    }
+
+    function menuResultMatchesQuery(item, query) {
+        const normalizedQuery = root.menuNormalizedText(query)
+        if (normalizedQuery.length <= 0)
+            return true
+        const haystack = root.menuNormalizedText(String((item && item.primary) || "")
+            + " "
+            + String((item && item.label) || "")
+            + " "
+            + String((item && item.secondary) || ""))
+        const tokens = normalizedQuery.split(/\s+/)
+        for (var i = 0; i < tokens.length; ++i) {
+            if (tokens[i].length > 0 && haystack.indexOf(tokens[i]) < 0)
+                return false
+        }
+        return true
+    }
+
+    function decoratedMenuResult(item, recent) {
+        var copy = {}
+        for (var key in item)
+            copy[key] = item[key]
+        if (recent) {
+            copy.recent = true
+            const secondary = String(copy.secondary || "")
+            copy.secondary = secondary.length > 0 ? "Recent - " + secondary : "Recent destination"
+        }
+        return copy
+    }
+
+    function mergedMenuResults(query) {
+        const trimmed = String(query || "").trim()
+        const recents = navigation && navigation.recents ? navigation.recents : []
+        const liveResults = navigation && navigation.searchResults ? navigation.searchResults : []
+        var merged = []
+        var seen = {}
+
+        function appendResult(item, recent) {
+            if (!item)
+                return
+            const key = root.menuResultKey(item)
+            if (key.length <= 0 || seen[key])
+                return
+            seen[key] = true
+            merged.push(root.decoratedMenuResult(item, recent))
+        }
+
+        if (trimmed.length < 2) {
+            for (var r = 0; r < recents.length; ++r)
+                appendResult(recents[r], true)
+            return merged
+        }
+
+        for (var recentIndex = 0; recentIndex < recents.length; ++recentIndex) {
+            if (root.menuResultMatchesQuery(recents[recentIndex], trimmed))
+                appendResult(recents[recentIndex], true)
+        }
+        for (var resultIndex = 0; resultIndex < liveResults.length; ++resultIndex)
+            appendResult(liveResults[resultIndex], false)
+        return merged
+    }
+
+    function menuSearchTitle() {
+        const query = searchInput ? String(searchInput.text || "").trim() : ""
+        if (query.length < 2)
+            return navigation.recents.length > 0 ? "Previous destinations" : "Tap the field to search"
+        return root.menuResultsModel().length > 0 ? "Closest and previous matches" : "No matches"
+    }
+
     function menuResultsModel() {
         if (root.mapMenuStage !== "search")
             return []
         const query = searchInput ? String(searchInput.text || "").trim() : ""
-        return query.length >= 2 ? navigation.searchResults : navigation.recents
+        return root.mergedMenuResults(query)
     }
 
     function chooseSearchResult(itemData) {
@@ -813,11 +951,27 @@ Window {
     }
 
     Component.onCompleted: {
+        if (!clusterUiSettings.mapThemeUserSelected && String(clusterUiSettings.mapTheme || "") !== "light")
+            clusterUiSettings.mapTheme = "light"
         root.showNormal()
         root.raise()
         root.requestActivate()
         updateLeftIndicatorVisual()
         updateRightIndicatorVisual()
+        const bootStage = root.normalizedMapMenuStage(root.initialMapMenuStage)
+        if (bootStage.length > 0 || root.initialMapSearchQuery.length > 0) {
+            root.mapMenuStage = bootStage.length > 0 ? bootStage : "search"
+            root.mapMenuOpen = true
+            root.searchKeyboardOpen = false
+        }
+        if (root.initialMapSearchQuery.length > 0) {
+            searchInput.text = root.initialMapSearchQuery
+            searchInput.cursorPosition = searchInput.text.length
+            root.mapMenuStage = "search"
+            Qt.callLater(function() {
+                root.fetchSearchSuggestions(searchInput.text)
+            })
+        }
         Qt.callLater(logMapLibreFallbackIfNeeded)
     }
 
@@ -2567,9 +2721,7 @@ Window {
                                             ? "Building route"
                                             : (root.mapMenuStage === "settings"
                                                 ? "Map settings"
-                                                : (searchInput.text.length < 2
-                                                    ? (navigation.recents.length > 0 ? "Recent destinations" : "Tap the field to search")
-                                                    : (root.menuResultsModel().length > 0 ? "Results" : "No matches"))))
+                                                : root.menuSearchTitle()))
                                     color: (root.routeLookupInProgress || root.mapMenuStage === "routing") ? "#9FE7FF" : "#9FBFD2"
                                     font.family: appTheme.fontMono
                                     font.pixelSize: 14
@@ -3228,8 +3380,14 @@ Window {
                                     }
                                     if (root.mapMenuStage === "routing")
                                         return
-                                    if (root.mapMenuStage === "search" && !root.routeLookupInProgress)
+                                    if (root.mapMenuStage === "search" && !root.routeLookupInProgress) {
+                                        const results = root.menuResultsModel()
+                                        if (results.length > 0) {
+                                            root.chooseSearchResult(results[0])
+                                            return
+                                        }
                                         root.routeSearchQuery(searchInput.text)
+                                    }
                                 }
 
                                 Text {

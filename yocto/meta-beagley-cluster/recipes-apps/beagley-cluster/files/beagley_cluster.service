@@ -15,7 +15,7 @@ Environment=BEAGLEY_GAUGE_DETAIL=safe
 Environment=BEAGLEY_GAUGE_DEMO=0
 Environment=BEAGLEY_MAP_RENDERER=maplibre-native
 Environment=BEAGLEY_MAPLIBRE_NATIVE_STYLE_URL=https://tiles.openfreemap.org/styles/positron
-Environment=BEAGLEY_MAPLIBRE_NATIVE_TRUSTED_STYLES=https://tiles.openfreemap.org/styles/positron
+Environment=BEAGLEY_MAPLIBRE_NATIVE_TRUSTED_STYLES=https://tiles.openfreemap.org/styles/positron,https://tiles.openfreemap.org/styles/liberty,https://tiles.openfreemap.org/styles/dark,https://tiles.openfreemap.org/styles/bright
 Environment=BEAGLEY_MAPLIBRE_NATIVE_ALLOW_UNTESTED_STYLES=0
 Environment=BEAGLEY_MAPLIBRE_NATIVE_FULL_UNDERLAY=0
 Environment=BEAGLEY_MAPLIBRE_NATIVE_MAX_ZOOM=14.0

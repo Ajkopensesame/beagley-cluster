@@ -40,7 +40,7 @@ Item {
 
             Text {
                 width: parent.width
-                text: "MAPS"
+                text: "MENU"
                 color: "#F7FBFF"
                 font.family: root.monoFont
                 font.pixelSize: Math.max(10, Math.floor(frame.side * 0.078))

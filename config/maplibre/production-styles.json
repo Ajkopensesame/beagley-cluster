@@ -26,6 +26,20 @@
       "notes": "Richer road-map candidate. Heavier than Positron."
     },
     {
+      "id": "openfreemap-dark",
+      "label": "OpenFreeMap Dark",
+      "role": "production-candidate",
+      "url": "https://tiles.openfreemap.org/styles/dark",
+      "notes": "Night map option for the in-cluster map menu."
+    },
+    {
+      "id": "openfreemap-bright",
+      "label": "OpenFreeMap Bright",
+      "role": "production-candidate",
+      "url": "https://tiles.openfreemap.org/styles/bright",
+      "notes": "High-contrast daytime candidate kept trusted for future menu tuning."
+    },
+    {
       "id": "carto-voyager",
       "label": "CARTO Voyager",
       "role": "compatibility-candidate",

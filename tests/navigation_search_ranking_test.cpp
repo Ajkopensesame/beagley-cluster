@@ -206,6 +206,55 @@ void testLocalCategoryRankingUnderstandsAustralianAliases()
     expectEqual(results.first().primary, QStringLiteral("Puma Petrol Station"), "local fuel POI should outrank global places named Servo");
 }
 
+void testAddressRankingPrefersClosestMatchingRoad()
+{
+    qputenv("BEAGLEY_NAV_SEARCH_COUNTRYCODE", "AU");
+    OpenNavigationProvider provider;
+    const QByteArray payload = R"JSON(
+[
+  {
+    "display_name": "David Low Way, Maroochydore, Queensland, 4558, Australia",
+    "lat": "-26.6570300",
+    "lon": "153.0890900",
+    "category": "highway",
+    "type": "secondary",
+    "addresstype": "road",
+    "importance": 0.95,
+    "address": {
+      "road": "David Low Way",
+      "city": "Maroochydore",
+      "state": "Queensland",
+      "country": "Australia",
+      "country_code": "au"
+    }
+  },
+  {
+    "display_name": "David Low Way, Peregian Beach, Queensland, 4573, Australia",
+    "lat": "-26.4896160",
+    "lon": "153.0938557",
+    "category": "highway",
+    "type": "secondary",
+    "addresstype": "road",
+    "importance": 0.25,
+    "address": {
+      "road": "David Low Way",
+      "suburb": "Peregian Beach",
+      "state": "Queensland",
+      "country": "Australia",
+      "country_code": "au"
+    }
+  }
+]
+)JSON";
+
+    const QList<SearchResultData> results = provider.parseSearchResponse(payload, QStringLiteral("David Low Way"), -26.4897, 153.0940);
+    expectTrue(!results.isEmpty(), "address ranking results should not be empty");
+    if (results.isEmpty()) {
+        return;
+    }
+    expectTrue(results.first().label.contains(QStringLiteral("Peregian Beach")), "closest matching road should rank before farther high-importance road");
+}
+
 void testWeakCategorySearchRefinesWithFallbackMerge()
 {
     qputenv("BEAGLEY_NAV_SEARCH_COUNTRYCODE", "AU");
@@ -271,6 +320,7 @@ int main()
     testNearMeCategorySearchUsesLocalProviderHints();
     testPlaceRankingPrefersSettlementOverNearbyPoi();
     testLocalCategoryRankingUnderstandsAustralianAliases();
+    testAddressRankingPrefersClosestMatchingRoad();
     testWeakCategorySearchRefinesWithFallbackMerge();
 
     if (g_failures == 0) {

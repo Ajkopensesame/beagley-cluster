@@ -645,6 +645,35 @@ double distanceScore(double distanceMeters)
     return 0.0;
 }
 
+double addressDistanceScore(double distanceMeters)
+{
+    if (!qIsFinite(distanceMeters) || distanceMeters < 0.0) {
+        return 0.0;
+    }
+    if (distanceMeters <= 500.0) {
+        return 70.0;
+    }
+    if (distanceMeters <= 2000.0) {
+        return 58.0;
+    }
+    if (distanceMeters <= 5000.0) {
+        return 46.0;
+    }
+    if (distanceMeters <= 15000.0) {
+        return 34.0;
+    }
+    if (distanceMeters <= 30000.0) {
+        return 22.0;
+    }
+    if (distanceMeters <= 60000.0) {
+        return 10.0;
+    }
+    if (distanceMeters <= 150000.0) {
+        return -24.0;
+    }
+    return -70.0;
+}
+
 double localIntentDistancePenalty(double distanceMeters)
 {
     if (!qIsFinite(distanceMeters) || distanceMeters < 0.0) {
@@ -799,6 +828,9 @@ double rankSearchResult(const SearchResultData &result, const QString &query, co
     score += categoryIntentScore(result, categoryQueryTokens);
     score += addressLike ? addressIntentScore(result, queryTokens, categoryQueryTokens) : placeIntentScore(result, categoryQueryTokens);
     score += distanceScore(result.distanceMeters);
+    if (addressLike) {
+        score += addressDistanceScore(result.distanceMeters);
+    }
     if (queryLooksLocalCategoryLike(query) || queryHasNearMeIntent(query)) {
         score += localIntentDistancePenalty(result.distanceMeters);
     }

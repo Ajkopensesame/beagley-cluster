@@ -10,7 +10,7 @@ BEAGLEY_MAP_RENDERER=maplibre-native
 # Verified on the real BeagleY display by tools/maplibre/probe_beagley_style.sh.
 # Keep untested styles disabled; change the URL only after a successful probe.
 BEAGLEY_MAPLIBRE_NATIVE_STYLE_URL=https://tiles.openfreemap.org/styles/positron
-BEAGLEY_MAPLIBRE_NATIVE_TRUSTED_STYLES=https://tiles.openfreemap.org/styles/positron
+BEAGLEY_MAPLIBRE_NATIVE_TRUSTED_STYLES=https://tiles.openfreemap.org/styles/positron,https://tiles.openfreemap.org/styles/liberty,https://tiles.openfreemap.org/styles/dark,https://tiles.openfreemap.org/styles/bright
 BEAGLEY_MAPLIBRE_NATIVE_MAX_ZOOM=14.0
 BEAGLEY_MAPLIBRE_NATIVE_FULL_UNDERLAY=0
 BEAGLEY_MAPLIBRE_NATIVE_ALLOW_UNTESTED_STYLES=0
