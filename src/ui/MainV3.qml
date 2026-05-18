@@ -391,7 +391,6 @@ Window {
     readonly property bool menuDarkChrome: resolvedChromeTheme === "dark"
     readonly property color menuAccentColor: "#1A73E8"
     readonly property color menuPanelColor: menuDarkChrome ? "#101821" : "#F8FAFF"
-    readonly property color menuTopAccentColor: menuDarkChrome ? "#64B5F6" : "#1A73E8"
     readonly property color menuSurfaceColor: menuDarkChrome ? "#111D2B" : "#FFFFFF"
     readonly property color menuSurfaceAltColor: menuDarkChrome ? "#182637" : "#F8FAFF"
     readonly property color menuSurfaceSelectedColor: menuDarkChrome ? "#1E3A5F" : "#E8F0FE"
@@ -2543,15 +2542,6 @@ Window {
                     color: root.menuPanelColor
                     border.width: 1
                     border.color: root.menuStrongBorderColor
-
-                    Rectangle {
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.top: parent.top
-                        height: 3
-                        color: root.menuTopAccentColor
-                        opacity: 0.88
-                    }
 
                     MouseArea {
                         anchors.fill: parent
