@@ -21,7 +21,7 @@ The helper:
 - starts a `cloudflared` quick tunnel to the BeagleY pairing server
 - prints the exact Spotify Redirect URI to add in
   <https://developer.spotify.com/dashboard>
-- starts the Spotify QR panel on the cluster
+- opens the menu Spotify QR panel on the cluster
 - waits for `BEAGLEY_SPOTIFY_REFRESH_TOKEN` to appear on the BeagleY
 - removes temporary tunnel/autostart/QML-dev/screenshot env keys after pairing
 

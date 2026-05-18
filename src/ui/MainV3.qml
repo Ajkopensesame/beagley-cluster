@@ -376,6 +376,23 @@ Window {
     property bool navControlsOpen: false
     property bool searchKeyboardOpen: false
     property string mapMenuStage: "search"
+    readonly property var nowPlayingService: (typeof nowPlaying !== "undefined") ? nowPlaying : null
+    readonly property bool musicAvailable: !!(nowPlayingService && nowPlayingService.available)
+    readonly property bool musicPlaying: !!(nowPlayingService && nowPlayingService.playing)
+    readonly property string musicTitle: nowPlayingService && nowPlayingService.title
+        ? String(nowPlayingService.title)
+        : ""
+    readonly property string musicArtist: nowPlayingService && nowPlayingService.artist
+        ? String(nowPlayingService.artist)
+        : ""
+    readonly property string musicStatus: nowPlayingService && nowPlayingService.status
+        ? String(nowPlayingService.status)
+        : "OFFLINE"
+    readonly property string musicDetail: nowPlayingService && nowPlayingService.statusDetail
+        ? String(nowPlayingService.statusDetail)
+        : "Spotify not connected"
+    readonly property bool spotifyPairingSupported: !!(nowPlayingService && nowPlayingService.spotifyPairingSupported)
+    readonly property bool spotifyPairingActive: !!(nowPlayingService && nowPlayingService.spotifyPairingActive)
     property real autoThemeSunriseMs: NaN
     property real autoThemeSunsetMs: NaN
     property bool autoThemeRequestActive: false
@@ -850,7 +867,7 @@ Window {
 
     function normalizedMapMenuStage(stage) {
         const value = String(stage || "").trim().toLowerCase()
-        if (value === "search" || value === "settings" || value === "routes" || value === "routing")
+        if (value === "search" || value === "settings" || value === "spotify" || value === "routes" || value === "routing")
             return value
         return ""
     }
@@ -904,13 +921,16 @@ Window {
         navigation.search(trimmed)
     }
 
-    function openMapMenu() {
+    function openMapMenu(stage) {
+        const requestedStage = root.normalizedMapMenuStage(stage)
         root.mapMenuOpen = true
         root.searchKeyboardOpen = false
         root.awaitingRoutePreview = false
         if (hasActiveRoute && navigation.activeRoute.destination)
             pendingDestination = navigation.activeRoute.destination
-        root.mapMenuStage = (root.availableRouteOptions().length > 0 && hasActiveRoute) ? "routes" : "search"
+        root.mapMenuStage = requestedStage.length > 0
+            ? requestedStage
+            : ((root.availableRouteOptions().length > 0 && hasActiveRoute) ? "routes" : "search")
         root.syncSelectedRouteIndexFromNavigation()
     }
 
@@ -930,6 +950,73 @@ Window {
             root.syncSelectedRouteIndexFromNavigation()
         if (stage === "search" && searchInput && String(searchInput.text || "").trim().length >= 2)
             suggestionDebounce.restart()
+    }
+
+    function mapMenuTitleText() {
+        if (root.mapMenuStage === "settings" || root.mapMenuStage === "spotify")
+            return "Menu"
+        return "Maps"
+    }
+
+    function mapMenuContentTitleText() {
+        if (root.mapMenuStage === "routes")
+            return "Route ready"
+        if (root.mapMenuStage === "routing")
+            return "Building route"
+        if (root.mapMenuStage === "settings")
+            return "Settings"
+        if (root.mapMenuStage === "spotify")
+            return "Spotify setup"
+        return root.menuSearchTitle()
+    }
+
+    function musicAuthRequired() {
+        return String(root.musicStatus).toUpperCase() === "AUTH"
+    }
+
+    function musicNowPlayingLine() {
+        if (root.musicTitle.length <= 0)
+            return root.musicDetail.length > 0 ? root.musicDetail : "No current track"
+        if (root.musicArtist.length > 0)
+            return root.musicTitle + " - " + root.musicArtist
+        return root.musicTitle
+    }
+
+    function spotifySetupStatusLine() {
+        if (!root.nowPlayingService)
+            return "Spotify service unavailable"
+        if (root.spotifyPairingActive && root.nowPlayingService.spotifyPairingStatus.length > 0)
+            return root.nowPlayingService.spotifyPairingStatus
+        if (root.musicAuthRequired())
+            return "Connect Spotify to show what is playing"
+        if (root.musicAvailable)
+            return root.musicPlaying ? "Now playing" : "Paused"
+        return root.musicDetail.length > 0 ? root.musicDetail : "Open Spotify on your phone"
+    }
+
+    function spotifyActionLabel() {
+        if (!root.spotifyPairingSupported)
+            return "UNAVAILABLE"
+        if (root.spotifyPairingActive)
+            return "CANCEL"
+        if (root.musicAuthRequired())
+            return "CONNECT"
+        return "REFRESH"
+    }
+
+    function triggerSpotifySetup() {
+        if (!root.nowPlayingService || !root.spotifyPairingSupported)
+            return
+        if (root.spotifyPairingActive) {
+            root.nowPlayingService.cancelSpotifyPairing()
+            return
+        }
+        if (root.musicAuthRequired()) {
+            root.mapMenuStage = "spotify"
+            root.nowPlayingService.beginSpotifyPairing()
+            return
+        }
+        root.nowPlayingService.refresh()
     }
 
     function menuNormalizedText(value) {
@@ -1560,14 +1647,14 @@ Window {
             effectLevel: root.effectLevel
             stressScene: root.stressScene
             phase: root.sharedEffectPhase
-            nowPlayingService: (typeof nowPlaying !== "undefined") ? nowPlaying : null
+            nowPlayingService: root.nowPlayingService
             expandedMode: (typeof BEAGLEY_INITIAL_WEATHER_EXPANDED_MODE !== "undefined")
                 ? String(BEAGLEY_INITIAL_WEATHER_EXPANDED_MODE)
                 : ""
             active: !root.mapMenuOpen && !root.navControlsOpen
 
-            onMapMenuRequested: {
-                root.openMapMenu()
+            onMapMenuRequested: function(stage) {
+                root.openMapMenu(stage)
             }
         }
 
@@ -2592,7 +2679,7 @@ Window {
 
                                 Text {
                                     width: parent.width
-                                    text: "Maps"
+                                    text: root.mapMenuTitleText()
                                     color: root.menuTextPrimaryColor
                                     font.family: appTheme.fontDisplay
                                     font.pixelSize: 28
@@ -2712,14 +2799,14 @@ Window {
                                 width: mapMenuTabs.tabWidth
                                 height: parent.height
                                 radius: 21
-                                color: root.mapMenuStage === "settings" ? root.menuSurfaceSelectedColor : root.menuSurfaceColor
+                                color: (root.mapMenuStage === "settings" || root.mapMenuStage === "spotify") ? root.menuSurfaceSelectedColor : root.menuSurfaceColor
                                 border.width: 1
-                                border.color: root.mapMenuStage === "settings" ? root.menuAccentColor : root.menuBorderColor
+                                border.color: (root.mapMenuStage === "settings" || root.mapMenuStage === "spotify") ? root.menuAccentColor : root.menuBorderColor
 
                                 Text {
                                     anchors.centerIn: parent
-                                    text: "Map"
-                                    color: root.mapMenuStage === "settings" ? root.menuAccentColor : root.menuTextSecondaryColor
+                                    text: "Menu"
+                                    color: (root.mapMenuStage === "settings" || root.mapMenuStage === "spotify") ? root.menuAccentColor : root.menuTextSecondaryColor
                                     font.family: appTheme.fontMono
                                     font.pixelSize: 13
                                     font.weight: Font.Bold
@@ -2873,8 +2960,11 @@ Window {
                                 : (root.mapMenuStage === "routing"
                                     ? 126
                                     : (root.mapMenuStage === "settings"
-                                        ? 350
+                                        ? 430
+                                        : (root.mapMenuStage === "spotify"
+                                            ? 350
                                         : (root.searchKeyboardOpen ? 190 : 258)))
+                                    )
                             radius: 22
                             color: root.menuSurfaceColor
                             border.width: 1
@@ -2886,13 +2976,7 @@ Window {
                                 spacing: 8
 
                                 Text {
-                                    text: root.mapMenuStage === "routes"
-                                        ? "Route ready"
-                                        : (root.mapMenuStage === "routing"
-                                            ? "Building route"
-                                            : (root.mapMenuStage === "settings"
-                                                ? "Theme and map"
-                                                : root.menuSearchTitle()))
+                                    text: root.mapMenuContentTitleText()
                                     color: (root.routeLookupInProgress || root.mapMenuStage === "routing") ? root.menuAccentColor : root.menuTextSecondaryColor
                                     font.family: appTheme.fontMono
                                     font.pixelSize: 14
@@ -3032,7 +3116,7 @@ Window {
 
                                         Row {
                                             width: parent.width
-                                            height: 76
+                                            height: 64
                                             spacing: 8
 
                                             Repeater {
@@ -3141,7 +3225,7 @@ Window {
 
                                         Row {
                                             width: parent.width
-                                            height: 116
+                                            height: 96
                                             spacing: 8
 
                                             Repeater {
@@ -3214,6 +3298,113 @@ Window {
                                         }
                                     }
 
+                                    Column {
+                                        width: parent.width
+                                        spacing: 8
+
+                                        Text {
+                                            width: parent.width
+                                            text: "Spotify"
+                                            color: root.menuTextSecondaryColor
+                                            font.family: appTheme.fontMono
+                                            font.pixelSize: 13
+                                            font.weight: Font.Bold
+                                            font.letterSpacing: 0.2
+                                            font.hintingPreference: root.menuTextHintingPreference
+                                            renderType: root.menuTextRenderType
+                                        }
+
+                                        Rectangle {
+                                            width: parent.width
+                                            height: 68
+                                            radius: 18
+                                            color: root.menuSurfaceAltColor
+                                            border.width: 1
+                                            border.color: root.spotifyPairingActive
+                                                ? root.menuAccentColor
+                                                : root.menuBorderColor
+
+                                            Row {
+                                                anchors.fill: parent
+                                                anchors.margins: 12
+                                                spacing: 12
+
+                                                OemIcon {
+                                                    width: 38
+                                                    height: 38
+                                                    anchors.verticalCenter: parent.verticalCenter
+                                                    icon: "audio"
+                                                    active: root.musicPlaying || root.spotifyPairingActive
+                                                    color: root.menuTextPrimaryColor
+                                                    accentColor: root.menuAccentColor
+                                                    strokeWidth: 3.2
+                                                }
+
+                                                Column {
+                                                    width: parent.width - spotifySetupButton.width - 62
+                                                    anchors.verticalCenter: parent.verticalCenter
+                                                    spacing: 2
+
+                                                    Text {
+                                                        width: parent.width
+                                                        text: root.musicAvailable ? root.musicNowPlayingLine() : "Now playing display"
+                                                        color: root.menuTextPrimaryColor
+                                                        font.family: appTheme.fontDisplay
+                                                        font.pixelSize: 17
+                                                        font.weight: Font.DemiBold
+                                                        font.hintingPreference: root.menuTextHintingPreference
+                                                        renderType: root.menuTextRenderType
+                                                        elide: Text.ElideRight
+                                                    }
+
+                                                    Text {
+                                                        width: parent.width
+                                                        text: root.spotifySetupStatusLine()
+                                                        color: root.musicAvailable || root.spotifyPairingActive ? root.menuAccentColor : root.menuTextSecondaryColor
+                                                        font.family: appTheme.fontMono
+                                                        font.pixelSize: 11
+                                                        font.weight: Font.Bold
+                                                        font.hintingPreference: root.menuTextHintingPreference
+                                                        renderType: root.menuTextRenderType
+                                                        elide: Text.ElideRight
+                                                    }
+                                                }
+
+                                                Rectangle {
+                                                    id: spotifySetupButton
+                                                    width: 116
+                                                    height: 40
+                                                    anchors.verticalCenter: parent.verticalCenter
+                                                    radius: 14
+                                                    enabled: root.spotifyPairingSupported
+                                                    opacity: enabled ? 1.0 : 0.56
+                                                    color: spotifySetupMouse.pressed && enabled ? root.menuSurfaceSelectedColor : root.menuSurfaceColor
+                                                    border.width: 1
+                                                    border.color: root.spotifyPairingActive ? root.menuAccentColor : root.menuBorderColor
+
+                                                    Text {
+                                                        anchors.centerIn: parent
+                                                        text: root.spotifyActionLabel()
+                                                        color: root.spotifyPairingSupported ? root.menuTextPrimaryColor : root.menuTextMutedColor
+                                                        font.family: appTheme.fontMono
+                                                        font.pixelSize: 12
+                                                        font.weight: Font.Bold
+                                                        font.letterSpacing: 0.8
+                                                        font.hintingPreference: root.menuTextHintingPreference
+                                                        renderType: root.menuTextRenderType
+                                                    }
+
+                                                    MouseArea {
+                                                        id: spotifySetupMouse
+                                                        anchors.fill: parent
+                                                        enabled: spotifySetupButton.enabled
+                                                        onClicked: root.triggerSpotifySetup()
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
                                     Row {
                                         width: parent.width
                                         height: 38
@@ -3269,6 +3460,202 @@ Window {
                                                     navigation.recenter()
                                                     navField.setFollowEnabled(true)
                                                 }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Column {
+                                    visible: root.mapMenuStage === "spotify"
+                                    width: parent.width
+                                    spacing: 10
+
+                                    Rectangle {
+                                        width: parent.width
+                                        height: 178
+                                        radius: 18
+                                        color: root.menuSurfaceAltColor
+                                        border.width: 1
+                                        border.color: root.spotifyPairingActive ? root.menuAccentColor : root.menuBorderColor
+
+                                        Row {
+                                            anchors.fill: parent
+                                            anchors.margins: 14
+                                            spacing: 16
+
+                                            Rectangle {
+                                                id: spotifyQrBox
+                                                width: 150
+                                                height: 150
+                                                radius: 8
+                                                anchors.verticalCenter: parent.verticalCenter
+                                                color: "#F8FBFF"
+                                                border.width: 1
+                                                border.color: root.menuAccentColor
+                                                visible: root.spotifyPairingActive
+                                                    && root.nowPlayingService
+                                                    && root.nowPlayingService.spotifyPairingQrPattern.length > 0
+                                                property string qrPattern: root.nowPlayingService ? String(root.nowPlayingService.spotifyPairingQrPattern) : ""
+                                                property var qrRows: qrPattern.length > 0 ? qrPattern.split("\n") : []
+                                                property int qrModuleCount: qrRows.length
+                                                property int qrModuleSize: qrModuleCount > 0 ? Math.floor((Math.min(width, height) - 18) / qrModuleCount) : 1
+                                                property var qrModules: qrPattern.length > 0 ? qrPattern.replace(/\n/g, "").split("") : []
+
+                                                Grid {
+                                                    anchors.centerIn: parent
+                                                    columns: Math.max(1, spotifyQrBox.qrModuleCount)
+                                                    rows: Math.max(1, spotifyQrBox.qrModuleCount)
+                                                    spacing: 0
+                                                    width: spotifyQrBox.qrModuleCount * spotifyQrBox.qrModuleSize
+                                                    height: width
+
+                                                    Repeater {
+                                                        model: spotifyQrBox.qrModules
+
+                                                        Rectangle {
+                                                            width: spotifyQrBox.qrModuleSize
+                                                            height: spotifyQrBox.qrModuleSize
+                                                            color: modelData === "1" ? "#05060A" : "#F8FBFF"
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            Rectangle {
+                                                width: 150
+                                                height: 150
+                                                radius: 75
+                                                anchors.verticalCenter: parent.verticalCenter
+                                                color: root.menuSurfaceColor
+                                                border.width: 1
+                                                border.color: root.menuBorderColor
+                                                visible: !spotifyQrBox.visible
+
+                                                OemIcon {
+                                                    anchors.centerIn: parent
+                                                    width: 70
+                                                    height: 70
+                                                    icon: "audio"
+                                                    active: root.musicPlaying
+                                                    color: root.menuTextPrimaryColor
+                                                    accentColor: root.menuAccentColor
+                                                    strokeWidth: 5.0
+                                                }
+                                            }
+
+                                            Column {
+                                                width: parent.width - 166
+                                                anchors.verticalCenter: parent.verticalCenter
+                                                spacing: 8
+
+                                                Text {
+                                                    width: parent.width
+                                                    text: "Spotify now playing"
+                                                    color: root.menuTextPrimaryColor
+                                                    font.family: appTheme.fontDisplay
+                                                    font.pixelSize: 24
+                                                    font.weight: Font.DemiBold
+                                                    font.hintingPreference: root.menuTextHintingPreference
+                                                    renderType: root.menuTextRenderType
+                                                    elide: Text.ElideRight
+                                                }
+
+                                                Text {
+                                                    width: parent.width
+                                                    text: root.spotifySetupStatusLine()
+                                                    color: root.spotifyPairingActive ? root.menuAccentColor : root.menuTextSecondaryColor
+                                                    font.family: appTheme.fontMono
+                                                    font.pixelSize: 12
+                                                    font.weight: Font.Bold
+                                                    font.hintingPreference: root.menuTextHintingPreference
+                                                    renderType: root.menuTextRenderType
+                                                    wrapMode: Text.WordWrap
+                                                    maximumLineCount: 2
+                                                }
+
+                                                Text {
+                                                    width: parent.width
+                                                    text: root.nowPlayingService && root.nowPlayingService.spotifyPairingCode.length > 0
+                                                        ? root.nowPlayingService.spotifyPairingCode
+                                                        : (root.musicAvailable ? root.musicNowPlayingLine() : "SCAN TO CONNECT")
+                                                    color: root.musicAvailable ? root.menuAccentColor : root.menuTextPrimaryColor
+                                                    font.family: appTheme.fontMono
+                                                    font.pixelSize: root.nowPlayingService && root.nowPlayingService.spotifyPairingCode.length > 0 ? 22 : 13
+                                                    font.weight: Font.Bold
+                                                    font.letterSpacing: 0.8
+                                                    font.hintingPreference: root.menuTextHintingPreference
+                                                    renderType: root.menuTextRenderType
+                                                    elide: Text.ElideRight
+                                                }
+
+                                                Rectangle {
+                                                    width: 154
+                                                    height: 42
+                                                    radius: 14
+                                                    enabled: root.spotifyPairingSupported
+                                                    opacity: enabled ? 1.0 : 0.56
+                                                    color: spotifyPairingMouse.pressed && enabled ? root.menuSurfaceSelectedColor : root.menuAccentColor
+                                                    border.width: 1
+                                                    border.color: root.menuAccentColor
+
+                                                    Text {
+                                                        anchors.centerIn: parent
+                                                        text: root.spotifyActionLabel()
+                                                        color: root.spotifyPairingSupported ? "#FFFFFF" : root.menuTextMutedColor
+                                                        font.family: appTheme.fontMono
+                                                        font.pixelSize: 13
+                                                        font.weight: Font.Bold
+                                                        font.letterSpacing: 1.0
+                                                        font.hintingPreference: root.menuTextHintingPreference
+                                                        renderType: root.menuTextRenderType
+                                                    }
+
+                                                    MouseArea {
+                                                        id: spotifyPairingMouse
+                                                        anchors.fill: parent
+                                                        enabled: parent.enabled
+                                                        onClicked: root.triggerSpotifySetup()
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        width: parent.width
+                                        height: 96
+                                        radius: 16
+                                        color: root.menuSurfaceAltColor
+                                        border.width: 1
+                                        border.color: root.menuBorderColor
+
+                                        Column {
+                                            anchors.fill: parent
+                                            anchors.margins: 12
+                                            spacing: 5
+
+                                            Text {
+                                                width: parent.width
+                                                text: root.musicAvailable ? root.musicNowPlayingLine() : "Nothing playing"
+                                                color: root.menuTextPrimaryColor
+                                                font.family: appTheme.fontDisplay
+                                                font.pixelSize: 20
+                                                font.weight: Font.DemiBold
+                                                font.hintingPreference: root.menuTextHintingPreference
+                                                renderType: root.menuTextRenderType
+                                                elide: Text.ElideRight
+                                            }
+
+                                            Text {
+                                                width: parent.width
+                                                text: "The cluster only reads the current track. Playback stays on the phone."
+                                                color: root.menuTextSecondaryColor
+                                                font.family: appTheme.fontMono
+                                                font.pixelSize: 12
+                                                font.hintingPreference: root.menuTextHintingPreference
+                                                renderType: root.menuTextRenderType
+                                                wrapMode: Text.WordWrap
+                                                maximumLineCount: 2
                                             }
                                         }
                                     }
@@ -3559,7 +3946,7 @@ Window {
                                 border.color: blocked ? root.menuBorderColor : root.menuAccentColor
 
                                 function trigger() {
-                                    if (root.mapMenuStage === "settings") {
+                                    if (root.mapMenuStage === "settings" || root.mapMenuStage === "spotify") {
                                         root.mapMenuOpen = false
                                         root.searchKeyboardOpen = false
                                         return
@@ -3584,7 +3971,7 @@ Window {
                                     anchors.centerIn: parent
                                     text: root.mapMenuStage === "routes"
                                         ? "START"
-                                        : (root.mapMenuStage === "settings"
+                                        : (root.mapMenuStage === "settings" || root.mapMenuStage === "spotify"
                                             ? "DONE"
                                             : ((root.mapMenuStage === "routing" || root.routeLookupInProgress) ? "LOADING" : "FIND"))
                                     color: routeButton.blocked ? root.menuTextMutedColor : "#FFFFFF"
@@ -3613,9 +4000,11 @@ Window {
                                     anchors.centerIn: parent
                                     text: root.mapMenuStage === "settings"
                                         ? (root.followUnlocked ? "RECENTER" : "FOLLOW")
+                                        : (root.mapMenuStage === "spotify"
+                                            ? "MENU"
                                         : (root.mapMenuStage === "search"
                                             ? (root.followUnlocked ? "RECENTER" : "FOLLOW")
-                                            : "BACK")
+                                            : "BACK"))
                                     color: root.menuTextPrimaryColor
                                     font.family: appTheme.fontMono
                                     font.pixelSize: (root.mapMenuStage === "search" || root.mapMenuStage === "settings") && root.followUnlocked ? 14 : 17
@@ -3626,7 +4015,9 @@ Window {
                                 MouseArea {
                                     anchors.fill: parent
                                     onClicked: {
-                                        if (root.mapMenuStage === "search" || root.mapMenuStage === "settings") {
+                                        if (root.mapMenuStage === "spotify") {
+                                            root.chooseMapMenuTab("settings")
+                                        } else if (root.mapMenuStage === "search" || root.mapMenuStage === "settings") {
                                             navigation.recenter()
                                             navField.setFollowEnabled(true)
                                             if (root.mapMenuStage === "search") {
@@ -3641,7 +4032,7 @@ Window {
                             }
 
                             Rectangle {
-                                visible: root.mapMenuStage !== "settings"
+                                visible: root.mapMenuStage !== "settings" && root.mapMenuStage !== "spotify"
                                 width: 112
                                 height: 50
                                 radius: 15

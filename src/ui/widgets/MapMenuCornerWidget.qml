@@ -7,6 +7,9 @@ Item {
     property string corner: "bottomRight"
     property string effectLevel: "high"
     property real bleedFraction: 0.18
+    property string icon: "menu"
+    property string label: "MENU"
+    property color accentColor: "#58FFE1"
 
     signal clicked()
 
@@ -30,17 +33,17 @@ Item {
 
             OemIcon {
                 width: Math.round(frame.side * 0.38)
-                height: Math.round(frame.side * 0.30)
+                height: root.icon === "menu" ? Math.round(frame.side * 0.30) : width
                 anchors.horizontalCenter: parent.horizontalCenter
-                icon: "menu"
+                icon: root.icon
                 color: "#F7FBFF"
-                accentColor: "#58FFE1"
+                accentColor: root.accentColor
                 strokeWidth: Math.max(5, frame.side * 0.052)
             }
 
             Text {
                 width: parent.width
-                text: "MENU"
+                text: root.label
                 color: "#F7FBFF"
                 font.family: root.monoFont
                 font.pixelSize: Math.max(10, Math.floor(frame.side * 0.078))

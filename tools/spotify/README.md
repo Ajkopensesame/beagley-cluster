@@ -7,8 +7,8 @@ does not control Spotify playback.
 
 For a phone-scanned QR code, the redirect URI must be HTTPS and reachable by the
 phone. The helper below starts a Cloudflare quick tunnel from this Mac to the
-BeagleY pairing server, prints the exact Spotify Redirect URI, starts the QR
-screen on the BeagleY, waits for the refresh token, then removes the temporary
+BeagleY pairing server, prints the exact Spotify Redirect URI, opens the menu
+Spotify QR panel on the BeagleY, waits for the refresh token, then removes the temporary
 tunnel settings from `/etc/default/beagley-cluster.local`.
 
 ## One-time Pairing
@@ -29,7 +29,7 @@ tunnel settings from `/etc/default/beagley-cluster.local`.
 
    Add that exact URI to the Spotify app in the dashboard and save it.
 4. Press Enter in the helper.
-5. Scan the QR on the BeagleY display and approve Spotify.
+5. Scan the QR in the BeagleY menu and approve Spotify.
 
 The helper leaves the BeagleY with:
 

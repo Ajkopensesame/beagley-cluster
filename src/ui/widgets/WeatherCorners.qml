@@ -101,7 +101,7 @@ Item {
     property int radarFrameIndex: -1
     property string expandedMode: ""
 
-    signal mapMenuRequested()
+    signal mapMenuRequested(string stage)
 
     readonly property bool radarServiceAvailable: typeof radarImage !== "undefined" && radarImage !== null
     readonly property bool radarServiceReady: radarServiceAvailable && radarImage.ready && String(radarImage.imageUrl).length > 0
@@ -202,6 +202,14 @@ Item {
         if (musicAvailable)
             return musicStatus
         return musicDetail.length > 0 ? musicDetail : "No media source"
+    }
+
+    function musicTickerLine() {
+        if (musicTitle.length <= 0)
+            return ""
+        if (musicArtist.length > 0)
+            return musicTitle + " - " + musicArtist
+        return musicTitle
     }
 
     function musicAuthRequired() {
@@ -1030,8 +1038,118 @@ Item {
         onClicked: root.expandedMode = root.expandedMode === "radar" ? "" : "radar"
     }
 
-    MediaCornerWidget {
-        id: mediaCorner
+    Rectangle {
+        id: nowPlayingTicker
+        z: 20
+        width: Math.floor(Math.min(560, Math.max(280, parent.width - root.podSize * 2.42)))
+        height: 34
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: parent.top
+        anchors.topMargin: Math.max(10, Math.round(root.podSize * 0.10))
+        visible: root.musicAvailable && root.musicTickerLine().length > 0
+        opacity: visible ? 1 : 0
+        radius: 17
+        clip: true
+        color: Qt.rgba(0.0, 0.0, 0.0, 0.68)
+        border.width: 1
+        border.color: root.musicPlaying ? Qt.rgba(0.35, 1.0, 0.88, 0.42) : Qt.rgba(0.61, 0.70, 1.0, 0.34)
+
+        Behavior on opacity { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+
+        OemIcon {
+            id: tickerIcon
+            width: 20
+            height: 20
+            anchors.left: parent.left
+            anchors.leftMargin: 12
+            anchors.verticalCenter: parent.verticalCenter
+            icon: "audio"
+            active: root.musicPlaying
+            color: "#F7FBFF"
+            accentColor: "#58FFE1"
+            strokeWidth: 2.4
+        }
+
+        Text {
+            id: tickerSource
+            anchors.left: tickerIcon.right
+            anchors.leftMargin: 8
+            anchors.verticalCenter: parent.verticalCenter
+            text: root.musicPlaying ? root.musicSourceLine() : "PAUSED"
+            color: root.musicPlaying ? "#58FFE1" : "#9DB4FF"
+            font.family: root.monoFont
+            font.pixelSize: 10
+            font.weight: Font.Bold
+            font.letterSpacing: 0
+        }
+
+        Item {
+            id: tickerTrack
+            anchors.left: tickerSource.right
+            anchors.leftMargin: 12
+            anchors.right: parent.right
+            anchors.rightMargin: 14
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            clip: true
+            property real scrollX: 0
+            readonly property bool marqueeNeeded: tickerText.paintedWidth > width
+
+            onMarqueeNeededChanged: {
+                if (marqueeNeeded)
+                    tickerScroll.restart()
+                else
+                    scrollX = 0
+            }
+            onWidthChanged: {
+                if (marqueeNeeded)
+                    tickerScroll.restart()
+            }
+
+            Text {
+                id: tickerText
+                x: tickerTrack.marqueeNeeded ? tickerTrack.scrollX : 0
+                anchors.verticalCenter: parent.verticalCenter
+                text: root.musicTickerLine()
+                color: "#F7FBFF"
+                font.family: root.displayFont
+                font.pixelSize: 16
+                font.weight: Font.Bold
+                font.letterSpacing: 0
+                wrapMode: Text.NoWrap
+                onTextChanged: {
+                    if (tickerTrack.marqueeNeeded)
+                        tickerScroll.restart()
+                    else
+                        tickerTrack.scrollX = 0
+                }
+            }
+
+            SequentialAnimation {
+                id: tickerScroll
+                running: nowPlayingTicker.visible && tickerTrack.marqueeNeeded
+                loops: Animation.Infinite
+
+                PropertyAction {
+                    target: tickerTrack
+                    property: "scrollX"
+                    value: tickerTrack.width
+                }
+                PauseAnimation { duration: 500 }
+                NumberAnimation {
+                    target: tickerTrack
+                    property: "scrollX"
+                    to: -tickerText.paintedWidth
+                    duration: Math.max(7600, Math.round((tickerTrack.width + tickerText.paintedWidth) * 36))
+                    easing.type: Easing.Linear
+                }
+                PauseAnimation { duration: 900 }
+            }
+        }
+    }
+
+    MapMenuCornerWidget {
+        id: menuCorner
         width: root.podSize
         height: root.podSize
         anchors.left: parent.left
@@ -1042,11 +1160,13 @@ Item {
         corner: "bottomLeft"
         effectLevel: root.effectLevel
         bleedFraction: root.podBleedFraction
-        available: root.musicAvailable
-        playing: root.musicPlaying
-        primaryText: root.musicPrimaryLine()
-        secondaryText: root.musicSecondaryLine()
-        onClicked: root.expandedMode = root.expandedMode === "music" ? "" : "music"
+        icon: "menu"
+        label: "MENU"
+        accentColor: "#9DB4FF"
+        onClicked: {
+            root.expandedMode = ""
+            root.mapMenuRequested("settings")
+        }
     }
 
     MapMenuCornerWidget {
@@ -1061,9 +1181,12 @@ Item {
         corner: "bottomRight"
         effectLevel: root.effectLevel
         bleedFraction: root.podBleedFraction
+        icon: "route"
+        label: "MAP"
+        accentColor: "#58FFE1"
         onClicked: {
             root.expandedMode = ""
-            root.mapMenuRequested()
+            root.mapMenuRequested("search")
         }
     }
 
