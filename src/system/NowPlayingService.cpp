@@ -1285,7 +1285,12 @@ bool NowPlayingService::persistSpotifyRefreshToken(QString *errorOut) const
     for (const QString &line : lines) {
         const QString key = line.section(QLatin1Char('='), 0, 0).trimmed();
         if (key == QLatin1String("BEAGLEY_SPOTIFY_REFRESH_TOKEN")
-            || key == QLatin1String("BEAGLEY_SPOTIFY_ACCESS_TOKEN")) {
+            || key == QLatin1String("BEAGLEY_SPOTIFY_ACCESS_TOKEN")
+            || key == QLatin1String("BEAGLEY_SPOTIFY_REDIRECT_URI")
+            || key == QLatin1String("BEAGLEY_SPOTIFY_PAIRING_BASE_URL")
+            || key == QLatin1String("BEAGLEY_SPOTIFY_CALLBACK_HOST")
+            || key == QLatin1String("BEAGLEY_SPOTIFY_CALLBACK_PORT")
+            || key == QLatin1String("BEAGLEY_SPOTIFY_PAIRING_AUTOSTART")) {
             continue;
         }
         if (!line.isEmpty()) {
