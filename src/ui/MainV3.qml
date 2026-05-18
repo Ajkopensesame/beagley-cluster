@@ -2422,7 +2422,11 @@ Window {
             Rectangle {
                 anchors.fill: parent
                 visible: root.navControlsOpen || root.mapMenuOpen
-                color: root.navControlsOpen ? "#6201060C" : "transparent"
+                color: root.navControlsOpen
+                    ? "#6201060C"
+                    : (root.mapMenuOpen
+                        ? (root.menuDarkChrome ? "#40000000" : "#33F8FAFF")
+                        : "transparent")
 
                 MouseArea {
                     anchors.fill: parent
@@ -2646,6 +2650,10 @@ Window {
                 id: mapMenu
                 visible: root.mapMenuOpen
                 anchors.fill: parent
+                z: 4000
+                clip: true
+                layer.enabled: root.mapMenuOpen
+                layer.smooth: false
 
                 Rectangle {
                     width: Math.floor(Math.min(760, Math.max(640, parent.width * 0.42)))
@@ -2656,6 +2664,9 @@ Window {
                     color: root.menuPanelColor
                     border.width: 1
                     border.color: root.menuStrongBorderColor
+                    clip: true
+                    layer.enabled: root.mapMenuOpen
+                    layer.smooth: false
 
                     MouseArea {
                         anchors.fill: parent
@@ -2969,6 +2980,7 @@ Window {
                             color: root.menuSurfaceColor
                             border.width: 1
                             border.color: root.menuBorderColor
+                            clip: true
 
                             Column {
                                 anchors.fill: parent
@@ -2989,6 +3001,7 @@ Window {
                                     visible: root.mapMenuStage === "search"
                                     width: parent.width
                                     height: parent.height - 30
+                                    clip: true
                                     readonly property var results: root.menuResultsModel()
                                     readonly property int rowHeight: root.searchKeyboardOpen ? 48 : 64
                                     readonly property int visibleRows: Math.min(root.visibleSearchResultSlots(),
@@ -3004,16 +3017,26 @@ Window {
                                         Repeater {
                                             model: searchResultsSurface.visibleRows
 
-                                            delegate: Rectangle {
+                                            delegate: Item {
+                                                id: searchResultRow
                                                 readonly property int resultIndex: root.searchResultOffset + index
                                                 readonly property var itemData: searchResultsSurface.results[resultIndex]
                                                 width: searchResultsColumn.width
                                                 height: searchResultsSurface.rowHeight
-                                                radius: 12
-                                                antialiasing: false
-                                                color: suggestionMouse.containsMouse ? root.menuSurfaceSelectedColor : root.menuSurfaceAltColor
-                                                border.width: 1
-                                                border.color: suggestionMouse.containsMouse ? root.menuAccentColor : root.menuBorderColor
+
+                                                Rectangle {
+                                                    anchors.fill: parent
+                                                    color: suggestionMouse.containsMouse ? root.menuSurfaceSelectedColor : root.menuSurfaceAltColor
+                                                }
+
+                                                Rectangle {
+                                                    anchors.fill: parent
+                                                    radius: 12
+                                                    antialiasing: false
+                                                    color: "transparent"
+                                                    border.width: 1
+                                                    border.color: suggestionMouse.containsMouse ? root.menuAccentColor : root.menuBorderColor
+                                                }
 
                                                 Column {
                                                     anchors.left: parent.left
@@ -3025,7 +3048,7 @@ Window {
 
                                                     Text {
                                                         width: parent.width
-                                                        text: String(itemData.primary || itemData.label || "")
+                                                        text: String(searchResultRow.itemData.primary || searchResultRow.itemData.label || "")
                                                         textFormat: Text.PlainText
                                                         color: root.menuTextPrimaryColor
                                                         font.family: appTheme.fontDisplay
@@ -3037,7 +3060,7 @@ Window {
 
                                                     Text {
                                                         width: parent.width
-                                                        text: root.searchResultSubtitle(itemData)
+                                                        text: root.searchResultSubtitle(searchResultRow.itemData)
                                                         textFormat: Text.PlainText
                                                         color: root.menuTextSecondaryColor
                                                         font.family: appTheme.fontMono
@@ -3053,7 +3076,7 @@ Window {
                                                     id: suggestionMouse
                                                     anchors.fill: parent
                                                     hoverEnabled: true
-                                                    onClicked: root.chooseSearchResult(itemData)
+                                                    onClicked: root.chooseSearchResult(searchResultRow.itemData)
                                                 }
                                             }
                                         }
