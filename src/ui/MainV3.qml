@@ -2352,14 +2352,13 @@ Window {
                                 border.width: 1
                                 border.color: closeMouse.containsMouse ? "#1A73E8" : "#DADCE0"
 
-                                W.OemIcon {
+                                Text {
                                     anchors.centerIn: parent
-                                    width: 24
-                                    height: 24
-                                    icon: "close"
+                                    text: "X"
                                     color: "#3C4043"
-                                    accentColor: "#3C4043"
-                                    strokeWidth: 4.0
+                                    font.family: appTheme.fontMono
+                                    font.pixelSize: 22
+                                    font.weight: Font.Bold
                                 }
 
                                 MouseArea {
