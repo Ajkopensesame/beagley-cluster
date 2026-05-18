@@ -2001,7 +2001,6 @@ Window {
                     vicDiameter: vicCenter.width
                     ringThickness: 16
                     gapPx: 3
-                    holdMs: 1100
                     heartbeat: true
                     active: root.displayHighBeamValue
                 }

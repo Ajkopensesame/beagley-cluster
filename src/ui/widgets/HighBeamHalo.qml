@@ -20,9 +20,6 @@ Item {
     // Input state (from vehicle_state later)
     property bool active: false
 
-    // How long to remain visible after active drops false (ms)
-    property int holdMs: 1400
-
     // Heartbeat pulse
     property bool heartbeat: true
     property real flashOpacity: 1.0
@@ -45,19 +42,17 @@ Item {
     width: haloDiameter
     height: haloDiameter
 
-    // Internal latched visibility so it "hangs" on after a blip
-    property bool _latched: false
+    readonly property bool _shown: active
 
-    // Display state: active OR latched
-    readonly property bool _shown: active || _latched
-
-    // Fade in/out (but don't instantly drop)
     opacity: _shown ? (heartbeat ? flashOpacity : 1.0) : 0.0
-    visible: opacity > 0.001
+    visible: active
     layer.enabled: visible && !root.embeddedSafeMode
     layer.smooth: !root.embeddedSafeMode
 
-    Behavior on opacity { NumberAnimation { duration: 180 } }
+    Behavior on opacity {
+        enabled: root.active
+        NumberAnimation { duration: 180 }
+    }
 
     // Heartbeat pulse: subtle scale + slight alpha modulation
     transform: Scale {
@@ -102,27 +97,6 @@ Item {
             root.flashOpacity = 1.0
             hbScale.xScale = 1.0
             hbScale.yScale = 1.0
-        }
-    }
-
-    // Latch behavior: when active goes true, latch ON immediately.
-    // When active goes false, stay latched for holdMs then release.
-    Timer {
-        id: holdTimer
-        interval: root.holdMs
-        repeat: false
-        onTriggered: root._latched = false
-    }
-
-    onActiveChanged: {
-        if (active) {
-            _latched = true
-            holdTimer.stop()
-        } else {
-            if (_latched) {
-                holdTimer.stop()
-                holdTimer.start()
-            }
         }
     }
 
