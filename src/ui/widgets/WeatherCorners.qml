@@ -204,6 +204,24 @@ Item {
         return musicDetail.length > 0 ? musicDetail : "No media source"
     }
 
+    function musicAuthRequired() {
+        return String(musicStatus).toUpperCase() === "AUTH"
+    }
+
+    function spotifyPairingVisible() {
+        return !!nowPlayingService
+            && nowPlayingService.spotifyPairingSupported
+            && (musicAuthRequired() || nowPlayingService.spotifyPairingActive)
+    }
+
+    function spotifyPairingStatusLine() {
+        if (!nowPlayingService)
+            return "Spotify login required"
+        if (nowPlayingService.spotifyPairingStatus.length > 0)
+            return nowPlayingService.spotifyPairingStatus
+        return musicStatusLine()
+    }
+
     function mediaControlEnabled() {
         return !!nowPlayingService && musicAvailable
     }
@@ -1254,10 +1272,178 @@ Item {
                                 }
                             }
 
+                            Rectangle {
+                                id: spotifyPairingPanel
+                                width: parent.width
+                                height: 168
+                                visible: root.spotifyPairingVisible()
+                                radius: 10
+                                color: "#050812"
+                                border.width: 1
+                                border.color: nowPlayingService && nowPlayingService.spotifyPairingActive ? "#58FFE1" : "#2A3450"
+
+                                Row {
+                                    anchors.fill: parent
+                                    anchors.margins: 12
+                                    spacing: 14
+
+                                    Rectangle {
+                                        width: 124
+                                        height: 124
+                                        radius: 6
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        color: "#F8FBFF"
+                                        border.width: 1
+                                        border.color: "#58FFE1"
+                                        visible: nowPlayingService && nowPlayingService.spotifyPairingActive && nowPlayingService.spotifyPairingQrRows.length > 0
+
+                                        Canvas {
+                                            id: spotifyQrCanvas
+                                            anchors.fill: parent
+                                            anchors.margins: 8
+                                            renderTarget: Canvas.Image
+                                            antialiasing: false
+                                            smooth: false
+
+                                            Component.onCompleted: requestPaint()
+                                            onWidthChanged: requestPaint()
+                                            onHeightChanged: requestPaint()
+
+                                            Connections {
+                                                target: nowPlayingService
+                                                function onSpotifyPairingChanged() {
+                                                    spotifyQrCanvas.requestPaint()
+                                                }
+                                            }
+
+                                            onPaint: {
+                                                const ctx = getContext("2d")
+                                                ctx.fillStyle = "#F8FBFF"
+                                                ctx.fillRect(0, 0, width, height)
+                                                if (!nowPlayingService)
+                                                    return
+                                                const rows = nowPlayingService.spotifyPairingQrRows
+                                                if (!rows || rows.length === 0)
+                                                    return
+                                                const n = rows.length
+                                                const scale = Math.floor(Math.min(width, height) / n)
+                                                const offsetX = Math.floor((width - scale * n) / 2)
+                                                const offsetY = Math.floor((height - scale * n) / 2)
+                                                ctx.fillStyle = "#05060A"
+                                                for (let y = 0; y < n; ++y) {
+                                                    const row = String(rows[y])
+                                                    for (let x = 0; x < row.length; ++x) {
+                                                        if (row.charAt(x) === "1")
+                                                            ctx.fillRect(offsetX + x * scale, offsetY + y * scale, scale, scale)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        width: 124
+                                        height: 124
+                                        radius: 62
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        color: "#05060A"
+                                        border.width: 1
+                                        border.color: "#5C4B90"
+                                        visible: !nowPlayingService || !nowPlayingService.spotifyPairingActive || nowPlayingService.spotifyPairingQrRows.length === 0
+
+                                        OemIcon {
+                                            anchors.centerIn: parent
+                                            width: 64
+                                            height: 64
+                                            icon: "audio"
+                                            active: true
+                                            color: "#7D86A6"
+                                            accentColor: "#5C6688"
+                                            strokeWidth: 5.0
+                                        }
+                                    }
+
+                                    Column {
+                                        width: parent.width - 138
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        spacing: 8
+
+                                        Text {
+                                            width: parent.width
+                                            text: "PAIR SPOTIFY"
+                                            color: "#58FFE1"
+                                            font.family: root.monoFont
+                                            font.pixelSize: 13
+                                            font.weight: Font.Bold
+                                            font.letterSpacing: 0
+                                            elide: Text.ElideRight
+                                        }
+
+                                        Text {
+                                            width: parent.width
+                                            text: root.spotifyPairingStatusLine()
+                                            color: "#F7FBFF"
+                                            font.family: root.monoFont
+                                            font.pixelSize: 12
+                                            font.weight: Font.Bold
+                                            font.letterSpacing: 0
+                                            wrapMode: Text.Wrap
+                                            maximumLineCount: 2
+                                        }
+
+                                        Text {
+                                            width: parent.width
+                                            text: nowPlayingService && nowPlayingService.spotifyPairingCode.length > 0
+                                                ? nowPlayingService.spotifyPairingCode
+                                                : "READY"
+                                            color: "#C568FF"
+                                            font.family: root.displayFont
+                                            font.pixelSize: 22
+                                            font.weight: Font.Bold
+                                            font.letterSpacing: 0
+                                            elide: Text.ElideRight
+                                        }
+
+                                        Rectangle {
+                                            width: parent.width
+                                            height: 38
+                                            radius: 8
+                                            color: pairingMouse.pressed ? "#123C44" : "#0A0D18"
+                                            border.width: 1
+                                            border.color: "#305E72"
+
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: nowPlayingService && nowPlayingService.spotifyPairingActive ? "CANCEL" : "START"
+                                                color: "#F7FBFF"
+                                                font.family: root.monoFont
+                                                font.pixelSize: 11
+                                                font.weight: Font.Bold
+                                                font.letterSpacing: 0
+                                            }
+
+                                            MouseArea {
+                                                id: pairingMouse
+                                                anchors.fill: parent
+                                                onClicked: {
+                                                    if (!nowPlayingService)
+                                                        return
+                                                    if (nowPlayingService.spotifyPairingActive)
+                                                        nowPlayingService.cancelSpotifyPairing()
+                                                    else
+                                                        nowPlayingService.beginSpotifyPairing()
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
                             Row {
                                 width: parent.width
                                 height: 76
                                 spacing: 12
+                                visible: !root.spotifyPairingVisible()
 
                                 Repeater {
                                     model: [
@@ -1318,6 +1504,7 @@ Item {
                             Rectangle {
                                 width: parent.width
                                 height: 42
+                                visible: !root.spotifyPairingVisible()
                                 radius: 8
                                 color: "#050812"
                                 border.width: 1

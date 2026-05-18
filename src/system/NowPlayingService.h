@@ -5,6 +5,8 @@
 #include <QNetworkReply>
 #include <QObject>
 #include <QProcess>
+#include <QStringList>
+#include <QTcpServer>
 #include <QTimer>
 
 class NowPlayingService : public QObject
@@ -19,6 +21,12 @@ class NowPlayingService : public QObject
     Q_PROPERTY(QString album READ album NOTIFY nowPlayingChanged)
     Q_PROPERTY(QString status READ status NOTIFY nowPlayingChanged)
     Q_PROPERTY(QString statusDetail READ statusDetail NOTIFY nowPlayingChanged)
+    Q_PROPERTY(bool spotifyPairingSupported READ spotifyPairingSupported NOTIFY spotifyPairingChanged)
+    Q_PROPERTY(bool spotifyPairingActive READ spotifyPairingActive NOTIFY spotifyPairingChanged)
+    Q_PROPERTY(QString spotifyPairingStatus READ spotifyPairingStatus NOTIFY spotifyPairingChanged)
+    Q_PROPERTY(QString spotifyPairingUrl READ spotifyPairingUrl NOTIFY spotifyPairingChanged)
+    Q_PROPERTY(QString spotifyPairingCode READ spotifyPairingCode NOTIFY spotifyPairingChanged)
+    Q_PROPERTY(QStringList spotifyPairingQrRows READ spotifyPairingQrRows NOTIFY spotifyPairingChanged)
 
 public:
     enum class Backend {
@@ -46,14 +54,23 @@ public:
     QString album() const { return m_album; }
     QString status() const { return m_status; }
     QString statusDetail() const { return m_statusDetail; }
+    bool spotifyPairingSupported() const;
+    bool spotifyPairingActive() const { return m_pairingActive; }
+    QString spotifyPairingStatus() const { return m_pairingStatus; }
+    QString spotifyPairingUrl() const { return m_pairingUrl; }
+    QString spotifyPairingCode() const { return m_pairingCode; }
+    QStringList spotifyPairingQrRows() const { return m_pairingQrRows; }
 
     Q_INVOKABLE void refresh();
     Q_INVOKABLE void playPause();
     Q_INVOKABLE void next();
     Q_INVOKABLE void previous();
+    Q_INVOKABLE void beginSpotifyPairing();
+    Q_INVOKABLE void cancelSpotifyPairing();
 
 signals:
     void nowPlayingChanged();
+    void spotifyPairingChanged();
 
 private:
     QString sourceLabel() const;
@@ -69,6 +86,17 @@ private:
     void handleSpotifyPlaybackReply(QNetworkReply *reply, bool retriedAfterTokenRefresh);
     void handleSpotifyTokenReply(QNetworkReply *reply);
     void handleSpotifyControlReply(QNetworkReply *reply, SpotifyAction action, bool retriedAfterTokenRefresh);
+    void exchangeSpotifyPairingCode(const QString &code);
+    void handleSpotifyPairingTokenReply(QNetworkReply *reply);
+    void handlePairingConnection();
+    void handlePairingRequest(const QByteArray &request, QTcpSocket *socket);
+    void stopPairingServer();
+    void setSpotifyPairingState(bool active,
+                                const QString &status,
+                                const QString &url = QString(),
+                                const QString &code = QString(),
+                                const QStringList &qrRows = QStringList());
+    bool persistSpotifyRefreshToken(QString *errorOut = nullptr) const;
     void setSpotifyAuthRequired(const QString &detail);
     void finishProcess(QProcess *process, bool commandFailed, const QString &fallbackDetail = QString());
     void setNowPlaying(bool available,
@@ -83,8 +111,11 @@ private:
     QProcess *m_process = nullptr;
     QNetworkAccessManager m_network;
     QNetworkReply *m_networkReply = nullptr;
+    QNetworkReply *m_pairingReply = nullptr;
+    QTcpServer m_pairingServer;
     QTimer m_refreshTimer;
     QTimer m_timeoutTimer;
+    QTimer m_pairingTimeoutTimer;
     Backend m_backend = Backend::Playerctl;
     SpotifyAction m_pendingSpotifyAction = SpotifyAction::None;
     QString m_playerName;
@@ -95,6 +126,15 @@ private:
     QString m_spotifyDeviceId;
     QString m_spotifyMarket;
     QDateTime m_spotifyAccessTokenExpiresAt;
+    bool m_pairingActive = false;
+    QString m_pairingStatus;
+    QString m_pairingUrl;
+    QString m_pairingCode;
+    QString m_pairingState;
+    QString m_pairingCodeVerifier;
+    QString m_pairingRedirectUri;
+    QString m_pairingAuthorizeUrl;
+    QStringList m_pairingQrRows;
     bool m_available = false;
     bool m_playing = false;
     QString m_source;
