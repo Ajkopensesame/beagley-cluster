@@ -417,6 +417,7 @@ Window {
     readonly property bool initialMapSearchKeyboard: (typeof BEAGLEY_INITIAL_MAP_SEARCH_KEYBOARD !== "undefined")
         ? boolEnvValue(BEAGLEY_INITIAL_MAP_SEARCH_KEYBOARD)
         : false
+    property int searchResultOffset: 0
     property var pendingDestination: ({})
     property int selectedRouteIndex: 0
     property bool awaitingRoutePreview: false
@@ -895,6 +896,7 @@ Window {
     function fetchSearchSuggestions(query) {
         const trimmed = String(query || "").trim()
         pendingSuggestionQuery = trimmed
+        root.searchResultOffset = 0
         if (trimmed.length < 2) {
             navigation.search("")
             return
@@ -1020,6 +1022,22 @@ Window {
             return []
         const query = searchInput ? String(searchInput.text || "").trim() : ""
         return root.mergedMenuResults(query)
+    }
+
+    function visibleSearchResultSlots() {
+        return 3
+    }
+
+    function maxSearchResultOffset() {
+        return Math.max(0, root.menuResultsModel().length - root.visibleSearchResultSlots())
+    }
+
+    function setSearchResultOffset(value) {
+        root.searchResultOffset = Math.max(0, Math.min(root.maxSearchResultOffset(), value))
+    }
+
+    function resetSearchResultOffset() {
+        root.searchResultOffset = 0
     }
 
     function chooseSearchResult(itemData) {
@@ -1224,6 +1242,10 @@ Window {
                 return
             if (root.awaitingRoutePreview && root.routeLookupInProgress && Object.keys(root.pendingDestination).length > 0)
                 root.mapMenuStage = "routing"
+        }
+
+        function onSearchResultsChanged() {
+            root.resetSearchResultOffset()
         }
 
         function onRouteAlternativesChanged() {
@@ -2885,103 +2907,104 @@ Window {
                                     height: parent.height - 30
                                     readonly property var results: root.menuResultsModel()
                                     readonly property int rowHeight: root.searchKeyboardOpen ? 48 : 64
+                                    readonly property int visibleRows: Math.min(root.visibleSearchResultSlots(),
+                                        Math.max(0, results.length - root.searchResultOffset))
 
-                                    Flickable {
-                                        id: searchResultsFlick
+                                    Column {
+                                        id: searchResultsColumn
                                         anchors.left: parent.left
-                                        anchors.right: parent.right
                                         anchors.top: parent.top
-                                        anchors.bottom: parent.bottom
-                                        clip: true
-                                        contentWidth: width
-                                        contentHeight: searchResultsColumn.implicitHeight
-                                        boundsBehavior: Flickable.StopAtBounds
-                                        flickDeceleration: 2600
-                                        maximumFlickVelocity: 2600
-                                        interactive: contentHeight > height
+                                        width: parent.width - (searchResultsSurface.results.length > searchResultsSurface.visibleRows ? 16 : 0)
+                                        spacing: 6
 
-                                        Column {
-                                            id: searchResultsColumn
-                                            width: searchResultsFlick.width - (searchResultsFlick.contentHeight > searchResultsFlick.height ? 10 : 0)
-                                            spacing: 6
+                                        Repeater {
+                                            model: searchResultsSurface.visibleRows
 
-                                            Repeater {
-                                                model: searchResultsSurface.results.length
+                                            delegate: Rectangle {
+                                                readonly property int resultIndex: root.searchResultOffset + index
+                                                readonly property var itemData: searchResultsSurface.results[resultIndex]
+                                                width: searchResultsColumn.width
+                                                height: searchResultsSurface.rowHeight
+                                                radius: 12
+                                                antialiasing: false
+                                                color: suggestionMouse.containsMouse ? root.menuSurfaceSelectedColor : root.menuSurfaceAltColor
+                                                border.width: 1
+                                                border.color: suggestionMouse.containsMouse ? root.menuAccentColor : root.menuBorderColor
 
-                                                delegate: Rectangle {
-                                                    readonly property var itemData: searchResultsSurface.results[index]
-                                                    width: searchResultsColumn.width
-                                                    height: searchResultsSurface.rowHeight
-                                                    radius: 12
-                                                    antialiasing: false
-                                                    color: suggestionMouse.containsMouse ? root.menuSurfaceSelectedColor : root.menuSurfaceAltColor
-                                                    border.width: 1
-                                                    border.color: suggestionMouse.containsMouse ? root.menuAccentColor : root.menuBorderColor
+                                                Column {
+                                                    anchors.left: parent.left
+                                                    anchors.right: parent.right
+                                                    anchors.verticalCenter: parent.verticalCenter
+                                                    anchors.leftMargin: 12
+                                                    anchors.rightMargin: 12
+                                                    spacing: root.searchKeyboardOpen ? 2 : 4
 
-                                                    Column {
-                                                        anchors.left: parent.left
-                                                        anchors.right: parent.right
-                                                        anchors.verticalCenter: parent.verticalCenter
-                                                        anchors.leftMargin: 12
-                                                        anchors.rightMargin: 12
-                                                        spacing: root.searchKeyboardOpen ? 2 : 4
-
-                                                        Text {
-                                                            width: parent.width
-                                                            text: String(itemData.primary || itemData.label || "")
-                                                            textFormat: Text.PlainText
-                                                            color: root.menuTextPrimaryColor
-                                                            font.family: appTheme.fontDisplay
-                                                            font.pixelSize: root.searchKeyboardOpen ? 15 : 17
-                                                            font.hintingPreference: root.menuTextHintingPreference
-                                                            renderType: root.menuTextRenderType
-                                                            elide: Text.ElideRight
-                                                        }
-
-                                                        Text {
-                                                            width: parent.width
-                                                            text: root.searchResultSubtitle(itemData)
-                                                            textFormat: Text.PlainText
-                                                            color: root.menuTextSecondaryColor
-                                                            font.family: appTheme.fontMono
-                                                            font.pixelSize: root.searchKeyboardOpen ? 10 : 11
-                                                            font.hintingPreference: root.menuTextHintingPreference
-                                                            renderType: root.menuTextRenderType
-                                                            elide: Text.ElideRight
-                                                            visible: text.length > 0
-                                                        }
+                                                    Text {
+                                                        width: parent.width
+                                                        text: String(itemData.primary || itemData.label || "")
+                                                        textFormat: Text.PlainText
+                                                        color: root.menuTextPrimaryColor
+                                                        font.family: appTheme.fontDisplay
+                                                        font.pixelSize: root.searchKeyboardOpen ? 15 : 17
+                                                        font.hintingPreference: root.menuTextHintingPreference
+                                                        renderType: root.menuTextRenderType
+                                                        elide: Text.ElideRight
                                                     }
 
-                                                    MouseArea {
-                                                        id: suggestionMouse
-                                                        anchors.fill: parent
-                                                        hoverEnabled: true
-                                                        onClicked: root.chooseSearchResult(itemData)
+                                                    Text {
+                                                        width: parent.width
+                                                        text: root.searchResultSubtitle(itemData)
+                                                        textFormat: Text.PlainText
+                                                        color: root.menuTextSecondaryColor
+                                                        font.family: appTheme.fontMono
+                                                        font.pixelSize: root.searchKeyboardOpen ? 10 : 11
+                                                        font.hintingPreference: root.menuTextHintingPreference
+                                                        renderType: root.menuTextRenderType
+                                                        elide: Text.ElideRight
+                                                        visible: text.length > 0
                                                     }
+                                                }
+
+                                                MouseArea {
+                                                    id: suggestionMouse
+                                                    anchors.fill: parent
+                                                    hoverEnabled: true
+                                                    onClicked: root.chooseSearchResult(itemData)
                                                 }
                                             }
                                         }
                                     }
 
                                     Rectangle {
-                                        visible: searchResultsFlick.contentHeight > searchResultsFlick.height
+                                        visible: searchResultsSurface.results.length > searchResultsSurface.visibleRows
                                         anchors.right: parent.right
                                         anchors.top: parent.top
                                         anchors.bottom: parent.bottom
-                                        width: 3
-                                        radius: 2
+                                        width: 8
+                                        radius: 4
                                         color: root.menuBorderColor
                                         opacity: 0.55
 
                                         Rectangle {
                                             width: parent.width
-                                            radius: 2
+                                            radius: 4
                                             color: root.menuAccentColor
-                                            height: Math.max(18, parent.height * searchResultsFlick.height / Math.max(searchResultsFlick.contentHeight, 1))
+                                            readonly property int maxOffset: Math.max(1, searchResultsSurface.results.length - searchResultsSurface.visibleRows)
+                                            height: Math.max(20, parent.height * searchResultsSurface.visibleRows / Math.max(searchResultsSurface.results.length, 1))
                                             y: Math.min(parent.height - height,
                                                 (parent.height - height)
-                                                * searchResultsFlick.contentY
-                                                / Math.max(searchResultsFlick.contentHeight - searchResultsFlick.height, 1))
+                                                * root.searchResultOffset
+                                                / maxOffset)
+                                        }
+
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            onClicked: {
+                                                const next = mouse.y > parent.height / 2
+                                                    ? root.searchResultOffset + 1
+                                                    : root.searchResultOffset - 1
+                                                root.setSearchResultOffset(next)
+                                            }
                                         }
                                     }
                                 }
