@@ -49,6 +49,10 @@ ok() {
   printf '[OK] %s\n' "$1"
 }
 
+info() {
+  printf '[INFO] %s\n' "$1"
+}
+
 warn() {
   WARNINGS=$((WARNINGS + 1))
   printf '[WARN] %s\n' "$1"
@@ -178,13 +182,19 @@ for wt in "${worktree_paths[@]}"; do
   wt_branch="$(git -C "$wt" branch --show-current 2>/dev/null || true)"
   wt_head="$(git -C "$wt" rev-parse --short=12 HEAD 2>/dev/null || true)"
   wt_dirty="$(dirty_count_for "$wt")"
+  wt_is_production=0
+  if [[ "$wt" == "$ROOT" || "$wt_branch" == "$SOURCE_BRANCH" ]]; then
+    wt_is_production=1
+  fi
   printf 'worktree=%s branch=%s head=%s dirty=%s\n' \
     "$wt" "${wt_branch:-detached}" "${wt_head:-unknown}" "${wt_dirty:-unknown}"
   if [[ "${wt_dirty:-0}" != "0" ]]; then
     if [[ "$FAIL_DIRTY" == 1 ]]; then
       fail "dirty worktree $wt has $wt_dirty uncommitted change(s)"
+    elif [[ "$wt_is_production" == 1 ]]; then
+      warn "dirty production worktree $wt has $wt_dirty uncommitted change(s)"
     else
-      warn "dirty worktree $wt has $wt_dirty uncommitted change(s)"
+      info "dirty non-production worktree $wt has $wt_dirty uncommitted change(s); ignored for source-truth verdict"
     fi
   fi
 done
