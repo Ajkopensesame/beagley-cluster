@@ -223,7 +223,7 @@ Item {
     }
 
     function mediaControlEnabled() {
-        return !!nowPlayingService && musicAvailable
+        return !!nowPlayingService && nowPlayingService.controlsSupported && musicAvailable
     }
 
     function triggerMediaControl(action) {
@@ -1427,6 +1427,8 @@ Item {
                                 height: 76
                                 spacing: 12
                                 visible: !root.spotifyPairingVisible()
+                                    && nowPlayingService
+                                    && nowPlayingService.controlsSupported
 
                                 Repeater {
                                     model: [

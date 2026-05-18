@@ -21,6 +21,7 @@ class NowPlayingService : public QObject
     Q_PROPERTY(QString album READ album NOTIFY nowPlayingChanged)
     Q_PROPERTY(QString status READ status NOTIFY nowPlayingChanged)
     Q_PROPERTY(QString statusDetail READ statusDetail NOTIFY nowPlayingChanged)
+    Q_PROPERTY(bool controlsSupported READ controlsSupported CONSTANT)
     Q_PROPERTY(bool spotifyPairingSupported READ spotifyPairingSupported NOTIFY spotifyPairingChanged)
     Q_PROPERTY(bool spotifyPairingActive READ spotifyPairingActive NOTIFY spotifyPairingChanged)
     Q_PROPERTY(QString spotifyPairingStatus READ spotifyPairingStatus NOTIFY spotifyPairingChanged)
@@ -55,6 +56,7 @@ public:
     QString album() const { return m_album; }
     QString status() const { return m_status; }
     QString statusDetail() const { return m_statusDetail; }
+    bool controlsSupported() const { return m_backend != Backend::SpotifyWeb; }
     bool spotifyPairingSupported() const;
     bool spotifyPairingActive() const { return m_pairingActive; }
     QString spotifyPairingStatus() const { return m_pairingStatus; }

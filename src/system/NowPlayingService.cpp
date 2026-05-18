@@ -22,8 +22,7 @@ constexpr auto kSpotifyApiBase = "https://api.spotify.com/v1";
 constexpr auto kSpotifyTokenUrl = "https://accounts.spotify.com/api/token";
 constexpr int kPairingPortDefault = 8787;
 constexpr int kPairingTimeoutMs = 5 * 60 * 1000;
-constexpr auto kSpotifyScopes =
-    "user-read-playback-state user-read-currently-playing user-modify-playback-state";
+constexpr auto kSpotifyScopes = "user-read-currently-playing";
 
 int refreshIntervalMs()
 {
@@ -602,7 +601,7 @@ QStringList NowPlayingService::playerctlBaseArgs() const
 void NowPlayingService::playPause()
 {
     if (spotifyBackendActive()) {
-        runSpotifyAction(m_playing ? SpotifyAction::Pause : SpotifyAction::Play);
+        refreshSpotifyPlayback();
         return;
     }
     runControlCommand(QStringLiteral("play-pause"));
@@ -611,7 +610,7 @@ void NowPlayingService::playPause()
 void NowPlayingService::next()
 {
     if (spotifyBackendActive()) {
-        runSpotifyAction(SpotifyAction::Next);
+        refreshSpotifyPlayback();
         return;
     }
     runControlCommand(QStringLiteral("next"));
@@ -620,7 +619,7 @@ void NowPlayingService::next()
 void NowPlayingService::previous()
 {
     if (spotifyBackendActive()) {
-        runSpotifyAction(SpotifyAction::Previous);
+        refreshSpotifyPlayback();
         return;
     }
     runControlCommand(QStringLiteral("previous"));
@@ -711,7 +710,7 @@ void NowPlayingService::refreshSpotifyPlayback(bool retriedAfterTokenRefresh)
     if (!m_spotifyMarket.isEmpty()) {
         query.addQueryItem(QStringLiteral("market"), m_spotifyMarket);
     }
-    QNetworkRequest request(spotifyUrl(QStringLiteral("/me/player"), query));
+    QNetworkRequest request(spotifyUrl(QStringLiteral("/me/player/currently-playing"), query));
     request.setRawHeader("Authorization", "Bearer " + m_spotifyAccessToken.toUtf8());
     request.setRawHeader("Accept", "application/json");
     request.setRawHeader("User-Agent", "BeagleyCluster/1.0");
@@ -910,12 +909,6 @@ void NowPlayingService::handleSpotifyPlaybackReply(QNetworkReply *reply, bool re
     }
 
     const QJsonObject root = document.object();
-    const QJsonObject device = root.value(QStringLiteral("device")).toObject();
-    const QString deviceName = device.value(QStringLiteral("name")).toString().trimmed();
-    const bool deviceActive = device.value(QStringLiteral("is_active")).toBool(false)
-        || !deviceName.isEmpty();
-    const bool deviceRestricted = device.value(QStringLiteral("is_restricted")).toBool(false);
-
     const QJsonObject item = root.value(QStringLiteral("item")).toObject();
     const QString itemType = item.value(QStringLiteral("type"))
                                  .toString(root.value(QStringLiteral("currently_playing_type")).toString());
@@ -932,14 +925,14 @@ void NowPlayingService::handleSpotifyPlaybackReply(QNetworkReply *reply, bool re
     }
 
     const bool playing = root.value(QStringLiteral("is_playing")).toBool(false);
-    const bool available = !title.isEmpty() || deviceActive;
+    const bool available = !title.isEmpty();
     const QString status = playing
         ? QStringLiteral("PLAYING")
         : (!title.isEmpty() ? QStringLiteral("PAUSED")
-                            : (deviceActive ? QStringLiteral("READY") : QStringLiteral("OFFLINE")));
-    const QString detail = deviceRestricted
-        ? QStringLiteral("Spotify device restricted")
-        : (!deviceName.isEmpty() ? deviceName : QStringLiteral("Spotify Web API"));
+                            : QStringLiteral("OFFLINE"));
+    const QString detail = title.isEmpty()
+        ? QStringLiteral("Open Spotify on your phone")
+        : QStringLiteral("Spotify now playing");
 
     setNowPlaying(available,
                   playing,

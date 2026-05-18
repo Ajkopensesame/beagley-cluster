@@ -6,7 +6,8 @@ description: Start a real Spotify QR pairing session for the BeagleY cluster by 
 # Spotify Pairing
 
 Use this when the user wants to scan the cluster QR code and connect their real
-Spotify account.
+Spotify account for read-only now-playing display. This flow does not request
+playback-control scope.
 
 Run from the canonical production checkout:
 
