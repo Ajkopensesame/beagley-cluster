@@ -997,12 +997,12 @@ Window {
             return merged
         }
 
+        for (var resultIndex = 0; resultIndex < liveResults.length; ++resultIndex)
+            appendResult(liveResults[resultIndex], false)
         for (var recentIndex = 0; recentIndex < recents.length; ++recentIndex) {
             if (root.menuResultMatchesQuery(recents[recentIndex], trimmed))
                 appendResult(recents[recentIndex], true)
         }
-        for (var resultIndex = 0; resultIndex < liveResults.length; ++resultIndex)
-            appendResult(liveResults[resultIndex], false)
         return merged
     }
 

@@ -255,6 +255,78 @@ void testAddressRankingPrefersClosestMatchingRoad()
     expectTrue(results.first().label.contains(QStringLiteral("Peregian Beach")), "closest matching road should rank before farther high-importance road");
 }
 
+void testPartialAddressPredictionUsesLocalAddressFallback()
+{
+    qputenv("BEAGLEY_NAV_SEARCH_COUNTRYCODE", "AU");
+    OpenNavigationProvider provider;
+    const QNetworkRequest primary = provider.buildSearchRequest(QStringLiteral("David Low"), -26.4593, 152.9990);
+    const QUrl primaryUrl = primary.url();
+
+    expectTrue(primaryUrl.host().contains(QStringLiteral("photon"), Qt::CaseInsensitive),
+        "partial address prediction should keep Photon as the fast autocomplete primary");
+
+    const QNetworkRequest fallback = provider.buildFallbackSearchRequest(QStringLiteral("David Low"), -26.4593, 152.9990);
+    const QUrlQuery fallbackQuery(fallback.url());
+
+    expectTrue(fallback.url().host().contains(QStringLiteral("nominatim"), Qt::CaseInsensitive),
+        "partial address prediction fallback should use Nominatim");
+    expectEqual(fallbackQuery.queryItemValue(QStringLiteral("layer")), QStringLiteral("address"),
+        "partial address prediction fallback should request the address layer");
+    expectEqual(fallbackQuery.queryItemValue(QStringLiteral("bounded")), QStringLiteral("1"),
+        "partial address prediction fallback should stay bounded near the vehicle");
+    expectEqual(fallbackQuery.queryItemValue(QStringLiteral("countrycodes")), QStringLiteral("au"),
+        "partial address prediction fallback should keep the local country hint");
+}
+
+void testPartialAddressRankingPrefersNearbyStreetPrediction()
+{
+    qputenv("BEAGLEY_NAV_SEARCH_COUNTRYCODE", "AU");
+    OpenNavigationProvider provider;
+    const QByteArray payload = R"JSON(
+[
+  {
+    "display_name": "David Low Way, Maroochydore, Queensland, 4558, Australia",
+    "lat": "-26.6570300",
+    "lon": "153.0890900",
+    "category": "highway",
+    "type": "secondary",
+    "addresstype": "road",
+    "importance": 0.95,
+    "address": {
+      "road": "David Low Way",
+      "city": "Maroochydore",
+      "state": "Queensland",
+      "country": "Australia",
+      "country_code": "au"
+    }
+  },
+  {
+    "display_name": "David Low Way, Peregian Beach, Queensland, 4573, Australia",
+    "lat": "-26.4896160",
+    "lon": "153.0938557",
+    "category": "highway",
+    "type": "secondary",
+    "addresstype": "road",
+    "importance": 0.25,
+    "address": {
+      "road": "David Low Way",
+      "suburb": "Peregian Beach",
+      "state": "Queensland",
+      "country": "Australia",
+      "country_code": "au"
+    }
+  }
+]
+)JSON";
+
+    const QList<SearchResultData> results = provider.parseSearchResponse(payload, QStringLiteral("David Low"), -26.4593, 152.9990);
+    expectTrue(!results.isEmpty(), "partial address ranking results should not be empty");
+    if (results.isEmpty()) {
+        return;
+    }
+    expectTrue(results.first().label.contains(QStringLiteral("Peregian Beach")), "nearby street prediction should rank before farther high-importance road");
+}
+
 void testWeakCategorySearchRefinesWithFallbackMerge()
 {
     qputenv("BEAGLEY_NAV_SEARCH_COUNTRYCODE", "AU");
@@ -321,6 +393,8 @@ int main()
     testPlaceRankingPrefersSettlementOverNearbyPoi();
     testLocalCategoryRankingUnderstandsAustralianAliases();
     testAddressRankingPrefersClosestMatchingRoad();
+    testPartialAddressPredictionUsesLocalAddressFallback();
+    testPartialAddressRankingPrefersNearbyStreetPrediction();
     testWeakCategorySearchRefinesWithFallbackMerge();
 
     if (g_failures == 0) {

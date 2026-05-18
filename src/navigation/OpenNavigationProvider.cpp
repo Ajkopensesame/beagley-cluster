@@ -439,6 +439,30 @@ bool queryLooksAddressLike(const QString &query)
     return false;
 }
 
+bool queryLooksAddressPredictionLike(const QString &query)
+{
+    if (queryLooksAddressLike(query)) {
+        return true;
+    }
+    if (queryLooksLocalCategoryLike(query) || queryHasNearMeIntent(query)) {
+        return false;
+    }
+
+    const QStringList tokens = tokenizeWords(query);
+    if (tokens.size() < 2) {
+        return false;
+    }
+
+    int usefulTokens = 0;
+    for (const QString &token : tokens) {
+        if (token.size() >= 2) {
+            ++usefulTokens;
+        }
+    }
+
+    return usefulTokens >= 2;
+}
+
 bool resultLooksSettlement(const SearchResultData &result)
 {
     static const QStringList settlementTypes = {
@@ -823,13 +847,24 @@ double rankSearchResult(const SearchResultData &result, const QString &query, co
     const QStringList queryTokens = tokenizeWords(queryNormalized);
     const QStringList categoryQueryTokens = categoryIntentTokens(query);
     const bool addressLike = queryLooksAddressLike(queryNormalized);
+    const bool addressPredictionLike = !addressLike && queryLooksAddressPredictionLike(queryNormalized);
+    const bool addressMode = addressLike || addressPredictionLike;
 
     double score = textMatchScore(queryNormalized, queryTokens, result);
     score += categoryIntentScore(result, categoryQueryTokens);
-    score += addressLike ? addressIntentScore(result, queryTokens, categoryQueryTokens) : placeIntentScore(result, categoryQueryTokens);
+    score += addressMode ? addressIntentScore(result, queryTokens, categoryQueryTokens) : placeIntentScore(result, categoryQueryTokens);
     score += distanceScore(result.distanceMeters);
-    if (addressLike) {
+    if (addressMode) {
         score += addressDistanceScore(result.distanceMeters);
+    }
+    if (addressPredictionLike) {
+        if (resultLooksAddressPoint(result)) {
+            score += 18.0;
+        } else if (resultLooksStreet(result)) {
+            score += 14.0;
+        } else if (resultLooksPoi(result) && !queryMatchesCategory(categoryQueryTokens, result)) {
+            score -= 14.0;
+        }
     }
     if (queryLooksLocalCategoryLike(query) || queryHasNearMeIntent(query)) {
         score += localIntentDistancePenalty(result.distanceMeters);
@@ -976,12 +1011,13 @@ QNetworkRequest OpenNavigationProvider::buildFallbackSearchRequest(const QString
     QUrl url(m_fallbackGeocoderUrl);
     QUrlQuery urlQuery(url);
     const bool addressLike = queryLooksAddressLike(effectiveQuery);
+    const bool addressPredictionLike = !addressLike && queryLooksAddressPredictionLike(effectiveQuery);
     const bool localIntent = queryLooksLocalCategoryLike(query);
     urlQuery.addQueryItem(QStringLiteral("format"), QStringLiteral("jsonv2"));
     urlQuery.addQueryItem(QStringLiteral("limit"), QString::number(kSearchResultLimit));
     urlQuery.addQueryItem(QStringLiteral("addressdetails"), QStringLiteral("1"));
     urlQuery.addQueryItem(QStringLiteral("q"), effectiveQuery);
-    if (addressLike) {
+    if (addressLike || addressPredictionLike) {
         urlQuery.addQueryItem(QStringLiteral("layer"), QStringLiteral("address"));
         if (!m_searchCountryCode.isEmpty()) {
             urlQuery.addQueryItem(QStringLiteral("countrycodes"), m_searchCountryCode.toLower());
@@ -992,7 +1028,7 @@ QNetworkRequest OpenNavigationProvider::buildFallbackSearchRequest(const QString
     const QString viewbox = searchViewbox(originLat, originLng, kNominatimViewboxRadiusKm);
     if (!viewbox.isEmpty()) {
         urlQuery.addQueryItem(QStringLiteral("viewbox"), viewbox);
-        if (localIntent) {
+        if (localIntent || addressPredictionLike) {
             urlQuery.addQueryItem(QStringLiteral("bounded"), QStringLiteral("1"));
         }
     }
@@ -1044,6 +1080,9 @@ bool OpenNavigationProvider::shouldRunFallbackSearch(const QList<SearchResultDat
     }
     if (queryLooksAddressLike(canonicalSearchQuery(query))) {
         return false;
+    }
+    if (queryLooksAddressPredictionLike(canonicalSearchQuery(query))) {
+        return true;
     }
 
     const bool localIntent = queryLooksLocalCategoryLike(query) || queryHasNearMeIntent(query);
