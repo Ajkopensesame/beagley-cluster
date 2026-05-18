@@ -2886,75 +2886,85 @@ Window {
                                     readonly property var results: root.menuResultsModel()
                                     readonly property int rowHeight: root.searchKeyboardOpen ? 48 : 64
 
-                                    ListView {
-                                        id: searchResultsList
+                                    Flickable {
+                                        id: searchResultsFlick
                                         anchors.left: parent.left
                                         anchors.right: parent.right
                                         anchors.top: parent.top
                                         anchors.bottom: parent.bottom
                                         clip: true
+                                        contentWidth: width
+                                        contentHeight: searchResultsColumn.implicitHeight
                                         boundsBehavior: Flickable.StopAtBounds
                                         flickDeceleration: 2600
                                         maximumFlickVelocity: 2600
                                         interactive: contentHeight > height
-                                        model: searchResultsSurface.results
-                                        spacing: 6
 
-                                        delegate: Rectangle {
-                                            readonly property var itemData: modelData
-                                            width: searchResultsList.width - (searchResultsList.contentHeight > searchResultsList.height ? 10 : 0)
-                                            height: searchResultsSurface.rowHeight
-                                            radius: 12
-                                            antialiasing: false
-                                            color: suggestionMouse.containsMouse ? root.menuSurfaceSelectedColor : root.menuSurfaceAltColor
-                                            border.width: 1
-                                            border.color: suggestionMouse.containsMouse ? root.menuAccentColor : root.menuBorderColor
+                                        Column {
+                                            id: searchResultsColumn
+                                            width: searchResultsFlick.width - (searchResultsFlick.contentHeight > searchResultsFlick.height ? 10 : 0)
+                                            spacing: 6
 
-                                            Column {
-                                                anchors.left: parent.left
-                                                anchors.right: parent.right
-                                                anchors.verticalCenter: parent.verticalCenter
-                                                anchors.leftMargin: 12
-                                                anchors.rightMargin: 12
-                                                spacing: root.searchKeyboardOpen ? 2 : 4
+                                            Repeater {
+                                                model: searchResultsSurface.results.length
 
-                                                Text {
-                                                    width: parent.width
-                                                    text: String(itemData.primary || itemData.label || "")
-                                                    textFormat: Text.PlainText
-                                                    color: root.menuTextPrimaryColor
-                                                    font.family: appTheme.fontDisplay
-                                                    font.pixelSize: root.searchKeyboardOpen ? 15 : 17
-                                                    font.hintingPreference: root.menuTextHintingPreference
-                                                    renderType: root.menuTextRenderType
-                                                    elide: Text.ElideRight
+                                                delegate: Rectangle {
+                                                    readonly property var itemData: searchResultsSurface.results[index]
+                                                    width: searchResultsColumn.width
+                                                    height: searchResultsSurface.rowHeight
+                                                    radius: 12
+                                                    antialiasing: false
+                                                    color: suggestionMouse.containsMouse ? root.menuSurfaceSelectedColor : root.menuSurfaceAltColor
+                                                    border.width: 1
+                                                    border.color: suggestionMouse.containsMouse ? root.menuAccentColor : root.menuBorderColor
+
+                                                    Column {
+                                                        anchors.left: parent.left
+                                                        anchors.right: parent.right
+                                                        anchors.verticalCenter: parent.verticalCenter
+                                                        anchors.leftMargin: 12
+                                                        anchors.rightMargin: 12
+                                                        spacing: root.searchKeyboardOpen ? 2 : 4
+
+                                                        Text {
+                                                            width: parent.width
+                                                            text: String(itemData.primary || itemData.label || "")
+                                                            textFormat: Text.PlainText
+                                                            color: root.menuTextPrimaryColor
+                                                            font.family: appTheme.fontDisplay
+                                                            font.pixelSize: root.searchKeyboardOpen ? 15 : 17
+                                                            font.hintingPreference: root.menuTextHintingPreference
+                                                            renderType: root.menuTextRenderType
+                                                            elide: Text.ElideRight
+                                                        }
+
+                                                        Text {
+                                                            width: parent.width
+                                                            text: root.searchResultSubtitle(itemData)
+                                                            textFormat: Text.PlainText
+                                                            color: root.menuTextSecondaryColor
+                                                            font.family: appTheme.fontMono
+                                                            font.pixelSize: root.searchKeyboardOpen ? 10 : 11
+                                                            font.hintingPreference: root.menuTextHintingPreference
+                                                            renderType: root.menuTextRenderType
+                                                            elide: Text.ElideRight
+                                                            visible: text.length > 0
+                                                        }
+                                                    }
+
+                                                    MouseArea {
+                                                        id: suggestionMouse
+                                                        anchors.fill: parent
+                                                        hoverEnabled: true
+                                                        onClicked: root.chooseSearchResult(itemData)
+                                                    }
                                                 }
-
-                                                Text {
-                                                    width: parent.width
-                                                    text: root.searchResultSubtitle(itemData)
-                                                    textFormat: Text.PlainText
-                                                    color: root.menuTextSecondaryColor
-                                                    font.family: appTheme.fontMono
-                                                    font.pixelSize: root.searchKeyboardOpen ? 10 : 11
-                                                    font.hintingPreference: root.menuTextHintingPreference
-                                                    renderType: root.menuTextRenderType
-                                                    elide: Text.ElideRight
-                                                    visible: text.length > 0
-                                                }
-                                            }
-
-                                            MouseArea {
-                                                id: suggestionMouse
-                                                anchors.fill: parent
-                                                hoverEnabled: true
-                                                onClicked: root.chooseSearchResult(itemData)
                                             }
                                         }
                                     }
 
                                     Rectangle {
-                                        visible: searchResultsList.contentHeight > searchResultsList.height
+                                        visible: searchResultsFlick.contentHeight > searchResultsFlick.height
                                         anchors.right: parent.right
                                         anchors.top: parent.top
                                         anchors.bottom: parent.bottom
@@ -2967,11 +2977,11 @@ Window {
                                             width: parent.width
                                             radius: 2
                                             color: root.menuAccentColor
-                                            height: Math.max(18, parent.height * searchResultsList.height / Math.max(searchResultsList.contentHeight, 1))
+                                            height: Math.max(18, parent.height * searchResultsFlick.height / Math.max(searchResultsFlick.contentHeight, 1))
                                             y: Math.min(parent.height - height,
                                                 (parent.height - height)
-                                                * searchResultsList.contentY
-                                                / Math.max(searchResultsList.contentHeight - searchResultsList.height, 1))
+                                                * searchResultsFlick.contentY
+                                                / Math.max(searchResultsFlick.contentHeight - searchResultsFlick.height, 1))
                                         }
                                     }
                                 }

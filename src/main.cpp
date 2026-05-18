@@ -470,6 +470,10 @@ int main(int argc, char *argv[])
         "BEAGLEY_INITIAL_MAP_SEARCH_QUERY",
         QString::fromUtf8(qgetenv("BEAGLEY_INITIAL_MAP_SEARCH_QUERY")).trimmed());
     engine.rootContext()->setContextProperty(
+        "BEAGLEY_INITIAL_MAP_SEARCH_KEYBOARD",
+        qEnvironmentVariableIsSet("BEAGLEY_INITIAL_MAP_SEARCH_KEYBOARD")
+            && qEnvironmentVariableIntValue("BEAGLEY_INITIAL_MAP_SEARCH_KEYBOARD") != 0);
+    engine.rootContext()->setContextProperty(
         "BEAGLEY_WEBENGINE_SOFTWARE",
         qEnvironmentVariableIsSet("BEAGLEY_WEBENGINE_SOFTWARE")
             && qEnvironmentVariableIntValue("BEAGLEY_WEBENGINE_SOFTWARE") != 0);
