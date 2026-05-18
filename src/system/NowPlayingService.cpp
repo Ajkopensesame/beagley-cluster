@@ -2,6 +2,7 @@
 
 #include <QByteArray>
 #include <QProcessEnvironment>
+#include <QTimer>
 #include <QtGlobal>
 
 namespace {
@@ -30,10 +31,43 @@ QString cleanedLine(const QStringList &lines, int index)
     return lines.at(index).trimmed();
 }
 
+QString configuredPlayerName()
+{
+    const QString value = QString::fromUtf8(qgetenv("BEAGLEY_NOW_PLAYING_PLAYER")).trimmed();
+    return value.isEmpty() ? QStringLiteral("spotify") : value;
+}
+
+QString configuredSourceLabel(const QString &playerName)
+{
+    const QString value = QString::fromUtf8(qgetenv("BEAGLEY_NOW_PLAYING_SOURCE_LABEL")).trimmed();
+    if (!value.isEmpty()) {
+        return value;
+    }
+    if (playerName.isEmpty() || playerName.compare(QStringLiteral("auto"), Qt::CaseInsensitive) == 0) {
+        return QStringLiteral("Media");
+    }
+    if (playerName.compare(QStringLiteral("spotify"), Qt::CaseInsensitive) == 0) {
+        return QStringLiteral("Spotify");
+    }
+
+    QString label = playerName;
+    label.replace(QLatin1Char('-'), QLatin1Char(' '));
+    label.replace(QLatin1Char('_'), QLatin1Char(' '));
+    QStringList words = label.split(QLatin1Char(' '), Qt::SkipEmptyParts);
+    for (QString &word : words) {
+        if (!word.isEmpty()) {
+            word[0] = word.at(0).toUpper();
+        }
+    }
+    return words.isEmpty() ? QStringLiteral("Media") : words.join(QLatin1Char(' '));
+}
+
 } // namespace
 
 NowPlayingService::NowPlayingService(QObject *parent)
     : QObject(parent)
+    , m_playerName(configuredPlayerName())
+    , m_source(sourceLabel())
 {
     m_refreshTimer.setInterval(refreshIntervalMs());
     m_refreshTimer.setTimerType(Qt::VeryCoarseTimer);
@@ -48,7 +82,7 @@ NowPlayingService::NowPlayingService(QObject *parent)
         }
         QProcess *process = m_process;
         process->kill();
-        finishProcess(process, true, QStringLiteral("Spotify query timed out"));
+        finishProcess(process, true, QStringLiteral("Media query timed out"));
     });
 
     QTimer::singleShot(500, this, &NowPlayingService::refresh);
@@ -79,7 +113,7 @@ void NowPlayingService::refresh()
     });
     connect(process, &QProcess::errorOccurred, this, [this, process](QProcess::ProcessError error) {
         if (error == QProcess::FailedToStart) {
-            finishProcess(process, true, QStringLiteral("Spotify player command unavailable"));
+            finishProcess(process, true, QStringLiteral("Media player command unavailable"));
         }
     });
 
@@ -103,14 +137,78 @@ end if
 )APPLESCRIPT");
     process->start(QStringLiteral("/usr/bin/osascript"), { QStringLiteral("-e"), script });
 #else
-    process->start(QStringLiteral("playerctl"),
-                   { QStringLiteral("-p"),
-                     QStringLiteral("spotify"),
-                     QStringLiteral("metadata"),
-                     QStringLiteral("--format"),
-                     QStringLiteral("{{status}}\n{{title}}\n{{artist}}\n{{album}}") });
+    QStringList args = playerctlBaseArgs();
+    args << QStringLiteral("metadata")
+         << QStringLiteral("--format")
+         << QStringLiteral("{{status}}\n{{title}}\n{{artist}}\n{{album}}");
+    process->start(QStringLiteral("playerctl"), args);
 #endif
     m_timeoutTimer.start();
+}
+
+QString NowPlayingService::sourceLabel() const
+{
+#if defined(Q_OS_MACOS)
+    return QStringLiteral("Spotify");
+#else
+    return configuredSourceLabel(m_playerName);
+#endif
+}
+
+QStringList NowPlayingService::playerctlBaseArgs() const
+{
+    const QString trimmed = m_playerName.trimmed();
+    if (trimmed.isEmpty() || trimmed.compare(QStringLiteral("auto"), Qt::CaseInsensitive) == 0) {
+        return {};
+    }
+    return { QStringLiteral("-p"), trimmed };
+}
+
+void NowPlayingService::playPause()
+{
+    runControlCommand(QStringLiteral("play-pause"));
+}
+
+void NowPlayingService::next()
+{
+    runControlCommand(QStringLiteral("next"));
+}
+
+void NowPlayingService::previous()
+{
+    runControlCommand(QStringLiteral("previous"));
+}
+
+void NowPlayingService::runControlCommand(const QString &action)
+{
+    if (action.isEmpty()) {
+        return;
+    }
+
+#if defined(Q_OS_MACOS)
+    QString spotifyCommand;
+    if (action == QLatin1String("play-pause")) {
+        spotifyCommand = QStringLiteral("playpause");
+    } else if (action == QLatin1String("next")) {
+        spotifyCommand = QStringLiteral("next track");
+    } else if (action == QLatin1String("previous")) {
+        spotifyCommand = QStringLiteral("previous track");
+    } else {
+        return;
+    }
+
+    const QString script = QStringLiteral(R"APPLESCRIPT(
+if application "Spotify" is running then
+    tell application "Spotify" to %1
+end if
+)APPLESCRIPT").arg(spotifyCommand);
+    QProcess::startDetached(QStringLiteral("/usr/bin/osascript"), { QStringLiteral("-e"), script });
+#else
+    QStringList args = playerctlBaseArgs();
+    args << action;
+    QProcess::startDetached(QStringLiteral("playerctl"), args);
+#endif
+    QTimer::singleShot(500, this, &NowPlayingService::refresh);
 }
 
 void NowPlayingService::finishProcess(QProcess *process, bool commandFailed, const QString &fallbackDetail)
@@ -138,7 +236,7 @@ void NowPlayingService::finishProcess(QProcess *process, bool commandFailed, con
             : QStringLiteral("OFFLINE");
         setNowPlaying(false,
                       false,
-                      QStringLiteral("Spotify"),
+                      sourceLabel(),
                       QString(),
                       QString(),
                       QString(),
@@ -161,12 +259,12 @@ void NowPlayingService::finishProcess(QProcess *process, bool commandFailed, con
         ? QStringLiteral("PLAYING")
         : (paused ? QStringLiteral("PAUSED") : QStringLiteral("OFFLINE"));
     const QString detail = available
-        ? QStringLiteral("Spotify local player")
-        : QStringLiteral("Spotify not playing");
+        ? sourceLabel() + QStringLiteral(" local player")
+        : sourceLabel() + QStringLiteral(" not playing");
 
     setNowPlaying(available,
                   playing,
-                  QStringLiteral("Spotify"),
+                  sourceLabel(),
                   title,
                   artist,
                   album,

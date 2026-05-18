@@ -31,11 +31,17 @@ public:
     QString statusDetail() const { return m_statusDetail; }
 
     Q_INVOKABLE void refresh();
+    Q_INVOKABLE void playPause();
+    Q_INVOKABLE void next();
+    Q_INVOKABLE void previous();
 
 signals:
     void nowPlayingChanged();
 
 private:
+    QString sourceLabel() const;
+    QStringList playerctlBaseArgs() const;
+    void runControlCommand(const QString &action);
     void finishProcess(QProcess *process, bool commandFailed, const QString &fallbackDetail = QString());
     void setNowPlaying(bool available,
                        bool playing,
@@ -49,12 +55,13 @@ private:
     QProcess *m_process = nullptr;
     QTimer m_refreshTimer;
     QTimer m_timeoutTimer;
+    QString m_playerName;
     bool m_available = false;
     bool m_playing = false;
-    QString m_source = QStringLiteral("Spotify");
+    QString m_source;
     QString m_title;
     QString m_artist;
     QString m_album;
     QString m_status = QStringLiteral("OFFLINE");
-    QString m_statusDetail = QStringLiteral("Spotify not connected");
+    QString m_statusDetail = QStringLiteral("Media not connected");
 };

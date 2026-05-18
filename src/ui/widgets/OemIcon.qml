@@ -192,6 +192,46 @@ Item {
                 return
             }
 
+            if (name === "play") {
+                ctx.fillStyle = css(accent)
+                ctx.beginPath()
+                ctx.moveTo(x(0.34), y(0.22))
+                ctx.lineTo(x(0.34), y(0.78))
+                ctx.lineTo(x(0.78), y(0.50))
+                ctx.closePath()
+                ctx.fill()
+                return
+            }
+
+            if (name === "pause") {
+                ctx.fillStyle = css(accent)
+                roundedRectPath(ctx, x(0.30), y(0.22), s * 0.13, s * 0.56, s * 0.035)
+                ctx.fill()
+                roundedRectPath(ctx, x(0.57), y(0.22), s * 0.13, s * 0.56, s * 0.035)
+                ctx.fill()
+                return
+            }
+
+            if (name === "next" || name === "previous") {
+                const flip = name === "previous"
+                ctx.fillStyle = css(accent)
+                function px(v) { return flip ? x(1.0 - v) : x(v) }
+                ctx.beginPath()
+                ctx.moveTo(px(0.24), y(0.24))
+                ctx.lineTo(px(0.24), y(0.76))
+                ctx.lineTo(px(0.54), y(0.50))
+                ctx.closePath()
+                ctx.fill()
+                ctx.beginPath()
+                ctx.moveTo(px(0.46), y(0.24))
+                ctx.lineTo(px(0.46), y(0.76))
+                ctx.lineTo(px(0.76), y(0.50))
+                ctx.closePath()
+                ctx.fill()
+                line(px(0.80), y(0.24), px(0.80), y(0.76), primary, 0.92)
+                return
+            }
+
             if (name === "fuel") {
                 ctx.strokeStyle = css(primary)
                 ctx.lineWidth = sw

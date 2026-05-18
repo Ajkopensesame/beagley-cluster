@@ -190,6 +190,35 @@ Item {
         return musicAvailable ? "LOCAL PLAYER" : "NOT CONNECTED"
     }
 
+    function musicSourceLine() {
+        if (nowPlayingService && nowPlayingService.source)
+            return String(nowPlayingService.source).toUpperCase()
+        return "MEDIA"
+    }
+
+    function musicStatusLine() {
+        if (musicPlaying)
+            return "PLAYING"
+        if (musicAvailable)
+            return musicStatus
+        return musicDetail.length > 0 ? musicDetail : "No media source"
+    }
+
+    function mediaControlEnabled() {
+        return !!nowPlayingService && musicAvailable
+    }
+
+    function triggerMediaControl(action) {
+        if (!nowPlayingService)
+            return
+        if (action === "previous")
+            nowPlayingService.previous()
+        else if (action === "next")
+            nowPlayingService.next()
+        else
+            nowPlayingService.playPause()
+    }
+
     function weatherCompactLabel() {
         if (locationName.length > 0)
             return locationName
@@ -1045,11 +1074,15 @@ Item {
                 ? Math.floor(Math.min(560, Math.max(500, parent.width * 0.30)))
                 : root.tallDetailMode
                 ? Math.floor(Math.min(620, Math.max(500, parent.width * 0.38)))
+                : root.expandedMode === "music"
+                ? Math.floor(Math.min(500, Math.max(430, parent.width * 0.30)))
                 : Math.floor(Math.min(452, Math.max(332, parent.width * 0.35)))
             height: root.expandedMode === "temp"
                 ? 430
                 : root.tallDetailMode
                 ? Math.floor(Math.min(parent.height - 44, Math.max(560, parent.height * 0.92)))
+                : root.expandedMode === "music"
+                ? 410
                 : Math.floor(Math.min(360, Math.max(272, parent.height * 0.46)))
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.verticalCenter: parent.verticalCenter
@@ -1106,22 +1139,42 @@ Item {
 
                 Column {
                     anchors.fill: parent
-                    spacing: 14
+                    spacing: 12
 
-                    Text {
+                    Row {
                         width: parent.width
-                        text: "NOW PLAYING"
-                        color: "#58FFE1"
-                        font.family: root.monoFont
-                        font.pixelSize: 13
-                        font.weight: Font.Bold
-                        font.letterSpacing: 0
-                        horizontalAlignment: Text.AlignHCenter
+                        height: 24
+                        spacing: 10
+
+                        Text {
+                            width: parent.width * 0.56
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "NOW PLAYING"
+                            color: "#58FFE1"
+                            font.family: root.monoFont
+                            font.pixelSize: 13
+                            font.weight: Font.Bold
+                            font.letterSpacing: 0
+                            elide: Text.ElideRight
+                        }
+
+                        Text {
+                            width: parent.width * 0.44 - parent.spacing
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: root.musicSourceLine()
+                            color: root.musicPlaying ? "#58FFE1" : "#9DB4FF"
+                            font.family: root.monoFont
+                            font.pixelSize: 11
+                            font.weight: Font.Bold
+                            font.letterSpacing: 0
+                            horizontalAlignment: Text.AlignRight
+                            elide: Text.ElideRight
+                        }
                     }
 
                     Rectangle {
                         width: parent.width
-                        height: parent.height - 30
+                        height: parent.height - 36
                         radius: 8
                         color: "#070913"
                         border.width: 1
@@ -1129,82 +1182,158 @@ Item {
 
                         Column {
                             anchors.fill: parent
-                            anchors.margins: 18
-                            spacing: 14
+                            anchors.margins: 14
+                            spacing: 12
 
-                            Rectangle {
-                                width: 96
-                                height: 96
-                                radius: 48
-                                anchors.horizontalCenter: parent.horizontalCenter
-                                color: "#05060A"
-                                border.width: 1
-                                border.color: root.musicPlaying ? "#58FFE1" : "#5C4B90"
-
-                                OemIcon {
-                                    anchors.centerIn: parent
-                                    width: 62
-                                    height: 62
-                                    icon: "audio"
-                                    active: root.musicPlaying
-                                    color: "#F7FBFF"
-                                    accentColor: "#58FFE1"
-                                    strokeWidth: 5.0
-                                }
-                            }
-
-                            Rectangle {
+                            Row {
                                 width: parent.width
-                                radius: 8
-                                color: "#0A0D18"
-                                border.width: 1
-                                border.color: "#22283D"
-                                implicitHeight: titleColumn.implicitHeight + 22
+                                height: 120
+                                spacing: 14
+
+                                Rectangle {
+                                    width: 104
+                                    height: 104
+                                    radius: 52
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    color: "#05060A"
+                                    border.width: 1
+                                    border.color: root.musicPlaying ? "#58FFE1" : "#5C4B90"
+
+                                    OemIcon {
+                                        anchors.centerIn: parent
+                                        width: 64
+                                        height: 64
+                                        icon: "audio"
+                                        active: root.musicPlaying
+                                        color: "#F7FBFF"
+                                        accentColor: "#58FFE1"
+                                        strokeWidth: 5.0
+                                    }
+                                }
 
                                 Column {
-                                    id: titleColumn
-                                    anchors.fill: parent
-                                    anchors.margins: 11
-                                    spacing: 8
+                                    width: parent.width - 118
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    spacing: 7
 
                                     Text {
                                         width: parent.width
                                         text: root.musicTitle.length > 0 ? root.musicTitle : root.musicStatus
                                         color: "#F7FBFF"
                                         font.family: root.displayFont
-                                        font.pixelSize: 24
+                                        font.pixelSize: 25
                                         font.weight: Font.Bold
                                         font.letterSpacing: 0
-                                        horizontalAlignment: Text.AlignHCenter
                                         wrapMode: Text.Wrap
                                         maximumLineCount: 2
                                     }
 
                                     Text {
                                         width: parent.width
-                                        text: root.musicArtist.length > 0 ? root.musicArtist : root.musicDetail
-                                        color: "#58FFE1"
+                                        text: root.musicArtist.length > 0 ? root.musicArtist : root.musicStatusLine()
+                                        color: root.musicPlaying ? "#58FFE1" : "#9DB4FF"
                                         font.family: root.monoFont
                                         font.pixelSize: 14
                                         font.weight: Font.Bold
                                         font.letterSpacing: 0
-                                        horizontalAlignment: Text.AlignHCenter
                                         wrapMode: Text.Wrap
                                         maximumLineCount: 2
                                     }
 
                                     Text {
                                         width: parent.width
-                                        text: root.musicAlbum.length > 0 ? root.musicAlbum : "SPOTIFY"
+                                        text: root.musicAlbum.length > 0 ? root.musicAlbum : root.musicSourceLine()
                                         color: "#C568FF"
                                         font.family: root.monoFont
-                                        font.pixelSize: 12
+                                        font.pixelSize: 11
                                         font.weight: Font.Bold
                                         font.letterSpacing: 0
-                                        horizontalAlignment: Text.AlignHCenter
-                                        wrapMode: Text.Wrap
-                                        maximumLineCount: 2
+                                        elide: Text.ElideRight
                                     }
+                                }
+                            }
+
+                            Row {
+                                width: parent.width
+                                height: 76
+                                spacing: 12
+
+                                Repeater {
+                                    model: [
+                                        { label: "PREV", icon: "previous", action: "previous" },
+                                        { label: root.musicPlaying ? "PAUSE" : "PLAY", icon: root.musicPlaying ? "pause" : "play", action: "playPause" },
+                                        { label: "NEXT", icon: "next", action: "next" }
+                                    ]
+
+                                    delegate: Rectangle {
+                                        id: mediaControlButton
+                                        readonly property bool controlEnabled: root.mediaControlEnabled()
+                                        width: (parent.width - parent.spacing * 2) / 3
+                                        height: parent.height
+                                        radius: 12
+                                        color: controlMouse.pressed && controlEnabled ? "#123C44" : "#0A0D18"
+                                        border.width: 1
+                                        border.color: controlEnabled ? "#305E72" : "#242B3E"
+                                        opacity: controlEnabled ? 1.0 : 0.55
+
+                                        Column {
+                                            anchors.centerIn: parent
+                                            spacing: 4
+
+                                            OemIcon {
+                                                width: 32
+                                                height: 32
+                                                anchors.horizontalCenter: parent.horizontalCenter
+                                                icon: modelData.icon
+                                                active: mediaControlButton.controlEnabled
+                                                color: "#F7FBFF"
+                                                accentColor: "#58FFE1"
+                                                strokeWidth: 3.4
+                                            }
+
+                                            Text {
+                                                width: parent.parent.width - 16
+                                                text: modelData.label
+                                                color: mediaControlButton.controlEnabled ? "#F7FBFF" : "#76809A"
+                                                font.family: root.monoFont
+                                                font.pixelSize: 11
+                                                font.weight: Font.Bold
+                                                font.letterSpacing: 0
+                                                horizontalAlignment: Text.AlignHCenter
+                                                elide: Text.ElideRight
+                                            }
+                                        }
+
+                                        MouseArea {
+                                            id: controlMouse
+                                            anchors.fill: parent
+                                            enabled: parent.controlEnabled
+                                            onClicked: root.triggerMediaControl(modelData.action)
+                                        }
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                width: parent.width
+                                height: 42
+                                radius: 8
+                                color: "#050812"
+                                border.width: 1
+                                border.color: "#22283D"
+
+                                Text {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 12
+                                    anchors.rightMargin: 12
+                                    verticalAlignment: Text.AlignVCenter
+                                    text: root.musicStatusLine()
+                                    color: root.musicPlaying ? "#58FFE1" : "#9DB4FF"
+                                    font.family: root.monoFont
+                                    font.pixelSize: 11
+                                    font.weight: Font.Bold
+                                    font.letterSpacing: 0
+                                    elide: Text.ElideRight
                                 }
                             }
                         }
