@@ -2652,8 +2652,6 @@ Window {
                 anchors.fill: parent
                 z: 4000
                 clip: true
-                layer.enabled: root.mapMenuOpen
-                layer.smooth: false
 
                 Rectangle {
                     width: Math.floor(Math.min(760, Math.max(640, parent.width * 0.42)))
@@ -2665,8 +2663,6 @@ Window {
                     border.width: 1
                     border.color: root.menuStrongBorderColor
                     clip: true
-                    layer.enabled: root.mapMenuOpen
-                    layer.smooth: false
 
                     MouseArea {
                         anchors.fill: parent
