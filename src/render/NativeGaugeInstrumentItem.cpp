@@ -183,7 +183,6 @@ public:
         , ticks(createGeometryNode(QColor(Qt::white)))
         , primaryArc(createGeometryNode(QColor(Qt::white)))
         , auxArc(createGeometryNode(QColor(Qt::white)))
-        , centerDot(createGeometryNode(QColor(Qt::white)))
     {
         appendChildNode(background);
         appendChildNode(track);
@@ -191,7 +190,6 @@ public:
         appendChildNode(ticks);
         appendChildNode(primaryArc);
         appendChildNode(auxArc);
-        appendChildNode(centerDot);
     }
 
     QSGGeometryNode *background = nullptr;
@@ -200,7 +198,6 @@ public:
     QSGGeometryNode *ticks = nullptr;
     QSGGeometryNode *primaryArc = nullptr;
     QSGGeometryNode *auxArc = nullptr;
-    QSGGeometryNode *centerDot = nullptr;
     QSizeF geometrySize;
     int staticRevision = -1;
     int dynamicRevision = -1;
@@ -368,14 +365,12 @@ QSGNode *NativeGaugeInstrumentItem::updatePaintNode(QSGNode *oldNode, UpdatePain
         std::vector<QPointF> trackVertices;
         std::vector<QPointF> auxTrackVertices;
         std::vector<QPointF> tickVertices;
-        std::vector<QPointF> centerVertices;
 
         if (m_backgroundOpacity > 0.001) {
             appendDisc(backgroundVertices, center, side * 0.470, 96);
         }
         appendArcBand(trackVertices, center, radius, stroke, kPrimaryStartDeg, kPrimarySweepDeg, 0.0, 1.0, arcSegments, true);
         appendArcBand(auxTrackVertices, center, auxRadius, auxStroke, kAuxStartDeg, kAuxSweepDeg, 0.0, 1.0, 64, true);
-        appendDisc(centerVertices, center, side * 0.0085, 18);
 
         const int minorCount = m_kind == QLatin1String("tach") ? 16 : 14;
         const int majorEvery = 2;
@@ -398,7 +393,6 @@ QSGNode *NativeGaugeInstrumentItem::updatePaintNode(QSGNode *oldNode, UpdatePain
         setGeometry(node->track, trackVertices, withAlpha(m_chromeColor, m_lowEffectMode ? 64 : 78));
         setGeometry(node->auxTrack, auxTrackVertices, withAlpha(m_chromeColor, m_lowEffectMode ? 56 : 70));
         setGeometry(node->ticks, tickVertices, withAlpha(m_chromeColor, m_lowEffectMode ? 176 : 196));
-        setGeometry(node->centerDot, centerVertices, withAlpha(m_chromeColor, 168));
         node->staticRevision = m_staticRevision;
     }
 

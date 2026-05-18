@@ -1834,9 +1834,9 @@ Window {
                     visible: root.displayOverdriveValue
                     anchors.horizontalCenter: speedValueText.horizontalCenter
                     anchors.bottom: speedValueText.top
-                    anchors.bottomMargin: parent.height * 0.017
-                    width: parent.width * 0.235
-                    height: parent.height * 0.083
+                    anchors.bottomMargin: parent.height * 0.046
+                    width: parent.width * 0.222
+                    height: parent.height * 0.078
 
                     Rectangle {
                         anchors.fill: parent
@@ -1890,10 +1890,11 @@ Window {
                     id: speedValueText
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.verticalCenter: parent.verticalCenter
+                    anchors.verticalCenterOffset: -parent.height * 0.030
                     text: root.formatSpeedValue(root.displaySpeedValue)
                     color: appTheme.speedColor(root.displaySpeedValue)
                     font.family: "Oxanium"
-                    font.pixelSize: parent.width * 0.166
+                    font.pixelSize: parent.width * 0.158
                     font.bold: true
                     renderType: root.menuTextRenderType
                     horizontalAlignment: Text.AlignHCenter
@@ -1905,10 +1906,10 @@ Window {
                     id: gearReadout
                     z: 61
                     anchors.top: speedValueText.bottom
-                    anchors.topMargin: parent.height * 0.006
+                    anchors.topMargin: parent.height * 0.024
                     anchors.horizontalCenter: speedValueText.horizontalCenter
-                    width: parent.width * 0.132
-                    height: parent.height * 0.080
+                    width: parent.width * 0.144
+                    height: parent.height * 0.088
 
                     Text {
                         id: gearText
@@ -1936,8 +1937,8 @@ Window {
                 Column {
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.top: gearReadout.bottom
-                    anchors.topMargin: -parent.height * 0.006
-                    spacing: -2
+                    anchors.topMargin: parent.height * 0.010
+                    spacing: -1
 
                     Text {
                         anchors.horizontalCenter: parent.horizontalCenter

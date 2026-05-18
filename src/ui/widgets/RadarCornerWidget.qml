@@ -20,15 +20,12 @@ Item {
     readonly property string monoFont: theme && theme.fontMono ? theme.fontMono : "Oxanium"
     readonly property bool live: root.status === "LIVE"
     readonly property bool frameReady: root.live && String(root.frameUrl).length > 0
-    readonly property int radarFaceInset: Math.round(frame.side * 0.135)
+    readonly property real side: Math.min(width, height)
+    readonly property int radarFaceInset: Math.max(3, Math.round(side * 0.022))
+    readonly property int radarBorderWidth: Math.max(2, Math.round(side * 0.014))
 
-    CornerPodFrame {
-        id: frame
+    Item {
         anchors.fill: parent
-        corner: root.corner
-        bleedFraction: root.bleedFraction
-        effectLevel: root.effectLevel
-        active: root.live
 
         Item {
             id: radarFace
@@ -52,12 +49,13 @@ Item {
                 anchors.fill: parent
                 radius: width / 2
                 color: "transparent"
-                border.width: Math.max(2, Math.round(frame.side * 0.014))
-                border.color: "#010307"
+                border.width: root.radarBorderWidth
+                border.color: Qt.rgba(0.0, 0.0, 0.0, 0.90)
             }
 
             Rectangle {
                 anchors.fill: parent
+                anchors.margins: root.radarBorderWidth
                 radius: width / 2
                 color: "transparent"
                 border.width: 1
@@ -67,9 +65,19 @@ Item {
 
         Item {
             anchors.centerIn: parent
-            width: Math.round(frame.side * 0.46)
+            width: Math.round(root.side * 0.46)
             height: width
             visible: !radarPreview.ready
+
+            Rectangle {
+                anchors.centerIn: parent
+                width: Math.round(root.side * 0.74)
+                height: width
+                radius: width / 2
+                color: Qt.rgba(0.01, 0.02, 0.04, 0.72)
+                border.width: root.radarBorderWidth
+                border.color: Qt.rgba(0.0, 0.0, 0.0, 0.86)
+            }
 
             WidgetLocal.RadarGlyph {
                 width: parent.width
