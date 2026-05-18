@@ -1288,57 +1288,37 @@ Item {
                                     spacing: 14
 
                                     Rectangle {
-                                        width: 124
-                                        height: 124
+                                        id: spotifyQrBox
+                                        width: 136
+                                        height: 136
                                         radius: 6
                                         anchors.verticalCenter: parent.verticalCenter
                                         color: "#F8FBFF"
                                         border.width: 1
                                         border.color: "#58FFE1"
                                         visible: nowPlayingService && nowPlayingService.spotifyPairingActive && nowPlayingService.spotifyPairingQrPattern.length > 0
+                                        property string qrPattern: nowPlayingService ? String(nowPlayingService.spotifyPairingQrPattern) : ""
+                                        property var qrRows: qrPattern.length > 0 ? qrPattern.split("\n") : []
+                                        property int qrModuleCount: qrRows.length
+                                        property int qrModuleSize: qrModuleCount > 0 ? Math.floor((Math.min(width, height) - 16) / qrModuleCount) : 1
+                                        property var qrModules: qrPattern.length > 0 ? qrPattern.replace(/\n/g, "").split("") : []
 
-                                        Canvas {
-                                            id: spotifyQrCanvas
-                                            anchors.fill: parent
-                                            anchors.margins: 8
-                                            renderTarget: Canvas.Image
-                                            antialiasing: false
-                                            smooth: false
+                                        Grid {
+                                            id: spotifyQrGrid
+                                            anchors.centerIn: parent
+                                            columns: Math.max(1, spotifyQrBox.qrModuleCount)
+                                            rows: Math.max(1, spotifyQrBox.qrModuleCount)
+                                            spacing: 0
+                                            width: spotifyQrBox.qrModuleCount * spotifyQrBox.qrModuleSize
+                                            height: width
 
-                                            Component.onCompleted: requestPaint()
-                                            onWidthChanged: requestPaint()
-                                            onHeightChanged: requestPaint()
+                                            Repeater {
+                                                model: spotifyQrBox.qrModules
 
-                                            Connections {
-                                                target: nowPlayingService
-                                                function onSpotifyPairingChanged() {
-                                                    spotifyQrCanvas.requestPaint()
-                                                }
-                                            }
-
-                                            onPaint: {
-                                                const ctx = getContext("2d")
-                                                ctx.fillStyle = "#F8FBFF"
-                                                ctx.fillRect(0, 0, width, height)
-                                                if (!nowPlayingService)
-                                                    return
-                                                const pattern = String(nowPlayingService.spotifyPairingQrPattern)
-                                                const rows = pattern.length > 0 ? pattern.split("\n") : []
-                                                if (rows.length === 0)
-                                                    return
-                                                const n = rows.length
-                                                const scale = Math.floor(Math.min(width, height) / n)
-                                                if (scale <= 0)
-                                                    return
-                                                const offsetX = Math.floor((width - scale * n) / 2)
-                                                const offsetY = Math.floor((height - scale * n) / 2)
-                                                ctx.fillStyle = "#05060A"
-                                                for (let y = 0; y < n; ++y) {
-                                                    const row = String(rows[y])
-                                                    for (let x = 0; x < row.length; ++x) {
-                                                        if (row.charAt(x) === "1")
-                                                            ctx.fillRect(offsetX + x * scale, offsetY + y * scale, scale, scale)
-                                                    }
+                                                Rectangle {
+                                                    width: spotifyQrBox.qrModuleSize
+                                                    height: spotifyQrBox.qrModuleSize
+                                                    color: modelData === "1" ? "#05060A" : "#F8FBFF"
                                                 }
                                             }
                                         }
@@ -1367,7 +1347,7 @@ Item {
                                     }
 
                                     Column {
-                                        width: parent.width - 138
+                                        width: parent.width - 150
                                         anchors.verticalCenter: parent.verticalCenter
                                         spacing: 8
 
