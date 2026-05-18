@@ -26,6 +26,11 @@ Window {
         category: "beagley_cluster_ui"
         property string mapTheme: "light"
         property bool mapThemeUserSelected: false
+        property string themeMode: "auto"
+        property string cachedSunriseIso: ""
+        property string cachedSunsetIso: ""
+        property int cachedSunUtcOffsetSeconds: 36000
+        property string cachedSunDate: ""
     }
 
     color: "#02060B"
@@ -371,6 +376,37 @@ Window {
     property bool navControlsOpen: false
     property bool searchKeyboardOpen: false
     property string mapMenuStage: "search"
+    property real autoThemeSunriseMs: NaN
+    property real autoThemeSunsetMs: NaN
+    property bool autoThemeRequestActive: false
+    property int autoThemeClockTick: 0
+    property real autoThemeLastRequestLat: NaN
+    property real autoThemeLastRequestLng: NaN
+    property string autoThemeStatus: "SYNC"
+    readonly property string normalizedThemeMode: normalizedChromeThemeMode(clusterUiSettings.themeMode)
+    readonly property string resolvedChromeTheme: resolveChromeTheme(normalizedThemeMode,
+        autoThemeClockTick,
+        autoThemeSunriseMs,
+        autoThemeSunsetMs)
+    readonly property bool menuDarkChrome: resolvedChromeTheme === "dark"
+    readonly property color menuAccentColor: "#1A73E8"
+    readonly property color menuPanelColor: menuDarkChrome ? "#101821" : "#F8FAFF"
+    readonly property color menuTopAccentColor: menuDarkChrome ? "#64B5F6" : "#1A73E8"
+    readonly property color menuSurfaceColor: menuDarkChrome ? "#111D2B" : "#FFFFFF"
+    readonly property color menuSurfaceAltColor: menuDarkChrome ? "#182637" : "#F8FAFF"
+    readonly property color menuSurfaceSelectedColor: menuDarkChrome ? "#1E3A5F" : "#E8F0FE"
+    readonly property color menuBorderColor: menuDarkChrome ? "#33465C" : "#DADCE0"
+    readonly property color menuStrongBorderColor: menuDarkChrome ? "#4B6F95" : "#D8E2EE"
+    readonly property color menuTextPrimaryColor: menuDarkChrome ? "#F8FAFC" : "#202124"
+    readonly property color menuTextSecondaryColor: menuDarkChrome ? "#A9B8C7" : "#5F6368"
+    readonly property color menuTextMutedColor: menuDarkChrome ? "#7D8EA3" : "#80868B"
+    readonly property color menuDangerSurfaceColor: menuDarkChrome ? "#3A1822" : "#FFF1F3"
+    readonly property color menuDangerBorderColor: menuDarkChrome ? "#87465A" : "#F4A8B8"
+    readonly property var chromeThemeOptions: [
+        { id: "auto", label: "Auto", detail: "Sunrise" },
+        { id: "light", label: "Light", detail: "Day" },
+        { id: "dark", label: "Dark", detail: "Night" }
+    ]
     readonly property string initialMapMenuStage: (typeof BEAGLEY_INITIAL_MAP_MENU_STAGE !== "undefined"
         && BEAGLEY_INITIAL_MAP_MENU_STAGE)
         ? String(BEAGLEY_INITIAL_MAP_MENU_STAGE).trim().toLowerCase()
@@ -387,7 +423,7 @@ Window {
     readonly property var mapThemeOptions: [
         {
             id: "light",
-            label: "Light",
+            label: "Minimal",
             detail: "Positron",
             tileUrlTemplate: "https://a.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}.png",
             styleUrl: "https://tiles.openfreemap.org/styles/positron",
@@ -568,6 +604,194 @@ Window {
         const option = root.mapThemeOption(themeId)
         clusterUiSettings.mapTheme = option.id
         clusterUiSettings.mapThemeUserSelected = true
+    }
+
+    function normalizedChromeThemeMode(value) {
+        const mode = String(value || "auto").trim().toLowerCase()
+        if (mode === "light" || mode === "dark")
+            return mode
+        return "auto"
+    }
+
+    function selectChromeThemeMode(mode) {
+        clusterUiSettings.themeMode = root.normalizedChromeThemeMode(mode)
+        root.autoThemeClockTick += 1
+        if (clusterUiSettings.themeMode === "auto")
+            root.requestAutoThemeSunTimes(false)
+    }
+
+    function resolveChromeTheme(mode, tick, sunriseMs, sunsetMs) {
+        const normalized = root.normalizedChromeThemeMode(mode)
+        if (normalized === "light" || normalized === "dark")
+            return normalized
+
+        // Reference tick keeps the binding fresh without forcing continuous work.
+        const ignoredTick = tick
+        if (ignoredTick < -1)
+            return "light"
+
+        const sunrise = Number(sunriseMs)
+        const sunset = Number(sunsetMs)
+        const now = Date.now()
+        if (isFinite(sunrise) && isFinite(sunset) && sunset > sunrise)
+            return (now < sunrise || now >= sunset) ? "dark" : "light"
+
+        const fallbackHour = (new Date()).getHours()
+        return (fallbackHour < 6 || fallbackHour >= 18) ? "dark" : "light"
+    }
+
+    function pad2(value) {
+        const n = Math.max(0, Math.floor(Number(value) || 0))
+        return n < 10 ? "0" + n : String(n)
+    }
+
+    function localDateKey(offsetSeconds) {
+        const offset = isFinite(Number(offsetSeconds)) ? Number(offsetSeconds) : 0
+        const local = new Date(Date.now() + offset * 1000)
+        return local.getUTCFullYear()
+            + "-" + root.pad2(local.getUTCMonth() + 1)
+            + "-" + root.pad2(local.getUTCDate())
+    }
+
+    function parseOpenMeteoLocalIso(isoText, offsetSeconds) {
+        const text = String(isoText || "")
+        const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/.exec(text)
+        if (!match)
+            return NaN
+
+        const offset = isFinite(Number(offsetSeconds)) ? Number(offsetSeconds) : 0
+        const utcMs = Date.UTC(Number(match[1]),
+            Number(match[2]) - 1,
+            Number(match[3]),
+            Number(match[4]),
+            Number(match[5]),
+            match[6] ? Number(match[6]) : 0)
+        return utcMs - offset * 1000
+    }
+
+    function formatSunTime(isoText) {
+        const match = /T(\d{2}):(\d{2})/.exec(String(isoText || ""))
+        if (!match)
+            return "--:--"
+        return match[1] + ":" + match[2]
+    }
+
+    function cachedSunTimesValid() {
+        return isFinite(Number(root.autoThemeSunriseMs))
+            && isFinite(Number(root.autoThemeSunsetMs))
+            && Number(root.autoThemeSunsetMs) > Number(root.autoThemeSunriseMs)
+    }
+
+    function restoreCachedSunTimes() {
+        const offset = Number(clusterUiSettings.cachedSunUtcOffsetSeconds)
+        const sunrise = root.parseOpenMeteoLocalIso(clusterUiSettings.cachedSunriseIso, offset)
+        const sunset = root.parseOpenMeteoLocalIso(clusterUiSettings.cachedSunsetIso, offset)
+        if (isFinite(sunrise) && isFinite(sunset) && sunset > sunrise) {
+            root.autoThemeSunriseMs = sunrise
+            root.autoThemeSunsetMs = sunset
+            root.autoThemeStatus = "CACHED"
+        }
+    }
+
+    function autoThemeDetailText() {
+        if (clusterUiSettings.cachedSunriseIso.length > 0
+                && clusterUiSettings.cachedSunsetIso.length > 0) {
+            return root.formatSunTime(clusterUiSettings.cachedSunriseIso)
+                + " / "
+                + root.formatSunTime(clusterUiSettings.cachedSunsetIso)
+        }
+        if (root.autoThemeStatus === "SYNC")
+            return "Syncing"
+        return "By daylight"
+    }
+
+    function themeOptionDetail(optionId, fallbackDetail) {
+        const id = String(optionId || "")
+        if (id === "auto")
+            return root.autoThemeDetailText()
+        return String(fallbackDetail || "")
+    }
+
+    function autoThemeUrl(latValue, lngValue) {
+        return "https://api.open-meteo.com/v1/forecast"
+            + "?latitude=" + Number(latValue).toFixed(5)
+            + "&longitude=" + Number(lngValue).toFixed(5)
+            + "&daily=sunrise,sunset"
+            + "&timezone=auto"
+            + "&forecast_days=1"
+            + "&beagley=" + Math.floor(Date.now() / (6 * 60 * 60 * 1000))
+    }
+
+    function applyAutoThemePayload(payload) {
+        const daily = payload && payload.daily ? payload.daily : ({})
+        const sunriseList = daily.sunrise || []
+        const sunsetList = daily.sunset || []
+        const sunriseIso = sunriseList.length > 0 ? String(sunriseList[0] || "") : ""
+        const sunsetIso = sunsetList.length > 0 ? String(sunsetList[0] || "") : ""
+        const offset = isFinite(Number(payload && payload.utc_offset_seconds))
+            ? Number(payload.utc_offset_seconds)
+            : Number(clusterUiSettings.cachedSunUtcOffsetSeconds)
+        const sunrise = root.parseOpenMeteoLocalIso(sunriseIso, offset)
+        const sunset = root.parseOpenMeteoLocalIso(sunsetIso, offset)
+        if (!isFinite(sunrise) || !isFinite(sunset) || sunset <= sunrise)
+            return false
+
+        root.autoThemeSunriseMs = sunrise
+        root.autoThemeSunsetMs = sunset
+        clusterUiSettings.cachedSunriseIso = sunriseIso
+        clusterUiSettings.cachedSunsetIso = sunsetIso
+        clusterUiSettings.cachedSunUtcOffsetSeconds = Math.round(offset)
+        clusterUiSettings.cachedSunDate = root.localDateKey(offset)
+        root.autoThemeStatus = "LIVE"
+        root.autoThemeClockTick += 1
+        return true
+    }
+
+    function requestAutoThemeSunTimes(force) {
+        if (root.autoThemeRequestActive)
+            return
+
+        const lat = Number(root.displayMapLat)
+        const lng = Number(root.displayMapLng)
+        if (!isFinite(lat) || !isFinite(lng))
+            return
+
+        const offset = Number(clusterUiSettings.cachedSunUtcOffsetSeconds)
+        const today = root.localDateKey(offset)
+        const moved = !isFinite(root.autoThemeLastRequestLat)
+            || Math.abs(lat - root.autoThemeLastRequestLat) > 0.08
+            || Math.abs(lng - root.autoThemeLastRequestLng) > 0.08
+        if (!force
+                && root.cachedSunTimesValid()
+                && clusterUiSettings.cachedSunDate === today
+                && !moved)
+            return
+
+        root.autoThemeRequestActive = true
+        root.autoThemeStatus = "SYNC"
+
+        const xhr = new XMLHttpRequest()
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState !== XMLHttpRequest.DONE)
+                return
+
+            root.autoThemeRequestActive = false
+            if (xhr.status >= 200 && xhr.status < 300) {
+                try {
+                    const payload = JSON.parse(xhr.responseText)
+                    if (root.applyAutoThemePayload(payload)) {
+                        root.autoThemeLastRequestLat = lat
+                        root.autoThemeLastRequestLng = lng
+                        return
+                    }
+                } catch (err) {
+                    console.warn("[MainV3] auto theme sunrise parse failed:", err)
+                }
+            }
+            root.autoThemeStatus = root.cachedSunTimesValid() ? "CACHED" : "OFFLINE"
+        }
+        xhr.open("GET", root.autoThemeUrl(lat, lng), true)
+        xhr.send()
     }
 
     function mapLibreStyleTrustedByList(styleUrl, trustedList) {
@@ -929,12 +1153,18 @@ Window {
     }
 
     function mapMenuSubtitleText() {
-        return String(root.activeMapThemeOption.label || "Light") + " map"
+        const theme = root.normalizedThemeMode === "auto"
+            ? ("Auto " + (root.menuDarkChrome ? "dark" : "light"))
+            : (root.menuDarkChrome ? "Dark" : "Light")
+        return theme + " / " + String(root.activeMapThemeOption.label || "Minimal") + " map"
     }
 
     Component.onCompleted: {
         if (!clusterUiSettings.mapThemeUserSelected && String(clusterUiSettings.mapTheme || "") !== "light")
             clusterUiSettings.mapTheme = "light"
+        clusterUiSettings.themeMode = root.normalizedChromeThemeMode(clusterUiSettings.themeMode)
+        root.restoreCachedSunTimes()
+        root.requestAutoThemeSunTimes(true)
         root.showNormal()
         root.raise()
         root.requestActivate()
@@ -955,6 +1185,16 @@ Window {
             })
         }
         Qt.callLater(logMapLibreFallbackIfNeeded)
+    }
+
+    Timer {
+        interval: 60000
+        running: true
+        repeat: true
+        onTriggered: {
+            root.autoThemeClockTick += 1
+            root.requestAutoThemeSunTimes(false)
+        }
     }
 
     onActiveMapStyleUrlChanged: Qt.callLater(logMapLibreFallbackIfNeeded)
@@ -2289,16 +2529,16 @@ Window {
                     radius: 28
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.verticalCenter: parent.verticalCenter
-                    color: "#F8FAFF"
+                    color: root.menuPanelColor
                     border.width: 1
-                    border.color: "#D8E2EE"
+                    border.color: root.menuStrongBorderColor
 
                     Rectangle {
                         anchors.left: parent.left
                         anchors.right: parent.right
                         anchors.top: parent.top
                         height: 3
-                        color: "#1A73E8"
+                        color: root.menuTopAccentColor
                         opacity: 0.88
                     }
 
@@ -2325,7 +2565,7 @@ Window {
                                 Text {
                                     width: parent.width
                                     text: "Maps"
-                                    color: "#202124"
+                                    color: root.menuTextPrimaryColor
                                     font.family: appTheme.fontDisplay
                                     font.pixelSize: 28
                                     font.weight: Font.DemiBold
@@ -2335,7 +2575,7 @@ Window {
                                 Text {
                                     width: parent.width
                                     text: root.mapMenuSubtitleText()
-                                    color: "#5F6368"
+                                    color: root.menuTextSecondaryColor
                                     font.family: appTheme.fontMono
                                     font.pixelSize: 12
                                     font.weight: Font.Bold
@@ -2348,14 +2588,14 @@ Window {
                                 width: 48
                                 height: 48
                                 radius: 12
-                                color: closeMouse.pressed ? "#E8F0FE" : "#FFFFFF"
+                                color: closeMouse.pressed ? root.menuSurfaceSelectedColor : root.menuSurfaceColor
                                 border.width: 1
-                                border.color: closeMouse.containsMouse ? "#1A73E8" : "#DADCE0"
+                                border.color: closeMouse.containsMouse ? root.menuAccentColor : root.menuBorderColor
 
                                 Text {
                                     anchors.centerIn: parent
                                     text: "X"
-                                    color: "#3C4043"
+                                    color: root.menuTextPrimaryColor
                                     font.family: appTheme.fontMono
                                     font.pixelSize: 22
                                     font.weight: Font.Bold
@@ -2390,14 +2630,14 @@ Window {
                                 width: mapMenuTabs.tabWidth
                                 height: parent.height
                                 radius: 21
-                                color: root.mapMenuStage === "search" ? "#E8F0FE" : "#FFFFFF"
+                                color: root.mapMenuStage === "search" ? root.menuSurfaceSelectedColor : root.menuSurfaceColor
                                 border.width: 1
-                                border.color: root.mapMenuStage === "search" ? "#1A73E8" : "#DADCE0"
+                                border.color: root.mapMenuStage === "search" ? root.menuAccentColor : root.menuBorderColor
 
                                 Text {
                                     anchors.centerIn: parent
                                     text: "Search"
-                                    color: root.mapMenuStage === "search" ? "#174EA6" : "#5F6368"
+                                    color: root.mapMenuStage === "search" ? root.menuAccentColor : root.menuTextSecondaryColor
                                     font.family: appTheme.fontMono
                                     font.pixelSize: 13
                                     font.weight: Font.Bold
@@ -2418,14 +2658,14 @@ Window {
                                 width: mapMenuTabs.tabWidth
                                 height: parent.height
                                 radius: 21
-                                color: (root.mapMenuStage === "routes" || root.mapMenuStage === "routing") ? "#E8F0FE" : "#FFFFFF"
+                                color: (root.mapMenuStage === "routes" || root.mapMenuStage === "routing") ? root.menuSurfaceSelectedColor : root.menuSurfaceColor
                                 border.width: 1
-                                border.color: (root.mapMenuStage === "routes" || root.mapMenuStage === "routing") ? "#1A73E8" : "#DADCE0"
+                                border.color: (root.mapMenuStage === "routes" || root.mapMenuStage === "routing") ? root.menuAccentColor : root.menuBorderColor
 
                                 Text {
                                     anchors.centerIn: parent
                                     text: "Route"
-                                    color: (root.mapMenuStage === "routes" || root.mapMenuStage === "routing") ? "#174EA6" : "#5F6368"
+                                    color: (root.mapMenuStage === "routes" || root.mapMenuStage === "routing") ? root.menuAccentColor : root.menuTextSecondaryColor
                                     font.family: appTheme.fontMono
                                     font.pixelSize: 13
                                     font.weight: Font.Bold
@@ -2444,14 +2684,14 @@ Window {
                                 width: mapMenuTabs.tabWidth
                                 height: parent.height
                                 radius: 21
-                                color: root.mapMenuStage === "settings" ? "#E8F0FE" : "#FFFFFF"
+                                color: root.mapMenuStage === "settings" ? root.menuSurfaceSelectedColor : root.menuSurfaceColor
                                 border.width: 1
-                                border.color: root.mapMenuStage === "settings" ? "#1A73E8" : "#DADCE0"
+                                border.color: root.mapMenuStage === "settings" ? root.menuAccentColor : root.menuBorderColor
 
                                 Text {
                                     anchors.centerIn: parent
                                     text: "Map"
-                                    color: root.mapMenuStage === "settings" ? "#174EA6" : "#5F6368"
+                                    color: root.mapMenuStage === "settings" ? root.menuAccentColor : root.menuTextSecondaryColor
                                     font.family: appTheme.fontMono
                                     font.pixelSize: 13
                                     font.weight: Font.Bold
@@ -2472,9 +2712,9 @@ Window {
                             width: parent.width
                             height: 70
                             radius: 22
-                            color: "#FFFFFF"
+                            color: root.menuSurfaceColor
                             border.width: 1
-                            border.color: searchInput.activeFocus ? "#1A73E8" : "#DADCE0"
+                            border.color: searchInput.activeFocus ? root.menuAccentColor : root.menuBorderColor
 
                             Row {
                                 anchors.fill: parent
@@ -2486,16 +2726,16 @@ Window {
                                     height: 46
                                     radius: 23
                                     anchors.verticalCenter: parent.verticalCenter
-                                    color: "#E8F0FE"
+                                    color: root.menuSurfaceSelectedColor
                                     border.width: 1
-                                    border.color: "#D2E3FC"
+                                    border.color: root.menuStrongBorderColor
 
                                     W.OemIcon {
                                         anchors.centerIn: parent
                                         width: 31
                                         height: 31
                                         icon: "route"
-                                        color: "#1A73E8"
+                                        color: root.menuAccentColor
                                         accentColor: "#34A853"
                                         strokeWidth: 3.2
                                     }
@@ -2510,7 +2750,7 @@ Window {
                                         anchors.right: parent.right
                                         anchors.top: parent.top
                                         text: "Where to?"
-                                        color: "#5F6368"
+                                        color: root.menuTextSecondaryColor
                                         font.family: appTheme.fontMono
                                         font.pixelSize: 11
                                         font.weight: Font.Bold
@@ -2555,7 +2795,7 @@ Window {
                                         text: searchInput.text
                                         visible: searchInput.text.length > 0
                                         textFormat: Text.PlainText
-                                        color: "#202124"
+                                        color: root.menuTextPrimaryColor
                                         font.family: appTheme.fontMono
                                         font.pixelSize: 24
                                         font.hintingPreference: root.menuTextHintingPreference
@@ -2571,7 +2811,7 @@ Window {
                                         verticalAlignment: Text.AlignVCenter
                                         text: "Search destination"
                                         visible: searchInput.text.length === 0 && !searchInput.activeFocus
-                                        color: "#80868B"
+                                        color: root.menuTextMutedColor
                                         font.family: appTheme.fontMono
                                         font.pixelSize: 22
                                         font.hintingPreference: root.menuTextHintingPreference
@@ -2604,12 +2844,12 @@ Window {
                                 : (root.mapMenuStage === "routing"
                                     ? 126
                                     : (root.mapMenuStage === "settings"
-                                        ? 240
+                                        ? 350
                                         : (root.searchKeyboardOpen ? 110 : 218)))
                             radius: 22
-                            color: "#FFFFFF"
+                            color: root.menuSurfaceColor
                             border.width: 1
-                            border.color: "#DADCE0"
+                            border.color: root.menuBorderColor
 
                             Column {
                                 anchors.fill: parent
@@ -2622,9 +2862,9 @@ Window {
                                         : (root.mapMenuStage === "routing"
                                             ? "Building route"
                                             : (root.mapMenuStage === "settings"
-                                                ? "Map layers"
+                                                ? "Theme and map"
                                                 : root.menuSearchTitle()))
-                                    color: (root.routeLookupInProgress || root.mapMenuStage === "routing") ? "#1A73E8" : "#5F6368"
+                                    color: (root.routeLookupInProgress || root.mapMenuStage === "routing") ? root.menuAccentColor : root.menuTextSecondaryColor
                                     font.family: appTheme.fontMono
                                     font.pixelSize: 14
                                     font.hintingPreference: root.menuTextHintingPreference
@@ -2656,9 +2896,9 @@ Window {
                                                 height: 64
                                                 radius: 12
                                                 antialiasing: false
-                                                color: suggestionMouse.containsMouse ? "#E8F0FE" : "#F8FAFF"
+                                                color: suggestionMouse.containsMouse ? root.menuSurfaceSelectedColor : root.menuSurfaceAltColor
                                                 border.width: 1
-                                                border.color: suggestionMouse.containsMouse ? "#1A73E8" : "#E2E8F0"
+                                                border.color: suggestionMouse.containsMouse ? root.menuAccentColor : root.menuBorderColor
 
                                                 Column {
                                                     anchors.left: parent.left
@@ -2672,7 +2912,7 @@ Window {
                                                         width: parent.width
                                                         text: String(itemData.primary || itemData.label || "")
                                                         textFormat: Text.PlainText
-                                                        color: "#202124"
+                                                        color: root.menuTextPrimaryColor
                                                         font.family: appTheme.fontDisplay
                                                         font.pixelSize: 17
                                                         font.hintingPreference: root.menuTextHintingPreference
@@ -2687,7 +2927,7 @@ Window {
                                                                 ? root.formatDistanceMeters(itemData.distanceMeters)
                                                                 : ""))
                                                         textFormat: Text.PlainText
-                                                        color: "#5F6368"
+                                                        color: root.menuTextSecondaryColor
                                                         font.family: appTheme.fontMono
                                                         font.pixelSize: 11
                                                         font.hintingPreference: root.menuTextHintingPreference
@@ -2711,7 +2951,7 @@ Window {
                                 Column {
                                     visible: root.mapMenuStage === "settings"
                                     width: parent.width
-                                    spacing: 9
+                                    spacing: 12
 
                                     Column {
                                         width: parent.width
@@ -2719,8 +2959,8 @@ Window {
 
                                         Text {
                                             width: parent.width
-                                            text: "Map type"
-                                            color: "#5F6368"
+                                            text: "Theme"
+                                            color: root.menuTextSecondaryColor
                                             font.family: appTheme.fontMono
                                             font.pixelSize: 13
                                             font.weight: Font.Bold
@@ -2731,7 +2971,116 @@ Window {
 
                                         Row {
                                             width: parent.width
-                                            height: 104
+                                            height: 76
+                                            spacing: 8
+
+                                            Repeater {
+                                                model: root.chromeThemeOptions
+
+                                                delegate: Rectangle {
+                                                    readonly property bool selected: String(modelData.id) === root.normalizedThemeMode
+                                                    width: (parent.width - 16) / 3
+                                                    height: parent.height
+                                                    radius: 18
+                                                    color: selected ? root.menuSurfaceSelectedColor : root.menuSurfaceAltColor
+                                                    border.width: 1
+                                                    border.color: selected ? root.menuAccentColor : root.menuBorderColor
+
+                                                    Column {
+                                                        anchors.fill: parent
+                                                        anchors.margins: 12
+                                                        spacing: 4
+
+                                                        Row {
+                                                            width: parent.width
+                                                            height: 14
+                                                            spacing: 5
+
+                                                            Rectangle {
+                                                                width: (parent.width - 10) / 3
+                                                                height: parent.height
+                                                                radius: 7
+                                                                color: modelData.id === "dark" ? "#111827" : "#FFFFFF"
+                                                                border.width: 1
+                                                                border.color: root.menuBorderColor
+                                                            }
+
+                                                            Rectangle {
+                                                                width: (parent.width - 10) / 3
+                                                                height: parent.height
+                                                                radius: 7
+                                                                color: modelData.id === "light" ? "#FFFFFF" : "#1F2937"
+                                                                border.width: 1
+                                                                border.color: root.menuBorderColor
+                                                            }
+
+                                                            Rectangle {
+                                                                width: (parent.width - 10) / 3
+                                                                height: parent.height
+                                                                radius: 7
+                                                                color: modelData.id === "auto"
+                                                                    ? (root.menuDarkChrome ? "#1F2937" : "#FFFFFF")
+                                                                    : (modelData.id === "dark" ? "#1F2937" : "#E8F0FE")
+                                                                border.width: 1
+                                                                border.color: root.menuBorderColor
+                                                            }
+                                                        }
+
+                                                        Text {
+                                                            width: parent.width
+                                                            text: modelData.label
+                                                            color: root.menuTextPrimaryColor
+                                                            font.family: appTheme.fontDisplay
+                                                            font.pixelSize: 17
+                                                            font.weight: Font.DemiBold
+                                                            font.hintingPreference: root.menuTextHintingPreference
+                                                            renderType: root.menuTextRenderType
+                                                            horizontalAlignment: Text.AlignHCenter
+                                                            elide: Text.ElideRight
+                                                        }
+
+                                                        Text {
+                                                            width: parent.width
+                                                            text: root.themeOptionDetail(modelData.id, modelData.detail)
+                                                            color: selected ? root.menuAccentColor : root.menuTextSecondaryColor
+                                                            font.family: appTheme.fontMono
+                                                            font.pixelSize: 10
+                                                            font.weight: Font.Bold
+                                                            font.hintingPreference: root.menuTextHintingPreference
+                                                            renderType: root.menuTextRenderType
+                                                            horizontalAlignment: Text.AlignHCenter
+                                                            elide: Text.ElideRight
+                                                        }
+                                                    }
+
+                                                    MouseArea {
+                                                        anchors.fill: parent
+                                                        onClicked: root.selectChromeThemeMode(modelData.id)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Column {
+                                        width: parent.width
+                                        spacing: 8
+
+                                        Text {
+                                            width: parent.width
+                                            text: "Map style"
+                                            color: root.menuTextSecondaryColor
+                                            font.family: appTheme.fontMono
+                                            font.pixelSize: 13
+                                            font.weight: Font.Bold
+                                            font.letterSpacing: 0.2
+                                            font.hintingPreference: root.menuTextHintingPreference
+                                            renderType: root.menuTextRenderType
+                                        }
+
+                                        Row {
+                                            width: parent.width
+                                            height: 116
                                             spacing: 8
 
                                             Repeater {
@@ -2742,9 +3091,9 @@ Window {
                                                     width: (parent.width - 24) / 4
                                                     height: parent.height
                                                     radius: 18
-                                                    color: selected ? "#E8F0FE" : "#FFFFFF"
+                                                    color: selected ? root.menuSurfaceSelectedColor : root.menuSurfaceAltColor
                                                     border.width: 1
-                                                    border.color: selected ? "#1A73E8" : "#DADCE0"
+                                                    border.color: selected ? root.menuAccentColor : root.menuBorderColor
 
                                                     Column {
                                                         anchors.fill: parent
@@ -2753,17 +3102,17 @@ Window {
 
                                                         Rectangle {
                                                             width: parent.width
-                                                            height: 22
-                                                            radius: 7
+                                                            height: 24
+                                                            radius: 8
                                                             color: modelData.swatchA
                                                             border.width: 1
-                                                            border.color: selected ? "#1A73E8" : "#CBD5E1"
+                                                            border.color: selected ? root.menuAccentColor : root.menuBorderColor
 
                                                             Rectangle {
                                                                 width: parent.width * 0.44
                                                                 height: parent.height
                                                                 anchors.right: parent.right
-                                                                radius: 4
+                                                                radius: 5
                                                                 color: modelData.swatchB
                                                             }
                                                         }
@@ -2771,7 +3120,7 @@ Window {
                                                         Text {
                                                             width: parent.width
                                                             text: modelData.label
-                                                            color: "#202124"
+                                                            color: root.menuTextPrimaryColor
                                                             font.family: appTheme.fontDisplay
                                                             font.pixelSize: 17
                                                             font.weight: Font.DemiBold
@@ -2784,7 +3133,7 @@ Window {
                                                         Text {
                                                             width: parent.width
                                                             text: modelData.detail
-                                                            color: selected ? "#174EA6" : "#5F6368"
+                                                            color: selected ? root.menuAccentColor : root.menuTextSecondaryColor
                                                             font.family: appTheme.fontMono
                                                             font.pixelSize: 10
                                                             font.weight: Font.Bold
@@ -2806,23 +3155,23 @@ Window {
 
                                     Row {
                                         width: parent.width
-                                        height: 50
+                                        height: 38
                                         spacing: 8
 
                                         Rectangle {
                                             width: (parent.width - 8) / 2
                                             height: parent.height
                                             radius: 18
-                                            color: navigation.muted ? "#FFF1F3" : "#F8FAFF"
+                                            color: navigation.muted ? root.menuDangerSurfaceColor : root.menuSurfaceAltColor
                                             border.width: 1
-                                            border.color: navigation.muted ? "#F4A8B8" : "#DADCE0"
+                                            border.color: navigation.muted ? root.menuDangerBorderColor : root.menuBorderColor
 
                                             Text {
                                                 anchors.centerIn: parent
                                                 text: navigation.muted ? "Sound off" : "Sound on"
-                                                color: navigation.muted ? "#A50E0E" : "#3C4043"
+                                                color: navigation.muted ? "#D93025" : root.menuTextPrimaryColor
                                                 font.family: appTheme.fontMono
-                                                font.pixelSize: 14
+                                                font.pixelSize: 13
                                                 font.weight: Font.Bold
                                                 font.hintingPreference: root.menuTextHintingPreference
                                                 renderType: root.menuTextRenderType
@@ -2838,16 +3187,16 @@ Window {
                                             width: (parent.width - 8) / 2
                                             height: parent.height
                                             radius: 18
-                                            color: "#F8FAFF"
+                                            color: root.menuSurfaceAltColor
                                             border.width: 1
-                                            border.color: followUnlocked ? "#AECBFA" : "#DADCE0"
+                                            border.color: followUnlocked ? root.menuAccentColor : root.menuBorderColor
 
                                             Text {
                                                 anchors.centerIn: parent
                                                 text: followUnlocked ? "Recenter map" : "Following"
-                                                color: followUnlocked ? "#174EA6" : "#3C4043"
+                                                color: followUnlocked ? root.menuAccentColor : root.menuTextPrimaryColor
                                                 font.family: appTheme.fontMono
-                                                font.pixelSize: 14
+                                                font.pixelSize: 13
                                                 font.weight: Font.Bold
                                                 font.hintingPreference: root.menuTextHintingPreference
                                                 renderType: root.menuTextRenderType
@@ -3144,9 +3493,9 @@ Window {
                                         && !root.hasActiveRoute)
                                 enabled: !blocked
                                 opacity: enabled ? 1.0 : 0.72
-                                color: blocked ? "#E8EAED" : "#1A73E8"
+                                color: blocked ? root.menuSurfaceAltColor : root.menuAccentColor
                                 border.width: 1
-                                border.color: blocked ? "#DADCE0" : "#1A73E8"
+                                border.color: blocked ? root.menuBorderColor : root.menuAccentColor
 
                                 function trigger() {
                                     if (root.mapMenuStage === "settings") {
@@ -3177,7 +3526,7 @@ Window {
                                         : (root.mapMenuStage === "settings"
                                             ? "DONE"
                                             : ((root.mapMenuStage === "routing" || root.routeLookupInProgress) ? "LOADING" : "FIND"))
-                                    color: blocked ? "#80868B" : "#FFFFFF"
+                                    color: blocked ? root.menuTextMutedColor : "#FFFFFF"
                                     font.family: appTheme.fontMono
                                     font.pixelSize: 17
                                     font.weight: Font.Bold
@@ -3195,9 +3544,9 @@ Window {
                                 width: 132
                                 height: 50
                                 radius: 15
-                                color: "#FFFFFF"
+                                color: root.menuSurfaceColor
                                 border.width: 1
-                                border.color: "#DADCE0"
+                                border.color: root.menuBorderColor
 
                                 Text {
                                     anchors.centerIn: parent
@@ -3206,7 +3555,7 @@ Window {
                                         : (root.mapMenuStage === "search"
                                             ? (root.followUnlocked ? "RECENTER" : "FOLLOW")
                                             : "BACK")
-                                    color: "#3C4043"
+                                    color: root.menuTextPrimaryColor
                                     font.family: appTheme.fontMono
                                     font.pixelSize: (root.mapMenuStage === "search" || root.mapMenuStage === "settings") && root.followUnlocked ? 14 : 17
                                     font.weight: Font.Bold
@@ -3235,16 +3584,16 @@ Window {
                                 width: 112
                                 height: 50
                                 radius: 15
-                                color: "#FFFFFF"
+                                color: root.menuSurfaceColor
                                 border.width: 1
-                                border.color: "#DADCE0"
+                                border.color: root.menuBorderColor
 
                                 Text {
                                     anchors.centerIn: parent
                                     text: root.mapMenuStage === "search"
                                         ? (root.searchKeyboardOpen ? "HIDE" : "KEYS")
                                         : "CENTER"
-                                    color: "#3C4043"
+                                    color: root.menuTextPrimaryColor
                                     font.family: appTheme.fontMono
                                     font.pixelSize: 16
                                     font.weight: Font.Bold
@@ -3267,14 +3616,14 @@ Window {
                                 width: 112
                                 height: 50
                                 radius: 15
-                                color: "#FFFFFF"
+                                color: root.menuSurfaceColor
                                 border.width: 1
-                                border.color: "#DADCE0"
+                                border.color: root.menuBorderColor
 
                                 Text {
                                     anchors.centerIn: parent
                                     text: "CLEAR"
-                                    color: "#3C4043"
+                                    color: root.menuTextPrimaryColor
                                     font.family: appTheme.fontMono
                                     font.pixelSize: 16
                                     font.weight: Font.Bold
