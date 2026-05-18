@@ -384,21 +384,18 @@ QString firstQueryNumber(const QStringList &queryTokens)
     return {};
 }
 
-bool queryLooksAddressLike(const QString &query)
+bool tokenHasDigit(const QString &token)
 {
-    const QStringList tokens = tokenizeWords(query);
-    if (tokens.isEmpty()) {
-        return false;
-    }
-
-    for (const QString &token : tokens) {
-        for (const QChar ch : token) {
-            if (ch.isDigit()) {
-                return true;
-            }
+    for (const QChar ch : token) {
+        if (ch.isDigit()) {
+            return true;
         }
     }
+    return false;
+}
 
+bool isStreetTypeToken(const QString &token)
+{
     static const QStringList streetTokens = {
         QStringLiteral("street"),
         QStringLiteral("st"),
@@ -429,14 +426,60 @@ bool queryLooksAddressLike(const QString &query)
         QStringLiteral("hwy"),
         QStringLiteral("way"),
     };
+    return streetTokens.contains(token);
+}
+
+bool queryLooksAddressLike(const QString &query)
+{
+    const QStringList tokens = tokenizeWords(query);
+    if (tokens.isEmpty()) {
+        return false;
+    }
+
+    for (const QString &token : tokens) {
+        if (tokenHasDigit(token)) {
+            return true;
+        }
+    }
 
     for (int index = 1; index < tokens.size(); ++index) {
-        if (streetTokens.contains(tokens.at(index))) {
+        if (isStreetTypeToken(tokens.at(index))) {
             return true;
         }
     }
 
     return false;
+}
+
+bool queryLooksIncompleteNumericAddress(const QString &query)
+{
+    const QStringList tokens = tokenizeWords(query);
+    bool hasNumber = false;
+    bool hasUsefulText = false;
+    for (const QString &token : tokens) {
+        if (tokenHasDigit(token)) {
+            hasNumber = true;
+            continue;
+        }
+        if (isStreetTypeToken(token)) {
+            return false;
+        }
+        if (token.size() >= 2) {
+            hasUsefulText = true;
+        }
+    }
+    return hasNumber && hasUsefulText;
+}
+
+QString incompleteNumericAddressPredictionQuery(const QString &query)
+{
+    QStringList kept;
+    for (const QString &token : tokenizeWords(query)) {
+        if (!tokenHasDigit(token) && !isSearchFillerToken(token)) {
+            kept.append(token);
+        }
+    }
+    return kept.join(QLatin1Char(' ')).simplified();
 }
 
 bool queryLooksAddressPredictionLike(const QString &query)
@@ -926,6 +969,21 @@ bool sameSearchResult(const SearchResultData &left, const SearchResultData &righ
     return false;
 }
 
+bool keepForIncompleteNumericAddress(const SearchResultData &result, const QString &countryCodeHint)
+{
+    if (!countryCodeHint.isEmpty()
+        && !result.countryCode.isEmpty()
+        && result.countryCode.compare(countryCodeHint, Qt::CaseInsensitive) != 0) {
+        return false;
+    }
+    if (qIsFinite(result.distanceMeters)
+        && result.distanceMeters >= 0.0
+        && result.distanceMeters > 250000.0) {
+        return false;
+    }
+    return true;
+}
+
 QList<SearchResultData> limitedSearchResults(QList<SearchResultData> results)
 {
     sortSearchResults(&results);
@@ -1011,6 +1069,32 @@ QNetworkRequest OpenNavigationProvider::buildSearchRequest(const QString &query,
 QNetworkRequest OpenNavigationProvider::buildFallbackSearchRequest(const QString &query, double originLat, double originLng) const
 {
     const QString effectiveQuery = providerSearchQuery(query);
+    if (queryLooksIncompleteNumericAddress(effectiveQuery)) {
+        const QString predictionQuery = incompleteNumericAddressPredictionQuery(effectiveQuery);
+        if (!predictionQuery.isEmpty()) {
+            QUrl url(m_geocoderUrl);
+            QUrlQuery urlQuery(url);
+            urlQuery.addQueryItem(QStringLiteral("limit"), QString::number(kSearchResultLimit));
+            urlQuery.addQueryItem(QStringLiteral("q"), predictionQuery);
+            if (qIsFinite(originLat) && qIsFinite(originLng)) {
+                urlQuery.addQueryItem(QStringLiteral("lat"), QString::number(originLat, 'f', 6));
+                urlQuery.addQueryItem(QStringLiteral("lon"), QString::number(originLng, 'f', 6));
+                urlQuery.addQueryItem(QStringLiteral("zoom"), QString::number(kPhotonBiasZoom));
+                urlQuery.addQueryItem(QStringLiteral("location_bias_scale"), QString::number(kPhotonBiasScale, 'f', 2));
+            }
+            const QString languageCode = photonLanguageCode(m_searchLanguage);
+            if (!languageCode.isEmpty()) {
+                urlQuery.addQueryItem(QStringLiteral("lang"), languageCode);
+            }
+            url.setQuery(urlQuery);
+
+            QNetworkRequest request(url);
+            request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
+            request.setRawHeader("User-Agent", QByteArrayLiteral("BeagleyCluster/1.0"));
+            return request;
+        }
+    }
+
     QUrl url(m_fallbackGeocoderUrl);
     QUrlQuery urlQuery(url);
     const bool addressLike = queryLooksAddressLike(effectiveQuery);
@@ -1069,6 +1153,16 @@ QList<SearchResultData> OpenNavigationProvider::parseSearchResponse(const QByteA
         }
     }
 
+    if (queryLooksIncompleteNumericAddress(canonicalSearchQuery(query))) {
+        for (auto it = results.begin(); it != results.end();) {
+            if (keepForIncompleteNumericAddress(*it, m_searchCountryCode)) {
+                ++it;
+            } else {
+                it = results.erase(it);
+            }
+        }
+    }
+
     for (SearchResultData &result : results) {
         result.rankScore = rankSearchResult(result, query, m_searchCountryCode);
     }
@@ -1079,6 +1173,9 @@ QList<SearchResultData> OpenNavigationProvider::parseSearchResponse(const QByteA
 bool OpenNavigationProvider::shouldRunFallbackSearch(const QList<SearchResultData> &primaryResults, const QString &query) const
 {
     if (primaryResults.isEmpty()) {
+        return true;
+    }
+    if (queryLooksIncompleteNumericAddress(canonicalSearchQuery(query))) {
         return true;
     }
     if (queryLooksAddressLike(canonicalSearchQuery(query))) {

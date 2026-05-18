@@ -193,6 +193,7 @@ NavigationService::NavigationService(VehicleStateClient *vehicleState, WiFiSetup
 void NavigationService::search(const QString &query)
 {
     const QString trimmed = query.trimmed();
+    const QString previousQuery = m_lastSearchQuery;
     m_lastSearchQuery = trimmed;
     const quint64 requestSerial = ++m_searchRequestSerial;
     m_activeSearchRequestSerial = requestSerial;
@@ -202,6 +203,10 @@ void NavigationService::search(const QString &query)
             setState(QStringLiteral("idle"));
         }
         return;
+    }
+
+    if (trimmed != previousQuery) {
+        setSearchResults({});
     }
 
     updateConnectivityStatus();

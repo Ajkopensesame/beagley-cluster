@@ -383,6 +383,84 @@ void testPartialAddressMergeKeepsCloserAutocompleteFirst()
     expectTrue(merged.first().label.contains(QStringLiteral("Peregian Beach")), "closer autocomplete result should stay first after fallback merge");
 }
 
+void testIncompleteNumericAddressFallbackUsesLocalPrediction()
+{
+    qputenv("BEAGLEY_NAV_SEARCH_COUNTRYCODE", "AU");
+    OpenNavigationProvider provider;
+    const QNetworkRequest primary = provider.buildSearchRequest(QStringLiteral("15 corb"), -26.4593, 152.9990);
+    const QUrlQuery primaryQuery(primary.url());
+
+    expectTrue(primary.url().host().contains(QStringLiteral("nominatim"), Qt::CaseInsensitive),
+        "numeric partial address should start with local bounded Nominatim");
+    expectEqual(primaryQuery.queryItemValue(QStringLiteral("q")), QStringLiteral("15 corb"),
+        "numeric partial address primary query should preserve typed address");
+    expectEqual(primaryQuery.queryItemValue(QStringLiteral("bounded")), QStringLiteral("1"),
+        "numeric partial address primary query should stay locally bounded");
+    expectEqual(primaryQuery.queryItemValue(QStringLiteral("countrycodes")), QStringLiteral("au"),
+        "numeric partial address primary query should keep local country hint");
+
+    const QNetworkRequest fallback = provider.buildFallbackSearchRequest(QStringLiteral("15 corb"), -26.4593, 152.9990);
+    const QUrlQuery fallbackQuery(fallback.url());
+    expectTrue(fallback.url().host().contains(QStringLiteral("photon"), Qt::CaseInsensitive),
+        "numeric partial address fallback should use Photon for local street prediction");
+    expectEqual(fallbackQuery.queryItemValue(QStringLiteral("q")), QStringLiteral("corb"),
+        "numeric partial address fallback should strip the house number for prediction");
+    expectEqual(fallbackQuery.queryItemValue(QStringLiteral("lat")), QStringLiteral("-26.459300"),
+        "numeric partial address fallback should keep latitude bias");
+    expectEqual(fallbackQuery.queryItemValue(QStringLiteral("lon")), QStringLiteral("152.999000"),
+        "numeric partial address fallback should keep longitude bias");
+}
+
+void testIncompleteNumericAddressFiltersForeignPredictions()
+{
+    qputenv("BEAGLEY_NAV_SEARCH_COUNTRYCODE", "AU");
+    OpenNavigationProvider provider;
+    const QByteArray payload = R"JSON(
+{
+  "features": [
+    {
+      "properties": {
+        "name": "15",
+        "housenumber": "15",
+        "street": "Carrer del Riu Corb",
+        "city": "el Palau d'Anglesola",
+        "state": "Catalonia",
+        "country": "Spain",
+        "countrycode": "ES",
+        "osm_key": "building",
+        "osm_value": "house",
+        "type": "house"
+      },
+      "geometry": { "type": "Point", "coordinates": [0.8831300, 41.6527800] }
+    },
+    {
+      "properties": {
+        "name": "Corbould Road",
+        "city": "Coolum Beach",
+        "state": "Queensland",
+        "country": "Australia",
+        "countrycode": "AU",
+        "osm_key": "highway",
+        "osm_value": "residential",
+        "type": "street"
+      },
+      "geometry": { "type": "Point", "coordinates": [153.0898700, -26.4396300] }
+    }
+  ]
+}
+)JSON";
+
+    const QList<SearchResultData> results = provider.parseSearchResponse(payload, QStringLiteral("15 corb"), -26.4593, 152.9990);
+    expectTrue(!results.isEmpty(), "local numeric partial address predictions should not be empty");
+    if (results.isEmpty()) {
+        return;
+    }
+    expectEqual(results.first().primary, QStringLiteral("Corbould Road"), "local street prediction should outrank foreign house-number match");
+    for (const SearchResultData &result : results) {
+        expectTrue(!result.label.contains(QStringLiteral("Spain")), "foreign numeric partial address prediction should be filtered");
+    }
+}
+
 void testWeakCategorySearchRefinesWithFallbackMerge()
 {
     qputenv("BEAGLEY_NAV_SEARCH_COUNTRYCODE", "AU");
@@ -452,6 +530,8 @@ int main()
     testPartialAddressPredictionUsesLocalAddressFallback();
     testPartialAddressRankingPrefersNearbyStreetPrediction();
     testPartialAddressMergeKeepsCloserAutocompleteFirst();
+    testIncompleteNumericAddressFallbackUsesLocalPrediction();
+    testIncompleteNumericAddressFiltersForeignPredictions();
     testWeakCategorySearchRefinesWithFallbackMerge();
 
     if (g_failures == 0) {
