@@ -928,26 +928,8 @@ Window {
         return totalMinutes + " min"
     }
 
-    function hotspotBadgeText() {
-        if (hotspotState === "online")
-            return "HOTSPOT ONLINE"
-        if (hotspotState === "no_internet")
-            return "HOTSPOT NO NET"
-        if (hotspotState === "associated_no_ip")
-            return "HOTSPOT DHCP"
-        if (hotspotState === "no_config")
-            return "HOTSPOT SETUP"
-        return "HOTSPOT JOINING"
-    }
-
-    function gpsBadgeText() {
-        if (gpsFixOk)
-            return "GPS FIX"
-        if (gpsHoldingPose)
-            return "GPS HOLD"
-        if (navigation.bbbLinkOk)
-            return "GPS WEAK"
-        return "GPS WAIT"
+    function mapMenuSubtitleText() {
+        return String(root.activeMapThemeOption.label || "Light") + " map"
     }
 
     Component.onCompleted: {
@@ -2304,20 +2286,20 @@ Window {
                 Rectangle {
                     width: Math.floor(Math.min(760, Math.max(640, parent.width * 0.42)))
                     height: Math.min(parent.height - 56, mapMenuColumn.implicitHeight + 40)
-                    radius: 24
+                    radius: 28
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.verticalCenter: parent.verticalCenter
-                    color: "#0A121B"
+                    color: "#F8FAFF"
                     border.width: 1
-                    border.color: "#5FAAD2"
+                    border.color: "#D8E2EE"
 
                     Rectangle {
                         anchors.left: parent.left
                         anchors.right: parent.right
                         anchors.top: parent.top
                         height: 3
-                        color: "#58D9FF"
-                        opacity: 0.72
+                        color: "#1A73E8"
+                        opacity: 0.88
                     }
 
                     MouseArea {
@@ -2343,7 +2325,7 @@ Window {
                                 Text {
                                     width: parent.width
                                     text: "Maps"
-                                    color: "#F5FBFF"
+                                    color: "#202124"
                                     font.family: appTheme.fontDisplay
                                     font.pixelSize: 28
                                     font.weight: Font.DemiBold
@@ -2352,12 +2334,12 @@ Window {
 
                                 Text {
                                     width: parent.width
-                                    text: root.gpsBadgeText() + "   " + root.hotspotBadgeText()
-                                    color: "#8FC6DF"
+                                    text: root.mapMenuSubtitleText()
+                                    color: "#5F6368"
                                     font.family: appTheme.fontMono
                                     font.pixelSize: 12
                                     font.weight: Font.Bold
-                                    font.letterSpacing: 1.0
+                                    font.letterSpacing: 0.4
                                     elide: Text.ElideRight
                                 }
                             }
@@ -2366,17 +2348,17 @@ Window {
                                 width: 48
                                 height: 48
                                 radius: 12
-                                color: closeMouse.pressed ? "#19364B" : "#0C1A25"
+                                color: closeMouse.pressed ? "#E8F0FE" : "#FFFFFF"
                                 border.width: 1
-                                border.color: closeMouse.containsMouse ? "#86D5FF" : "#42657A"
+                                border.color: closeMouse.containsMouse ? "#1A73E8" : "#DADCE0"
 
                                 W.OemIcon {
                                     anchors.centerIn: parent
                                     width: 24
                                     height: 24
                                     icon: "close"
-                                    color: "#EAF5FB"
-                                    accentColor: "#EAF5FB"
+                                    color: "#3C4043"
+                                    accentColor: "#3C4043"
                                     strokeWidth: 4.0
                                 }
 
@@ -2408,15 +2390,15 @@ Window {
                             Rectangle {
                                 width: mapMenuTabs.tabWidth
                                 height: parent.height
-                                radius: 13
-                                color: root.mapMenuStage === "search" ? "#143B52" : "#0B1720"
+                                radius: 21
+                                color: root.mapMenuStage === "search" ? "#E8F0FE" : "#FFFFFF"
                                 border.width: 1
-                                border.color: root.mapMenuStage === "search" ? "#86D5FF" : "#345468"
+                                border.color: root.mapMenuStage === "search" ? "#1A73E8" : "#DADCE0"
 
                                 Text {
                                     anchors.centerIn: parent
-                                    text: "FIND"
-                                    color: root.mapMenuStage === "search" ? "#F7FBFF" : "#A8C8D8"
+                                    text: "Search"
+                                    color: root.mapMenuStage === "search" ? "#174EA6" : "#5F6368"
                                     font.family: appTheme.fontMono
                                     font.pixelSize: 13
                                     font.weight: Font.Bold
@@ -2436,15 +2418,15 @@ Window {
                                 visible: mapMenuTabs.routeTabVisible
                                 width: mapMenuTabs.tabWidth
                                 height: parent.height
-                                radius: 13
-                                color: (root.mapMenuStage === "routes" || root.mapMenuStage === "routing") ? "#143B52" : "#0B1720"
+                                radius: 21
+                                color: (root.mapMenuStage === "routes" || root.mapMenuStage === "routing") ? "#E8F0FE" : "#FFFFFF"
                                 border.width: 1
-                                border.color: (root.mapMenuStage === "routes" || root.mapMenuStage === "routing") ? "#86D5FF" : "#345468"
+                                border.color: (root.mapMenuStage === "routes" || root.mapMenuStage === "routing") ? "#1A73E8" : "#DADCE0"
 
                                 Text {
                                     anchors.centerIn: parent
-                                    text: "ROUTE"
-                                    color: (root.mapMenuStage === "routes" || root.mapMenuStage === "routing") ? "#F7FBFF" : "#A8C8D8"
+                                    text: "Route"
+                                    color: (root.mapMenuStage === "routes" || root.mapMenuStage === "routing") ? "#174EA6" : "#5F6368"
                                     font.family: appTheme.fontMono
                                     font.pixelSize: 13
                                     font.weight: Font.Bold
@@ -2462,15 +2444,15 @@ Window {
                             Rectangle {
                                 width: mapMenuTabs.tabWidth
                                 height: parent.height
-                                radius: 13
-                                color: root.mapMenuStage === "settings" ? "#143B52" : "#0B1720"
+                                radius: 21
+                                color: root.mapMenuStage === "settings" ? "#E8F0FE" : "#FFFFFF"
                                 border.width: 1
-                                border.color: root.mapMenuStage === "settings" ? "#86D5FF" : "#345468"
+                                border.color: root.mapMenuStage === "settings" ? "#1A73E8" : "#DADCE0"
 
                                 Text {
                                     anchors.centerIn: parent
-                                    text: "SETTINGS"
-                                    color: root.mapMenuStage === "settings" ? "#F7FBFF" : "#A8C8D8"
+                                    text: "Map"
+                                    color: root.mapMenuStage === "settings" ? "#174EA6" : "#5F6368"
                                     font.family: appTheme.fontMono
                                     font.pixelSize: 13
                                     font.weight: Font.Bold
@@ -2490,10 +2472,10 @@ Window {
                             visible: root.mapMenuStage === "search"
                             width: parent.width
                             height: 70
-                            radius: 16
-                            color: searchInput.activeFocus ? "#111E2A" : "#071019"
+                            radius: 22
+                            color: "#FFFFFF"
                             border.width: 1
-                            border.color: searchInput.activeFocus ? "#82C9F2" : "#2E5975"
+                            border.color: searchInput.activeFocus ? "#1A73E8" : "#DADCE0"
 
                             Row {
                                 anchors.fill: parent
@@ -2503,19 +2485,19 @@ Window {
                                 Rectangle {
                                     width: 46
                                     height: 46
-                                    radius: 13
+                                    radius: 23
                                     anchors.verticalCenter: parent.verticalCenter
-                                    color: "#102A3A"
+                                    color: "#E8F0FE"
                                     border.width: 1
-                                    border.color: "#35698A"
+                                    border.color: "#D2E3FC"
 
                                     W.OemIcon {
                                         anchors.centerIn: parent
                                         width: 31
                                         height: 31
                                         icon: "route"
-                                        color: "#F7FBFF"
-                                        accentColor: "#8DE8FF"
+                                        color: "#1A73E8"
+                                        accentColor: "#34A853"
                                         strokeWidth: 3.2
                                     }
                                 }
@@ -2528,8 +2510,8 @@ Window {
                                         anchors.left: parent.left
                                         anchors.right: parent.right
                                         anchors.top: parent.top
-                                        text: "DESTINATION"
-                                        color: "#6FA8C2"
+                                        text: "Where to?"
+                                        color: "#5F6368"
                                         font.family: appTheme.fontMono
                                         font.pixelSize: 11
                                         font.weight: Font.Bold
@@ -2574,7 +2556,7 @@ Window {
                                         text: searchInput.text
                                         visible: searchInput.text.length > 0
                                         textFormat: Text.PlainText
-                                        color: "#F7FBFF"
+                                        color: "#202124"
                                         font.family: appTheme.fontMono
                                         font.pixelSize: 24
                                         font.hintingPreference: root.menuTextHintingPreference
@@ -2590,7 +2572,7 @@ Window {
                                         verticalAlignment: Text.AlignVCenter
                                         text: "Search destination"
                                         visible: searchInput.text.length === 0 && !searchInput.activeFocus
-                                        color: "#7092A7"
+                                        color: "#80868B"
                                         font.family: appTheme.fontMono
                                         font.pixelSize: 22
                                         font.hintingPreference: root.menuTextHintingPreference
@@ -2609,85 +2591,6 @@ Window {
                             }
                         }
 
-                        Row {
-                            visible: root.mapMenuStage === "search"
-                            width: parent.width
-                            height: 42
-                            spacing: 10
-
-                            Rectangle {
-                                width: (parent.width - 10) / 2
-                                height: parent.height
-                                radius: 13
-                                color: "#091722"
-                                border.width: 1
-                                border.color: root.gpsFixOk ? "#2D8F69" : "#806130"
-
-                                Row {
-                                    anchors.fill: parent
-                                    anchors.leftMargin: 12
-                                    anchors.rightMargin: 12
-                                    spacing: 9
-
-                                    Rectangle {
-                                        width: 10
-                                        height: 10
-                                        radius: 5
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        color: root.gpsFixOk ? "#7EF0B0" : "#FFCC5C"
-                                    }
-
-                                    Text {
-                                        width: parent.width - 19
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        text: root.gpsBadgeText()
-                                        color: "#EAF5FB"
-                                        font.family: appTheme.fontMono
-                                        font.pixelSize: 13
-                                        font.weight: Font.Bold
-                                        font.letterSpacing: 1.0
-                                        elide: Text.ElideRight
-                                    }
-                                }
-                            }
-
-                            Rectangle {
-                                width: (parent.width - 10) / 2
-                                height: parent.height
-                                radius: 13
-                                color: "#091722"
-                                border.width: 1
-                                border.color: root.hotspotState === "online" ? "#2D8F69" : "#456A7D"
-
-                                Row {
-                                    anchors.fill: parent
-                                    anchors.leftMargin: 12
-                                    anchors.rightMargin: 12
-                                    spacing: 9
-
-                                    Rectangle {
-                                        width: 10
-                                        height: 10
-                                        radius: 5
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        color: root.hotspotState === "online" ? "#7EF0B0" : "#9BC9DF"
-                                    }
-
-                                    Text {
-                                        width: parent.width - 19
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        text: root.hotspotBadgeText()
-                                        color: "#EAF5FB"
-                                        font.family: appTheme.fontMono
-                                        font.pixelSize: 13
-                                        font.weight: Font.Bold
-                                        font.letterSpacing: 1.0
-                                        elide: Text.ElideRight
-                                    }
-                                }
-                            }
-                        }
-
                         Timer {
                             id: suggestionDebounce
                             interval: 250
@@ -2702,12 +2605,12 @@ Window {
                                 : (root.mapMenuStage === "routing"
                                     ? 126
                                     : (root.mapMenuStage === "settings"
-                                        ? 372
+                                        ? 240
                                         : (root.searchKeyboardOpen ? 110 : 218)))
-                            radius: 16
-                            color: "#0A151F"
+                            radius: 22
+                            color: "#FFFFFF"
                             border.width: 1
-                            border.color: "#2A5A74"
+                            border.color: "#DADCE0"
 
                             Column {
                                 anchors.fill: parent
@@ -2720,9 +2623,9 @@ Window {
                                         : (root.mapMenuStage === "routing"
                                             ? "Building route"
                                             : (root.mapMenuStage === "settings"
-                                                ? "Map settings"
+                                                ? "Map layers"
                                                 : root.menuSearchTitle()))
-                                    color: (root.routeLookupInProgress || root.mapMenuStage === "routing") ? "#9FE7FF" : "#9FBFD2"
+                                    color: (root.routeLookupInProgress || root.mapMenuStage === "routing") ? "#1A73E8" : "#5F6368"
                                     font.family: appTheme.fontMono
                                     font.pixelSize: 14
                                     font.hintingPreference: root.menuTextHintingPreference
@@ -2754,9 +2657,9 @@ Window {
                                                 height: 64
                                                 radius: 12
                                                 antialiasing: false
-                                                color: suggestionMouse.containsMouse ? "#143346" : "#0F1B26"
+                                                color: suggestionMouse.containsMouse ? "#E8F0FE" : "#F8FAFF"
                                                 border.width: 1
-                                                border.color: suggestionMouse.containsMouse ? "#86D5FF" : "#24455A"
+                                                border.color: suggestionMouse.containsMouse ? "#1A73E8" : "#E2E8F0"
 
                                                 Column {
                                                     anchors.left: parent.left
@@ -2770,7 +2673,7 @@ Window {
                                                         width: parent.width
                                                         text: String(itemData.primary || itemData.label || "")
                                                         textFormat: Text.PlainText
-                                                        color: "#F5FBFF"
+                                                        color: "#202124"
                                                         font.family: appTheme.fontDisplay
                                                         font.pixelSize: 17
                                                         font.hintingPreference: root.menuTextHintingPreference
@@ -2785,7 +2688,7 @@ Window {
                                                                 ? root.formatDistanceMeters(itemData.distanceMeters)
                                                                 : ""))
                                                         textFormat: Text.PlainText
-                                                        color: "#8FB4C8"
+                                                        color: "#5F6368"
                                                         font.family: appTheme.fontMono
                                                         font.pixelSize: 11
                                                         font.hintingPreference: root.menuTextHintingPreference
@@ -2809,188 +2712,7 @@ Window {
                                 Column {
                                     visible: root.mapMenuStage === "settings"
                                     width: parent.width
-                                    spacing: 10
-
-                                    Row {
-                                        width: parent.width
-                                        height: 86
-                                        spacing: 10
-
-                                        Rectangle {
-                                            width: (parent.width - 10) / 2
-                                            height: parent.height
-                                            radius: 14
-                                            color: navigation.muted ? "#21151B" : "#0F202C"
-                                            border.width: 1
-                                            border.color: navigation.muted ? "#A35D74" : "#2F6A84"
-
-                                            Column {
-                                                anchors.fill: parent
-                                                anchors.margins: 12
-                                                spacing: 6
-
-                                                Text {
-                                                    width: parent.width
-                                                    text: "VOICE"
-                                                    color: "#7FAFC5"
-                                                    font.family: appTheme.fontMono
-                                                    font.pixelSize: 11
-                                                    font.weight: Font.Bold
-                                                    font.letterSpacing: 1.0
-                                                    font.hintingPreference: root.menuTextHintingPreference
-                                                    renderType: root.menuTextRenderType
-                                                }
-
-                                                Text {
-                                                    width: parent.width
-                                                    text: navigation.muted ? "Muted" : "Prompts on"
-                                                    color: "#F5FBFF"
-                                                    font.family: appTheme.fontDisplay
-                                                    font.pixelSize: 22
-                                                    font.weight: Font.DemiBold
-                                                    font.hintingPreference: root.menuTextHintingPreference
-                                                    renderType: root.menuTextRenderType
-                                                    elide: Text.ElideRight
-                                                }
-                                            }
-
-                                            MouseArea {
-                                                anchors.fill: parent
-                                                onClicked: navigation.setMuted(!navigation.muted)
-                                            }
-                                        }
-
-                                        Rectangle {
-                                            width: (parent.width - 10) / 2
-                                            height: parent.height
-                                            radius: 14
-                                            color: followUnlocked ? "#171D2A" : "#0F202C"
-                                            border.width: 1
-                                            border.color: followUnlocked ? "#7389FF" : "#2F6A84"
-
-                                            Column {
-                                                anchors.fill: parent
-                                                anchors.margins: 12
-                                                spacing: 6
-
-                                                Text {
-                                                    width: parent.width
-                                                    text: "CAMERA"
-                                                    color: "#7FAFC5"
-                                                    font.family: appTheme.fontMono
-                                                    font.pixelSize: 11
-                                                    font.weight: Font.Bold
-                                                    font.letterSpacing: 1.0
-                                                    font.hintingPreference: root.menuTextHintingPreference
-                                                    renderType: root.menuTextRenderType
-                                                }
-
-                                                Text {
-                                                    width: parent.width
-                                                    text: followUnlocked ? "Free pan" : "Following"
-                                                    color: "#F5FBFF"
-                                                    font.family: appTheme.fontDisplay
-                                                    font.pixelSize: 22
-                                                    font.weight: Font.DemiBold
-                                                    font.hintingPreference: root.menuTextHintingPreference
-                                                    renderType: root.menuTextRenderType
-                                                    elide: Text.ElideRight
-                                                }
-                                            }
-
-                                            MouseArea {
-                                                anchors.fill: parent
-                                                onClicked: {
-                                                    navigation.recenter()
-                                                    navField.setFollowEnabled(true)
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    Row {
-                                        width: parent.width
-                                        height: 86
-                                        spacing: 10
-
-                                        Rectangle {
-                                            width: (parent.width - 10) / 2
-                                            height: parent.height
-                                            radius: 14
-                                            color: "#0F202C"
-                                            border.width: 1
-                                            border.color: root.gpsFixOk ? "#2D8F69" : "#806130"
-
-                                            Column {
-                                                anchors.fill: parent
-                                                anchors.margins: 12
-                                                spacing: 6
-
-                                                Text {
-                                                    width: parent.width
-                                                    text: "GPS"
-                                                    color: "#7FAFC5"
-                                                    font.family: appTheme.fontMono
-                                                    font.pixelSize: 11
-                                                    font.weight: Font.Bold
-                                                    font.letterSpacing: 1.0
-                                                    font.hintingPreference: root.menuTextHintingPreference
-                                                    renderType: root.menuTextRenderType
-                                                }
-
-                                                Text {
-                                                    width: parent.width
-                                                    text: root.gpsBadgeText()
-                                                    color: "#F5FBFF"
-                                                    font.family: appTheme.fontDisplay
-                                                    font.pixelSize: 22
-                                                    font.weight: Font.DemiBold
-                                                    font.hintingPreference: root.menuTextHintingPreference
-                                                    renderType: root.menuTextRenderType
-                                                    elide: Text.ElideRight
-                                                }
-                                            }
-                                        }
-
-                                        Rectangle {
-                                            width: (parent.width - 10) / 2
-                                            height: parent.height
-                                            radius: 14
-                                            color: "#0F202C"
-                                            border.width: 1
-                                            border.color: root.hotspotState === "online" ? "#2D8F69" : "#456A7D"
-
-                                            Column {
-                                                anchors.fill: parent
-                                                anchors.margins: 12
-                                                spacing: 6
-
-                                                Text {
-                                                    width: parent.width
-                                                    text: "NETWORK"
-                                                    color: "#7FAFC5"
-                                                    font.family: appTheme.fontMono
-                                                    font.pixelSize: 11
-                                                    font.weight: Font.Bold
-                                                    font.letterSpacing: 1.0
-                                                    font.hintingPreference: root.menuTextHintingPreference
-                                                    renderType: root.menuTextRenderType
-                                                }
-
-                                                Text {
-                                                    width: parent.width
-                                                    text: root.hotspotBadgeText()
-                                                    color: "#F5FBFF"
-                                                    font.family: appTheme.fontDisplay
-                                                    font.pixelSize: 22
-                                                    font.weight: Font.DemiBold
-                                                    font.hintingPreference: root.menuTextHintingPreference
-                                                    renderType: root.menuTextRenderType
-                                                    elide: Text.ElideRight
-                                                }
-                                            }
-                                        }
-                                    }
+                                    spacing: 9
 
                                     Column {
                                         width: parent.width
@@ -2998,19 +2720,19 @@ Window {
 
                                         Text {
                                             width: parent.width
-                                            text: "MAP STYLE"
-                                            color: "#7FAFC5"
+                                            text: "Map type"
+                                            color: "#5F6368"
                                             font.family: appTheme.fontMono
-                                            font.pixelSize: 11
+                                            font.pixelSize: 13
                                             font.weight: Font.Bold
-                                            font.letterSpacing: 1.0
+                                            font.letterSpacing: 0.2
                                             font.hintingPreference: root.menuTextHintingPreference
                                             renderType: root.menuTextRenderType
                                         }
 
                                         Row {
                                             width: parent.width
-                                            height: 76
+                                            height: 104
                                             spacing: 8
 
                                             Repeater {
@@ -3020,23 +2742,23 @@ Window {
                                                     readonly property bool selected: String(modelData.id) === String(root.activeMapThemeOption.id)
                                                     width: (parent.width - 24) / 4
                                                     height: parent.height
-                                                    radius: 12
-                                                    color: selected ? "#143B52" : "#0F202C"
+                                                    radius: 18
+                                                    color: selected ? "#E8F0FE" : "#FFFFFF"
                                                     border.width: 1
-                                                    border.color: selected ? "#86D5FF" : "#2F6A84"
+                                                    border.color: selected ? "#1A73E8" : "#DADCE0"
 
                                                     Column {
                                                         anchors.fill: parent
-                                                        anchors.margins: 9
-                                                        spacing: 5
+                                                        anchors.margins: 10
+                                                        spacing: 6
 
                                                         Rectangle {
                                                             width: parent.width
-                                                            height: 16
-                                                            radius: 4
+                                                            height: 22
+                                                            radius: 7
                                                             color: modelData.swatchA
                                                             border.width: 1
-                                                            border.color: selected ? "#F7FBFF" : "#355B70"
+                                                            border.color: selected ? "#1A73E8" : "#CBD5E1"
 
                                                             Rectangle {
                                                                 width: parent.width * 0.44
@@ -3050,9 +2772,9 @@ Window {
                                                         Text {
                                                             width: parent.width
                                                             text: modelData.label
-                                                            color: "#F5FBFF"
+                                                            color: "#202124"
                                                             font.family: appTheme.fontDisplay
-                                                            font.pixelSize: 18
+                                                            font.pixelSize: 17
                                                             font.weight: Font.DemiBold
                                                             font.hintingPreference: root.menuTextHintingPreference
                                                             renderType: root.menuTextRenderType
@@ -3063,7 +2785,7 @@ Window {
                                                         Text {
                                                             width: parent.width
                                                             text: modelData.detail
-                                                            color: selected ? "#9FE7FF" : "#7FAFC5"
+                                                            color: selected ? "#174EA6" : "#5F6368"
                                                             font.family: appTheme.fontMono
                                                             font.pixelSize: 10
                                                             font.weight: Font.Bold
@@ -3078,6 +2800,65 @@ Window {
                                                         anchors.fill: parent
                                                         onClicked: root.selectMapTheme(modelData.id)
                                                     }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Row {
+                                        width: parent.width
+                                        height: 50
+                                        spacing: 8
+
+                                        Rectangle {
+                                            width: (parent.width - 8) / 2
+                                            height: parent.height
+                                            radius: 18
+                                            color: navigation.muted ? "#FFF1F3" : "#F8FAFF"
+                                            border.width: 1
+                                            border.color: navigation.muted ? "#F4A8B8" : "#DADCE0"
+
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: navigation.muted ? "Sound off" : "Sound on"
+                                                color: navigation.muted ? "#A50E0E" : "#3C4043"
+                                                font.family: appTheme.fontMono
+                                                font.pixelSize: 14
+                                                font.weight: Font.Bold
+                                                font.hintingPreference: root.menuTextHintingPreference
+                                                renderType: root.menuTextRenderType
+                                            }
+
+                                            MouseArea {
+                                                anchors.fill: parent
+                                                onClicked: navigation.setMuted(!navigation.muted)
+                                            }
+                                        }
+
+                                        Rectangle {
+                                            width: (parent.width - 8) / 2
+                                            height: parent.height
+                                            radius: 18
+                                            color: "#F8FAFF"
+                                            border.width: 1
+                                            border.color: followUnlocked ? "#AECBFA" : "#DADCE0"
+
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: followUnlocked ? "Recenter map" : "Following"
+                                                color: followUnlocked ? "#174EA6" : "#3C4043"
+                                                font.family: appTheme.fontMono
+                                                font.pixelSize: 14
+                                                font.weight: Font.Bold
+                                                font.hintingPreference: root.menuTextHintingPreference
+                                                renderType: root.menuTextRenderType
+                                            }
+
+                                            MouseArea {
+                                                anchors.fill: parent
+                                                onClicked: {
+                                                    navigation.recenter()
+                                                    navField.setFollowEnabled(true)
                                                 }
                                             }
                                         }
@@ -3364,9 +3145,9 @@ Window {
                                         && !root.hasActiveRoute)
                                 enabled: !blocked
                                 opacity: enabled ? 1.0 : 0.72
-                                color: blocked ? "#102635" : (root.mapMenuStage === "routes" ? "#1A7E62" : "#1F6A97")
+                                color: blocked ? "#E8EAED" : "#1A73E8"
                                 border.width: 1
-                                border.color: blocked ? "#345A70" : (root.mapMenuStage === "routes" ? "#8DF0D0" : "#82C9F2")
+                                border.color: blocked ? "#DADCE0" : "#1A73E8"
 
                                 function trigger() {
                                     if (root.mapMenuStage === "settings") {
@@ -3397,7 +3178,7 @@ Window {
                                         : (root.mapMenuStage === "settings"
                                             ? "DONE"
                                             : ((root.mapMenuStage === "routing" || root.routeLookupInProgress) ? "LOADING" : "FIND"))
-                                    color: "#F7FBFF"
+                                    color: blocked ? "#80868B" : "#FFFFFF"
                                     font.family: appTheme.fontMono
                                     font.pixelSize: 17
                                     font.weight: Font.Bold
@@ -3415,9 +3196,9 @@ Window {
                                 width: 132
                                 height: 50
                                 radius: 15
-                                color: root.mapMenuStage === "search" ? "#114261" : "#0B1720"
+                                color: "#FFFFFF"
                                 border.width: 1
-                                border.color: root.mapMenuStage === "search" ? "#84D8FF" : "#476679"
+                                border.color: "#DADCE0"
 
                                 Text {
                                     anchors.centerIn: parent
@@ -3426,7 +3207,7 @@ Window {
                                         : (root.mapMenuStage === "search"
                                             ? (root.followUnlocked ? "RECENTER" : "FOLLOW")
                                             : "BACK")
-                                    color: "#F5FBFF"
+                                    color: "#3C4043"
                                     font.family: appTheme.fontMono
                                     font.pixelSize: (root.mapMenuStage === "search" || root.mapMenuStage === "settings") && root.followUnlocked ? 14 : 17
                                     font.weight: Font.Bold
@@ -3451,21 +3232,20 @@ Window {
                             }
 
                             Rectangle {
+                                visible: root.mapMenuStage !== "settings"
                                 width: 112
                                 height: 50
                                 radius: 15
-                                color: "#0B1720"
+                                color: "#FFFFFF"
                                 border.width: 1
-                                border.color: "#476679"
+                                border.color: "#DADCE0"
 
                                 Text {
                                     anchors.centerIn: parent
-                                    text: root.mapMenuStage === "settings"
-                                        ? (navigation.muted ? "UNMUTE" : "MUTE")
-                                        : (root.mapMenuStage === "search"
-                                            ? (root.searchKeyboardOpen ? "HIDE" : "KEYS")
-                                            : "CENTER")
-                                    color: "#E6F1F8"
+                                    text: root.mapMenuStage === "search"
+                                        ? (root.searchKeyboardOpen ? "HIDE" : "KEYS")
+                                        : "CENTER"
+                                    color: "#3C4043"
                                     font.family: appTheme.fontMono
                                     font.pixelSize: 16
                                     font.weight: Font.Bold
@@ -3475,9 +3255,7 @@ Window {
                                 MouseArea {
                                     anchors.fill: parent
                                     onClicked: {
-                                        if (root.mapMenuStage === "settings")
-                                            navigation.setMuted(!navigation.muted)
-                                        else if (root.mapMenuStage === "search")
+                                        if (root.mapMenuStage === "search")
                                             root.searchKeyboardOpen = !root.searchKeyboardOpen
                                         else
                                             navigation.recenter()
@@ -3486,17 +3264,18 @@ Window {
                             }
 
                             Rectangle {
+                                visible: root.mapMenuStage === "search" && searchInput.text.length > 0
                                 width: 112
                                 height: 50
                                 radius: 15
-                                color: "#0B1720"
+                                color: "#FFFFFF"
                                 border.width: 1
-                                border.color: "#476679"
+                                border.color: "#DADCE0"
 
                                 Text {
                                     anchors.centerIn: parent
                                     text: "CLEAR"
-                                    color: "#E6F1F8"
+                                    color: "#3C4043"
                                     font.family: appTheme.fontMono
                                     font.pixelSize: 16
                                     font.weight: Font.Bold
