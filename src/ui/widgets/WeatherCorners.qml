@@ -1295,7 +1295,7 @@ Item {
                                         color: "#F8FBFF"
                                         border.width: 1
                                         border.color: "#58FFE1"
-                                        visible: nowPlayingService && nowPlayingService.spotifyPairingActive && nowPlayingService.spotifyPairingQrRows.length > 0
+                                        visible: nowPlayingService && nowPlayingService.spotifyPairingActive && nowPlayingService.spotifyPairingQrPattern.length > 0
 
                                         Canvas {
                                             id: spotifyQrCanvas
@@ -1322,11 +1322,14 @@ Item {
                                                 ctx.fillRect(0, 0, width, height)
                                                 if (!nowPlayingService)
                                                     return
-                                                const rows = nowPlayingService.spotifyPairingQrRows
-                                                if (!rows || rows.length === 0)
+                                                const pattern = String(nowPlayingService.spotifyPairingQrPattern)
+                                                const rows = pattern.length > 0 ? pattern.split("\n") : []
+                                                if (rows.length === 0)
                                                     return
                                                 const n = rows.length
                                                 const scale = Math.floor(Math.min(width, height) / n)
+                                                if (scale <= 0)
+                                                    return
                                                 const offsetX = Math.floor((width - scale * n) / 2)
                                                 const offsetY = Math.floor((height - scale * n) / 2)
                                                 ctx.fillStyle = "#05060A"
@@ -1349,7 +1352,7 @@ Item {
                                         color: "#05060A"
                                         border.width: 1
                                         border.color: "#5C4B90"
-                                        visible: !nowPlayingService || !nowPlayingService.spotifyPairingActive || nowPlayingService.spotifyPairingQrRows.length === 0
+                                        visible: !nowPlayingService || !nowPlayingService.spotifyPairingActive || nowPlayingService.spotifyPairingQrPattern.length === 0
 
                                         OemIcon {
                                             anchors.centerIn: parent

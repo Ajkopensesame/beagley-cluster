@@ -27,6 +27,7 @@ class NowPlayingService : public QObject
     Q_PROPERTY(QString spotifyPairingUrl READ spotifyPairingUrl NOTIFY spotifyPairingChanged)
     Q_PROPERTY(QString spotifyPairingCode READ spotifyPairingCode NOTIFY spotifyPairingChanged)
     Q_PROPERTY(QStringList spotifyPairingQrRows READ spotifyPairingQrRows NOTIFY spotifyPairingChanged)
+    Q_PROPERTY(QString spotifyPairingQrPattern READ spotifyPairingQrPattern NOTIFY spotifyPairingChanged)
 
 public:
     enum class Backend {
@@ -60,6 +61,7 @@ public:
     QString spotifyPairingUrl() const { return m_pairingUrl; }
     QString spotifyPairingCode() const { return m_pairingCode; }
     QStringList spotifyPairingQrRows() const { return m_pairingQrRows; }
+    QString spotifyPairingQrPattern() const { return m_pairingQrRows.join(QLatin1Char('\n')); }
 
     Q_INVOKABLE void refresh();
     Q_INVOKABLE void playPause();
