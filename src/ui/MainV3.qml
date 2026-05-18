@@ -3548,7 +3548,7 @@ Window {
                                         : (root.mapMenuStage === "settings"
                                             ? "DONE"
                                             : ((root.mapMenuStage === "routing" || root.routeLookupInProgress) ? "LOADING" : "FIND"))
-                                    color: blocked ? root.menuTextMutedColor : "#FFFFFF"
+                                    color: routeButton.blocked ? root.menuTextMutedColor : "#FFFFFF"
                                     font.family: appTheme.fontMono
                                     font.pixelSize: 17
                                     font.weight: Font.Bold
