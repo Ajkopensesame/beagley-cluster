@@ -82,7 +82,7 @@ NowPlayingService::NowPlayingService(QObject *parent)
         }
         QProcess *process = m_process;
         process->kill();
-        finishProcess(process, true, QStringLiteral("Media query timed out"));
+        finishProcess(process, true, sourceLabel() + QStringLiteral(" did not respond"));
     });
 
     QTimer::singleShot(500, this, &NowPlayingService::refresh);
@@ -113,7 +113,7 @@ void NowPlayingService::refresh()
     });
     connect(process, &QProcess::errorOccurred, this, [this, process](QProcess::ProcessError error) {
         if (error == QProcess::FailedToStart) {
-            finishProcess(process, true, QStringLiteral("Media player command unavailable"));
+            finishProcess(process, true, sourceLabel() + QStringLiteral(" not connected"));
         }
     });
 
@@ -228,7 +228,7 @@ void NowPlayingService::finishProcess(QProcess *process, bool commandFailed, con
     if (commandFailed || exitCode != 0) {
         const QString detail = !fallbackDetail.isEmpty()
             ? fallbackDetail
-            : (!stdErr.isEmpty() ? stdErr : QStringLiteral("Spotify not available"));
+            : (!stdErr.isEmpty() ? stdErr : sourceLabel() + QStringLiteral(" not available"));
         const QString lowerDetail = detail.toLower();
         const QString status = lowerDetail.contains(QStringLiteral("not authorized"))
                 || lowerDetail.contains(QStringLiteral("not authorised"))

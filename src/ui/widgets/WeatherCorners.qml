@@ -1204,9 +1204,10 @@ Item {
                                         width: 64
                                         height: 64
                                         icon: "audio"
-                                        active: root.musicPlaying
-                                        color: "#F7FBFF"
-                                        accentColor: "#58FFE1"
+                                        active: true
+                                        opacity: root.musicAvailable ? 1.0 : 0.62
+                                        color: root.musicAvailable ? "#F7FBFF" : "#7D86A6"
+                                        accentColor: root.musicAvailable ? "#58FFE1" : "#5C6688"
                                         strokeWidth: 5.0
                                     }
                                 }
