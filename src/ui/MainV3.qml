@@ -989,6 +989,8 @@ Window {
     function spotifySetupStatusLine() {
         if (!root.nowPlayingService)
             return "Spotify service unavailable"
+        if (!root.spotifyPairingSupported)
+            return "Spotify setup required"
         if (root.spotifyPairingActive && root.nowPlayingService.spotifyPairingStatus.length > 0)
             return root.nowPlayingService.spotifyPairingStatus
         if (root.musicAuthRequired())
@@ -1000,7 +1002,7 @@ Window {
 
     function spotifyActionLabel() {
         if (!root.spotifyPairingSupported)
-            return "UNAVAILABLE"
+            return "SETUP"
         if (root.spotifyPairingActive)
             return "CANCEL"
         if (root.musicAuthRequired())
@@ -1009,8 +1011,12 @@ Window {
     }
 
     function triggerSpotifySetup() {
-        if (!root.nowPlayingService || !root.spotifyPairingSupported)
+        if (!root.nowPlayingService)
             return
+        if (!root.spotifyPairingSupported) {
+            root.mapMenuStage = "spotify"
+            return
+        }
         if (root.spotifyPairingActive) {
             root.nowPlayingService.cancelSpotifyPairing()
             return
@@ -3425,7 +3431,7 @@ Window {
                                                     height: 40
                                                     anchors.verticalCenter: parent.verticalCenter
                                                     radius: 14
-                                                    enabled: root.spotifyPairingSupported
+                                                    enabled: !!root.nowPlayingService
                                                     opacity: enabled ? 1.0 : 0.56
                                                     color: spotifySetupMouse.pressed && enabled ? root.menuSurfaceSelectedColor : root.menuSurfaceColor
                                                     border.width: 1
@@ -3434,7 +3440,7 @@ Window {
                                                     Text {
                                                         anchors.centerIn: parent
                                                         text: root.spotifyActionLabel()
-                                                        color: root.spotifyPairingSupported ? root.menuTextPrimaryColor : root.menuTextMutedColor
+                                                        color: root.nowPlayingService ? root.menuTextPrimaryColor : root.menuTextMutedColor
                                                         font.family: appTheme.fontMono
                                                         font.pixelSize: 12
                                                         font.weight: Font.Bold
