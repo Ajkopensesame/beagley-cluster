@@ -373,6 +373,7 @@ Window {
         ["SPACE", ".", ",", "-", "BACKSPACE", "CLEAR"]
     ]
     property bool mapMenuOpen: false
+    property bool mapMenuSystemMode: false
     property bool navControlsOpen: false
     property bool searchKeyboardOpen: false
     property string mapMenuStage: "search"
@@ -926,6 +927,7 @@ Window {
         root.mapMenuOpen = true
         root.searchKeyboardOpen = false
         root.awaitingRoutePreview = false
+        root.mapMenuSystemMode = requestedStage === "settings" || requestedStage === "spotify"
         if (hasActiveRoute && navigation.activeRoute.destination)
             pendingDestination = navigation.activeRoute.destination
         root.mapMenuStage = requestedStage.length > 0
@@ -945,6 +947,8 @@ Window {
             }
         }
         root.mapMenuStage = stage
+        if (stage === "search" || stage === "routes" || stage === "routing")
+            root.mapMenuSystemMode = false
         root.searchKeyboardOpen = false
         if (stage === "routes")
             root.syncSelectedRouteIndexFromNavigation()
@@ -953,7 +957,7 @@ Window {
     }
 
     function mapMenuTitleText() {
-        if (root.mapMenuStage === "settings" || root.mapMenuStage === "spotify")
+        if (root.mapMenuSystemMode)
             return "Menu"
         return "Maps"
     }
@@ -964,7 +968,7 @@ Window {
         if (root.mapMenuStage === "routing")
             return "Building route"
         if (root.mapMenuStage === "settings")
-            return "Settings"
+            return root.mapMenuSystemMode ? "Cluster settings" : "Map style"
         if (root.mapMenuStage === "spotify")
             return "Spotify setup"
         return root.menuSearchTitle()
@@ -1271,6 +1275,11 @@ Window {
     }
 
     function mapMenuSubtitleText() {
+        if (root.mapMenuSystemMode) {
+            if (root.mapMenuStage === "spotify")
+                return "Scan the code to connect now playing"
+            return "Cluster settings and connections"
+        }
         const theme = root.normalizedThemeMode === "auto"
             ? ("Auto " + (root.menuDarkChrome ? "dark" : "light"))
             : (root.menuDarkChrome ? "Dark" : "Light")
@@ -1291,6 +1300,7 @@ Window {
         const bootStage = root.normalizedMapMenuStage(root.initialMapMenuStage)
         if (bootStage.length > 0 || root.initialMapSearchQuery.length > 0) {
             root.mapMenuStage = bootStage.length > 0 ? bootStage : "search"
+            root.mapMenuSystemMode = root.mapMenuStage === "settings" || root.mapMenuStage === "spotify"
             root.mapMenuOpen = true
             root.searchKeyboardOpen = root.initialMapSearchKeyboard && root.mapMenuStage === "search"
         }
@@ -1298,6 +1308,7 @@ Window {
             searchInput.text = root.initialMapSearchQuery
             searchInput.cursorPosition = searchInput.text.length
             root.mapMenuStage = "search"
+            root.mapMenuSystemMode = false
             root.searchKeyboardOpen = root.initialMapSearchKeyboard
             Qt.callLater(function() {
                 if (root.searchKeyboardOpen)
@@ -2740,16 +2751,18 @@ Window {
                             width: parent.width
                             height: 42
                             spacing: 10
+                            readonly property bool systemTabs: root.mapMenuSystemMode
                             readonly property bool routeTabVisible: root.mapMenuStage === "routing"
                                 || root.awaitingRoutePreview
                                 || root.routeLookupInProgress
                                 || root.availableRouteOptions().length > 0
                                 || root.hasActiveRoute
-                            readonly property int tabCount: routeTabVisible ? 3 : 2
+                            readonly property int tabCount: systemTabs ? 2 : (routeTabVisible ? 3 : 2)
                             readonly property real tabWidth: (width - spacing * (tabCount - 1)) / tabCount
 
                             Rectangle {
-                                width: mapMenuTabs.tabWidth
+                                visible: !mapMenuTabs.systemTabs
+                                width: visible ? mapMenuTabs.tabWidth : 0
                                 height: parent.height
                                 radius: 21
                                 color: root.mapMenuStage === "search" ? root.menuSurfaceSelectedColor : root.menuSurfaceColor
@@ -2776,8 +2789,8 @@ Window {
 
                             Rectangle {
                                 id: routeTab
-                                visible: mapMenuTabs.routeTabVisible
-                                width: mapMenuTabs.tabWidth
+                                visible: !mapMenuTabs.systemTabs && mapMenuTabs.routeTabVisible
+                                width: visible ? mapMenuTabs.tabWidth : 0
                                 height: parent.height
                                 radius: 21
                                 color: (root.mapMenuStage === "routes" || root.mapMenuStage === "routing") ? root.menuSurfaceSelectedColor : root.menuSurfaceColor
@@ -2806,14 +2819,14 @@ Window {
                                 width: mapMenuTabs.tabWidth
                                 height: parent.height
                                 radius: 21
-                                color: (root.mapMenuStage === "settings" || root.mapMenuStage === "spotify") ? root.menuSurfaceSelectedColor : root.menuSurfaceColor
+                                color: root.mapMenuStage === "settings" ? root.menuSurfaceSelectedColor : root.menuSurfaceColor
                                 border.width: 1
-                                border.color: (root.mapMenuStage === "settings" || root.mapMenuStage === "spotify") ? root.menuAccentColor : root.menuBorderColor
+                                border.color: root.mapMenuStage === "settings" ? root.menuAccentColor : root.menuBorderColor
 
                                 Text {
                                     anchors.centerIn: parent
-                                    text: "Menu"
-                                    color: (root.mapMenuStage === "settings" || root.mapMenuStage === "spotify") ? root.menuAccentColor : root.menuTextSecondaryColor
+                                    text: mapMenuTabs.systemTabs ? "Settings" : "Style"
+                                    color: root.mapMenuStage === "settings" ? root.menuAccentColor : root.menuTextSecondaryColor
                                     font.family: appTheme.fontMono
                                     font.pixelSize: 13
                                     font.weight: Font.Bold
@@ -2825,6 +2838,33 @@ Window {
                                 MouseArea {
                                     anchors.fill: parent
                                     onClicked: root.chooseMapMenuTab("settings")
+                                }
+                            }
+
+                            Rectangle {
+                                visible: mapMenuTabs.systemTabs
+                                width: visible ? mapMenuTabs.tabWidth : 0
+                                height: parent.height
+                                radius: 21
+                                color: root.mapMenuStage === "spotify" ? root.menuSurfaceSelectedColor : root.menuSurfaceColor
+                                border.width: 1
+                                border.color: root.mapMenuStage === "spotify" ? root.menuAccentColor : root.menuBorderColor
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "Spotify"
+                                    color: root.mapMenuStage === "spotify" ? root.menuAccentColor : root.menuTextSecondaryColor
+                                    font.family: appTheme.fontMono
+                                    font.pixelSize: 13
+                                    font.weight: Font.Bold
+                                    font.letterSpacing: 1.0
+                                    font.hintingPreference: root.menuTextHintingPreference
+                                    renderType: root.menuTextRenderType
+                                }
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    onClicked: root.chooseMapMenuTab("spotify")
                                 }
                             }
                         }
@@ -2967,7 +3007,7 @@ Window {
                                 : (root.mapMenuStage === "routing"
                                     ? 126
                                     : (root.mapMenuStage === "settings"
-                                        ? 430
+                                        ? (root.mapMenuSystemMode ? 334 : 342)
                                         : (root.mapMenuStage === "spotify"
                                             ? 350
                                         : (root.searchKeyboardOpen ? 190 : 258)))
@@ -3215,6 +3255,7 @@ Window {
                                     }
 
                                     Column {
+                                        visible: !root.mapMenuSystemMode
                                         width: parent.width
                                         spacing: 8
 
@@ -3306,6 +3347,7 @@ Window {
                                     }
 
                                     Column {
+                                        visible: root.mapMenuSystemMode
                                         width: parent.width
                                         spacing: 8
 
@@ -3427,7 +3469,9 @@ Window {
 
                                             Text {
                                                 anchors.centerIn: parent
-                                                text: navigation.muted ? "Sound off" : "Sound on"
+                                                text: root.mapMenuSystemMode
+                                                    ? (navigation.muted ? "Audio cues off" : "Audio cues on")
+                                                    : (navigation.muted ? "Sound off" : "Sound on")
                                                 color: navigation.muted ? "#D93025" : root.menuTextPrimaryColor
                                                 font.family: appTheme.fontMono
                                                 font.pixelSize: 13
@@ -3448,12 +3492,18 @@ Window {
                                             radius: 18
                                             color: root.menuSurfaceAltColor
                                             border.width: 1
-                                            border.color: followUnlocked ? root.menuAccentColor : root.menuBorderColor
+                                            border.color: root.mapMenuSystemMode
+                                                ? (hotspotState === "online" ? "#2E8B67" : root.menuBorderColor)
+                                                : (followUnlocked ? root.menuAccentColor : root.menuBorderColor)
 
                                             Text {
                                                 anchors.centerIn: parent
-                                                text: followUnlocked ? "Recenter map" : "Following"
-                                                color: followUnlocked ? root.menuAccentColor : root.menuTextPrimaryColor
+                                                text: root.mapMenuSystemMode
+                                                    ? (hotspotState === "online" ? "Wi-Fi details" : "Set up Wi-Fi")
+                                                    : (followUnlocked ? "Recenter map" : "Following")
+                                                color: root.mapMenuSystemMode
+                                                    ? (hotspotState === "online" ? "#8AF0B7" : root.menuTextPrimaryColor)
+                                                    : (followUnlocked ? root.menuAccentColor : root.menuTextPrimaryColor)
                                                 font.family: appTheme.fontMono
                                                 font.pixelSize: 13
                                                 font.weight: Font.Bold
@@ -3464,6 +3514,12 @@ Window {
                                             MouseArea {
                                                 anchors.fill: parent
                                                 onClicked: {
+                                                    if (root.mapMenuSystemMode) {
+                                                        wifiOverlay.openPrompt()
+                                                        root.mapMenuOpen = false
+                                                        root.searchKeyboardOpen = false
+                                                        return
+                                                    }
                                                     navigation.recenter()
                                                     navField.setFollowEnabled(true)
                                                 }
@@ -4005,16 +4061,18 @@ Window {
 
                                 Text {
                                     anchors.centerIn: parent
-                                    text: root.mapMenuStage === "settings"
+                                    text: root.mapMenuSystemMode
+                                        ? (root.mapMenuStage === "spotify" ? "SETTINGS" : "SPOTIFY")
+                                        : (root.mapMenuStage === "settings"
                                         ? (root.followUnlocked ? "RECENTER" : "FOLLOW")
                                         : (root.mapMenuStage === "spotify"
                                             ? "MENU"
                                         : (root.mapMenuStage === "search"
                                             ? (root.followUnlocked ? "RECENTER" : "FOLLOW")
-                                            : "BACK"))
+                                            : "BACK")))
                                     color: root.menuTextPrimaryColor
                                     font.family: appTheme.fontMono
-                                    font.pixelSize: (root.mapMenuStage === "search" || root.mapMenuStage === "settings") && root.followUnlocked ? 14 : 17
+                                    font.pixelSize: (!root.mapMenuSystemMode && (root.mapMenuStage === "search" || root.mapMenuStage === "settings") && root.followUnlocked) ? 14 : 17
                                     font.weight: Font.Bold
                                     font.letterSpacing: 1.2
                                 }
@@ -4022,7 +4080,9 @@ Window {
                                 MouseArea {
                                     anchors.fill: parent
                                     onClicked: {
-                                        if (root.mapMenuStage === "spotify") {
+                                        if (root.mapMenuSystemMode) {
+                                            root.chooseMapMenuTab(root.mapMenuStage === "spotify" ? "settings" : "spotify")
+                                        } else if (root.mapMenuStage === "spotify") {
                                             root.chooseMapMenuTab("settings")
                                         } else if (root.mapMenuStage === "search" || root.mapMenuStage === "settings") {
                                             navigation.recenter()

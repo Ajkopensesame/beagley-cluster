@@ -17,6 +17,7 @@ Item {
     readonly property string monoFont: theme && theme.fontMono ? theme.fontMono : "Oxanium"
     readonly property real side: Math.min(width, height)
     readonly property bool menuIcon: root.icon === "menu"
+    readonly property color podFaceColor: root.menuIcon ? "#020409" : Qt.rgba(0.01, 0.02, 0.04, 0.86)
 
     CornerPodFrame {
         id: frame
@@ -27,15 +28,27 @@ Item {
         active: true
 
         Rectangle {
-            id: actionFace
-            width: Math.round(frame.side * 0.615)
+            visible: root.menuIcon
+            width: Math.round(frame.side * 0.720)
             height: width
             radius: width / 2
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.verticalCenter: parent.verticalCenter
-            color: Qt.rgba(0.01, 0.02, 0.04, 0.86)
+            color: "#020409"
+            border.width: Math.max(1, Math.round(frame.side * 0.010))
+            border.color: Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, 0.28)
+        }
+
+        Rectangle {
+            id: actionFace
+            width: Math.round(frame.side * (root.menuIcon ? 0.650 : 0.615))
+            height: width
+            radius: width / 2
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.verticalCenter: parent.verticalCenter
+            color: root.podFaceColor
             border.width: Math.max(3, Math.round(frame.side * 0.018))
-            border.color: Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, 0.66)
+            border.color: Qt.rgba(root.accentColor.r, root.accentColor.g, root.accentColor.b, root.menuIcon ? 0.78 : 0.66)
         }
 
         Rectangle {
@@ -43,12 +56,13 @@ Item {
             height: width
             radius: width / 2
             anchors.centerIn: actionFace
-            color: "transparent"
+            color: root.menuIcon ? Qt.rgba(0.02, 0.03, 0.07, 0.72) : "transparent"
             border.width: 1
-            border.color: Qt.rgba(0.86, 0.90, 0.98, 0.20)
+            border.color: Qt.rgba(0.86, 0.90, 0.98, root.menuIcon ? 0.14 : 0.20)
         }
 
         Rectangle {
+            visible: !root.menuIcon
             width: Math.round(frame.side * 0.150)
             height: Math.max(2, Math.round(frame.side * 0.018))
             radius: height / 2
