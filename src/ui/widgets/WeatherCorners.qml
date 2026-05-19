@@ -999,7 +999,7 @@ Item {
         }
     }
 
-    WeatherCornerWidget {
+    WidgetLocal.WeatherCornerWidget {
         id: weatherCorner
         width: root.podSize
         height: root.podSize
@@ -1148,7 +1148,7 @@ Item {
         }
     }
 
-    MapMenuCornerWidget {
+    WidgetLocal.MapMenuCornerWidget {
         id: menuCorner
         width: root.podSize
         height: root.podSize
@@ -1169,7 +1169,7 @@ Item {
         }
     }
 
-    MapMenuCornerWidget {
+    WidgetLocal.MapMenuCornerWidget {
         id: mapMenuCorner
         width: root.podSize
         height: root.podSize
