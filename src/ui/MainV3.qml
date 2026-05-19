@@ -3541,40 +3541,36 @@ Window {
 
                                     Rectangle {
                                         width: parent.width
-                                        height: 178
+                                        height: 274
                                         radius: 18
                                         color: root.menuSurfaceAltColor
                                         border.width: 1
-                                        border.color: root.spotifyPairingActive ? root.menuAccentColor : root.menuBorderColor
+                                        border.color: root.menuBorderColor
 
                                         Row {
                                             anchors.fill: parent
-                                            anchors.margins: 14
-                                            spacing: 16
+                                            anchors.margins: 18
+                                            spacing: 22
 
                                             Rectangle {
                                                 id: spotifyQrBox
-                                                width: 150
-                                                height: 150
-                                                radius: 8
+                                                width: 238
+                                                height: 238
+                                                radius: 6
                                                 anchors.verticalCenter: parent.verticalCenter
-                                                color: "#F8FBFF"
-                                                border.width: 1
-                                                border.color: root.menuAccentColor
+                                                color: "#FFFFFF"
+                                                border.width: 0
                                                 visible: root.spotifyPairingActive
                                                     && root.nowPlayingService
                                                     && root.nowPlayingService.spotifyPairingQrPattern.length > 0
                                                 property string qrPattern: root.nowPlayingService ? String(root.nowPlayingService.spotifyPairingQrPattern) : ""
                                                 property var qrRows: qrPattern.length > 0 ? qrPattern.split("\n") : []
                                                 property int qrModuleCount: qrRows.length
-                                                property int qrModuleSize: qrModuleCount > 0 ? Math.floor((Math.min(width, height) - 18) / qrModuleCount) : 1
+                                                property int qrModuleSize: qrModuleCount > 0 ? Math.floor((Math.min(width, height) - 28) / qrModuleCount) : 1
                                                 property var qrModules: qrPattern.length > 0 ? qrPattern.replace(/\n/g, "").split("") : []
 
-                                                Grid {
+                                                Item {
                                                     anchors.centerIn: parent
-                                                    columns: Math.max(1, spotifyQrBox.qrModuleCount)
-                                                    rows: Math.max(1, spotifyQrBox.qrModuleCount)
-                                                    spacing: 0
                                                     width: spotifyQrBox.qrModuleCount * spotifyQrBox.qrModuleSize
                                                     height: width
 
@@ -3582,18 +3578,20 @@ Window {
                                                         model: spotifyQrBox.qrModules
 
                                                         Rectangle {
+                                                            x: (index % spotifyQrBox.qrModuleCount) * spotifyQrBox.qrModuleSize
+                                                            y: Math.floor(index / spotifyQrBox.qrModuleCount) * spotifyQrBox.qrModuleSize
                                                             width: spotifyQrBox.qrModuleSize
                                                             height: spotifyQrBox.qrModuleSize
-                                                            color: modelData === "1" ? "#05060A" : "#F8FBFF"
+                                                            color: modelData === "1" ? "#000000" : "#FFFFFF"
                                                         }
                                                     }
                                                 }
                                             }
 
                                             Rectangle {
-                                                width: 150
-                                                height: 150
-                                                radius: 75
+                                                width: 238
+                                                height: 238
+                                                radius: 119
                                                 anchors.verticalCenter: parent.verticalCenter
                                                 color: root.menuSurfaceColor
                                                 border.width: 1
@@ -3602,8 +3600,8 @@ Window {
 
                                                 OemIcon {
                                                     anchors.centerIn: parent
-                                                    width: 70
-                                                    height: 70
+                                                    width: 96
+                                                    height: 96
                                                     icon: "audio"
                                                     active: root.musicPlaying
                                                     color: root.menuTextPrimaryColor
@@ -3613,16 +3611,16 @@ Window {
                                             }
 
                                             Column {
-                                                width: parent.width - 166
+                                                width: parent.width - 260
                                                 anchors.verticalCenter: parent.verticalCenter
-                                                spacing: 8
+                                                spacing: 10
 
                                                 Text {
                                                     width: parent.width
                                                     text: "Spotify now playing"
                                                     color: root.menuTextPrimaryColor
                                                     font.family: appTheme.fontDisplay
-                                                    font.pixelSize: 24
+                                                    font.pixelSize: 26
                                                     font.weight: Font.DemiBold
                                                     font.hintingPreference: root.menuTextHintingPreference
                                                     renderType: root.menuTextRenderType
@@ -3632,9 +3630,9 @@ Window {
                                                 Text {
                                                     width: parent.width
                                                     text: root.spotifySetupStatusLine()
-                                                    color: root.spotifyPairingActive ? root.menuAccentColor : root.menuTextSecondaryColor
+                                                    color: root.spotifyPairingActive ? "#FFFFFF" : root.menuTextSecondaryColor
                                                     font.family: appTheme.fontMono
-                                                    font.pixelSize: 12
+                                                    font.pixelSize: 13
                                                     font.weight: Font.Bold
                                                     font.hintingPreference: root.menuTextHintingPreference
                                                     renderType: root.menuTextRenderType
@@ -3649,9 +3647,9 @@ Window {
                                                         : (root.musicAvailable ? root.musicNowPlayingLine() : "SCAN TO CONNECT")
                                                     color: root.musicAvailable ? root.menuAccentColor : root.menuTextPrimaryColor
                                                     font.family: appTheme.fontMono
-                                                    font.pixelSize: root.nowPlayingService && root.nowPlayingService.spotifyPairingCode.length > 0 ? 22 : 13
+                                                    font.pixelSize: root.nowPlayingService && root.nowPlayingService.spotifyPairingCode.length > 0 ? 34 : 13
                                                     font.weight: Font.Bold
-                                                    font.letterSpacing: 0.8
+                                                    font.letterSpacing: 0
                                                     font.hintingPreference: root.menuTextHintingPreference
                                                     renderType: root.menuTextRenderType
                                                     elide: Text.ElideRight
@@ -3691,6 +3689,7 @@ Window {
                                     }
 
                                     Rectangle {
+                                        visible: !root.spotifyPairingActive
                                         width: parent.width
                                         height: 96
                                         radius: 16

@@ -1412,26 +1412,22 @@ Item {
 
                                     Rectangle {
                                         id: spotifyQrBox
-                                        width: 136
-                                        height: 136
+                                        width: 148
+                                        height: 148
                                         radius: 6
                                         anchors.verticalCenter: parent.verticalCenter
-                                        color: "#F8FBFF"
-                                        border.width: 1
-                                        border.color: "#58FFE1"
+                                        color: "#FFFFFF"
+                                        border.width: 0
                                         visible: nowPlayingService && nowPlayingService.spotifyPairingActive && nowPlayingService.spotifyPairingQrPattern.length > 0
                                         property string qrPattern: nowPlayingService ? String(nowPlayingService.spotifyPairingQrPattern) : ""
                                         property var qrRows: qrPattern.length > 0 ? qrPattern.split("\n") : []
                                         property int qrModuleCount: qrRows.length
-                                        property int qrModuleSize: qrModuleCount > 0 ? Math.floor((Math.min(width, height) - 16) / qrModuleCount) : 1
+                                        property int qrModuleSize: qrModuleCount > 0 ? Math.floor((Math.min(width, height) - 20) / qrModuleCount) : 1
                                         property var qrModules: qrPattern.length > 0 ? qrPattern.replace(/\n/g, "").split("") : []
 
-                                        Grid {
+                                        Item {
                                             id: spotifyQrGrid
                                             anchors.centerIn: parent
-                                            columns: Math.max(1, spotifyQrBox.qrModuleCount)
-                                            rows: Math.max(1, spotifyQrBox.qrModuleCount)
-                                            spacing: 0
                                             width: spotifyQrBox.qrModuleCount * spotifyQrBox.qrModuleSize
                                             height: width
 
@@ -1439,9 +1435,11 @@ Item {
                                                 model: spotifyQrBox.qrModules
 
                                                 Rectangle {
+                                                    x: (index % spotifyQrBox.qrModuleCount) * spotifyQrBox.qrModuleSize
+                                                    y: Math.floor(index / spotifyQrBox.qrModuleCount) * spotifyQrBox.qrModuleSize
                                                     width: spotifyQrBox.qrModuleSize
                                                     height: spotifyQrBox.qrModuleSize
-                                                    color: modelData === "1" ? "#05060A" : "#F8FBFF"
+                                                    color: modelData === "1" ? "#000000" : "#FFFFFF"
                                                 }
                                             }
                                         }

@@ -302,7 +302,7 @@ QStringList qrRowsForShortText(const QString &text)
 {
     const QByteArray payload = text.toUtf8();
     constexpr int version = 5;
-    constexpr int size = 21 + version * 4;
+    constexpr int size = 21 + (version - 1) * 4;
     constexpr int dataCodewords = 108;
     constexpr int eccCodewords = 26;
     if (payload.size() > 106) {
