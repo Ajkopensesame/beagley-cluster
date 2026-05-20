@@ -1041,18 +1041,18 @@ Item {
     Rectangle {
         id: nowPlayingTicker
         z: 20
-        width: Math.floor(Math.min(560, Math.max(280, parent.width - root.podSize * 2.42)))
-        height: 34
+        width: Math.floor(Math.min(620, Math.max(320, parent.width - root.podSize * 2.42)))
+        height: 36
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: parent.top
         anchors.topMargin: Math.max(10, Math.round(root.podSize * 0.10))
         visible: root.musicAvailable && root.musicTickerLine().length > 0
         opacity: visible ? 1 : 0
-        radius: 17
-        clip: true
-        color: Qt.rgba(0.0, 0.0, 0.0, 0.68)
+        radius: height * 0.5
+        clip: false
+        color: "#05070B"
         border.width: 1
-        border.color: root.musicPlaying ? Qt.rgba(0.35, 1.0, 0.88, 0.42) : Qt.rgba(0.61, 0.70, 1.0, 0.34)
+        border.color: root.musicPlaying ? "#16464A" : "#253145"
 
         Behavior on opacity { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
 
@@ -1066,7 +1066,7 @@ Item {
             icon: "audio"
             active: root.musicPlaying
             color: "#F7FBFF"
-            accentColor: "#58FFE1"
+            accentColor: "#4FF3D2"
             strokeWidth: 2.4
         }
 
@@ -1076,75 +1076,40 @@ Item {
             anchors.leftMargin: 8
             anchors.verticalCenter: parent.verticalCenter
             text: root.musicPlaying ? root.musicSourceLine() : "PAUSED"
-            color: root.musicPlaying ? "#58FFE1" : "#9DB4FF"
+            color: root.musicPlaying ? "#4FF3D2" : "#9DB4FF"
             font.family: root.monoFont
             font.pixelSize: 10
             font.weight: Font.Bold
             font.letterSpacing: 0
         }
 
-        Item {
-            id: tickerTrack
+        Rectangle {
+            id: tickerDivider
+            width: 1
+            height: 18
+            radius: 0
             anchors.left: tickerSource.right
-            anchors.leftMargin: 12
+            anchors.leftMargin: 10
+            anchors.verticalCenter: parent.verticalCenter
+            color: "#253145"
+        }
+
+        Text {
+            id: tickerText
+            anchors.left: tickerDivider.right
+            anchors.leftMargin: 10
             anchors.right: parent.right
-            anchors.rightMargin: 14
-            anchors.top: parent.top
-            anchors.bottom: parent.bottom
-            clip: true
-            property real scrollX: 0
-            readonly property bool marqueeNeeded: tickerText.paintedWidth > width
-
-            onMarqueeNeededChanged: {
-                if (marqueeNeeded)
-                    tickerScroll.restart()
-                else
-                    scrollX = 0
-            }
-            onWidthChanged: {
-                if (marqueeNeeded)
-                    tickerScroll.restart()
-            }
-
-            Text {
-                id: tickerText
-                x: tickerTrack.marqueeNeeded ? tickerTrack.scrollX : 0
-                anchors.verticalCenter: parent.verticalCenter
-                text: root.musicTickerLine()
-                color: "#F7FBFF"
-                font.family: root.displayFont
-                font.pixelSize: 16
-                font.weight: Font.Bold
-                font.letterSpacing: 0
-                wrapMode: Text.NoWrap
-                onTextChanged: {
-                    if (tickerTrack.marqueeNeeded)
-                        tickerScroll.restart()
-                    else
-                        tickerTrack.scrollX = 0
-                }
-            }
-
-            SequentialAnimation {
-                id: tickerScroll
-                running: nowPlayingTicker.visible && tickerTrack.marqueeNeeded
-                loops: Animation.Infinite
-
-                PropertyAction {
-                    target: tickerTrack
-                    property: "scrollX"
-                    value: tickerTrack.width
-                }
-                PauseAnimation { duration: 500 }
-                NumberAnimation {
-                    target: tickerTrack
-                    property: "scrollX"
-                    to: -tickerText.paintedWidth
-                    duration: Math.max(7600, Math.round((tickerTrack.width + tickerText.paintedWidth) * 36))
-                    easing.type: Easing.Linear
-                }
-                PauseAnimation { duration: 900 }
-            }
+            anchors.rightMargin: 16
+            anchors.verticalCenter: parent.verticalCenter
+            text: root.musicTickerLine()
+            color: "#F7FBFF"
+            font.family: root.displayFont
+            font.pixelSize: 15
+            font.weight: Font.DemiBold
+            font.letterSpacing: 0
+            elide: Text.ElideRight
+            maximumLineCount: 1
+            wrapMode: Text.NoWrap
         }
     }
 
