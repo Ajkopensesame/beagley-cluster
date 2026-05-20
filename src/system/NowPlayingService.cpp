@@ -1,8 +1,11 @@
 #include "NowPlayingService.h"
 
 #include <QByteArray>
+#include <QCoreApplication>
 #include <QCryptographicHash>
+#include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -105,6 +108,57 @@ QString configuredSourceLabel(const QString &playerName)
 QString envString(const char *name)
 {
     return QString::fromUtf8(qgetenv(name)).trimmed();
+}
+
+QString nowPlayingStatePath()
+{
+    const QString configured = envString("BEAGLEY_NOW_PLAYING_STATE_PATH");
+    if (!configured.isEmpty()) {
+        return configured;
+    }
+#if defined(Q_OS_LINUX)
+    return QStringLiteral("/run/beagley-nowplaying/state.json");
+#else
+    return QDir::tempPath() + QStringLiteral("/beagley-nowplaying-state.json");
+#endif
+}
+
+QString backendName(NowPlayingService::Backend backend)
+{
+    return backend == NowPlayingService::Backend::SpotifyWeb
+        ? QStringLiteral("spotify-web")
+        : QStringLiteral("playerctl");
+}
+
+QString normalizedState(bool available,
+                        bool playing,
+                        const QString &status,
+                        const QString &detail)
+{
+    const QString normalizedStatus = status.trimmed().toUpper();
+    if (normalizedStatus == QLatin1String("AUTH")) {
+        return QStringLiteral("auth_required");
+    }
+    if (normalizedStatus == QLatin1String("PERMISSION")) {
+        return QStringLiteral("permission_required");
+    }
+    if (available && playing) {
+        return QStringLiteral("playing");
+    }
+    if (available) {
+        return QStringLiteral("paused");
+    }
+    if (normalizedStatus == QLatin1String("IDLE")
+        || detail.contains(QStringLiteral("Open Spotify"), Qt::CaseInsensitive)) {
+        return QStringLiteral("idle");
+    }
+    if (normalizedStatus == QLatin1String("OFFLINE")) {
+        return QStringLiteral("offline");
+    }
+    if (!normalizedStatus.isEmpty()) {
+        return normalizedStatus.toLower();
+    }
+    return QStringLiteral("unknown");
 }
 
 bool envFlag(const char *name)
@@ -462,6 +516,7 @@ NowPlayingService::NowPlayingService(QObject *parent)
     , m_spotifyClientSecret(envString("BEAGLEY_SPOTIFY_CLIENT_SECRET"))
     , m_spotifyDeviceId(envString("BEAGLEY_SPOTIFY_DEVICE_ID"))
     , m_spotifyMarket(envString("BEAGLEY_SPOTIFY_MARKET"))
+    , m_statePath(nowPlayingStatePath())
     , m_source(sourceLabel())
 {
     if (!m_spotifyAccessToken.isEmpty()) {
@@ -496,6 +551,7 @@ NowPlayingService::NowPlayingService(QObject *parent)
     if (envFlag("BEAGLEY_SPOTIFY_PAIRING_AUTOSTART")) {
         QTimer::singleShot(900, this, &NowPlayingService::beginSpotifyPairing);
     }
+    writeStateSnapshot();
 }
 
 NowPlayingService::~NowPlayingService()
@@ -840,6 +896,8 @@ void NowPlayingService::handleSpotifyPlaybackReply(QNetworkReply *reply, bool re
 {
     const int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     const QByteArray payload = reply->readAll();
+    m_lastPlaybackHttpStatus = statusCode;
+    m_lastBackendError = reply->error() == QNetworkReply::NoError ? QString() : reply->errorString();
 
     if (statusCode == 401) {
         if (!retriedAfterTokenRefresh && spotifyRefreshConfigured()) {
@@ -857,7 +915,7 @@ void NowPlayingService::handleSpotifyPlaybackReply(QNetworkReply *reply, bool re
                       QString(),
                       QString(),
                       QString(),
-                      QStringLiteral("OFFLINE"),
+                      QStringLiteral("IDLE"),
                       QStringLiteral("Open Spotify on your phone"));
         return;
     }
@@ -929,7 +987,7 @@ void NowPlayingService::handleSpotifyPlaybackReply(QNetworkReply *reply, bool re
     const QString status = playing
         ? QStringLiteral("PLAYING")
         : (!title.isEmpty() ? QStringLiteral("PAUSED")
-                            : QStringLiteral("OFFLINE"));
+                            : QStringLiteral("IDLE"));
     const QString detail = title.isEmpty()
         ? QStringLiteral("Open Spotify on your phone")
         : QStringLiteral("Spotify now playing");
@@ -948,6 +1006,10 @@ void NowPlayingService::handleSpotifyTokenReply(QNetworkReply *reply)
 {
     const int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
     const QByteArray payload = reply->readAll();
+    m_lastTokenHttpStatus = statusCode;
+    if (reply->error() != QNetworkReply::NoError) {
+        m_lastBackendError = reply->errorString();
+    }
     if (reply->error() != QNetworkReply::NoError || statusCode != 200) {
         m_pendingSpotifyAction = SpotifyAction::None;
         setSpotifyAuthRequired(QStringLiteral("Spotify login expired"));
@@ -964,6 +1026,7 @@ void NowPlayingService::handleSpotifyTokenReply(QNetworkReply *reply)
     }
 
     m_spotifyAccessToken = accessToken;
+    m_lastBackendError.clear();
     const int expiresIn = qMax(300, root.value(QStringLiteral("expires_in")).toInt(3600));
     m_spotifyAccessTokenExpiresAt = QDateTime::currentDateTimeUtc().addSecs(expiresIn);
     const QString refreshToken = root.value(QStringLiteral("refresh_token")).toString().trimmed();
@@ -1387,6 +1450,7 @@ void NowPlayingService::setNowPlaying(bool available,
                                       const QString &status,
                                       const QString &statusDetail)
 {
+    m_lastStateUpdatedAt = QDateTime::currentDateTimeUtc();
     if (m_available == available
         && m_playing == playing
         && m_source == source
@@ -1395,6 +1459,7 @@ void NowPlayingService::setNowPlaying(bool available,
         && m_album == album
         && m_status == status
         && m_statusDetail == statusDetail) {
+        writeStateSnapshot();
         return;
     }
 
@@ -1406,5 +1471,57 @@ void NowPlayingService::setNowPlaying(bool available,
     m_album = album;
     m_status = status;
     m_statusDetail = statusDetail;
+    writeStateSnapshot();
     emit nowPlayingChanged();
+}
+
+void NowPlayingService::writeStateSnapshot() const
+{
+    if (m_statePath.isEmpty()) {
+        return;
+    }
+
+    const QFileInfo stateInfo(m_statePath);
+    QDir stateDir(stateInfo.absolutePath());
+    if (!stateDir.exists() && !stateDir.mkpath(QStringLiteral("."))) {
+        return;
+    }
+
+    const QDateTime updatedAt = m_lastStateUpdatedAt.isValid()
+        ? m_lastStateUpdatedAt
+        : QDateTime::currentDateTimeUtc();
+
+    QJsonObject object;
+    object.insert(QStringLiteral("schema_version"), 1);
+    object.insert(QStringLiteral("backend"), backendName(m_backend));
+    object.insert(QStringLiteral("state"), normalizedState(m_available, m_playing, m_status, m_statusDetail));
+    object.insert(QStringLiteral("source"), m_source);
+    object.insert(QStringLiteral("available"), m_available);
+    object.insert(QStringLiteral("playing"), m_playing);
+    object.insert(QStringLiteral("title"), m_title);
+    object.insert(QStringLiteral("artist"), m_artist);
+    object.insert(QStringLiteral("album"), m_album);
+    object.insert(QStringLiteral("status"), m_status);
+    object.insert(QStringLiteral("detail"), m_statusDetail);
+    object.insert(QStringLiteral("playback_http_status"), m_lastPlaybackHttpStatus);
+    object.insert(QStringLiteral("token_http_status"), m_lastTokenHttpStatus);
+    object.insert(QStringLiteral("spotify_refresh_configured"), spotifyRefreshConfigured());
+    object.insert(QStringLiteral("spotify_token_usable"), spotifyTokenUsable());
+    object.insert(QStringLiteral("error"), m_lastBackendError);
+    object.insert(QStringLiteral("updated_utc"), updatedAt.toString(Qt::ISODateWithMs));
+    object.insert(QStringLiteral("pid"), QString::number(QCoreApplication::applicationPid()));
+
+    QSaveFile file(m_statePath);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        return;
+    }
+    file.write(QJsonDocument(object).toJson(QJsonDocument::Compact));
+    file.write("\n");
+    if (file.commit()) {
+        QFile::setPermissions(m_statePath,
+                              QFileDevice::ReadOwner
+                                  | QFileDevice::WriteOwner
+                                  | QFileDevice::ReadGroup
+                                  | QFileDevice::ReadOther);
+    }
 }

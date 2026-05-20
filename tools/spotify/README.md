@@ -43,6 +43,31 @@ BEAGLEY_SPOTIFY_REFRESH_TOKEN=...
 Temporary redirect, tunnel, QR autostart, and screenshot/QML-dev keys are
 removed after pairing completes.
 
+## Board Status
+
+The cluster writes its current now-playing state to:
+
+```text
+/run/beagley-nowplaying/state.json
+```
+
+On the BeagleY, inspect the cached state with:
+
+```bash
+nowplayingctl status
+```
+
+Useful states:
+
+- `playing`: Spotify returned a current track or episode and playback is active.
+- `paused`: Spotify returned a current track or episode, but it is paused.
+- `idle`: Spotify is paired, but Spotify returned no active playback.
+- `auth_required`: the saved login is missing or expired.
+- `permission_required`: Spotify rejected the current scope/account permissions.
+- `offline`: network/API access failed or Spotify returned an unavailable state.
+
+Use `nowplayingctl status --json` when a script needs the exact cached payload.
+
 ## Stable URL
 
 Cloudflare quick tunnel URLs are temporary. For repeat pairing without changing

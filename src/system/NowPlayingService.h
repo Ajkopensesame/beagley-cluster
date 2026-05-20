@@ -111,6 +111,7 @@ private:
                        const QString &album,
                        const QString &status,
                        const QString &statusDetail);
+    void writeStateSnapshot() const;
 
     QProcess *m_process = nullptr;
     QNetworkAccessManager m_network;
@@ -129,7 +130,12 @@ private:
     QString m_spotifyClientSecret;
     QString m_spotifyDeviceId;
     QString m_spotifyMarket;
+    QString m_statePath;
     QDateTime m_spotifyAccessTokenExpiresAt;
+    QDateTime m_lastStateUpdatedAt;
+    int m_lastPlaybackHttpStatus = -1;
+    int m_lastTokenHttpStatus = -1;
+    QString m_lastBackendError;
     bool m_pairingActive = false;
     QString m_pairingStatus;
     QString m_pairingUrl;

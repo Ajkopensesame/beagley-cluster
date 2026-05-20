@@ -100,6 +100,11 @@ do_install:append() {
         install -m 0755 ${B}/beagley_cluster ${D}${bindir}/beagley_cluster
     fi
     test -x ${D}${bindir}/beagley_cluster || bbfatal "expected ${D}${bindir}/beagley_cluster from the recipe install step, but it was not installed"
+    if [ ! -x ${D}${bindir}/nowplayingctl ]; then
+        test -x ${B}/nowplayingctl || bbfatal "expected ${B}/nowplayingctl after build, but it was not produced"
+        install -m 0755 ${B}/nowplayingctl ${D}${bindir}/nowplayingctl
+    fi
+    test -x ${D}${bindir}/nowplayingctl || bbfatal "expected ${D}${bindir}/nowplayingctl from the recipe install step, but it was not installed"
     install -m 0755 ${WORKDIR}/beagley-cluster-launch.sh ${D}${bindir}/beagley-cluster-launch.sh
     install -m 0755 ${WORKDIR}/beagley-gpu-gate.sh ${D}${bindir}/beagley-gpu-gate
 
@@ -145,6 +150,7 @@ do_install:append() {
 
 FILES:${PN} += " \
     ${systemd_system_unitdir}/beagley_cluster.service \
+    ${bindir}/nowplayingctl \
     ${systemd_system_unitdir}/beagley-cluster-gpu-probe.service \
     ${systemd_system_unitdir}/beagley-cluster-touch-probe.service \
     ${systemd_system_unitdir}/beagley-cluster-provision.service \

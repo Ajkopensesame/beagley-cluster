@@ -104,6 +104,11 @@ qt_add_executable(beagley_cluster
     src/system/WiFiSsidUtils.cpp
 )
 
+add_executable(nowplayingctl
+    src/tools/NowPlayingCtl.cpp
+)
+target_link_libraries(nowplayingctl PRIVATE Qt6::Core)
+
 target_compile_definitions(beagley_cluster PRIVATE
     "BEAGLEY_BUILD_SOURCE_PATH=\"${CMAKE_SOURCE_DIR}\""
     "BEAGLEY_BUILD_GIT_BRANCH=\"${BEAGLEY_BUILD_GIT_BRANCH}\""
@@ -279,7 +284,7 @@ if(BEAGLEY_APPLIANCE_PRODUCTION)
     target_compile_definitions(beagley_cluster PRIVATE BEAGLEY_APPLIANCE_PRODUCTION=1)
 endif()
 
-install(TARGETS beagley_cluster RUNTIME DESTINATION bin)
+install(TARGETS beagley_cluster nowplayingctl RUNTIME DESTINATION bin)
 
 # Qt generates the BeagleY module manifest in the build tree. Installing that
 # metadata lets engine.loadFromModule("BeagleY", ...) resolve the resource-backed
