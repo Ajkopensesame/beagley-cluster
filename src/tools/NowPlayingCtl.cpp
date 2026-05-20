@@ -1,3 +1,4 @@
+#include <QByteArray>
 #include <QCommandLineOption>
 #include <QCommandLineParser>
 #include <QCoreApplication>
@@ -8,6 +9,18 @@
 #include <QTextStream>
 
 namespace {
+
+void ensureUtf8Locale()
+{
+    const QByteArray lcAll = qgetenv("LC_ALL");
+    const QByteArray lang = qgetenv("LANG");
+    if (lcAll.isEmpty() || lcAll == "C" || lcAll == "POSIX") {
+        qputenv("LC_ALL", QByteArrayLiteral("C.UTF-8"));
+    }
+    if (lang.isEmpty() || lang == "C" || lang == "POSIX") {
+        qputenv("LANG", QByteArrayLiteral("C.UTF-8"));
+    }
+}
 
 QString defaultStatePath()
 {
@@ -46,6 +59,8 @@ void printLine(QTextStream &out, const QString &key, const QJsonObject &object)
 
 int main(int argc, char **argv)
 {
+    ensureUtf8Locale();
+
     QCoreApplication app(argc, argv);
     QCoreApplication::setApplicationName(QStringLiteral("nowplayingctl"));
     QCoreApplication::setApplicationVersion(QStringLiteral("1.0"));
