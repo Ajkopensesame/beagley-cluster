@@ -212,6 +212,25 @@ Item {
         return musicTitle
     }
 
+    function musicTickerDisplayLine() {
+        var line = musicTickerLine()
+        if (line.length > 0)
+            return line
+        if (musicSourceLine() === "SPOTIFY" && musicDetail.length > 0)
+            return musicDetail
+        if (musicSourceLine() === "SPOTIFY" && musicStatus.length > 0)
+            return musicStatus
+        return ""
+    }
+
+    function musicTickerVisible() {
+        if (musicAuthRequired())
+            return false
+        if (musicAvailable && musicTickerDisplayLine().length > 0)
+            return true
+        return musicSourceLine() === "SPOTIFY" && musicTickerDisplayLine().length > 0
+    }
+
     function musicAuthRequired() {
         return String(musicStatus).toUpperCase() === "AUTH"
     }
@@ -1046,7 +1065,7 @@ Item {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: parent.top
         anchors.topMargin: Math.max(10, Math.round(root.podSize * 0.10))
-        visible: root.musicAvailable && root.musicTickerLine().length > 0
+        visible: root.musicTickerVisible()
         opacity: visible ? 1 : 0
         radius: height * 0.5
         clip: false
@@ -1101,7 +1120,7 @@ Item {
             anchors.right: parent.right
             anchors.rightMargin: 16
             anchors.verticalCenter: parent.verticalCenter
-            text: root.musicTickerLine()
+            text: root.musicTickerDisplayLine()
             color: "#F7FBFF"
             font.family: root.displayFont
             font.pixelSize: 15
