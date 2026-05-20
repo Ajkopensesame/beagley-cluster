@@ -969,6 +969,12 @@ void NowPlayingService::handleSpotifyTokenReply(QNetworkReply *reply)
     const QString refreshToken = root.value(QStringLiteral("refresh_token")).toString().trimmed();
     if (!refreshToken.isEmpty()) {
         m_spotifyRefreshToken = refreshToken;
+        QString error;
+        if (!persistSpotifyRefreshToken(&error)) {
+            m_pendingSpotifyAction = SpotifyAction::None;
+            setSpotifyAuthRequired(error.isEmpty() ? QStringLiteral("Spotify save failed") : error);
+            return;
+        }
     }
 
     const SpotifyAction pendingAction = m_pendingSpotifyAction;
