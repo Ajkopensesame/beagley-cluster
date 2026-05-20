@@ -62,6 +62,7 @@ Item {
     readonly property string musicDetail: nowPlayingService && nowPlayingService.statusDetail
         ? String(nowPlayingService.statusDetail)
         : "Spotify not connected"
+    readonly property bool musicSpotifyConfigured: !!(nowPlayingService && nowPlayingService.spotifyPairingSupported)
     readonly property int weatherRefreshIntervalMs: expandedMode === "temp"
         ? 5 * 60 * 1000
         : 8 * 60 * 1000
@@ -193,6 +194,8 @@ Item {
     function musicSourceLine() {
         if (nowPlayingService && nowPlayingService.source)
             return String(nowPlayingService.source).toUpperCase()
+        if (musicSpotifyConfigured)
+            return "SPOTIFY"
         return "MEDIA"
     }
 
@@ -216,9 +219,9 @@ Item {
         var line = musicTickerLine()
         if (line.length > 0)
             return line
-        if (musicSourceLine() === "SPOTIFY" && musicDetail.length > 0)
+        if ((musicSpotifyConfigured || musicSourceLine() === "SPOTIFY") && musicDetail.length > 0)
             return musicDetail
-        if (musicSourceLine() === "SPOTIFY" && musicStatus.length > 0)
+        if ((musicSpotifyConfigured || musicSourceLine() === "SPOTIFY") && musicStatus.length > 0)
             return musicStatus
         return ""
     }
@@ -228,7 +231,8 @@ Item {
             return false
         if (musicAvailable && musicTickerDisplayLine().length > 0)
             return true
-        return musicSourceLine() === "SPOTIFY" && musicTickerDisplayLine().length > 0
+        return (musicSpotifyConfigured || musicSourceLine() === "SPOTIFY")
+            && musicTickerDisplayLine().length > 0
     }
 
     function musicAuthRequired() {
@@ -1094,7 +1098,7 @@ Item {
             anchors.left: tickerIcon.right
             anchors.leftMargin: 8
             anchors.verticalCenter: parent.verticalCenter
-            text: root.musicPlaying ? root.musicSourceLine() : "PAUSED"
+            text: root.musicSourceLine()
             color: root.musicPlaying ? "#4FF3D2" : "#9DB4FF"
             font.family: root.monoFont
             font.pixelSize: 10
