@@ -166,14 +166,26 @@ fi
     ssh(ssh_target, remote_script, "1" if restart else "0", check=False)
 
 
-def refresh_token_present(ssh_target: str) -> bool:
+def refresh_token_fingerprint(ssh_target: str) -> str:
     remote_script = r"""
-awk -F= '
-  $1 == "BEAGLEY_SPOTIFY_REFRESH_TOKEN" && length($2) > 0 { found=1 }
-  END { exit found ? 0 : 1 }
-' /etc/default/beagley-cluster.local 2>/dev/null
+set -euo pipefail
+token="$(awk -F= '$1 == "BEAGLEY_SPOTIFY_REFRESH_TOKEN" && length($2) > 0 { print $2; exit }' /etc/default/beagley-cluster.local 2>/dev/null || true)"
+[ -n "$token" ] || exit 0
+if command -v sha256sum >/dev/null 2>&1; then
+  printf '%s' "$token" | sha256sum | awk '{ print $1 }'
+else
+  printf '%s' "$token" | cksum | awk '{ print $1 "-" $2 }'
+fi
 """
-    return ssh(ssh_target, remote_script, check=False).returncode == 0
+    result = ssh(ssh_target, remote_script, check=False)
+    if result.returncode != 0:
+        return ""
+    return result.stdout.strip().splitlines()[-1] if result.stdout.strip() else ""
+
+
+def refresh_token_changed(ssh_target: str, previous_fingerprint: str) -> bool:
+    current_fingerprint = refresh_token_fingerprint(ssh_target)
+    return bool(current_fingerprint) and current_fingerprint != previous_fingerprint
 
 
 def start_cloudflared(origin_url: str) -> tuple[subprocess.Popen[str], str]:
@@ -288,6 +300,8 @@ def main() -> int:
             die("not running in a TTY; rerun with --skip-dashboard-wait after adding the redirect URI")
         input("Press Enter after the redirect URI is saved in Spotify Dashboard...")
 
+    initial_refresh_token_fingerprint = refresh_token_fingerprint(ssh_target)
+
     print(f"[spotify-pair] configuring BeagleY {ssh_target}")
     configure_beagley(ssh_target, args.client_id, public_url, redirect_uri, args.port)
     print("[spotify-pair] QR is active on the cluster. Scan it with your phone and approve Spotify.")
@@ -296,7 +310,7 @@ def main() -> int:
     paired = False
     try:
         while time.monotonic() < deadline:
-            if refresh_token_present(ssh_target):
+            if refresh_token_changed(ssh_target, initial_refresh_token_fingerprint):
                 paired = True
                 break
             time.sleep(3)
@@ -305,7 +319,7 @@ def main() -> int:
         print("[spotify-pair] interrupted")
     finally:
         if paired:
-            print("[spotify-pair] refresh token detected; cleaning temporary pairing env")
+            print("[spotify-pair] fresh refresh token detected; cleaning temporary pairing env")
             cleanup_pairing_env(ssh_target, restart=True)
         elif not args.leave_active_on_timeout:
             print("[spotify-pair] pairing did not complete; cleaning temporary pairing env")
