@@ -1,9 +1,10 @@
 # Spotify Pairing
 
 The cluster uses Spotify Authorization Code with PKCE because Spotify does not
-offer a public device-code grant for the Web API. The app requests only
-`user-read-currently-playing`; it does not request playback-control scope and
-does not control Spotify playback.
+offer a public device-code grant for the Web API. The app requests
+`user-read-currently-playing` and `user-library-modify`, so it can show the
+current track and save that track to Liked Songs. It still does not request
+playback-control scope and does not control Spotify playback.
 
 For a phone-scanned QR code, the redirect URI must be HTTPS and reachable by the
 phone. The helper below starts a Cloudflare quick tunnel from this Mac to the

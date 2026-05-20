@@ -29,6 +29,10 @@ class NowPlayingService : public QObject
     Q_PROPERTY(QString spotifyPairingCode READ spotifyPairingCode NOTIFY spotifyPairingChanged)
     Q_PROPERTY(QStringList spotifyPairingQrRows READ spotifyPairingQrRows NOTIFY spotifyPairingChanged)
     Q_PROPERTY(QString spotifyPairingQrPattern READ spotifyPairingQrPattern NOTIFY spotifyPairingChanged)
+    Q_PROPERTY(bool spotifySaveSupported READ spotifySaveSupported NOTIFY nowPlayingChanged)
+    Q_PROPERTY(bool spotifySavePending READ spotifySavePending NOTIFY spotifySaveChanged)
+    Q_PROPERTY(QString spotifySaveStatus READ spotifySaveStatus NOTIFY spotifySaveChanged)
+    Q_PROPERTY(QString spotifySaveDetail READ spotifySaveDetail NOTIFY spotifySaveChanged)
 
 public:
     enum class Backend {
@@ -42,7 +46,8 @@ public:
         Play,
         Pause,
         Next,
-        Previous
+        Previous,
+        SaveCurrentTrack
     };
 
     explicit NowPlayingService(QObject *parent = nullptr);
@@ -64,17 +69,23 @@ public:
     QString spotifyPairingCode() const { return m_pairingCode; }
     QStringList spotifyPairingQrRows() const { return m_pairingQrRows; }
     QString spotifyPairingQrPattern() const { return m_pairingQrRows.join(QLatin1Char('\n')); }
+    bool spotifySaveSupported() const;
+    bool spotifySavePending() const { return m_spotifySavePending; }
+    QString spotifySaveStatus() const { return m_spotifySaveStatus; }
+    QString spotifySaveDetail() const { return m_spotifySaveDetail; }
 
     Q_INVOKABLE void refresh();
     Q_INVOKABLE void playPause();
     Q_INVOKABLE void next();
     Q_INVOKABLE void previous();
+    Q_INVOKABLE void saveCurrentSpotifyTrack();
     Q_INVOKABLE void beginSpotifyPairing();
     Q_INVOKABLE void cancelSpotifyPairing();
 
 signals:
     void nowPlayingChanged();
     void spotifyPairingChanged();
+    void spotifySaveChanged();
 
 private:
     QString sourceLabel() const;
@@ -100,6 +111,10 @@ private:
                                 const QString &url = QString(),
                                 const QString &code = QString(),
                                 const QStringList &qrRows = QStringList());
+    void setSpotifySaveState(bool pending,
+                             const QString &status,
+                             const QString &detail = QString(),
+                             int clearAfterMs = 0);
     bool persistSpotifyRefreshToken(QString *errorOut = nullptr) const;
     void setSpotifyAuthRequired(const QString &detail);
     void finishProcess(QProcess *process, bool commandFailed, const QString &fallbackDetail = QString());
@@ -130,6 +145,10 @@ private:
     QString m_spotifyClientSecret;
     QString m_spotifyDeviceId;
     QString m_spotifyMarket;
+    QString m_spotifyCurrentTrackId;
+    bool m_spotifySavePending = false;
+    QString m_spotifySaveStatus;
+    QString m_spotifySaveDetail;
     QString m_statePath;
     QDateTime m_spotifyAccessTokenExpiresAt;
     QDateTime m_lastStateUpdatedAt;

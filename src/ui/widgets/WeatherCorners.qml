@@ -63,6 +63,14 @@ Item {
         ? String(nowPlayingService.statusDetail)
         : "Spotify not connected"
     readonly property bool musicSpotifyConfigured: !!(nowPlayingService && nowPlayingService.spotifyPairingSupported)
+    readonly property bool spotifySaveSupported: !!(nowPlayingService && nowPlayingService.spotifySaveSupported)
+    readonly property bool spotifySavePending: !!(nowPlayingService && nowPlayingService.spotifySavePending)
+    readonly property string spotifySaveStatus: nowPlayingService && nowPlayingService.spotifySaveStatus
+        ? String(nowPlayingService.spotifySaveStatus)
+        : ""
+    readonly property string spotifySaveDetail: nowPlayingService && nowPlayingService.spotifySaveDetail
+        ? String(nowPlayingService.spotifySaveDetail)
+        : ""
     readonly property int weatherRefreshIntervalMs: expandedMode === "temp"
         ? 5 * 60 * 1000
         : 8 * 60 * 1000
@@ -210,9 +218,12 @@ Item {
     function musicTickerLine() {
         if (musicTitle.length <= 0)
             return ""
+        var line = musicTitle
         if (musicArtist.length > 0)
-            return musicTitle + " - " + musicArtist
-        return musicTitle
+            line += " - " + musicArtist
+        if (musicAlbum.length > 0)
+            line += "  |  " + musicAlbum
+        return line
     }
 
     function musicTickerDisplayLine() {
@@ -255,6 +266,39 @@ Item {
 
     function mediaControlEnabled() {
         return !!nowPlayingService && nowPlayingService.controlsSupported && musicAvailable
+    }
+
+    function spotifySaveVisible() {
+        return !!nowPlayingService
+            && root.musicAvailable
+            && root.musicSourceLine() === "SPOTIFY"
+    }
+
+    function spotifySaveEnabled() {
+        return root.spotifySaveVisible()
+            && root.spotifySaveSupported
+            && !root.spotifySavePending
+    }
+
+    function spotifySaveButtonText() {
+        var status = String(root.spotifySaveStatus).toUpperCase()
+        if (root.spotifySavePending || status === "SAVING")
+            return "..."
+        return "+"
+    }
+
+    function spotifySaveStatusLine() {
+        if (root.spotifySaveDetail.length > 0)
+            return root.spotifySaveDetail
+        if (!root.spotifySaveSupported && root.spotifySaveVisible())
+            return "Re-pair Spotify to save songs"
+        return "Add to Liked Songs"
+    }
+
+    function triggerSpotifySave() {
+        if (!root.spotifySaveEnabled())
+            return
+        root.nowPlayingService.saveCurrentSpotifyTrack()
     }
 
     function triggerMediaControl(action) {
@@ -1117,22 +1161,91 @@ Item {
             color: "#253145"
         }
 
-        Text {
-            id: tickerText
+        Item {
+            id: tickerTextClip
             anchors.left: tickerDivider.right
             anchors.leftMargin: 10
             anchors.right: parent.right
-            anchors.rightMargin: 16
+            anchors.rightMargin: tickerSaveButton.visible ? 48 : 16
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            clip: true
+
+            property real scrollX: 0
+            property bool scrollNeeded: tickerText.implicitWidth > width
+            property real scrollEndX: Math.min(0, width - tickerText.implicitWidth - 26)
+
+            onScrollNeededChanged: scrollX = 0
+            onWidthChanged: scrollX = 0
+
+            Text {
+                id: tickerText
+                x: tickerTextClip.scrollNeeded
+                    ? tickerTextClip.scrollX
+                    : Math.round(Math.max(0, (tickerTextClip.width - implicitWidth) * 0.5))
+                anchors.verticalCenter: parent.verticalCenter
+                text: root.musicTickerDisplayLine()
+                color: "#F7FBFF"
+                font.family: root.displayFont
+                font.pixelSize: 15
+                font.weight: Font.DemiBold
+                font.letterSpacing: 0
+                maximumLineCount: 1
+                wrapMode: Text.NoWrap
+            }
+
+            SequentialAnimation {
+                running: tickerTextClip.scrollNeeded && nowPlayingTicker.visible
+                loops: Animation.Infinite
+                PauseAnimation { duration: 1000 }
+                NumberAnimation {
+                    target: tickerTextClip
+                    property: "scrollX"
+                    from: 0
+                    to: tickerTextClip.scrollEndX
+                    duration: Math.max(5200, Math.abs(tickerTextClip.scrollEndX) * 42)
+                    easing.type: Easing.Linear
+                }
+                PauseAnimation { duration: 900 }
+                ScriptAction { script: tickerTextClip.scrollX = 0 }
+            }
+        }
+
+        Rectangle {
+            id: tickerSaveButton
+            width: 30
+            height: 30
+            radius: 15
+            anchors.right: parent.right
+            anchors.rightMargin: 6
             anchors.verticalCenter: parent.verticalCenter
-            text: root.musicTickerDisplayLine()
-            color: "#F7FBFF"
-            font.family: root.displayFont
-            font.pixelSize: 15
-            font.weight: Font.DemiBold
-            font.letterSpacing: 0
-            elide: Text.ElideRight
-            maximumLineCount: 1
-            wrapMode: Text.NoWrap
+            visible: root.spotifySaveVisible()
+            enabled: root.spotifySaveEnabled()
+            opacity: enabled || root.spotifySavePending ? 1.0 : 0.58
+            color: tickerSaveMouse.pressed && enabled
+                ? "#123C44"
+                : (root.spotifySaveStatus.toUpperCase() === "SAVED" ? "#103A2F" : "#070B12")
+            border.width: 1
+            border.color: root.spotifySaveStatus.toUpperCase() === "SAVED"
+                ? "#58FFE1"
+                : (enabled ? "#305E72" : "#253145")
+
+            Text {
+                anchors.centerIn: parent
+                text: root.spotifySaveButtonText()
+                color: root.spotifySaveStatus.toUpperCase() === "SAVED" ? "#58FFE1" : "#F7FBFF"
+                font.family: root.monoFont
+                font.pixelSize: root.spotifySavePending ? 10 : 18
+                font.weight: Font.Bold
+                font.letterSpacing: 0
+            }
+
+            MouseArea {
+                id: tickerSaveMouse
+                anchors.fill: parent
+                enabled: tickerSaveButton.enabled
+                onClicked: root.triggerSpotifySave()
+            }
         }
     }
 
@@ -1380,6 +1493,73 @@ Item {
                                         font.letterSpacing: 0
                                         elide: Text.ElideRight
                                     }
+                                }
+                            }
+
+                            Rectangle {
+                                width: parent.width
+                                height: 44
+                                visible: !root.spotifyPairingVisible() && root.spotifySaveVisible()
+                                radius: 8
+                                color: saveDetailMouse.pressed && root.spotifySaveEnabled() ? "#123C44" : "#050812"
+                                border.width: 1
+                                border.color: root.spotifySaveStatus.toUpperCase() === "SAVED"
+                                    ? "#58FFE1"
+                                    : (root.spotifySaveEnabled() ? "#305E72" : "#22283D")
+                                opacity: root.spotifySaveEnabled() || root.spotifySavePending ? 1.0 : 0.62
+
+                                Row {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 14
+                                    anchors.rightMargin: 14
+                                    spacing: 10
+
+                                    Text {
+                                        width: 28
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: root.spotifySaveButtonText()
+                                        color: root.spotifySaveStatus.toUpperCase() === "SAVED" ? "#58FFE1" : "#F7FBFF"
+                                        font.family: root.monoFont
+                                        font.pixelSize: root.spotifySavePending ? 11 : 19
+                                        font.weight: Font.Bold
+                                        font.letterSpacing: 0
+                                        horizontalAlignment: Text.AlignHCenter
+                                    }
+
+                                    Column {
+                                        width: parent.width - 38
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        spacing: 1
+
+                                        Text {
+                                            width: parent.width
+                                            text: root.spotifySaveStatus.toUpperCase() === "SAVED" ? "LIKED SONGS" : "ADD TO LIKED SONGS"
+                                            color: "#F7FBFF"
+                                            font.family: root.monoFont
+                                            font.pixelSize: 11
+                                            font.weight: Font.Bold
+                                            font.letterSpacing: 0
+                                            elide: Text.ElideRight
+                                        }
+
+                                        Text {
+                                            width: parent.width
+                                            text: root.spotifySaveStatusLine()
+                                            color: root.spotifySaveStatus.toUpperCase() === "SAVED" ? "#58FFE1" : "#9DB4FF"
+                                            font.family: root.monoFont
+                                            font.pixelSize: 9
+                                            font.weight: Font.Bold
+                                            font.letterSpacing: 0
+                                            elide: Text.ElideRight
+                                        }
+                                    }
+                                }
+
+                                MouseArea {
+                                    id: saveDetailMouse
+                                    anchors.fill: parent
+                                    enabled: root.spotifySaveEnabled()
+                                    onClicked: root.triggerSpotifySave()
                                 }
                             }
 

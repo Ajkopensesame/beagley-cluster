@@ -25,7 +25,7 @@ constexpr auto kSpotifyApiBase = "https://api.spotify.com/v1";
 constexpr auto kSpotifyTokenUrl = "https://accounts.spotify.com/api/token";
 constexpr int kPairingPortDefault = 8787;
 constexpr int kPairingTimeoutMs = 5 * 60 * 1000;
-constexpr auto kSpotifyScopes = "user-read-currently-playing";
+constexpr auto kSpotifyScopes = "user-read-currently-playing user-library-modify";
 
 int refreshIntervalMs()
 {
@@ -681,6 +681,21 @@ void NowPlayingService::previous()
     runControlCommand(QStringLiteral("previous"));
 }
 
+void NowPlayingService::saveCurrentSpotifyTrack()
+{
+    if (!spotifyBackendActive()) {
+        return;
+    }
+    if (m_spotifyCurrentTrackId.isEmpty()) {
+        setSpotifySaveState(false,
+                            QStringLiteral("NO TRACK"),
+                            QStringLiteral("No track to save"),
+                            1800);
+        return;
+    }
+    runSpotifyAction(SpotifyAction::SaveCurrentTrack);
+}
+
 void NowPlayingService::runControlCommand(const QString &action)
 {
     if (action.isEmpty()) {
@@ -721,6 +736,11 @@ bool NowPlayingService::spotifyBackendActive() const
 bool NowPlayingService::spotifyRefreshConfigured() const
 {
     return !m_spotifyRefreshToken.isEmpty() && !m_spotifyClientId.isEmpty();
+}
+
+bool NowPlayingService::spotifySaveSupported() const
+{
+    return spotifyBackendActive() && !m_spotifyCurrentTrackId.isEmpty();
 }
 
 bool NowPlayingService::spotifyTokenUsable() const
@@ -833,6 +853,13 @@ void NowPlayingService::runSpotifyAction(SpotifyAction action, bool retriedAfter
         return;
     }
     if (m_networkReply) {
+        if (action == SpotifyAction::SaveCurrentTrack) {
+            setSpotifySaveState(false,
+                                QStringLiteral("WAIT"),
+                                QStringLiteral("Spotify is updating"),
+                                1200);
+            QTimer::singleShot(900, this, &NowPlayingService::saveCurrentSpotifyTrack);
+        }
         return;
     }
     if (!spotifyTokenUsable()) {
@@ -859,13 +886,25 @@ void NowPlayingService::runSpotifyAction(SpotifyAction action, bool retriedAfter
     case SpotifyAction::Previous:
         path = QStringLiteral("/me/player/previous");
         break;
+    case SpotifyAction::SaveCurrentTrack:
+        if (m_spotifyCurrentTrackId.isEmpty()) {
+            setSpotifySaveState(false,
+                                QStringLiteral("NO TRACK"),
+                                QStringLiteral("No track to save"),
+                                1800);
+            return;
+        }
+        path = QStringLiteral("/me/tracks");
+        break;
     case SpotifyAction::None:
     case SpotifyAction::RefreshPlayback:
         return;
     }
 
     QUrlQuery query;
-    if (!m_spotifyDeviceId.isEmpty()) {
+    if (action == SpotifyAction::SaveCurrentTrack) {
+        query.addQueryItem(QStringLiteral("ids"), m_spotifyCurrentTrackId);
+    } else if (!m_spotifyDeviceId.isEmpty()) {
         query.addQueryItem(QStringLiteral("device_id"), m_spotifyDeviceId);
     }
     QNetworkRequest request(spotifyUrl(path, query));
@@ -875,7 +914,12 @@ void NowPlayingService::runSpotifyAction(SpotifyAction action, bool retriedAfter
     request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
 
     QNetworkReply *reply = nullptr;
-    if (action == SpotifyAction::Play || action == SpotifyAction::Pause) {
+    if (action == SpotifyAction::SaveCurrentTrack) {
+        setSpotifySaveState(true,
+                            QStringLiteral("SAVING"),
+                            QStringLiteral("Adding to Liked Songs"));
+        reply = m_network.put(request, QByteArray());
+    } else if (action == SpotifyAction::Play || action == SpotifyAction::Pause) {
         reply = m_network.put(request, QByteArray());
     } else {
         reply = m_network.post(request, QByteArray());
@@ -973,7 +1017,9 @@ void NowPlayingService::handleSpotifyPlaybackReply(QNetworkReply *reply, bool re
     const QString title = item.value(QStringLiteral("name")).toString().trimmed();
     QString artist;
     QString album;
+    QString trackId;
     if (itemType == QLatin1String("track")) {
+        trackId = item.value(QStringLiteral("id")).toString().trimmed();
         artist = spotifyArtists(item.value(QStringLiteral("artists")).toArray());
         album = item.value(QStringLiteral("album")).toObject().value(QStringLiteral("name")).toString().trimmed();
     } else if (itemType == QLatin1String("episode")) {
@@ -991,6 +1037,13 @@ void NowPlayingService::handleSpotifyPlaybackReply(QNetworkReply *reply, bool re
     const QString detail = title.isEmpty()
         ? QStringLiteral("Open Spotify on your phone")
         : QStringLiteral("Spotify now playing");
+    const bool trackChanged = m_spotifyCurrentTrackId != trackId;
+    if (trackChanged) {
+        m_spotifyCurrentTrackId = trackId;
+        if (!m_spotifySavePending) {
+            setSpotifySaveState(false, QString(), QString());
+        }
+    }
 
     setNowPlaying(available,
                   playing,
@@ -1000,6 +1053,9 @@ void NowPlayingService::handleSpotifyPlaybackReply(QNetworkReply *reply, bool re
                   album,
                   status,
                   detail);
+    if (trackChanged) {
+        emit nowPlayingChanged();
+    }
 }
 
 void NowPlayingService::handleSpotifyTokenReply(QNetworkReply *reply)
@@ -1064,6 +1120,13 @@ void NowPlayingService::handleSpotifyControlReply(QNetworkReply *reply,
         return;
     }
     if (statusCode == 403) {
+        if (action == SpotifyAction::SaveCurrentTrack) {
+            setSpotifySaveState(false,
+                                QStringLiteral("REPAIR"),
+                                QStringLiteral("Re-pair Spotify for Liked Songs"),
+                                4500);
+            return;
+        }
         setNowPlaying(m_available,
                       m_playing,
                       m_source,
@@ -1076,6 +1139,13 @@ void NowPlayingService::handleSpotifyControlReply(QNetworkReply *reply,
         return;
     }
     if (statusCode == 404) {
+        if (action == SpotifyAction::SaveCurrentTrack) {
+            setSpotifySaveState(false,
+                                QStringLiteral("NO TRACK"),
+                                QStringLiteral("No track to save"),
+                                2400);
+            return;
+        }
         setNowPlaying(m_available,
                       m_playing,
                       m_source,
@@ -1088,6 +1158,13 @@ void NowPlayingService::handleSpotifyControlReply(QNetworkReply *reply,
         return;
     }
     if (statusCode == 429) {
+        if (action == SpotifyAction::SaveCurrentTrack) {
+            setSpotifySaveState(false,
+                                QStringLiteral("RATE LIMIT"),
+                                QStringLiteral("Spotify rate limited"),
+                                3200);
+            return;
+        }
         setNowPlaying(m_available,
                       m_playing,
                       m_source,
@@ -1096,6 +1173,24 @@ void NowPlayingService::handleSpotifyControlReply(QNetworkReply *reply,
                       m_album,
                       QStringLiteral("OFFLINE"),
                       QStringLiteral("Spotify rate limited"));
+        return;
+    }
+
+    if (reply->error() != QNetworkReply::NoError || statusCode < 200 || statusCode >= 300) {
+        if (action == SpotifyAction::SaveCurrentTrack) {
+            setSpotifySaveState(false,
+                                QStringLiteral("FAILED"),
+                                QStringLiteral("Could not add song"),
+                                3200);
+            return;
+        }
+    }
+
+    if (action == SpotifyAction::SaveCurrentTrack) {
+        setSpotifySaveState(false,
+                            QStringLiteral("SAVED"),
+                            QStringLiteral("Added to Liked Songs"),
+                            3000);
         return;
     }
 
@@ -1193,6 +1288,33 @@ void NowPlayingService::setSpotifyPairingState(bool active,
     m_pairingCode = code;
     m_pairingQrRows = qrRows;
     emit spotifyPairingChanged();
+}
+
+void NowPlayingService::setSpotifySaveState(bool pending,
+                                            const QString &status,
+                                            const QString &detail,
+                                            int clearAfterMs)
+{
+    if (m_spotifySavePending == pending
+        && m_spotifySaveStatus == status
+        && m_spotifySaveDetail == detail) {
+        return;
+    }
+
+    m_spotifySavePending = pending;
+    m_spotifySaveStatus = status;
+    m_spotifySaveDetail = detail;
+    writeStateSnapshot();
+    emit spotifySaveChanged();
+
+    if (clearAfterMs > 0 && !status.isEmpty()) {
+        const QString expectedStatus = status;
+        QTimer::singleShot(clearAfterMs, this, [this, expectedStatus]() {
+            if (!m_spotifySavePending && m_spotifySaveStatus == expectedStatus) {
+                setSpotifySaveState(false, QString(), QString());
+            }
+        });
+    }
 }
 
 void NowPlayingService::handlePairingConnection()
@@ -1501,12 +1623,17 @@ void NowPlayingService::writeStateSnapshot() const
     object.insert(QStringLiteral("title"), m_title);
     object.insert(QStringLiteral("artist"), m_artist);
     object.insert(QStringLiteral("album"), m_album);
+    object.insert(QStringLiteral("track_id"), m_spotifyCurrentTrackId);
     object.insert(QStringLiteral("status"), m_status);
     object.insert(QStringLiteral("detail"), m_statusDetail);
     object.insert(QStringLiteral("playback_http_status"), m_lastPlaybackHttpStatus);
     object.insert(QStringLiteral("token_http_status"), m_lastTokenHttpStatus);
     object.insert(QStringLiteral("spotify_refresh_configured"), spotifyRefreshConfigured());
     object.insert(QStringLiteral("spotify_token_usable"), spotifyTokenUsable());
+    object.insert(QStringLiteral("spotify_save_supported"), spotifySaveSupported());
+    object.insert(QStringLiteral("spotify_save_pending"), m_spotifySavePending);
+    object.insert(QStringLiteral("spotify_save_status"), m_spotifySaveStatus);
+    object.insert(QStringLiteral("spotify_save_detail"), m_spotifySaveDetail);
     object.insert(QStringLiteral("error"), m_lastBackendError);
     object.insert(QStringLiteral("updated_utc"), updatedAt.toString(Qt::ISODateWithMs));
     object.insert(QStringLiteral("pid"), QString::number(QCoreApplication::applicationPid()));
