@@ -65,6 +65,8 @@ Item {
     readonly property bool musicSpotifyConfigured: !!(nowPlayingService && nowPlayingService.spotifyPairingSupported)
     readonly property bool spotifySaveSupported: !!(nowPlayingService && nowPlayingService.spotifySaveSupported)
     readonly property bool spotifySavePending: !!(nowPlayingService && nowPlayingService.spotifySavePending)
+    readonly property bool spotifyTrackSaved: !!(nowPlayingService && nowPlayingService.spotifyTrackSaved)
+    readonly property bool spotifyTrackSavedKnown: !!(nowPlayingService && nowPlayingService.spotifyTrackSavedKnown)
     readonly property string spotifySaveStatus: nowPlayingService && nowPlayingService.spotifySaveStatus
         ? String(nowPlayingService.spotifySaveStatus)
         : ""
@@ -272,12 +274,21 @@ Item {
         return !!nowPlayingService
             && root.musicAvailable
             && root.musicSourceLine() === "SPOTIFY"
+            && (root.spotifySaveSupported
+                || root.spotifySavePending
+                || root.spotifyTrackSavedKnown
+                || root.spotifySaveStatus.length > 0)
+    }
+
+    function spotifySaveSaved() {
+        return root.spotifyTrackSavedKnown && root.spotifyTrackSaved
     }
 
     function spotifySaveEnabled() {
         return root.spotifySaveVisible()
             && root.spotifySaveSupported
             && !root.spotifySavePending
+            && !root.spotifySaveSaved()
     }
 
     function spotifySaveButtonText() {
@@ -288,6 +299,8 @@ Item {
     }
 
     function spotifySaveStatusLine() {
+        if (root.spotifySaveSaved())
+            return "Already in Liked Songs"
         if (root.spotifySaveDetail.length > 0)
             return root.spotifySaveDetail
         if (!root.spotifySaveSupported && root.spotifySaveVisible())
@@ -1224,23 +1237,74 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             visible: root.spotifySaveVisible()
             enabled: root.spotifySaveEnabled()
-            opacity: enabled || root.spotifySavePending ? 1.0 : 0.58
+            opacity: enabled || root.spotifySavePending || root.spotifySaveSaved() ? 1.0 : 0.58
             color: tickerSaveMouse.pressed && enabled
                 ? "#123C44"
-                : (root.spotifySaveStatus.toUpperCase() === "SAVED" ? "#103A2F" : "#070B12")
+                : (root.spotifySaveSaved() ? "#1ED760" : "#070B12")
             border.width: 1
-            border.color: root.spotifySaveStatus.toUpperCase() === "SAVED"
-                ? "#58FFE1"
+            border.color: root.spotifySaveSaved()
+                ? "#1ED760"
                 : (enabled ? "#305E72" : "#253145")
 
             Text {
                 anchors.centerIn: parent
+                visible: root.spotifySavePending
                 text: root.spotifySaveButtonText()
-                color: root.spotifySaveStatus.toUpperCase() === "SAVED" ? "#58FFE1" : "#F7FBFF"
+                color: "#F7FBFF"
                 font.family: root.monoFont
-                font.pixelSize: root.spotifySavePending ? 10 : 18
+                font.pixelSize: 10
                 font.weight: Font.Bold
                 font.letterSpacing: 0
+            }
+
+            Item {
+                width: 14
+                height: 14
+                anchors.centerIn: parent
+                visible: !root.spotifySavePending && !root.spotifySaveSaved()
+
+                Rectangle {
+                    width: 14
+                    height: 2
+                    radius: 1
+                    anchors.centerIn: parent
+                    color: "#F7FBFF"
+                }
+
+                Rectangle {
+                    width: 2
+                    height: 14
+                    radius: 1
+                    anchors.centerIn: parent
+                    color: "#F7FBFF"
+                }
+            }
+
+            Item {
+                width: 16
+                height: 14
+                anchors.centerIn: parent
+                visible: !root.spotifySavePending && root.spotifySaveSaved()
+
+                Rectangle {
+                    width: 7
+                    height: 3
+                    radius: 1
+                    x: 1
+                    y: 7
+                    rotation: 45
+                    color: "#06120A"
+                }
+
+                Rectangle {
+                    width: 13
+                    height: 3
+                    radius: 1
+                    x: 5
+                    y: 5
+                    rotation: -45
+                    color: "#06120A"
+                }
             }
 
             MouseArea {
@@ -1506,10 +1570,10 @@ Item {
                                 radius: 8
                                 color: saveDetailMouse.pressed && root.spotifySaveEnabled() ? "#123C44" : "#050812"
                                 border.width: 1
-                                border.color: root.spotifySaveStatus.toUpperCase() === "SAVED"
-                                    ? "#58FFE1"
+                                border.color: root.spotifySaveSaved()
+                                    ? "#1ED760"
                                     : (root.spotifySaveEnabled() ? "#305E72" : "#22283D")
-                                opacity: root.spotifySaveEnabled() || root.spotifySavePending ? 1.0 : 0.62
+                                opacity: root.spotifySaveEnabled() || root.spotifySavePending || root.spotifySaveSaved() ? 1.0 : 0.62
 
                                 Row {
                                     anchors.fill: parent
@@ -1517,16 +1581,75 @@ Item {
                                     anchors.rightMargin: 14
                                     spacing: 10
 
-                                    Text {
+                                    Rectangle {
                                         width: 28
+                                        height: 28
+                                        radius: 14
                                         anchors.verticalCenter: parent.verticalCenter
-                                        text: root.spotifySaveButtonText()
-                                        color: root.spotifySaveStatus.toUpperCase() === "SAVED" ? "#58FFE1" : "#F7FBFF"
-                                        font.family: root.monoFont
-                                        font.pixelSize: root.spotifySavePending ? 11 : 19
-                                        font.weight: Font.Bold
-                                        font.letterSpacing: 0
-                                        horizontalAlignment: Text.AlignHCenter
+                                        color: root.spotifySaveSaved() ? "#1ED760" : "#070B12"
+                                        border.width: 1
+                                        border.color: root.spotifySaveSaved() ? "#1ED760" : "#305E72"
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            visible: root.spotifySavePending
+                                            text: root.spotifySaveButtonText()
+                                            color: "#F7FBFF"
+                                            font.family: root.monoFont
+                                            font.pixelSize: 10
+                                            font.weight: Font.Bold
+                                            font.letterSpacing: 0
+                                        }
+
+                                        Item {
+                                            width: 13
+                                            height: 13
+                                            anchors.centerIn: parent
+                                            visible: !root.spotifySavePending && !root.spotifySaveSaved()
+
+                                            Rectangle {
+                                                width: 13
+                                                height: 2
+                                                radius: 1
+                                                anchors.centerIn: parent
+                                                color: "#F7FBFF"
+                                            }
+
+                                            Rectangle {
+                                                width: 2
+                                                height: 13
+                                                radius: 1
+                                                anchors.centerIn: parent
+                                                color: "#F7FBFF"
+                                            }
+                                        }
+
+                                        Item {
+                                            width: 15
+                                            height: 13
+                                            anchors.centerIn: parent
+                                            visible: !root.spotifySavePending && root.spotifySaveSaved()
+
+                                            Rectangle {
+                                                width: 7
+                                                height: 3
+                                                radius: 1
+                                                x: 1
+                                                y: 7
+                                                rotation: 45
+                                                color: "#06120A"
+                                            }
+
+                                            Rectangle {
+                                                width: 12
+                                                height: 3
+                                                radius: 1
+                                                x: 5
+                                                y: 5
+                                                rotation: -45
+                                                color: "#06120A"
+                                            }
+                                        }
                                     }
 
                                     Column {
@@ -1536,7 +1659,7 @@ Item {
 
                                         Text {
                                             width: parent.width
-                                            text: root.spotifySaveStatus.toUpperCase() === "SAVED" ? "LIKED SONGS" : "ADD TO LIKED SONGS"
+                                            text: root.spotifySaveSaved() ? "LIKED SONGS" : "ADD TO LIKED SONGS"
                                             color: "#F7FBFF"
                                             font.family: root.monoFont
                                             font.pixelSize: 11
@@ -1548,7 +1671,7 @@ Item {
                                         Text {
                                             width: parent.width
                                             text: root.spotifySaveStatusLine()
-                                            color: root.spotifySaveStatus.toUpperCase() === "SAVED" ? "#58FFE1" : "#9DB4FF"
+                                            color: root.spotifySaveSaved() ? "#1ED760" : "#9DB4FF"
                                             font.family: root.monoFont
                                             font.pixelSize: 9
                                             font.weight: Font.Bold

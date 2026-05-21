@@ -31,6 +31,8 @@ class NowPlayingService : public QObject
     Q_PROPERTY(QString spotifyPairingQrPattern READ spotifyPairingQrPattern NOTIFY spotifyPairingChanged)
     Q_PROPERTY(bool spotifySaveSupported READ spotifySaveSupported NOTIFY nowPlayingChanged)
     Q_PROPERTY(bool spotifySavePending READ spotifySavePending NOTIFY spotifySaveChanged)
+    Q_PROPERTY(bool spotifyTrackSaved READ spotifyTrackSaved NOTIFY spotifySaveChanged)
+    Q_PROPERTY(bool spotifyTrackSavedKnown READ spotifyTrackSavedKnown NOTIFY spotifySaveChanged)
     Q_PROPERTY(QString spotifySaveStatus READ spotifySaveStatus NOTIFY spotifySaveChanged)
     Q_PROPERTY(QString spotifySaveDetail READ spotifySaveDetail NOTIFY spotifySaveChanged)
 
@@ -47,6 +49,7 @@ public:
         Pause,
         Next,
         Previous,
+        RefreshSavedState,
         SaveCurrentTrack
     };
 
@@ -71,6 +74,8 @@ public:
     QString spotifyPairingQrPattern() const { return m_pairingQrRows.join(QLatin1Char('\n')); }
     bool spotifySaveSupported() const;
     bool spotifySavePending() const { return m_spotifySavePending; }
+    bool spotifyTrackSaved() const;
+    bool spotifyTrackSavedKnown() const;
     QString spotifySaveStatus() const { return m_spotifySaveStatus; }
     QString spotifySaveDetail() const { return m_spotifySaveDetail; }
 
@@ -93,6 +98,7 @@ private:
     void runControlCommand(const QString &action);
     void refreshPlayerctl();
     void refreshSpotifyPlayback(bool retriedAfterTokenRefresh = false);
+    void refreshSpotifySavedState(bool retriedAfterTokenRefresh = false);
     void refreshSpotifyAccessToken();
     void runSpotifyAction(SpotifyAction action, bool retriedAfterTokenRefresh = false);
     bool spotifyBackendActive() const;
@@ -101,6 +107,9 @@ private:
     void handleSpotifyPlaybackReply(QNetworkReply *reply, bool retriedAfterTokenRefresh);
     void handleSpotifyTokenReply(QNetworkReply *reply);
     void handleSpotifyControlReply(QNetworkReply *reply, SpotifyAction action, bool retriedAfterTokenRefresh);
+    void handleSpotifySavedStateReply(QNetworkReply *reply,
+                                      bool retriedAfterTokenRefresh,
+                                      const QString &trackId);
     void exchangeSpotifyPairingCode(const QString &code);
     void handleSpotifyPairingTokenReply(QNetworkReply *reply);
     void handlePairingConnection();
@@ -115,6 +124,7 @@ private:
                              const QString &status,
                              const QString &detail = QString(),
                              int clearAfterMs = 0);
+    void setSpotifyTrackSavedState(bool known, bool saved, const QString &trackId = QString());
     bool persistSpotifyRefreshToken(QString *errorOut = nullptr) const;
     void setSpotifyAuthRequired(const QString &detail);
     void finishProcess(QProcess *process, bool commandFailed, const QString &fallbackDetail = QString());
@@ -147,6 +157,9 @@ private:
     QString m_spotifyMarket;
     QString m_spotifyCurrentTrackId;
     bool m_spotifySavePending = false;
+    bool m_spotifyTrackSavedKnown = false;
+    bool m_spotifyTrackSaved = false;
+    QString m_spotifySavedStateTrackId;
     QString m_spotifySaveStatus;
     QString m_spotifySaveDetail;
     QString m_statePath;
