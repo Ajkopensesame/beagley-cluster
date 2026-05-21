@@ -1169,10 +1169,10 @@ Item {
             anchors.rightMargin: tickerSaveButton.visible ? 48 : 16
             anchors.top: parent.top
             anchors.bottom: parent.bottom
-            clip: true
+            clip: scrollNeeded
 
             property real scrollX: 0
-            property bool scrollNeeded: tickerText.implicitWidth > width
+            property bool scrollNeeded: !root.embeddedSafeMode && tickerText.implicitWidth > width
             property real scrollEndX: Math.min(0, width - tickerText.implicitWidth - 26)
 
             onScrollNeededChanged: scrollX = 0
@@ -1180,16 +1180,19 @@ Item {
 
             Text {
                 id: tickerText
+                width: tickerTextClip.scrollNeeded ? implicitWidth : tickerTextClip.width
                 x: tickerTextClip.scrollNeeded
                     ? tickerTextClip.scrollX
-                    : Math.round(Math.max(0, (tickerTextClip.width - implicitWidth) * 0.5))
+                    : 0
                 anchors.verticalCenter: parent.verticalCenter
                 text: root.musicTickerDisplayLine()
                 color: "#F7FBFF"
                 font.family: root.displayFont
                 font.pixelSize: 15
-                font.weight: Font.DemiBold
+                font.weight: Font.Bold
                 font.letterSpacing: 0
+                horizontalAlignment: tickerTextClip.scrollNeeded ? Text.AlignLeft : Text.AlignHCenter
+                elide: tickerTextClip.scrollNeeded ? Text.ElideNone : Text.ElideRight
                 maximumLineCount: 1
                 wrapMode: Text.NoWrap
             }

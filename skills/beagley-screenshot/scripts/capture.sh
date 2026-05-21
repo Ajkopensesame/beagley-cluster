@@ -179,7 +179,22 @@ restore_remote() {
   echo "[beagley-screenshot] Restoring BeagleY service environment..."
   beagley_ssh "set -e;
     if [ -f $(remote_quote "$REMOTE_BACKUP") ]; then
-      cp $(remote_quote "$REMOTE_BACKUP") $(remote_quote "$REMOTE_ENV");
+      current_token_file=\$(mktemp);
+      if [ -f $(remote_quote "$REMOTE_ENV") ]; then
+        awk -F= '\$1 == \"BEAGLEY_SPOTIFY_REFRESH_TOKEN\" || \$1 == \"BEAGLEY_SPOTIFY_ACCESS_TOKEN\" { print }' $(remote_quote "$REMOTE_ENV") > \"\$current_token_file\" || true;
+      else
+        : > \"\$current_token_file\";
+      fi;
+      if [ -s \"\$current_token_file\" ]; then
+        tmp_env=\$(mktemp);
+        awk -F= '\$1 == \"BEAGLEY_SPOTIFY_REFRESH_TOKEN\" || \$1 == \"BEAGLEY_SPOTIFY_ACCESS_TOKEN\" { next } { print }' $(remote_quote "$REMOTE_BACKUP") > \"\$tmp_env\";
+        cat \"\$current_token_file\" >> \"\$tmp_env\";
+        cp \"\$tmp_env\" $(remote_quote "$REMOTE_ENV");
+        rm -f \"\$tmp_env\";
+      else
+        cp $(remote_quote "$REMOTE_BACKUP") $(remote_quote "$REMOTE_ENV");
+      fi;
+      rm -f \"\$current_token_file\";
       chmod 0600 $(remote_quote "$REMOTE_ENV") 2>/dev/null || true;
       rm -f $(remote_quote "$REMOTE_BACKUP");
     fi;
