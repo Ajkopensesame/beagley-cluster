@@ -394,6 +394,15 @@ Window {
         : "Spotify not connected"
     readonly property bool spotifyPairingSupported: !!(nowPlayingService && nowPlayingService.spotifyPairingSupported)
     readonly property bool spotifyPairingActive: !!(nowPlayingService && nowPlayingService.spotifyPairingActive)
+    readonly property bool spotifySaveSupported: !!(nowPlayingService && nowPlayingService.spotifySaveSupported)
+    readonly property bool spotifySavePending: !!(nowPlayingService && nowPlayingService.spotifySavePending)
+    readonly property string spotifySaveStatus: nowPlayingService && nowPlayingService.spotifySaveStatus
+        ? String(nowPlayingService.spotifySaveStatus)
+        : ""
+    readonly property string spotifySaveDetail: nowPlayingService && nowPlayingService.spotifySaveDetail
+        ? String(nowPlayingService.spotifySaveDetail)
+        : ""
+    readonly property bool spotifyRepairRequired: spotifySaveStatus.toUpperCase() === "REPAIR"
     property real autoThemeSunriseMs: NaN
     property real autoThemeSunsetMs: NaN
     property bool autoThemeRequestActive: false
@@ -968,7 +977,7 @@ Window {
         if (root.mapMenuStage === "routing")
             return "Building route"
         if (root.mapMenuStage === "settings")
-            return root.mapMenuSystemMode ? "Cluster settings" : "Map style"
+            return root.mapMenuSystemMode ? "System controls" : "Map style"
         if (root.mapMenuStage === "spotify")
             return "Spotify setup"
         return root.menuSearchTitle()
@@ -993,6 +1002,10 @@ Window {
             return "Spotify setup required"
         if (root.spotifyPairingActive && root.nowPlayingService.spotifyPairingStatus.length > 0)
             return root.nowPlayingService.spotifyPairingStatus
+        if (root.spotifyRepairRequired)
+            return root.spotifySaveDetail.length > 0 ? root.spotifySaveDetail : "Reconnect Spotify for liked songs"
+        if (root.spotifySavePending)
+            return "Updating liked songs"
         if (root.musicAuthRequired())
             return "Connect Spotify to show what is playing"
         if (root.musicAvailable)
@@ -1007,6 +1020,8 @@ Window {
             return "CANCEL"
         if (root.musicAuthRequired())
             return "CONNECT"
+        if (root.spotifyRepairRequired)
+            return "REPAIR"
         return "REFRESH"
     }
 
@@ -1021,7 +1036,7 @@ Window {
             root.nowPlayingService.cancelSpotifyPairing()
             return
         }
-        if (root.musicAuthRequired()) {
+        if (root.musicAuthRequired() || root.spotifyRepairRequired) {
             root.mapMenuStage = "spotify"
             root.nowPlayingService.beginSpotifyPairing()
             return
@@ -1284,7 +1299,7 @@ Window {
         if (root.mapMenuSystemMode) {
             if (root.mapMenuStage === "spotify")
                 return "Scan the code to connect now playing"
-            return "Cluster settings and connections"
+            return "System controls and connections"
         }
         const theme = root.normalizedThemeMode === "auto"
             ? ("Auto " + (root.menuDarkChrome ? "dark" : "light"))
@@ -3013,7 +3028,7 @@ Window {
                                 : (root.mapMenuStage === "routing"
                                     ? 126
                                     : (root.mapMenuStage === "settings"
-                                        ? (root.mapMenuSystemMode ? 334 : 342)
+                                        ? (root.mapMenuSystemMode ? 312 : 220)
                                         : (root.mapMenuStage === "spotify"
                                             ? 350
                                         : (root.searchKeyboardOpen ? 190 : 258)))
@@ -3152,6 +3167,7 @@ Window {
                                     spacing: 12
 
                                     Column {
+                                        visible: root.mapMenuSystemMode
                                         width: parent.width
                                         spacing: 8
 
@@ -3461,9 +3477,39 @@ Window {
                                     }
 
                                     Row {
+                                        visible: root.mapMenuSystemMode
                                         width: parent.width
                                         height: 38
                                         spacing: 8
+
+                                        Rectangle {
+                                            width: (parent.width - 8) / 2
+                                            height: parent.height
+                                            radius: 18
+                                            color: root.menuSurfaceAltColor
+                                            border.width: 1
+                                            border.color: hotspotState === "online" ? "#2E8B67" : root.menuBorderColor
+
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: hotspotState === "online" ? "Wi-Fi details" : "Set up Wi-Fi"
+                                                color: hotspotState === "online" ? "#8AF0B7" : root.menuTextPrimaryColor
+                                                font.family: appTheme.fontMono
+                                                font.pixelSize: 13
+                                                font.weight: Font.Bold
+                                                font.hintingPreference: root.menuTextHintingPreference
+                                                renderType: root.menuTextRenderType
+                                            }
+
+                                            MouseArea {
+                                                anchors.fill: parent
+                                                onClicked: {
+                                                    wifiOverlay.openPrompt()
+                                                    root.mapMenuOpen = false
+                                                    root.searchKeyboardOpen = false
+                                                }
+                                            }
+                                        }
 
                                         Rectangle {
                                             width: (parent.width - 8) / 2
@@ -3475,9 +3521,7 @@ Window {
 
                                             Text {
                                                 anchors.centerIn: parent
-                                                text: root.mapMenuSystemMode
-                                                    ? (navigation.muted ? "Audio cues off" : "Audio cues on")
-                                                    : (navigation.muted ? "Sound off" : "Sound on")
+                                                text: navigation.muted ? "Audio cues off" : "Audio cues on"
                                                 color: navigation.muted ? "#D93025" : root.menuTextPrimaryColor
                                                 font.family: appTheme.fontMono
                                                 font.pixelSize: 13
@@ -3491,6 +3535,13 @@ Window {
                                                 onClicked: navigation.setMuted(!navigation.muted)
                                             }
                                         }
+                                    }
+
+                                    Row {
+                                        visible: !root.mapMenuSystemMode
+                                        width: parent.width
+                                        height: 38
+                                        spacing: 8
 
                                         Rectangle {
                                             width: (parent.width - 8) / 2
@@ -3498,18 +3549,12 @@ Window {
                                             radius: 18
                                             color: root.menuSurfaceAltColor
                                             border.width: 1
-                                            border.color: root.mapMenuSystemMode
-                                                ? (hotspotState === "online" ? "#2E8B67" : root.menuBorderColor)
-                                                : (followUnlocked ? root.menuAccentColor : root.menuBorderColor)
+                                            border.color: followUnlocked ? root.menuAccentColor : root.menuBorderColor
 
                                             Text {
                                                 anchors.centerIn: parent
-                                                text: root.mapMenuSystemMode
-                                                    ? (hotspotState === "online" ? "Wi-Fi details" : "Set up Wi-Fi")
-                                                    : (followUnlocked ? "Recenter map" : "Following")
-                                                color: root.mapMenuSystemMode
-                                                    ? (hotspotState === "online" ? "#8AF0B7" : root.menuTextPrimaryColor)
-                                                    : (followUnlocked ? root.menuAccentColor : root.menuTextPrimaryColor)
+                                                text: followUnlocked ? "Recenter map" : "Following"
+                                                color: followUnlocked ? root.menuAccentColor : root.menuTextPrimaryColor
                                                 font.family: appTheme.fontMono
                                                 font.pixelSize: 13
                                                 font.weight: Font.Bold
@@ -3520,15 +3565,34 @@ Window {
                                             MouseArea {
                                                 anchors.fill: parent
                                                 onClicked: {
-                                                    if (root.mapMenuSystemMode) {
-                                                        wifiOverlay.openPrompt()
-                                                        root.mapMenuOpen = false
-                                                        root.searchKeyboardOpen = false
-                                                        return
-                                                    }
                                                     navigation.recenter()
                                                     navField.setFollowEnabled(true)
                                                 }
+                                            }
+                                        }
+
+                                        Rectangle {
+                                            width: (parent.width - 8) / 2
+                                            height: parent.height
+                                            radius: 18
+                                            color: navigation.muted ? root.menuDangerSurfaceColor : root.menuSurfaceAltColor
+                                            border.width: 1
+                                            border.color: navigation.muted ? root.menuDangerBorderColor : root.menuBorderColor
+
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: navigation.muted ? "Sound off" : "Sound on"
+                                                color: navigation.muted ? "#D93025" : root.menuTextPrimaryColor
+                                                font.family: appTheme.fontMono
+                                                font.pixelSize: 13
+                                                font.weight: Font.Bold
+                                                font.hintingPreference: root.menuTextHintingPreference
+                                                renderType: root.menuTextRenderType
+                                            }
+
+                                            MouseArea {
+                                                anchors.fill: parent
+                                                onClicked: navigation.setMuted(!navigation.muted)
                                             }
                                         }
                                     }
@@ -4069,7 +4133,7 @@ Window {
                                     text: root.mapMenuSystemMode
                                         ? (root.mapMenuStage === "spotify" ? "SETTINGS" : "SPOTIFY")
                                         : (root.mapMenuStage === "settings"
-                                        ? (root.followUnlocked ? "RECENTER" : "FOLLOW")
+                                        ? "SEARCH"
                                         : (root.mapMenuStage === "spotify"
                                             ? "MENU"
                                         : (root.mapMenuStage === "search"
@@ -4077,7 +4141,7 @@ Window {
                                             : "BACK")))
                                     color: root.menuTextPrimaryColor
                                     font.family: appTheme.fontMono
-                                    font.pixelSize: (!root.mapMenuSystemMode && (root.mapMenuStage === "search" || root.mapMenuStage === "settings") && root.followUnlocked) ? 14 : 17
+                                    font.pixelSize: (!root.mapMenuSystemMode && root.mapMenuStage === "search" && root.followUnlocked) ? 14 : 17
                                     font.weight: Font.Bold
                                     font.letterSpacing: 1.2
                                 }
@@ -4089,13 +4153,13 @@ Window {
                                             root.chooseMapMenuTab(root.mapMenuStage === "spotify" ? "settings" : "spotify")
                                         } else if (root.mapMenuStage === "spotify") {
                                             root.chooseMapMenuTab("settings")
-                                        } else if (root.mapMenuStage === "search" || root.mapMenuStage === "settings") {
+                                        } else if (root.mapMenuStage === "settings") {
+                                            root.chooseMapMenuTab("search")
+                                        } else if (root.mapMenuStage === "search") {
                                             navigation.recenter()
                                             navField.setFollowEnabled(true)
-                                            if (root.mapMenuStage === "search") {
-                                                root.mapMenuOpen = false
-                                                root.searchKeyboardOpen = false
-                                            }
+                                            root.mapMenuOpen = false
+                                            root.searchKeyboardOpen = false
                                         } else {
                                             root.backToRouteSearch()
                                         }
