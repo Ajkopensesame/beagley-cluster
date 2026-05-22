@@ -272,6 +272,30 @@ QString spotifyTrackUri(const QString &trackId)
     return QStringLiteral("spotify:track:") + trackId;
 }
 
+QString queryItem(const QString &key, const QString &value)
+{
+    return QString::fromLatin1(QUrl::toPercentEncoding(key))
+        + QLatin1Char('=')
+        + QString::fromLatin1(QUrl::toPercentEncoding(value));
+}
+
+QString spotifyAuthorizeUrl(const QString &clientId,
+                            const QString &scope,
+                            const QString &redirectUri,
+                            const QString &state,
+                            const QString &codeChallenge)
+{
+    QStringList query;
+    query << queryItem(QStringLiteral("response_type"), QStringLiteral("code"))
+          << queryItem(QStringLiteral("client_id"), clientId)
+          << queryItem(QStringLiteral("scope"), scope)
+          << queryItem(QStringLiteral("redirect_uri"), redirectUri)
+          << queryItem(QStringLiteral("state"), state)
+          << queryItem(QStringLiteral("code_challenge_method"), QStringLiteral("S256"))
+          << queryItem(QStringLiteral("code_challenge"), codeChallenge);
+    return QStringLiteral("https://accounts.spotify.com/authorize?") + query.join(QLatin1Char('&'));
+}
+
 QString requestPath(const QByteArray &request)
 {
     const QList<QByteArray> lines = request.split('\n');
@@ -1361,17 +1385,11 @@ void NowPlayingService::beginSpotifyPairing()
     const QString codeChallenge = base64Url(verifierHash);
     m_pairingRedirectUri = callbackRedirectUri(port);
 
-    QUrlQuery authQuery;
-    authQuery.addQueryItem(QStringLiteral("response_type"), QStringLiteral("code"));
-    authQuery.addQueryItem(QStringLiteral("client_id"), m_spotifyClientId);
-    authQuery.addQueryItem(QStringLiteral("scope"), QString::fromLatin1(kSpotifyScopes));
-    authQuery.addQueryItem(QStringLiteral("redirect_uri"), m_pairingRedirectUri);
-    authQuery.addQueryItem(QStringLiteral("state"), m_pairingState);
-    authQuery.addQueryItem(QStringLiteral("code_challenge_method"), QStringLiteral("S256"));
-    authQuery.addQueryItem(QStringLiteral("code_challenge"), codeChallenge);
-    QUrl authUrl(QStringLiteral("https://accounts.spotify.com/authorize"));
-    authUrl.setQuery(authQuery);
-    m_pairingAuthorizeUrl = authUrl.toString(QUrl::FullyEncoded);
+    m_pairingAuthorizeUrl = spotifyAuthorizeUrl(m_spotifyClientId,
+                                                QString::fromLatin1(kSpotifyScopes),
+                                                m_pairingRedirectUri,
+                                                m_pairingState,
+                                                codeChallenge);
 
     const QString baseUrl = pairingPublicBaseUrl(port);
     const QString pairUrl = QStringLiteral("%1/spotify/pair/%2").arg(baseUrl, m_pairingCode);
