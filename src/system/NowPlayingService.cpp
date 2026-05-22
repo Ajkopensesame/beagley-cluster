@@ -24,7 +24,7 @@ namespace {
 constexpr auto kSpotifyApiBase = "https://api.spotify.com/v1";
 constexpr auto kSpotifyTokenUrl = "https://accounts.spotify.com/api/token";
 constexpr int kPairingPortDefault = 8787;
-constexpr int kPairingTimeoutMs = 5 * 60 * 1000;
+constexpr int kPairingTimeoutMs = 15 * 60 * 1000;
 constexpr auto kSpotifyScopes = "user-read-currently-playing user-library-read user-library-modify";
 
 int refreshIntervalMs()
