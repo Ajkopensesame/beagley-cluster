@@ -968,7 +968,7 @@ Window {
     function mapMenuTitleText() {
         if (root.mapMenuSystemMode)
             return "Menu"
-        return "Maps"
+        return "Navigation"
     }
 
     function mapMenuContentTitleText() {
