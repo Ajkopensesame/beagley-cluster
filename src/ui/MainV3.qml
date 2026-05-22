@@ -3132,7 +3132,7 @@ Window {
                                         : (root.mapMenuStage === "settings"
                                             ? 220
                                             : (root.mapMenuStage === "spotify"
-                                                ? 350
+                                                ? 430
                                             : (root.searchKeyboardOpen ? 190 : 258)))
                                         )
                             radius: 22
