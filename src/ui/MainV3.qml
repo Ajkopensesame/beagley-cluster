@@ -2893,21 +2893,32 @@ Window {
                         Rectangle {
                             visible: root.mapMenuStage === "search"
                             width: parent.width
-                            height: 70
-                            radius: 22
+                            height: 68
+                            radius: 18
                             color: root.menuSurfaceColor
                             border.width: 1
                             border.color: searchInput.activeFocus ? root.menuAccentColor : root.menuBorderColor
+
+                            MouseArea {
+                                anchors.fill: parent
+                                z: 0
+                                onClicked: {
+                                    root.mapMenuStage = "search"
+                                    root.searchKeyboardOpen = true
+                                    searchInput.forceActiveFocus()
+                                }
+                            }
 
                             Row {
                                 anchors.fill: parent
                                 anchors.margins: 12
                                 spacing: 12
+                                z: 1
 
                                 Rectangle {
-                                    width: 46
-                                    height: 46
-                                    radius: 23
+                                    width: 44
+                                    height: 44
+                                    radius: 22
                                     anchors.verticalCenter: parent.verticalCenter
                                     color: root.menuSurfaceSelectedColor
                                     border.width: 1
@@ -2925,7 +2936,7 @@ Window {
                                 }
 
                                 Item {
-                                    width: parent.width - 58
+                                    width: Math.max(0, parent.width - 56 - searchKeyboardButton.width - searchFindButton.width - searchClearButton.width - parent.spacing * 4)
                                     height: parent.height
 
                                     Text {
@@ -3001,14 +3012,105 @@ Window {
                                         renderType: root.menuTextRenderType
                                     }
                                 }
-                            }
 
-                            MouseArea {
-                                anchors.fill: parent
-                                onClicked: {
-                                    root.mapMenuStage = "search"
-                                    root.searchKeyboardOpen = true
-                                    searchInput.forceActiveFocus()
+                                Rectangle {
+                                    id: searchKeyboardButton
+                                    width: 64
+                                    height: 34
+                                    radius: 11
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    color: searchKeyboardMouse.pressed ? root.menuSurfaceSelectedColor : root.menuSurfaceAltColor
+                                    border.width: 1
+                                    border.color: root.searchKeyboardOpen ? root.menuAccentColor : root.menuBorderColor
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: root.searchKeyboardOpen ? "HIDE" : "KEYS"
+                                        color: root.searchKeyboardOpen ? root.menuAccentColor : root.menuTextSecondaryColor
+                                        font.family: appTheme.fontMono
+                                        font.pixelSize: 11
+                                        font.weight: Font.Bold
+                                        font.letterSpacing: 0.8
+                                        font.hintingPreference: root.menuTextHintingPreference
+                                        renderType: root.menuTextRenderType
+                                    }
+
+                                    MouseArea {
+                                        id: searchKeyboardMouse
+                                        anchors.fill: parent
+                                        onClicked: {
+                                            root.searchKeyboardOpen = !root.searchKeyboardOpen
+                                            if (root.searchKeyboardOpen)
+                                                searchInput.forceActiveFocus()
+                                        }
+                                    }
+                                }
+
+                                Rectangle {
+                                    id: searchFindButton
+                                    width: 58
+                                    height: 34
+                                    radius: 11
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    enabled: !root.routeLookupInProgress
+                                    opacity: enabled ? 1.0 : 0.54
+                                    color: searchFindMouse.pressed ? "#3B8EFF" : root.menuAccentColor
+                                    border.width: 1
+                                    border.color: root.menuAccentColor
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: root.routeLookupInProgress ? "..." : "GO"
+                                        color: "#FFFFFF"
+                                        font.family: appTheme.fontMono
+                                        font.pixelSize: 12
+                                        font.weight: Font.Bold
+                                        font.letterSpacing: 1.0
+                                        font.hintingPreference: root.menuTextHintingPreference
+                                        renderType: root.menuTextRenderType
+                                    }
+
+                                    MouseArea {
+                                        id: searchFindMouse
+                                        anchors.fill: parent
+                                        enabled: searchFindButton.enabled
+                                        onClicked: routeButton.trigger()
+                                    }
+                                }
+
+                                Rectangle {
+                                    id: searchClearButton
+                                    width: 48
+                                    height: 34
+                                    radius: 11
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    enabled: searchInput.text.length > 0
+                                    opacity: enabled ? 1.0 : 0.35
+                                    color: searchClearMouse.pressed ? root.menuSurfaceSelectedColor : "transparent"
+                                    border.width: 1
+                                    border.color: enabled ? root.menuBorderColor : "transparent"
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "CLR"
+                                        color: searchClearButton.enabled ? root.menuTextSecondaryColor : root.menuTextMutedColor
+                                        font.family: appTheme.fontMono
+                                        font.pixelSize: 11
+                                        font.weight: Font.Bold
+                                        font.letterSpacing: 0.7
+                                        font.hintingPreference: root.menuTextHintingPreference
+                                        renderType: root.menuTextRenderType
+                                    }
+
+                                    MouseArea {
+                                        id: searchClearMouse
+                                        anchors.fill: parent
+                                        enabled: searchClearButton.enabled
+                                        onClicked: {
+                                            root.clearMapSearch()
+                                            searchInput.forceActiveFocus()
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -3969,7 +4071,7 @@ Window {
                                         Column {
                                             anchors.fill: parent
                                             anchors.leftMargin: 12
-                                            anchors.rightMargin: 12
+                                            anchors.rightMargin: 116
                                             anchors.topMargin: 8
                                             anchors.bottomMargin: 8
                                             spacing: 2
@@ -4000,6 +4102,40 @@ Window {
                                                 font.hintingPreference: root.menuTextHintingPreference
                                                 renderType: root.menuTextRenderType
                                                 elide: Text.ElideRight
+                                            }
+                                        }
+
+                                        Rectangle {
+                                            id: routeStartButton
+                                            width: 86
+                                            height: 34
+                                            radius: 11
+                                            anchors.right: parent.right
+                                            anchors.rightMargin: 12
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            enabled: root.availableRouteOptions().length > 0 || root.hasActiveRoute
+                                            opacity: enabled ? 1.0 : 0.48
+                                            color: routeStartMouse.pressed ? "#3B8EFF" : root.menuAccentColor
+                                            border.width: 1
+                                            border.color: root.menuAccentColor
+
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: "START"
+                                                color: "#FFFFFF"
+                                                font.family: appTheme.fontMono
+                                                font.pixelSize: 12
+                                                font.weight: Font.Bold
+                                                font.letterSpacing: 1.0
+                                                font.hintingPreference: root.menuTextHintingPreference
+                                                renderType: root.menuTextRenderType
+                                            }
+
+                                            MouseArea {
+                                                id: routeStartMouse
+                                                anchors.fill: parent
+                                                enabled: routeStartButton.enabled
+                                                onClicked: root.startSelectedRoute()
                                             }
                                         }
                                     }
@@ -4058,169 +4194,36 @@ Window {
                             }
                         }
 
-                        Row {
-                            spacing: 10
-                            anchors.horizontalCenter: parent.horizontalCenter
+                        Item {
+                            id: routeButton
+                            visible: false
+                            width: 0
+                            height: 0
 
-                            Rectangle {
-                                id: routeButton
-                                width: 154
-                                height: 50
-                                radius: 15
-                                readonly property bool blocked: root.mapMenuStage === "routing"
-                                    || (root.mapMenuStage === "routes"
-                                        && root.availableRouteOptions().length <= 0
-                                        && !root.hasActiveRoute)
-                                enabled: !blocked
-                                opacity: enabled ? 1.0 : 0.72
-                                color: blocked ? root.menuSurfaceAltColor : root.menuAccentColor
-                                border.width: 1
-                                border.color: blocked ? root.menuBorderColor : root.menuAccentColor
+                            readonly property bool blocked: root.mapMenuStage === "routing"
+                                || (root.mapMenuStage === "routes"
+                                    && root.availableRouteOptions().length <= 0
+                                    && !root.hasActiveRoute)
 
-                                function trigger() {
-                                    if (root.mapMenuStage === "settings" || root.mapMenuStage === "spotify") {
-                                        root.mapMenuOpen = false
-                                        root.searchKeyboardOpen = false
+                            function trigger() {
+                                if (root.mapMenuStage === "settings" || root.mapMenuStage === "spotify") {
+                                    root.mapMenuOpen = false
+                                    root.searchKeyboardOpen = false
+                                    return
+                                }
+                                if (root.mapMenuStage === "routes") {
+                                    root.startSelectedRoute()
+                                    return
+                                }
+                                if (root.mapMenuStage === "routing")
+                                    return
+                                if (root.mapMenuStage === "search" && !root.routeLookupInProgress) {
+                                    const results = root.menuResultsModel()
+                                    if (results.length > 0) {
+                                        root.chooseSearchResult(results[0])
                                         return
                                     }
-                                    if (root.mapMenuStage === "routes") {
-                                        root.startSelectedRoute()
-                                        return
-                                    }
-                                    if (root.mapMenuStage === "routing")
-                                        return
-                                    if (root.mapMenuStage === "search" && !root.routeLookupInProgress) {
-                                        const results = root.menuResultsModel()
-                                        if (results.length > 0) {
-                                            root.chooseSearchResult(results[0])
-                                            return
-                                        }
-                                        root.routeSearchQuery(searchInput.text)
-                                    }
-                                }
-
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: root.mapMenuStage === "routes"
-                                        ? "START"
-                                        : (root.mapMenuStage === "settings" || root.mapMenuStage === "spotify"
-                                            ? "DONE"
-                                            : ((root.mapMenuStage === "routing" || root.routeLookupInProgress) ? "LOADING" : "FIND"))
-                                    color: routeButton.blocked ? root.menuTextMutedColor : "#FFFFFF"
-                                    font.family: appTheme.fontMono
-                                    font.pixelSize: 17
-                                    font.weight: Font.Bold
-                                    font.letterSpacing: 1.8
-                                }
-
-                                MouseArea {
-                                    anchors.fill: parent
-                                    enabled: routeButton.enabled
-                                    onClicked: routeButton.trigger()
-                                }
-                            }
-
-                            Rectangle {
-                                width: 132
-                                height: 50
-                                radius: 15
-                                color: root.menuSurfaceColor
-                                border.width: 1
-                                border.color: root.menuBorderColor
-
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: root.mapMenuSystemMode
-                                        ? (root.mapMenuStage === "spotify" ? "SETTINGS" : "SPOTIFY")
-                                        : (root.mapMenuStage === "settings"
-                                        ? "SEARCH"
-                                        : (root.mapMenuStage === "spotify"
-                                            ? "MENU"
-                                        : (root.mapMenuStage === "search"
-                                            ? (root.followUnlocked ? "RECENTER" : "FOLLOW")
-                                            : "BACK")))
-                                    color: root.menuTextPrimaryColor
-                                    font.family: appTheme.fontMono
-                                    font.pixelSize: (!root.mapMenuSystemMode && root.mapMenuStage === "search" && root.followUnlocked) ? 14 : 17
-                                    font.weight: Font.Bold
-                                    font.letterSpacing: 1.2
-                                }
-
-                                MouseArea {
-                                    anchors.fill: parent
-                                    onClicked: {
-                                        if (root.mapMenuSystemMode) {
-                                            root.chooseMapMenuTab(root.mapMenuStage === "spotify" ? "settings" : "spotify")
-                                        } else if (root.mapMenuStage === "spotify") {
-                                            root.chooseMapMenuTab("settings")
-                                        } else if (root.mapMenuStage === "settings") {
-                                            root.chooseMapMenuTab("search")
-                                        } else if (root.mapMenuStage === "search") {
-                                            navigation.recenter()
-                                            navField.setFollowEnabled(true)
-                                            root.mapMenuOpen = false
-                                            root.searchKeyboardOpen = false
-                                        } else {
-                                            root.backToRouteSearch()
-                                        }
-                                    }
-                                }
-                            }
-
-                            Rectangle {
-                                visible: root.mapMenuStage !== "settings" && root.mapMenuStage !== "spotify"
-                                width: 112
-                                height: 50
-                                radius: 15
-                                color: root.menuSurfaceColor
-                                border.width: 1
-                                border.color: root.menuBorderColor
-
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: root.mapMenuStage === "search"
-                                        ? (root.searchKeyboardOpen ? "HIDE" : "KEYS")
-                                        : "CENTER"
-                                    color: root.menuTextPrimaryColor
-                                    font.family: appTheme.fontMono
-                                    font.pixelSize: 16
-                                    font.weight: Font.Bold
-                                    font.letterSpacing: 1.4
-                                }
-
-                                MouseArea {
-                                    anchors.fill: parent
-                                    onClicked: {
-                                        if (root.mapMenuStage === "search")
-                                            root.searchKeyboardOpen = !root.searchKeyboardOpen
-                                        else
-                                            navigation.recenter()
-                                    }
-                                }
-                            }
-
-                            Rectangle {
-                                visible: root.mapMenuStage === "search" && searchInput.text.length > 0
-                                width: 112
-                                height: 50
-                                radius: 15
-                                color: root.menuSurfaceColor
-                                border.width: 1
-                                border.color: root.menuBorderColor
-
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: "CLEAR"
-                                    color: root.menuTextPrimaryColor
-                                    font.family: appTheme.fontMono
-                                    font.pixelSize: 16
-                                    font.weight: Font.Bold
-                                    font.letterSpacing: 1.4
-                                }
-
-                                MouseArea {
-                                    anchors.fill: parent
-                                    onClicked: root.clearMapSearch()
+                                    root.routeSearchQuery(searchInput.text)
                                 }
                             }
                         }
