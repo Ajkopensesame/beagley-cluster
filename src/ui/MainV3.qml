@@ -3127,14 +3127,14 @@ Window {
                             width: parent.width
                             height: root.mapMenuStage === "routes"
                                 ? 244
-                                : (root.mapMenuStage === "routing"
-                                    ? 126
-                                    : (root.mapMenuStage === "settings"
-                                        ? (root.mapMenuSystemMode ? 312 : 220)
-                                        : (root.mapMenuStage === "spotify"
-                                            ? 350
-                                        : (root.searchKeyboardOpen ? 190 : 258)))
-                                    )
+                                    : (root.mapMenuStage === "routing"
+                                        ? 126
+                                        : (root.mapMenuStage === "settings"
+                                            ? 220
+                                            : (root.mapMenuStage === "spotify"
+                                                ? 350
+                                            : (root.searchKeyboardOpen ? 190 : 258)))
+                                        )
                             radius: 22
                             color: root.menuSurfaceColor
                             border.width: 1
@@ -3464,114 +3464,6 @@ Window {
                                                     MouseArea {
                                                         anchors.fill: parent
                                                         onClicked: root.selectMapTheme(modelData.id)
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    Column {
-                                        visible: root.mapMenuSystemMode
-                                        width: parent.width
-                                        spacing: 8
-
-                                        Text {
-                                            width: parent.width
-                                            text: "Spotify"
-                                            color: root.menuTextSecondaryColor
-                                            font.family: appTheme.fontMono
-                                            font.pixelSize: 13
-                                            font.weight: Font.Bold
-                                            font.letterSpacing: 0.2
-                                            font.hintingPreference: root.menuTextHintingPreference
-                                            renderType: root.menuTextRenderType
-                                        }
-
-                                        Rectangle {
-                                            width: parent.width
-                                            height: 68
-                                            radius: 18
-                                            color: root.menuSurfaceAltColor
-                                            border.width: 1
-                                            border.color: root.spotifyPairingActive
-                                                ? root.menuAccentColor
-                                                : root.menuBorderColor
-
-                                            Row {
-                                                anchors.fill: parent
-                                                anchors.margins: 12
-                                                spacing: 12
-
-                                                OemIcon {
-                                                    width: 38
-                                                    height: 38
-                                                    anchors.verticalCenter: parent.verticalCenter
-                                                    icon: "audio"
-                                                    active: root.musicPlaying || root.spotifyPairingActive
-                                                    color: root.menuTextPrimaryColor
-                                                    accentColor: root.menuAccentColor
-                                                    strokeWidth: 3.2
-                                                }
-
-                                                Column {
-                                                    width: parent.width - spotifySetupButton.width - 62
-                                                    anchors.verticalCenter: parent.verticalCenter
-                                                    spacing: 2
-
-                                                    Text {
-                                                        width: parent.width
-                                                        text: root.musicAvailable ? root.musicNowPlayingLine() : "Now playing display"
-                                                        color: root.menuTextPrimaryColor
-                                                        font.family: appTheme.fontDisplay
-                                                        font.pixelSize: 17
-                                                        font.weight: Font.DemiBold
-                                                        font.hintingPreference: root.menuTextHintingPreference
-                                                        renderType: root.menuTextRenderType
-                                                        elide: Text.ElideRight
-                                                    }
-
-                                                    Text {
-                                                        width: parent.width
-                                                        text: root.spotifySetupStatusLine()
-                                                        color: root.musicAvailable || root.spotifyPairingActive ? root.menuAccentColor : root.menuTextSecondaryColor
-                                                        font.family: appTheme.fontMono
-                                                        font.pixelSize: 11
-                                                        font.weight: Font.Bold
-                                                        font.hintingPreference: root.menuTextHintingPreference
-                                                        renderType: root.menuTextRenderType
-                                                        elide: Text.ElideRight
-                                                    }
-                                                }
-
-                                                Rectangle {
-                                                    id: spotifySetupButton
-                                                    width: 116
-                                                    height: 40
-                                                    anchors.verticalCenter: parent.verticalCenter
-                                                    radius: 14
-                                                    enabled: !!root.nowPlayingService
-                                                    opacity: enabled ? 1.0 : 0.56
-                                                    color: spotifySetupMouse.pressed && enabled ? root.menuSurfaceSelectedColor : root.menuSurfaceColor
-                                                    border.width: 1
-                                                    border.color: root.spotifyPairingActive ? root.menuAccentColor : root.menuBorderColor
-
-                                                    Text {
-                                                        anchors.centerIn: parent
-                                                        text: root.spotifyActionLabel()
-                                                        color: root.nowPlayingService ? root.menuTextPrimaryColor : root.menuTextMutedColor
-                                                        font.family: appTheme.fontMono
-                                                        font.pixelSize: 12
-                                                        font.weight: Font.Bold
-                                                        font.letterSpacing: 0.8
-                                                        font.hintingPreference: root.menuTextHintingPreference
-                                                        renderType: root.menuTextRenderType
-                                                    }
-
-                                                    MouseArea {
-                                                        id: spotifySetupMouse
-                                                        anchors.fill: parent
-                                                        enabled: spotifySetupButton.enabled
-                                                        onClicked: root.triggerSpotifySetup()
                                                     }
                                                 }
                                             }
