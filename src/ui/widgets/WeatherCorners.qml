@@ -11,6 +11,7 @@ Item {
     property real lat: NaN
     property real lng: NaN
     property bool livePositionValid: false
+    property bool positionLive: livePositionValid
     property string effectLevel: "low"
     property bool active: true
     property bool stressScene: false
@@ -642,7 +643,9 @@ Item {
     }
 
     function coordinateStatusText() {
-        return livePositionValid || stressScene ? "SYNC" : "GPS WAIT"
+        if (weatherPositionReady)
+            return positionLive || stressScene ? "SYNC" : "GPS HOLD"
+        return "GPS WAIT"
     }
 
     function requestLocationFallback(latValue, lngValue) {

@@ -65,6 +65,51 @@ class NmeaGpsStateTest(unittest.TestCase):
         self.assertIn("lat", payload)
         self.assertIn("lng", payload)
 
+    def test_transient_invalid_sentences_hold_recent_valid_fix(self) -> None:
+        state = NmeaGpsState(min_heading_speed_kph=7.0, fix_hold_seconds=3.0)
+        state.feed_line(
+            "$GPRMC,092751.000,A,5321.6802,N,00630.3372,W,12.4,84.4,230394,003.1,W",
+            received_wall_time=1_710_000_000.0,
+            received_monotonic=10.0,
+        )
+        valid = state.feed_line(
+            "$GPGGA,092751.000,5321.6802,N,00630.3372,W,1,08,0.9,545.4,M,46.9,M,,",
+            received_wall_time=1_710_000_000.1,
+            received_monotonic=10.1,
+        )
+        self.assertIsNotNone(valid)
+        assert valid is not None
+        self.assertTrue(valid.fix_valid)
+
+        state.feed_line(
+            "$GNRMC,092752.000,V,,,,,,,230394,,,N,V",
+            received_wall_time=1_710_000_001.0,
+            received_monotonic=11.0,
+        )
+        held = state.feed_line(
+            "$GNGGA,092752.000,,,,,0,00,99.99,,,,,,",
+            received_wall_time=1_710_000_001.1,
+            received_monotonic=11.1,
+        )
+        self.assertIsNotNone(held)
+        assert held is not None
+        self.assertTrue(held.fix_valid)
+        self.assertAlmostEqual(held.lat, valid.lat)
+        self.assertAlmostEqual(held.lng, valid.lng)
+        self.assertAlmostEqual(held.accuracy_m, valid.accuracy_m)
+        self.assertEqual(held.satellites, valid.satellites)
+
+        expired = state.feed_line(
+            "$GNGGA,092756.000,,,,,0,00,99.99,,,,,,",
+            received_wall_time=1_710_000_006.0,
+            received_monotonic=16.0,
+        )
+        self.assertIsNotNone(expired)
+        assert expired is not None
+        self.assertFalse(expired.fix_valid)
+        self.assertAlmostEqual(expired.accuracy_m, 499.95)
+        self.assertEqual(expired.satellites, 0)
+
     def test_malformed_sentence_does_not_poison_latest_sample(self) -> None:
         state = NmeaGpsState()
         with self.assertRaises(ValueError):

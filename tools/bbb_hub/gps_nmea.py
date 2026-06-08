@@ -149,9 +149,11 @@ class NmeaGpsState:
         *,
         min_heading_speed_kph: float = 7.0,
         default_accuracy_m: float = 25.0,
+        fix_hold_seconds: float = 15.0,
     ) -> None:
         self._min_heading_speed_kph = min_heading_speed_kph
         self._default_accuracy_m = default_accuracy_m
+        self._fix_hold_seconds = max(0.0, fix_hold_seconds)
         self._rmc_status: Optional[str] = None
         self._gga_fix_quality: Optional[int] = None
         self._lat: Optional[float] = None
@@ -163,8 +165,10 @@ class NmeaGpsState:
         self._accuracy_m = default_accuracy_m
         self._timestamp_ms = 0
         self._last_received_monotonic = 0.0
+        self._last_valid_sample: Optional[GpsSample] = None
+        self._last_valid_monotonic = 0.0
 
-    def _current_fix_valid(self) -> bool:
+    def _raw_fix_valid(self) -> bool:
         fix_valid = False
         if self._rmc_status is not None:
             fix_valid = self._rmc_status == "A"
@@ -172,11 +176,10 @@ class NmeaGpsState:
             fix_valid = fix_valid and self._gga_fix_quality > 0 if self._rmc_status is not None else self._gga_fix_quality > 0
         return fix_valid
 
-    def _current_heading_reliable(self) -> bool:
-        return self._course_present and self._current_fix_valid() and self._speed_kph >= self._min_heading_speed_kph
-
-    def _build_sample(self, received_monotonic: float) -> GpsSample:
+    def _build_state_sample(self, received_monotonic: float, *, fix_valid: bool) -> GpsSample:
         timestamp_ms = self._timestamp_ms or int(time.time() * 1000)
+        heading_reliable = self._course_present and fix_valid and self._speed_kph >= self._min_heading_speed_kph
+
         return GpsSample(
             lat=self._lat,
             lng=self._lng,
@@ -184,12 +187,46 @@ class NmeaGpsState:
             speed_kph=self._speed_kph,
             accuracy_m=self._accuracy_m,
             timestamp_ms=timestamp_ms,
-            fix_valid=self._current_fix_valid(),
-            heading_reliable=self._current_heading_reliable(),
+            fix_valid=fix_valid,
+            heading_reliable=heading_reliable,
             satellites=self._satellites,
             source="hardware",
             received_monotonic=received_monotonic,
         )
+
+    def _build_held_sample(self, received_monotonic: float) -> Optional[GpsSample]:
+        if self._last_valid_sample is None:
+            return None
+        if received_monotonic - self._last_valid_monotonic > self._fix_hold_seconds:
+            return None
+
+        sample = self._last_valid_sample
+        return GpsSample(
+            lat=sample.lat,
+            lng=sample.lng,
+            bearing=sample.bearing,
+            speed_kph=sample.speed_kph,
+            accuracy_m=sample.accuracy_m,
+            timestamp_ms=sample.timestamp_ms,
+            fix_valid=True,
+            heading_reliable=sample.heading_reliable,
+            satellites=sample.satellites,
+            source=sample.source,
+            received_monotonic=received_monotonic,
+        )
+
+    def _build_sample(self, received_monotonic: float) -> GpsSample:
+        if self._raw_fix_valid():
+            sample = self._build_state_sample(received_monotonic, fix_valid=True)
+            self._last_valid_sample = sample
+            self._last_valid_monotonic = received_monotonic
+            return sample
+
+        held = self._build_held_sample(received_monotonic)
+        if held is not None:
+            return held
+
+        return self._build_state_sample(received_monotonic, fix_valid=False)
 
     def feed_line(
         self,

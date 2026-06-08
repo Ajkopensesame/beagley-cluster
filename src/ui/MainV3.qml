@@ -157,11 +157,22 @@ Window {
         && !hub.bbbStale
         && isFinite(Number(hub.gpsLat))
         && isFinite(Number(hub.gpsLng)))
+    readonly property bool retainedGpsPoseValid: !!(hub
+        && hub.gpsEverValid
+        && isFinite(Number(hub.gpsLat))
+        && isFinite(Number(hub.gpsLng)))
     readonly property string gpsSourceText: hub && hub.gpsSource ? String(hub.gpsSource).toUpperCase() : "UNKNOWN"
     readonly property var navConnectivity: navigation ? (navigation.mapConnectivity || ({})) : ({})
     readonly property var navVehiclePose: navigation ? (navigation.mapVehiclePose || ({})) : ({})
     readonly property bool navVehiclePoseFinite: isFinite(Number(navVehiclePose.lat))
         && isFinite(Number(navVehiclePose.lng))
+    readonly property bool weatherPoseValid: liveMapPoseValid || retainedGpsPoseValid || navVehiclePoseFinite
+    readonly property real weatherPoseLat: (liveMapPoseValid || retainedGpsPoseValid)
+        ? Number(hub.gpsLat)
+        : (navVehiclePoseFinite ? Number(navVehiclePose.lat) : NaN)
+    readonly property real weatherPoseLng: (liveMapPoseValid || retainedGpsPoseValid)
+        ? Number(hub.gpsLng)
+        : (navVehiclePoseFinite ? Number(navVehiclePose.lng) : NaN)
     readonly property bool mapVehicleMarkerVisible: mapLibreNativeActive
         && (liveMapPoseValid || navVehiclePoseFinite)
     readonly property bool mapVehicleMarkerGuidanceAnchor: hasActiveRoute
@@ -1674,9 +1685,10 @@ Window {
             anchors.fill: parent
             z: 260
             theme: appTheme
-            lat: root.displayMapLat
-            lng: root.displayMapLng
-            livePositionValid: root.liveMapPoseValid
+            lat: root.weatherPoseLat
+            lng: root.weatherPoseLng
+            livePositionValid: root.weatherPoseValid
+            positionLive: root.liveMapPoseValid
             effectLevel: root.effectLevel
             stressScene: root.stressScene
             phase: root.sharedEffectPhase
