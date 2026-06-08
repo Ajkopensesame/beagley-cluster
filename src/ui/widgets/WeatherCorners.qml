@@ -12,6 +12,7 @@ Item {
     property real lng: NaN
     property bool livePositionValid: false
     property bool positionLive: livePositionValid
+    property bool positionWeak: false
     property string effectLevel: "low"
     property bool active: true
     property bool stressScene: false
@@ -643,8 +644,11 @@ Item {
     }
 
     function coordinateStatusText() {
-        if (weatherPositionReady)
-            return positionLive || stressScene ? "SYNC" : "GPS HOLD"
+        if (weatherPositionReady) {
+            if (positionLive || stressScene)
+                return "SYNC"
+            return positionWeak ? "GPS WEAK" : "GPS HOLD"
+        }
         return "GPS WAIT"
     }
 

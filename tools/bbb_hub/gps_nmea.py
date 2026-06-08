@@ -169,12 +169,11 @@ class NmeaGpsState:
         self._last_valid_monotonic = 0.0
 
     def _raw_fix_valid(self) -> bool:
-        fix_valid = False
-        if self._rmc_status is not None:
-            fix_valid = self._rmc_status == "A"
-        if self._gga_fix_quality is not None:
-            fix_valid = fix_valid and self._gga_fix_quality > 0 if self._rmc_status is not None else self._gga_fix_quality > 0
-        return fix_valid
+        if self._lat is None or self._lng is None:
+            return False
+        if self._gga_fix_quality is not None and self._gga_fix_quality > 0:
+            return True
+        return self._rmc_status == "A"
 
     def _build_state_sample(self, received_monotonic: float, *, fix_valid: bool) -> GpsSample:
         timestamp_ms = self._timestamp_ms or int(time.time() * 1000)

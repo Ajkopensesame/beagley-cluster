@@ -161,20 +161,32 @@ Window {
         && hub.gpsEverValid
         && isFinite(Number(hub.gpsLat))
         && isFinite(Number(hub.gpsLng)))
+    readonly property bool weakGpsPoseValid: !!(hub
+        && hub.vehicleStateSeen
+        && hub.gpsPoseValid
+        && !hub.linkStale
+        && !hub.bbbStale
+        && isFinite(Number(hub.gpsLat))
+        && isFinite(Number(hub.gpsLng)))
+    readonly property bool gpsSignalSeen: !!(hub
+        && hub.vehicleStateSeen
+        && !hub.linkStale
+        && !hub.bbbStale
+        && (Number(hub.gpsSatellites) > 0 || Number(hub.gpsAccuracyM) > 0))
     readonly property string gpsSourceText: hub && hub.gpsSource ? String(hub.gpsSource).toUpperCase() : "UNKNOWN"
     readonly property var navConnectivity: navigation ? (navigation.mapConnectivity || ({})) : ({})
     readonly property var navVehiclePose: navigation ? (navigation.mapVehiclePose || ({})) : ({})
     readonly property bool navVehiclePoseFinite: isFinite(Number(navVehiclePose.lat))
         && isFinite(Number(navVehiclePose.lng))
-    readonly property bool weatherPoseValid: liveMapPoseValid || retainedGpsPoseValid || navVehiclePoseFinite
-    readonly property real weatherPoseLat: (liveMapPoseValid || retainedGpsPoseValid)
+    readonly property bool weatherPoseValid: weakGpsPoseValid || retainedGpsPoseValid || navVehiclePoseFinite
+    readonly property real weatherPoseLat: (weakGpsPoseValid || retainedGpsPoseValid)
         ? Number(hub.gpsLat)
         : (navVehiclePoseFinite ? Number(navVehiclePose.lat) : NaN)
-    readonly property real weatherPoseLng: (liveMapPoseValid || retainedGpsPoseValid)
+    readonly property real weatherPoseLng: (weakGpsPoseValid || retainedGpsPoseValid)
         ? Number(hub.gpsLng)
         : (navVehiclePoseFinite ? Number(navVehiclePose.lng) : NaN)
     readonly property bool mapVehicleMarkerVisible: mapLibreNativeActive
-        && (liveMapPoseValid || navVehiclePoseFinite)
+        && (weakGpsPoseValid || navVehiclePoseFinite)
     readonly property bool mapVehicleMarkerGuidanceAnchor: hasActiveRoute
         && navigation
         && navigation.guidanceStarted
@@ -1689,6 +1701,7 @@ Window {
             lng: root.weatherPoseLng
             livePositionValid: root.weatherPoseValid
             positionLive: root.liveMapPoseValid
+            positionWeak: root.weakGpsPoseValid && !root.liveMapPoseValid
             effectLevel: root.effectLevel
             stressScene: root.stressScene
             phase: root.sharedEffectPhase
@@ -2637,7 +2650,11 @@ Window {
                             Text {
                                 text: gpsFixOk
                                     ? ("FIX  " + Math.max(0, hub.gpsSatellites) + " SAT")
-                                    : (navigation.bbbLinkOk ? "NO FIX" : "WAITING")
+                                    : (root.weakGpsPoseValid
+                                    ? ("POS  " + Math.max(0, hub.gpsSatellites) + " SAT")
+                                    : (root.gpsSignalSeen
+                                    ? ("ACQ  " + Math.max(0, hub.gpsSatellites) + " SAT")
+                                    : (navigation.bbbLinkOk ? "NO FIX" : "WAITING")))
                                 color: "#F5FBFF"
                                 font.family: appTheme.fontDisplay
                                 font.pixelSize: 22
@@ -2645,10 +2662,12 @@ Window {
                             }
 
                             Text {
-                                visible: hub.gpsAccuracyM > 0 || gpsEverValid
+                                visible: hub.gpsAccuracyM > 0 || gpsEverValid || root.gpsSignalSeen
                                 text: hub.gpsAccuracyM > 0
                                     ? ("±" + Math.round(hub.gpsAccuracyM) + " m")
-                                    : (gpsEverValid ? "Holding last known BBB pose" : "Waiting for first valid fix")
+                                    : (root.gpsSignalSeen
+                                    ? "Reading satellites; waiting for coordinates"
+                                    : (gpsEverValid ? "Holding last known BBB pose" : "Waiting for first valid fix"))
                                 color: "#8FB4C8"
                                 font.family: appTheme.fontMono
                                 font.pixelSize: 12

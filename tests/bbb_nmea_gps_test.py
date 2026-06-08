@@ -65,6 +65,42 @@ class NmeaGpsStateTest(unittest.TestCase):
         self.assertIn("lat", payload)
         self.assertIn("lng", payload)
 
+    def test_gga_quality_with_coordinates_is_enough_for_minimal_fix(self) -> None:
+        state = NmeaGpsState(min_heading_speed_kph=7.0)
+        state.feed_line(
+            "$GNRMC,092752.000,V,,,,,,,230394,,,N,V",
+            received_wall_time=1_710_000_006.0,
+            received_monotonic=16.0,
+        )
+        sample = state.feed_line(
+            "$GNGGA,092752.000,5321.6802,N,00630.3372,W,1,05,3.2,545.4,M,46.9,M,,",
+            received_wall_time=1_710_000_006.1,
+            received_monotonic=16.1,
+        )
+
+        self.assertIsNotNone(sample)
+        assert sample is not None
+        self.assertTrue(sample.fix_valid)
+        self.assertEqual(sample.satellites, 5)
+        self.assertAlmostEqual(sample.lat, 53.3613367, places=5)
+        self.assertAlmostEqual(sample.lng, -6.50562, places=5)
+        self.assertFalse(sample.heading_reliable)
+
+    def test_satellites_without_coordinates_are_signal_not_position(self) -> None:
+        state = NmeaGpsState(min_heading_speed_kph=7.0)
+        sample = state.feed_line(
+            "$GNGGA,092752.000,,,,,0,05,3.2,,,,,,",
+            received_wall_time=1_710_000_007.0,
+            received_monotonic=17.0,
+        )
+
+        self.assertIsNotNone(sample)
+        assert sample is not None
+        self.assertFalse(sample.fix_valid)
+        self.assertIsNone(sample.lat)
+        self.assertIsNone(sample.lng)
+        self.assertEqual(sample.satellites, 5)
+
     def test_transient_invalid_sentences_hold_recent_valid_fix(self) -> None:
         state = NmeaGpsState(min_heading_speed_kph=7.0, fix_hold_seconds=3.0)
         state.feed_line(
