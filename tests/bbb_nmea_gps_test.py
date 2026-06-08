@@ -62,8 +62,8 @@ class NmeaGpsStateTest(unittest.TestCase):
         payload = build_hardware_gps_payload(sample, stale=False, now_ms=sample.timestamp_ms)
         self.assertFalse(payload["fixValid"])
         self.assertEqual(payload["satellites"], 3)
-        self.assertIn("lat", payload)
-        self.assertIn("lng", payload)
+        self.assertNotIn("lat", payload)
+        self.assertNotIn("lng", payload)
 
     def test_gga_quality_with_coordinates_is_enough_for_minimal_fix(self) -> None:
         state = NmeaGpsState(min_heading_speed_kph=7.0)
@@ -100,6 +100,26 @@ class NmeaGpsStateTest(unittest.TestCase):
         self.assertIsNone(sample.lat)
         self.assertIsNone(sample.lng)
         self.assertEqual(sample.satellites, 5)
+
+    def test_low_satellite_gga_coordinates_are_not_published_as_fix(self) -> None:
+        state = NmeaGpsState(min_heading_speed_kph=7.0)
+        sample = state.feed_line(
+            "$GNGGA,092752.000,5321.6802,N,00630.3372,W,1,03,2.1,545.4,M,46.9,M,,",
+            received_wall_time=1_710_000_007.0,
+            received_monotonic=17.0,
+        )
+
+        self.assertIsNotNone(sample)
+        assert sample is not None
+        self.assertFalse(sample.fix_valid)
+        self.assertEqual(sample.satellites, 3)
+        self.assertAlmostEqual(sample.lat, 53.3613367, places=5)
+        self.assertAlmostEqual(sample.lng, -6.50562, places=5)
+
+        payload = build_hardware_gps_payload(sample, stale=False, now_ms=sample.timestamp_ms)
+        self.assertFalse(payload["fixValid"])
+        self.assertNotIn("lat", payload)
+        self.assertNotIn("lng", payload)
 
     def test_transient_invalid_sentences_hold_recent_valid_fix(self) -> None:
         state = NmeaGpsState(min_heading_speed_kph=7.0, fix_hold_seconds=3.0)
@@ -192,7 +212,8 @@ class NmeaGpsStateTest(unittest.TestCase):
         payload = build_hardware_gps_payload(sample, stale=True, now_ms=sample.timestamp_ms + 4000)
         self.assertFalse(payload["fixValid"])
         self.assertFalse(payload["headingReliable"])
-        self.assertIn("lat", payload)
+        self.assertNotIn("lat", payload)
+        self.assertNotIn("lng", payload)
 
 
 if __name__ == "__main__":

@@ -150,10 +150,14 @@ class NmeaGpsState:
         min_heading_speed_kph: float = 7.0,
         default_accuracy_m: float = 25.0,
         fix_hold_seconds: float = 15.0,
+        min_fix_satellites: int = 4,
+        max_fix_accuracy_m: float = 80.0,
     ) -> None:
         self._min_heading_speed_kph = min_heading_speed_kph
         self._default_accuracy_m = default_accuracy_m
         self._fix_hold_seconds = max(0.0, fix_hold_seconds)
+        self._min_fix_satellites = max(0, min_fix_satellites)
+        self._max_fix_accuracy_m = max(5.0, max_fix_accuracy_m)
         self._rmc_status: Optional[str] = None
         self._gga_fix_quality: Optional[int] = None
         self._lat: Optional[float] = None
@@ -171,8 +175,12 @@ class NmeaGpsState:
     def _raw_fix_valid(self) -> bool:
         if self._lat is None or self._lng is None:
             return False
-        if self._gga_fix_quality is not None and self._gga_fix_quality > 0:
-            return True
+        if self._gga_fix_quality is not None:
+            return (
+                self._gga_fix_quality > 0
+                and self._satellites >= self._min_fix_satellites
+                and self._accuracy_m <= self._max_fix_accuracy_m
+            )
         return self._rmc_status == "A"
 
     def _build_state_sample(self, received_monotonic: float, *, fix_valid: bool) -> GpsSample:
@@ -453,8 +461,8 @@ def build_hardware_gps_payload(
         "speedKph": sample.speed_kph if sample is not None else 0.0,
         "headingReliable": bool(sample is not None and sample.heading_reliable and not stale),
     }
-    if sample is not None and sample.lat is not None:
+    if sample is not None and sample.fix_valid and not stale and sample.lat is not None:
         payload["lat"] = sample.lat
-    if sample is not None and sample.lng is not None:
+    if sample is not None and sample.fix_valid and not stale and sample.lng is not None:
         payload["lng"] = sample.lng
     return payload

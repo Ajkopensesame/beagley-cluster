@@ -85,6 +85,24 @@ double readNumberAny(const QJsonObject &obj,
     return fallback;
 }
 
+bool readNumberAnyPresent(const QJsonObject &obj,
+                          std::initializer_list<const char *> keys,
+                          double *out)
+{
+    for (const char *key : keys) {
+        const QJsonValue value = obj.value(QLatin1String(key));
+        bool ok = false;
+        const double parsed = jsonNumber(value, &ok);
+        if (ok) {
+            if (out) {
+                *out = parsed;
+            }
+            return true;
+        }
+    }
+    return false;
+}
+
 bool readBoolAny(const QJsonObject &obj,
                  std::initializer_list<const char *> keys,
                  bool fallback)
@@ -658,22 +676,18 @@ void VehicleStateClient::onTextMessageReceived(const QString &msg)
     bool gpsLatValid = false;
     bool gpsLngValid = false;
 
-    const double lat = readNumberAny(
-        gps,
-        {"lat", "latitude"},
-        readNumberAny(obj, {"gpsLat", "lat", "latitude"}, m_gpsLat)
-    );
-    if (lat >= -90.0 && lat <= 90.0) {
+    double lat = 0.0;
+    const bool latPresent = readNumberAnyPresent(gps, {"lat", "latitude"}, &lat)
+        || readNumberAnyPresent(obj, {"gpsLat", "lat", "latitude"}, &lat);
+    if (latPresent && lat >= -90.0 && lat <= 90.0) {
         gpsLatValid = true;
         setGpsLat(lat);
     }
 
-    const double lng = readNumberAny(
-        gps,
-        {"lng", "lon", "longitude"},
-        readNumberAny(obj, {"gpsLng", "lng", "lon", "longitude"}, m_gpsLng)
-    );
-    if (lng >= -180.0 && lng <= 180.0) {
+    double lng = 0.0;
+    const bool lngPresent = readNumberAnyPresent(gps, {"lng", "lon", "longitude"}, &lng)
+        || readNumberAnyPresent(obj, {"gpsLng", "lng", "lon", "longitude"}, &lng);
+    if (lngPresent && lng >= -180.0 && lng <= 180.0) {
         gpsLngValid = true;
         setGpsLng(lng);
     }

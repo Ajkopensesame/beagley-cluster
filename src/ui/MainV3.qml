@@ -157,15 +157,15 @@ Window {
         && !hub.bbbStale
         && isFinite(Number(hub.gpsLat))
         && isFinite(Number(hub.gpsLng)))
-    readonly property bool retainedGpsPoseValid: !!(hub
-        && hub.gpsEverValid
-        && isFinite(Number(hub.gpsLat))
-        && isFinite(Number(hub.gpsLng)))
     readonly property bool weakGpsPoseValid: !!(hub
         && hub.vehicleStateSeen
         && hub.gpsPoseValid
+        && !hub.gpsFixValid
         && !hub.linkStale
         && !hub.bbbStale
+        && Number(hub.gpsSatellites) >= 4
+        && Number(hub.gpsAccuracyM) > 0
+        && Number(hub.gpsAccuracyM) <= 80
         && isFinite(Number(hub.gpsLat))
         && isFinite(Number(hub.gpsLng)))
     readonly property bool gpsSignalSeen: !!(hub
@@ -178,15 +178,16 @@ Window {
     readonly property var navVehiclePose: navigation ? (navigation.mapVehiclePose || ({})) : ({})
     readonly property bool navVehiclePoseFinite: isFinite(Number(navVehiclePose.lat))
         && isFinite(Number(navVehiclePose.lng))
-    readonly property bool weatherPoseValid: weakGpsPoseValid || retainedGpsPoseValid || navVehiclePoseFinite
-    readonly property real weatherPoseLat: (weakGpsPoseValid || retainedGpsPoseValid)
+    readonly property bool retainedGpsPoseValid: !!(navConnectivity.gpsUsingLastKnown && navVehiclePoseFinite)
+    readonly property bool weatherPoseValid: liveMapPoseValid || weakGpsPoseValid || retainedGpsPoseValid || navVehiclePoseFinite
+    readonly property real weatherPoseLat: (liveMapPoseValid || weakGpsPoseValid)
         ? Number(hub.gpsLat)
         : (navVehiclePoseFinite ? Number(navVehiclePose.lat) : NaN)
-    readonly property real weatherPoseLng: (weakGpsPoseValid || retainedGpsPoseValid)
+    readonly property real weatherPoseLng: (liveMapPoseValid || weakGpsPoseValid)
         ? Number(hub.gpsLng)
         : (navVehiclePoseFinite ? Number(navVehiclePose.lng) : NaN)
     readonly property bool mapVehicleMarkerVisible: mapLibreNativeActive
-        && (weakGpsPoseValid || navVehiclePoseFinite)
+        && (liveMapPoseValid || weakGpsPoseValid || retainedGpsPoseValid)
     readonly property bool mapVehicleMarkerGuidanceAnchor: hasActiveRoute
         && navigation
         && navigation.guidanceStarted
@@ -333,14 +334,14 @@ Window {
         ? Number(hub.gpsLat)
         : (isFinite(Number(navVehiclePose.lat))
         ? Number(navVehiclePose.lat)
-        : (isFinite(Number(hub && hub.gpsLat)) ? Number(hub.gpsLat) : root.defaultMapLat)))
+        : root.defaultMapLat))
         : (cluster && isFinite(Number(cluster.mapLat))
         ? Number(cluster.mapLat)
         : (liveMapPoseValid
         ? Number(hub.gpsLat)
         : (isFinite(Number(navVehiclePose.lat))
         ? Number(navVehiclePose.lat)
-        : (isFinite(Number(hub && hub.gpsLat)) ? Number(hub.gpsLat) : root.defaultMapLat)))))
+        : root.defaultMapLat))))
     readonly property real displayMapLng: stressMapMotionEnabled
         ? (root.defaultMapLng + 0.0046 * Math.cos(stressPhase * 0.12))
         : (embeddedDirectMapCamera
@@ -348,14 +349,14 @@ Window {
         ? Number(hub.gpsLng)
         : (isFinite(Number(navVehiclePose.lng))
         ? Number(navVehiclePose.lng)
-        : (isFinite(Number(hub && hub.gpsLng)) ? Number(hub.gpsLng) : root.defaultMapLng)))
+        : root.defaultMapLng))
         : (cluster && isFinite(Number(cluster.mapLng))
         ? Number(cluster.mapLng)
         : (liveMapPoseValid
         ? Number(hub.gpsLng)
         : (isFinite(Number(navVehiclePose.lng))
         ? Number(navVehiclePose.lng)
-        : (isFinite(Number(hub && hub.gpsLng)) ? Number(hub.gpsLng) : root.defaultMapLng)))))
+        : root.defaultMapLng))))
     readonly property real displayMapBearing: stressMapMotionEnabled
         ? ((stressPhase * 26) % 360)
         : (embeddedDirectMapCamera

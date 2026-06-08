@@ -21,6 +21,8 @@ constexpr int kDefaultRouteRefreshSec = 30;
 constexpr int kOverviewDurationMs = 1200;
 constexpr int kRerouteVoiceDelayMs = 2000;
 constexpr int kRerouteMinDistanceMs = 4000;
+constexpr double kDefaultMapLat = -27.4698;
+constexpr double kDefaultMapLng = 153.0251;
 
 QString defaultNavCacheDir()
 {
@@ -1402,7 +1404,11 @@ NavigationService::Pose NavigationService::currentPose() const
         frozen.speedKph = pose.speedKph;
         return frozen;
     }
-    return pose;
+    Pose fallback = pose;
+    fallback.lat = kDefaultMapLat;
+    fallback.lng = kDefaultMapLng;
+    fallback.bearing = 0.0;
+    return fallback;
 }
 
 bool NavigationService::hotspotPathReady() const

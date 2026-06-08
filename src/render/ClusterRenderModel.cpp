@@ -392,7 +392,7 @@ void ClusterRenderModel::tick()
     double targetBearing = m_mapBearing;
     double targetZoom = normalizedZoomForSpeed(m_targetSpeedKph);
 
-    if (m_vehicleState && m_truthOk && m_vehicleState->gpsPoseValid()) {
+    if (m_vehicleState && m_truthOk && m_vehicleState->gpsFixValid() && m_vehicleState->gpsPoseValid()) {
         targetLat = m_vehicleState->gpsLat();
         targetLng = m_vehicleState->gpsLng();
         targetBearing = m_vehicleState->gpsBearing();
