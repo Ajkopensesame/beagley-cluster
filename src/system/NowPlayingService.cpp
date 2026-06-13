@@ -285,6 +285,11 @@ QUrl spotifyUrl(const QString &path, const QUrlQuery &query = {})
     return url;
 }
 
+QString spotifyTrackUri(const QString &trackId)
+{
+    return QStringLiteral("spotify:track:") + trackId;
+}
+
 QString queryItem(const QString &key, const QString &value)
 {
     return QString::fromLatin1(QUrl::toPercentEncoding(key))
@@ -911,8 +916,8 @@ void NowPlayingService::refreshSpotifySavedState(bool retriedAfterTokenRefresh)
     }
 
     QUrlQuery query;
-    query.addQueryItem(QStringLiteral("ids"), trackId);
-    QNetworkRequest request(spotifyUrl(QStringLiteral("/me/tracks/contains"), query));
+    query.addQueryItem(QStringLiteral("uris"), spotifyTrackUri(trackId));
+    QNetworkRequest request(spotifyUrl(QStringLiteral("/me/library/contains"), query));
     request.setRawHeader("Authorization", "Bearer " + m_spotifyAccessToken.toUtf8());
     request.setRawHeader("Accept", "application/json");
     request.setRawHeader("User-Agent", "BeagleyCluster/1.0");
@@ -1045,7 +1050,7 @@ void NowPlayingService::runSpotifyAction(SpotifyAction action, bool retriedAfter
                                 1800);
             return;
         }
-        path = QStringLiteral("/me/tracks");
+        path = QStringLiteral("/me/library");
         break;
     case SpotifyAction::None:
     case SpotifyAction::RefreshPlayback:
@@ -1055,7 +1060,7 @@ void NowPlayingService::runSpotifyAction(SpotifyAction action, bool retriedAfter
 
     QUrlQuery query;
     if (action == SpotifyAction::SaveCurrentTrack) {
-        query.addQueryItem(QStringLiteral("ids"), m_spotifyCurrentTrackId);
+        query.addQueryItem(QStringLiteral("uris"), spotifyTrackUri(m_spotifyCurrentTrackId));
     } else if (!m_spotifyDeviceId.isEmpty()) {
         query.addQueryItem(QStringLiteral("device_id"), m_spotifyDeviceId);
     }
