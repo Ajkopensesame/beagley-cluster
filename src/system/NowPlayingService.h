@@ -133,6 +133,7 @@ private:
     void setSpotifyTrackSavedState(bool known, bool saved, const QString &trackId = QString());
     bool persistSpotifyRefreshToken(QString *errorOut = nullptr) const;
     void setSpotifyAuthRequired(const QString &detail);
+    void autoStartSpotifyRepairPairing();
     void finishProcess(QProcess *process, bool commandFailed, const QString &fallbackDetail = QString());
     void setNowPlaying(bool available,
                        bool playing,

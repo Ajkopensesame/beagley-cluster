@@ -833,6 +833,23 @@ void NowPlayingService::setSpotifyAuthRequired(const QString &detail)
                   QString(),
                   QStringLiteral("AUTH"),
                   detail);
+    autoStartSpotifyRepairPairing();
+}
+
+void NowPlayingService::autoStartSpotifyRepairPairing()
+{
+    if (!envFlag("BEAGLEY_SPOTIFY_PAIRING_AUTOSTART")
+        || !spotifyBackendActive()
+        || m_pairingActive
+        || m_pairingReply) {
+        return;
+    }
+
+    QTimer::singleShot(300, this, [this]() {
+        if (!m_pairingActive && !m_pairingReply && spotifyBackendActive()) {
+            beginSpotifyPairing();
+        }
+    });
 }
 
 void NowPlayingService::refreshSpotifyPlayback(bool retriedAfterTokenRefresh)
@@ -1270,6 +1287,7 @@ void NowPlayingService::handleSpotifyControlReply(QNetworkReply *reply,
                                 QStringLiteral("REPAIR"),
                                 QStringLiteral("Re-pair Spotify for Liked Songs"),
                                 4500);
+            autoStartSpotifyRepairPairing();
             return;
         }
         setNowPlaying(m_available,
@@ -1371,6 +1389,7 @@ void NowPlayingService::handleSpotifySavedStateReply(QNetworkReply *reply,
                             QStringLiteral("REPAIR"),
                             QStringLiteral("Liked Songs permission required"),
                             4500);
+        autoStartSpotifyRepairPairing();
         return;
     }
     if (statusCode == 429) {
