@@ -838,8 +838,8 @@ void NowPlayingService::setSpotifyAuthRequired(const QString &detail)
 
 void NowPlayingService::autoStartSpotifyRepairPairing()
 {
-    if (!envFlag("BEAGLEY_SPOTIFY_PAIRING_AUTOSTART")
-        || !spotifyBackendActive()
+    if (!spotifyBackendActive()
+        || m_spotifyClientId.isEmpty()
         || m_pairingActive
         || m_pairingReply) {
         return;
