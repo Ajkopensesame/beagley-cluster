@@ -166,15 +166,14 @@ NavigationService::NavigationService(VehicleStateClient *vehicleState, WiFiSetup
         connect(m_vehicleState, &VehicleStateClient::gpsAccuracyMChanged, this, updateSlot);
         connect(m_vehicleState, &VehicleStateClient::gpsTimestampMsChanged, this, updateSlot);
         connect(m_vehicleState, &VehicleStateClient::gpsFixValidChanged, this, updateSlot);
+        connect(m_vehicleState, &VehicleStateClient::gpsPoseValidChanged, this, updateSlot);
         connect(m_vehicleState, &VehicleStateClient::gpsSourceChanged, this, updateSlot);
         connect(m_vehicleState, &VehicleStateClient::gpsSatellitesChanged, this, updateSlot);
         connect(m_vehicleState, &VehicleStateClient::gpsHeadingReliableChanged, this, updateSlot);
         connect(m_vehicleState, &VehicleStateClient::linkStaleChanged, this, updateSlot);
         connect(m_vehicleState, &VehicleStateClient::bbbStaleChanged, this, updateSlot);
         connect(m_vehicleState, &VehicleStateClient::connectedChanged, this, &NavigationService::updateConnectivityStatus);
-        connect(m_vehicleState, &VehicleStateClient::vehicleStateSeenChanged, this, &NavigationService::updateConnectivityStatus);
-        connect(m_vehicleState, &VehicleStateClient::gpsFixValidChanged, this, &NavigationService::updateConnectivityStatus);
-        connect(m_vehicleState, &VehicleStateClient::gpsPoseValidChanged, this, &NavigationService::updateConnectivityStatus);
+        connect(m_vehicleState, &VehicleStateClient::vehicleStateSeenChanged, this, updateSlot);
     }
 
     if (m_wifiSetup) {
@@ -1436,7 +1435,7 @@ bool NavigationService::gpsReady() const
     if (!m_vehicleState->vehicleStateSeen() || !m_vehicleState->gpsPoseValid()) {
         return false;
     }
-    if (m_vehicleState->linkStale() || m_vehicleState->bbbStale()) {
+    if (m_vehicleState->linkStale()) {
         return false;
     }
     if (!m_vehicleState->gpsFixValid()) {

@@ -154,7 +154,6 @@ Window {
         && hub.gpsPoseValid
         && hub.gpsFixValid
         && !hub.linkStale
-        && !hub.bbbStale
         && isFinite(Number(hub.gpsLat))
         && isFinite(Number(hub.gpsLng)))
     readonly property bool weakGpsPoseValid: !!(hub
@@ -162,7 +161,6 @@ Window {
         && hub.gpsPoseValid
         && !hub.gpsFixValid
         && !hub.linkStale
-        && !hub.bbbStale
         && Number(hub.gpsSatellites) >= 4
         && Number(hub.gpsAccuracyM) > 0
         && Number(hub.gpsAccuracyM) <= 80
@@ -171,7 +169,6 @@ Window {
     readonly property bool gpsSignalSeen: !!(hub
         && hub.vehicleStateSeen
         && !hub.linkStale
-        && !hub.bbbStale
         && (Number(hub.gpsSatellites) > 0 || Number(hub.gpsAccuracyM) > 0))
     readonly property string gpsSourceText: hub && hub.gpsSource ? String(hub.gpsSource).toUpperCase() : "UNKNOWN"
     readonly property var navConnectivity: navigation ? (navigation.mapConnectivity || ({})) : ({})
@@ -384,6 +381,21 @@ Window {
         : (liveMapPoseValid && isFinite(Number(hub && hub.gpsSpeedKph)) && Number(hub.gpsSpeedKph) > 0
         ? Number(hub.gpsSpeedKph)
         : (isFinite(Number(navVehiclePose.speedKph)) ? Number(navVehiclePose.speedKph) : speedValue))
+    readonly property var displayMapVehiclePose: (liveMapPoseValid || weakGpsPoseValid)
+        ? ({
+            lat: Number(hub.gpsLat),
+            lng: Number(hub.gpsLng),
+            bearing: isFinite(Number(hub.gpsBearing)) ? Number(hub.gpsBearing) : 0,
+            speedKph: displayMapSpeed,
+            gpsReady: liveMapPoseValid,
+            gpsFixValid: !!hub.gpsFixValid,
+            gpsSource: hub.gpsSource || "",
+            accuracyM: Number(hub.gpsAccuracyM) || 0,
+            satellites: Number(hub.gpsSatellites) || 0,
+            headingReliable: !!hub.gpsHeadingReliable,
+            usingLastKnown: false
+        })
+        : navVehiclePose
     readonly property bool fallbackRouteOriginEnabled: false
     readonly property real fallbackRouteOriginLat: NaN
     readonly property real fallbackRouteOriginLng: NaN
@@ -1632,7 +1644,7 @@ Window {
             fixedOriginLng: fallbackRouteOriginLng
             fixedOriginLabel: fallbackRouteOriginLabel
             navigationState: (root.effectiveMapRenderer === "web") ? navigation.mapPayload : ({})
-            mapVehiclePose: navigation.mapVehiclePose
+            mapVehiclePose: root.displayMapVehiclePose
             mapCameraHints: root.effectiveMapCameraHints
             mapRouteOverlay: navigation.mapRouteOverlay
             mapGuidanceBanner: navigation.mapGuidanceBanner
