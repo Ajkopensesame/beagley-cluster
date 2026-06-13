@@ -36,3 +36,6 @@ BEAGLEY_PROFILE_METRICS=0
 BEAGLEY_NOW_PLAYING_BACKEND=spotify-web
 BEAGLEY_NOW_PLAYING_SOURCE_LABEL=Spotify
 BEAGLEY_NOW_PLAYING_REFRESH_MS=5000
+# Optional long-term QR sign-in broker. Put the broker token in
+# /etc/default/beagley-cluster.local, not in this image default file.
+# BEAGLEY_SPOTIFY_BROKER_URL=https://spotify.pneumaion.com

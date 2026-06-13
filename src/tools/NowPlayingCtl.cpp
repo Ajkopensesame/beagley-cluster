@@ -126,6 +126,7 @@ int main(int argc, char **argv)
     printLine(out, QStringLiteral("token_http_status"), object);
     printLine(out, QStringLiteral("spotify_refresh_configured"), object);
     printLine(out, QStringLiteral("spotify_token_usable"), object);
+    printLine(out, QStringLiteral("spotify_broker_configured"), object);
     printLine(out, QStringLiteral("spotify_save_supported"), object);
     printLine(out, QStringLiteral("spotify_save_pending"), object);
     printLine(out, QStringLiteral("spotify_save_status"), object);

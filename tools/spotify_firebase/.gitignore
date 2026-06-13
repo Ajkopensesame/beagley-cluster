@@ -1,0 +1,4 @@
+/.device_token
+/.firebaserc
+/functions/.env
+/functions/.env.*

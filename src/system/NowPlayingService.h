@@ -112,9 +112,14 @@ private:
                                       const QString &trackId);
     void exchangeSpotifyPairingCode(const QString &code);
     void handleSpotifyPairingTokenReply(QNetworkReply *reply);
+    void beginBrokerSpotifyPairing();
+    void pollBrokerSpotifyPairing();
+    void handleBrokerPairingCreateReply(QNetworkReply *reply);
+    void handleBrokerPairingPollReply(QNetworkReply *reply);
     void handlePairingConnection();
     void handlePairingRequest(const QByteArray &request, QTcpSocket *socket);
     void stopPairingServer();
+    bool spotifyBrokerConfigured() const;
     void setSpotifyPairingState(bool active,
                                 const QString &status,
                                 const QString &url = QString(),
@@ -146,6 +151,7 @@ private:
     QTimer m_refreshTimer;
     QTimer m_timeoutTimer;
     QTimer m_pairingTimeoutTimer;
+    QTimer m_brokerPairingPollTimer;
     Backend m_backend = Backend::Playerctl;
     SpotifyAction m_pendingSpotifyAction = SpotifyAction::None;
     QString m_playerName;
@@ -155,6 +161,8 @@ private:
     QString m_spotifyClientSecret;
     QString m_spotifyDeviceId;
     QString m_spotifyMarket;
+    QString m_spotifyBrokerUrl;
+    QString m_spotifyBrokerToken;
     QString m_spotifyCurrentTrackId;
     bool m_spotifySavePending = false;
     bool m_spotifyTrackSavedKnown = false;

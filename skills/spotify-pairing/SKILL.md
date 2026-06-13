@@ -1,6 +1,6 @@
 ---
 name: spotify-pairing
-description: Start a real Spotify QR pairing session for the BeagleY cluster by tunneling the BeagleY pairing server over HTTPS, guiding the Spotify redirect URI setup, and saving the refresh token on the board.
+description: Start or debug Spotify QR pairing for the BeagleY cluster, preferring the stable pairing broker and falling back to the legacy tunnel helper only for lab recovery.
 ---
 
 # Spotify Pairing
@@ -10,7 +10,30 @@ Spotify account for now-playing display plus the optional add-to-Liked-Songs
 button. This flow requests current-playback read and library-save scope, but it
 does not request playback-control scope.
 
-Run from the canonical production checkout:
+Preferred production path: configure a stable broker and set these BeagleY
+local env keys. The current deployed fallback is the Firebase Functions broker
+from `tools/spotify_firebase`:
+
+```text
+BEAGLEY_SPOTIFY_BROKER_URL=https://australia-southeast1-pneumaion-prod.cloudfunctions.net/spotifyBroker
+BEAGLEY_SPOTIFY_BROKER_TOKEN=...
+BEAGLEY_SPOTIFY_CLIENT_ID=...
+BEAGLEY_NOW_PLAYING_BACKEND=spotify-web
+```
+
+Register this Spotify Redirect URI once:
+
+```text
+https://australia-southeast1-pneumaion-prod.cloudfunctions.net/spotifyBroker/spotify/callback
+```
+
+The cleaner custom-domain target is the Cloudflare Worker broker in
+`tools/spotify_broker`, normally `https://spotify.pneumaion.com`, once
+Cloudflare Worker/KV auth is available.
+
+With broker mode enabled, the user only scans the cluster QR, signs in, and
+approves Spotify. Use the legacy tunnel helper only when the broker is not
+deployed or when recovering a lab board:
 
 ```bash
 tools/spotify/pair_spotify.py --client-id YOUR_SPOTIFY_CLIENT_ID

@@ -218,6 +218,24 @@ QString pairingPublicBaseUrl(int port)
     return QStringLiteral("http://%1:%2").arg(localCallbackHost()).arg(port);
 }
 
+QString trimmedBaseUrl(const char *name)
+{
+    QString value = envString(name);
+    while (value.endsWith(QLatin1Char('/'))) {
+        value.chop(1);
+    }
+    return value;
+}
+
+QUrl brokerApiUrl(const QString &baseUrl, const QString &path)
+{
+    QString normalizedPath = path;
+    if (!normalizedPath.startsWith(QLatin1Char('/'))) {
+        normalizedPath.prepend(QLatin1Char('/'));
+    }
+    return QUrl(baseUrl + normalizedPath);
+}
+
 QString base64Url(const QByteArray &bytes)
 {
     QString encoded = QString::fromLatin1(bytes.toBase64(QByteArray::Base64UrlEncoding
@@ -545,6 +563,8 @@ NowPlayingService::NowPlayingService(QObject *parent)
     , m_spotifyClientSecret(envString("BEAGLEY_SPOTIFY_CLIENT_SECRET"))
     , m_spotifyDeviceId(envString("BEAGLEY_SPOTIFY_DEVICE_ID"))
     , m_spotifyMarket(envString("BEAGLEY_SPOTIFY_MARKET"))
+    , m_spotifyBrokerUrl(trimmedBaseUrl("BEAGLEY_SPOTIFY_BROKER_URL"))
+    , m_spotifyBrokerToken(envString("BEAGLEY_SPOTIFY_BROKER_TOKEN"))
     , m_statePath(nowPlayingStatePath())
     , m_source(sourceLabel())
 {
@@ -574,6 +594,9 @@ NowPlayingService::NowPlayingService(QObject *parent)
         stopPairingServer();
         setSpotifyPairingState(false, QStringLiteral("Spotify pairing timed out"));
     });
+    m_brokerPairingPollTimer.setInterval(2500);
+    m_brokerPairingPollTimer.setTimerType(Qt::VeryCoarseTimer);
+    connect(&m_brokerPairingPollTimer, &QTimer::timeout, this, &NowPlayingService::pollBrokerSpotifyPairing);
     connect(&m_pairingServer, &QTcpServer::newConnection, this, &NowPlayingService::handlePairingConnection);
 
     QTimer::singleShot(500, this, &NowPlayingService::refresh);
@@ -1358,6 +1381,11 @@ bool NowPlayingService::spotifyPairingSupported() const
     return spotifyBackendActive();
 }
 
+bool NowPlayingService::spotifyBrokerConfigured() const
+{
+    return !m_spotifyBrokerUrl.isEmpty();
+}
+
 void NowPlayingService::beginSpotifyPairing()
 {
     if (!spotifyBackendActive()) {
@@ -1366,6 +1394,11 @@ void NowPlayingService::beginSpotifyPairing()
     }
     if (m_spotifyClientId.isEmpty()) {
         setSpotifyPairingState(false, QStringLiteral("Spotify app missing"));
+        return;
+    }
+
+    if (spotifyBrokerConfigured()) {
+        beginBrokerSpotifyPairing();
         return;
     }
 
@@ -1410,12 +1443,178 @@ void NowPlayingService::cancelSpotifyPairing()
 void NowPlayingService::stopPairingServer()
 {
     m_pairingTimeoutTimer.stop();
+    m_brokerPairingPollTimer.stop();
     m_pairingServer.close();
     while (m_pairingServer.hasPendingConnections()) {
         QTcpSocket *socket = m_pairingServer.nextPendingConnection();
         socket->disconnectFromHost();
         socket->deleteLater();
     }
+}
+
+void NowPlayingService::beginBrokerSpotifyPairing()
+{
+    stopPairingServer();
+    if (m_pairingReply) {
+        m_pairingReply->abort();
+        m_pairingReply->deleteLater();
+        m_pairingReply = nullptr;
+    }
+
+    QNetworkRequest request(brokerApiUrl(m_spotifyBrokerUrl, QStringLiteral("/api/sessions")));
+    request.setRawHeader("Accept", "application/json");
+    request.setRawHeader("User-Agent", "BeagleyCluster/1.0");
+    request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
+    if (!m_spotifyBrokerToken.isEmpty()) {
+        request.setRawHeader("Authorization", "Bearer " + m_spotifyBrokerToken.toUtf8());
+    }
+
+    QJsonObject body;
+    body.insert(QStringLiteral("client_id"), m_spotifyClientId);
+    body.insert(QStringLiteral("scope"), QString::fromLatin1(kSpotifyScopes));
+
+    setSpotifyPairingState(true, QStringLiteral("Starting Spotify sign-in"));
+    m_pairingTimeoutTimer.start();
+    m_pairingReply = m_network.post(request, QJsonDocument(body).toJson(QJsonDocument::Compact));
+    connect(m_pairingReply, &QNetworkReply::finished, this, [this]() {
+        QNetworkReply *reply = m_pairingReply;
+        m_pairingReply = nullptr;
+        handleBrokerPairingCreateReply(reply);
+        reply->deleteLater();
+    });
+}
+
+void NowPlayingService::handleBrokerPairingCreateReply(QNetworkReply *reply)
+{
+    const int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    const QByteArray payload = reply->readAll();
+    if (reply->error() != QNetworkReply::NoError || statusCode < 200 || statusCode >= 300) {
+        stopPairingServer();
+        const QString detail = statusCode == 401
+            ? QStringLiteral("Spotify broker denied")
+            : QStringLiteral("Spotify broker unavailable");
+        setSpotifyPairingState(false, detail);
+        return;
+    }
+
+    const QJsonDocument document = QJsonDocument::fromJson(payload);
+    const QJsonObject root = document.object();
+    const QString pairCode = root.value(QStringLiteral("pair_code"))
+                                 .toString(root.value(QStringLiteral("pairCode")).toString())
+                                 .trimmed();
+    const QString pairUrl = root.value(QStringLiteral("pair_url"))
+                                .toString(root.value(QStringLiteral("pairUrl")).toString())
+                                .trimmed();
+    if (pairCode.isEmpty() || pairUrl.isEmpty()) {
+        stopPairingServer();
+        setSpotifyPairingState(false, QStringLiteral("Spotify broker response invalid"));
+        return;
+    }
+
+    m_pairingCode = pairCode;
+    m_pairingUrl = pairUrl;
+    setSpotifyPairingState(true,
+                           QStringLiteral("Scan Spotify sign-in"),
+                           pairUrl,
+                           pairCode,
+                           qrRowsForShortText(pairUrl));
+    m_brokerPairingPollTimer.start();
+}
+
+void NowPlayingService::pollBrokerSpotifyPairing()
+{
+    if (m_pairingReply || !m_pairingActive || m_pairingCode.isEmpty() || !spotifyBrokerConfigured()) {
+        return;
+    }
+
+    QNetworkRequest request(brokerApiUrl(m_spotifyBrokerUrl,
+                                         QStringLiteral("/api/sessions/%1").arg(m_pairingCode)));
+    request.setRawHeader("Accept", "application/json");
+    request.setRawHeader("User-Agent", "BeagleyCluster/1.0");
+    if (!m_spotifyBrokerToken.isEmpty()) {
+        request.setRawHeader("Authorization", "Bearer " + m_spotifyBrokerToken.toUtf8());
+    }
+
+    m_pairingReply = m_network.get(request);
+    connect(m_pairingReply, &QNetworkReply::finished, this, [this]() {
+        QNetworkReply *reply = m_pairingReply;
+        m_pairingReply = nullptr;
+        handleBrokerPairingPollReply(reply);
+        reply->deleteLater();
+    });
+}
+
+void NowPlayingService::handleBrokerPairingPollReply(QNetworkReply *reply)
+{
+    const int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    const QByteArray payload = reply->readAll();
+    const QJsonDocument document = QJsonDocument::fromJson(payload);
+    const QJsonObject root = document.object();
+    const QString status = root.value(QStringLiteral("status")).toString().trimmed().toLower();
+
+    if (statusCode == 202 || status == QLatin1String("pending")) {
+        setSpotifyPairingState(true,
+                               QStringLiteral("Waiting for approval"),
+                               m_pairingUrl,
+                               m_pairingCode,
+                               m_pairingQrRows);
+        return;
+    }
+
+    if (statusCode == 401) {
+        stopPairingServer();
+        setSpotifyPairingState(false, QStringLiteral("Spotify broker denied"));
+        return;
+    }
+
+    if (status == QLatin1String("denied")) {
+        stopPairingServer();
+        setSpotifyPairingState(false, QStringLiteral("Spotify pairing denied"));
+        return;
+    }
+
+    if (statusCode == 404 || statusCode == 410) {
+        stopPairingServer();
+        setSpotifyPairingState(false, QStringLiteral("Spotify pairing expired"));
+        return;
+    }
+
+    if (reply->error() != QNetworkReply::NoError || statusCode != 200 || status != QLatin1String("ready")) {
+        if (status == QLatin1String("failed")) {
+            stopPairingServer();
+            setSpotifyPairingState(false, QStringLiteral("Spotify pairing failed"));
+        }
+        return;
+    }
+
+    const QString accessToken = root.value(QStringLiteral("access_token")).toString().trimmed();
+    const QString refreshToken = root.value(QStringLiteral("refresh_token")).toString().trimmed();
+    const QString clientId = root.value(QStringLiteral("client_id")).toString().trimmed();
+    if (accessToken.isEmpty() || refreshToken.isEmpty()) {
+        stopPairingServer();
+        setSpotifyPairingState(false, QStringLiteral("Spotify token missing"));
+        return;
+    }
+
+    m_spotifyAccessToken = accessToken;
+    m_spotifyRefreshToken = refreshToken;
+    if (!clientId.isEmpty()) {
+        m_spotifyClientId = clientId;
+    }
+    const int expiresIn = qMax(300, root.value(QStringLiteral("expires_in")).toInt(3600));
+    m_spotifyAccessTokenExpiresAt = QDateTime::currentDateTimeUtc().addSecs(expiresIn);
+
+    QString error;
+    if (!persistSpotifyRefreshToken(&error)) {
+        stopPairingServer();
+        setSpotifyPairingState(false,
+                               error.isEmpty() ? QStringLiteral("Spotify save failed") : error);
+        return;
+    }
+
+    stopPairingServer();
+    setSpotifyPairingState(false, QStringLiteral("Spotify paired"));
+    refreshSpotifyPlayback();
 }
 
 void NowPlayingService::setSpotifyPairingState(bool active,
@@ -1798,6 +1997,7 @@ void NowPlayingService::writeStateSnapshot() const
     object.insert(QStringLiteral("token_http_status"), m_lastTokenHttpStatus);
     object.insert(QStringLiteral("spotify_refresh_configured"), spotifyRefreshConfigured());
     object.insert(QStringLiteral("spotify_token_usable"), spotifyTokenUsable());
+    object.insert(QStringLiteral("spotify_broker_configured"), spotifyBrokerConfigured());
     object.insert(QStringLiteral("spotify_save_supported"), spotifySaveSupported());
     object.insert(QStringLiteral("spotify_save_pending"), m_spotifySavePending);
     object.insert(QStringLiteral("spotify_track_saved_known"), spotifyTrackSavedKnown());

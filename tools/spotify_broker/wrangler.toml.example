@@ -1,0 +1,21 @@
+name = "beagley-spotify-broker"
+main = "worker.js"
+compatibility_date = "2026-06-13"
+
+# Replace with the permanent hostname that users will scan.
+routes = [
+  { pattern = "spotify.pneumaion.com/*", zone_name = "pneumaion.com" }
+]
+
+[[kv_namespaces]]
+binding = "SPOTIFY_SESSIONS"
+id = "replace-with-cloudflare-kv-namespace-id"
+
+[vars]
+PUBLIC_BASE_URL = "https://spotify.pneumaion.com"
+SPOTIFY_REDIRECT_URI = "https://spotify.pneumaion.com/spotify/callback"
+SPOTIFY_SCOPE = "user-read-currently-playing user-library-read user-library-modify"
+
+# Set these as secrets, not vars:
+#   wrangler secret put SPOTIFY_CLIENT_ID
+#   wrangler secret put DEVICE_TOKEN
