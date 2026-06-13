@@ -99,6 +99,7 @@ private:
     void refreshPlayerctl();
     void refreshSpotifyPlayback(bool retriedAfterTokenRefresh = false);
     void refreshSpotifySavedState(bool retriedAfterTokenRefresh = false);
+    void confirmSpotifySavedTrack(const QString &trackId, int attemptsRemaining = 4);
     void refreshSpotifyAccessToken();
     void runSpotifyAction(SpotifyAction action, bool retriedAfterTokenRefresh = false);
     bool spotifyBackendActive() const;

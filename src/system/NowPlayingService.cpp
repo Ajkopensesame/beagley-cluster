@@ -285,11 +285,6 @@ QUrl spotifyUrl(const QString &path, const QUrlQuery &query = {})
     return url;
 }
 
-QString spotifyTrackUri(const QString &trackId)
-{
-    return QStringLiteral("spotify:track:") + trackId;
-}
-
 QString queryItem(const QString &key, const QString &value)
 {
     return QString::fromLatin1(QUrl::toPercentEncoding(key))
@@ -899,8 +894,8 @@ void NowPlayingService::refreshSpotifySavedState(bool retriedAfterTokenRefresh)
     }
 
     QUrlQuery query;
-    query.addQueryItem(QStringLiteral("uris"), spotifyTrackUri(trackId));
-    QNetworkRequest request(spotifyUrl(QStringLiteral("/me/library/contains"), query));
+    query.addQueryItem(QStringLiteral("ids"), trackId);
+    QNetworkRequest request(spotifyUrl(QStringLiteral("/me/tracks/contains"), query));
     request.setRawHeader("Authorization", "Bearer " + m_spotifyAccessToken.toUtf8());
     request.setRawHeader("Accept", "application/json");
     request.setRawHeader("User-Agent", "BeagleyCluster/1.0");
@@ -916,6 +911,27 @@ void NowPlayingService::refreshSpotifySavedState(bool retriedAfterTokenRefresh)
         handleSpotifySavedStateReply(reply, retriedAfterTokenRefresh, trackId);
         reply->deleteLater();
     });
+}
+
+void NowPlayingService::confirmSpotifySavedTrack(const QString &trackId, int attemptsRemaining)
+{
+    if (trackId.isEmpty() || trackId != m_spotifyCurrentTrackId) {
+        return;
+    }
+    if (m_networkReply) {
+        if (attemptsRemaining > 0) {
+            QTimer::singleShot(600, this, [this, trackId, attemptsRemaining]() {
+                confirmSpotifySavedTrack(trackId, attemptsRemaining - 1);
+            });
+        } else {
+            setSpotifySaveState(false,
+                                QStringLiteral("FAILED"),
+                                QStringLiteral("Could not confirm Liked Songs"),
+                                3200);
+        }
+        return;
+    }
+    refreshSpotifySavedState();
 }
 
 void NowPlayingService::refreshSpotifyAccessToken()
@@ -1012,7 +1028,7 @@ void NowPlayingService::runSpotifyAction(SpotifyAction action, bool retriedAfter
                                 1800);
             return;
         }
-        path = QStringLiteral("/me/library");
+        path = QStringLiteral("/me/tracks");
         break;
     case SpotifyAction::None:
     case SpotifyAction::RefreshPlayback:
@@ -1022,7 +1038,7 @@ void NowPlayingService::runSpotifyAction(SpotifyAction action, bool retriedAfter
 
     QUrlQuery query;
     if (action == SpotifyAction::SaveCurrentTrack) {
-        query.addQueryItem(QStringLiteral("uris"), spotifyTrackUri(m_spotifyCurrentTrackId));
+        query.addQueryItem(QStringLiteral("ids"), m_spotifyCurrentTrackId);
     } else if (!m_spotifyDeviceId.isEmpty()) {
         query.addQueryItem(QStringLiteral("device_id"), m_spotifyDeviceId);
     }
@@ -1316,11 +1332,14 @@ void NowPlayingService::handleSpotifyControlReply(QNetworkReply *reply,
     }
 
     if (action == SpotifyAction::SaveCurrentTrack) {
-        setSpotifyTrackSavedState(true, true, m_spotifyCurrentTrackId);
-        setSpotifySaveState(false,
-                            QStringLiteral("SAVED"),
-                            QStringLiteral("Added to Liked Songs"),
-                            3000);
+        const QString savedTrackId = m_spotifyCurrentTrackId;
+        setSpotifyTrackSavedState(false, false, savedTrackId);
+        setSpotifySaveState(true,
+                            QStringLiteral("CHECKING"),
+                            QStringLiteral("Confirming Liked Songs"));
+        QTimer::singleShot(900, this, [this, savedTrackId]() {
+            confirmSpotifySavedTrack(savedTrackId);
+        });
         return;
     }
 
@@ -1350,7 +1369,7 @@ void NowPlayingService::handleSpotifySavedStateReply(QNetworkReply *reply,
         setSpotifyTrackSavedState(false, false, trackId);
         setSpotifySaveState(false,
                             QStringLiteral("REPAIR"),
-                            QStringLiteral("Re-pair Spotify for Liked Songs"),
+                            QStringLiteral("Liked Songs permission required"),
                             4500);
         return;
     }
@@ -1373,7 +1392,25 @@ void NowPlayingService::handleSpotifySavedStateReply(QNetworkReply *reply,
         return;
     }
 
-    setSpotifyTrackSavedState(true, document.array().at(0).toBool(false), trackId);
+    const bool saved = document.array().at(0).toBool(false);
+    const bool confirmingSave = m_spotifySaveStatus == QLatin1String("CHECKING")
+        || m_spotifySaveStatus == QLatin1String("SAVING");
+
+    setSpotifyTrackSavedState(true, saved, trackId);
+
+    if (confirmingSave) {
+        if (saved) {
+            setSpotifySaveState(false,
+                                QStringLiteral("SAVED"),
+                                QStringLiteral("Added to Liked Songs"),
+                                3000);
+        } else {
+            setSpotifySaveState(false,
+                                QStringLiteral("FAILED"),
+                                QStringLiteral("Not in Liked Songs"),
+                                3200);
+        }
+    }
 }
 
 bool NowPlayingService::spotifyPairingSupported() const
