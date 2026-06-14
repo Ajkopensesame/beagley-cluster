@@ -2,11 +2,12 @@
 
 #include <QDebug>
 #include <QFileInfo>
+#include <QHash>
 #include <QImageReader>
+#include <QSGFlatColorMaterial>
 #include <QSGGeometry>
 #include <QSGGeometryNode>
 #include <QSGNode>
-#include <QSGVertexColorMaterial>
 #include <QtMath>
 
 namespace {
@@ -206,72 +207,89 @@ void appendGpsMarker(QVector<ColoredRect> &rects, const QSize &targetSize)
                QColor(247, 251, 255, 232));
 }
 
-QSGGeometryNode *createRectNode(const QVector<ColoredRect> &rects)
+QSGGeometryNode *createFlatRectNode(const QVector<QRectF> &rects, const QColor &color)
 {
     if (rects.isEmpty()) {
         return nullptr;
     }
 
-    auto *geometry = new QSGGeometry(QSGGeometry::defaultAttributes_ColoredPoint2D(), rects.size() * 6);
+    auto *geometry = new QSGGeometry(QSGGeometry::defaultAttributes_Point2D(), rects.size() * 6);
     geometry->setDrawingMode(QSGGeometry::DrawTriangles);
-    auto *vertices = geometry->vertexDataAsColoredPoint2D();
+    auto *vertices = geometry->vertexDataAsPoint2D();
     int index = 0;
-    for (const ColoredRect &item : rects) {
-        const QRectF rect = item.rect;
-        const QColor color = item.color;
-        const uchar r = uchar(qBound(0, color.red(), 255));
-        const uchar g = uchar(qBound(0, color.green(), 255));
-        const uchar b = uchar(qBound(0, color.blue(), 255));
-        const uchar a = uchar(qBound(0, color.alpha(), 255));
+    for (const QRectF &rect : rects) {
         const float x1 = float(rect.left());
         const float y1 = float(rect.top());
         const float x2 = float(rect.right());
         const float y2 = float(rect.bottom());
-        vertices[index++].set(x1, y1, r, g, b, a);
-        vertices[index++].set(x2, y1, r, g, b, a);
-        vertices[index++].set(x1, y2, r, g, b, a);
-        vertices[index++].set(x2, y1, r, g, b, a);
-        vertices[index++].set(x2, y2, r, g, b, a);
-        vertices[index++].set(x1, y2, r, g, b, a);
+        vertices[index++].set(x1, y1);
+        vertices[index++].set(x2, y1);
+        vertices[index++].set(x1, y2);
+        vertices[index++].set(x2, y1);
+        vertices[index++].set(x2, y2);
+        vertices[index++].set(x1, y2);
     }
 
     auto *node = new QSGGeometryNode;
     node->setGeometry(geometry);
     node->setFlag(QSGNode::OwnsGeometry);
-    auto *material = new QSGVertexColorMaterial;
+    auto *material = new QSGFlatColorMaterial;
+    material->setColor(color);
     node->setMaterial(material);
     node->setFlag(QSGNode::OwnsMaterial);
     return node;
 }
 
-QSGGeometryNode *createLineNode(const QVector<ColoredLine> &lines)
+void appendRectNodes(QSGNode *root, const QVector<ColoredRect> &rects)
+{
+    QHash<QRgb, QVector<QRectF>> groups;
+    for (const ColoredRect &item : rects) {
+        groups[item.color.rgba()].append(item.rect);
+    }
+    for (auto it = groups.cbegin(); it != groups.cend(); ++it) {
+        if (auto *node = createFlatRectNode(it.value(), QColor::fromRgba(it.key()))) {
+            root->appendChildNode(node);
+        }
+    }
+}
+
+QSGGeometryNode *createFlatLineNode(const QVector<ColoredLine> &lines, const QColor &color)
 {
     if (lines.isEmpty()) {
         return nullptr;
     }
 
-    auto *geometry = new QSGGeometry(QSGGeometry::defaultAttributes_ColoredPoint2D(), lines.size() * 2);
+    auto *geometry = new QSGGeometry(QSGGeometry::defaultAttributes_Point2D(), lines.size() * 2);
     geometry->setDrawingMode(QSGGeometry::DrawLines);
     geometry->setLineWidth(1.0f);
-    auto *vertices = geometry->vertexDataAsColoredPoint2D();
+    auto *vertices = geometry->vertexDataAsPoint2D();
     int index = 0;
     for (const ColoredLine &item : lines) {
-        const QColor color = item.color;
-        const uchar r = uchar(qBound(0, color.red(), 255));
-        const uchar g = uchar(qBound(0, color.green(), 255));
-        const uchar b = uchar(qBound(0, color.blue(), 255));
-        const uchar a = uchar(qBound(0, color.alpha(), 255));
-        vertices[index++].set(float(item.start.x()), float(item.start.y()), r, g, b, a);
-        vertices[index++].set(float(item.end.x()), float(item.end.y()), r, g, b, a);
+        vertices[index++].set(float(item.start.x()), float(item.start.y()));
+        vertices[index++].set(float(item.end.x()), float(item.end.y()));
     }
 
     auto *node = new QSGGeometryNode;
     node->setGeometry(geometry);
     node->setFlag(QSGNode::OwnsGeometry);
-    auto *material = new QSGVertexColorMaterial;
+    auto *material = new QSGFlatColorMaterial;
+    material->setColor(color);
     node->setMaterial(material);
     node->setFlag(QSGNode::OwnsMaterial);
     return node;
+}
+
+void appendLineNodes(QSGNode *root, const QVector<ColoredLine> &lines)
+{
+    QHash<QRgb, QVector<ColoredLine>> groups;
+    for (const ColoredLine &item : lines) {
+        groups[item.color.rgba()].append(item);
+    }
+    for (auto it = groups.cbegin(); it != groups.cend(); ++it) {
+        if (auto *node = createFlatLineNode(it.value(), QColor::fromRgba(it.key()))) {
+            root->appendChildNode(node);
+        }
+    }
 }
 } // namespace
 
@@ -473,15 +491,12 @@ QSGNode *RadarFrameItem::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *
     const int totalSamples = appendRadarSamples(rects, m_image, targetSize, m_circular);
     appendGpsMarker(rects, targetSize);
 
-    if (auto *rectNode = createRectNode(rects)) {
-        root->appendChildNode(rectNode);
-    }
-    if (auto *lineNode = createLineNode(lines)) {
-        root->appendChildNode(lineNode);
-    }
+    appendRectNodes(root, rects);
+    appendLineNodes(root, lines);
 
     qInfo().noquote() << "[RadarFrameItem] vector samples" << totalSamples
                       << targetSize.width() << "x" << targetSize.height()
+                      << "flatColor true"
                       << "mapIgnored" << !m_mapImage.isNull()
                       << "circular" << m_circular;
     return root;
