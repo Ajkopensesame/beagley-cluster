@@ -236,7 +236,8 @@ beagley_ssh "bash -s -- \
   $(remote_quote "$REMOTE_BACKUP") \
   $(remote_quote "$REMOTE_TEMP_QML") \
   $(remote_quote "$DELAY_MS") \
-  $(remote_quote "$REMOTE_CAPTURE_EXIT")" <<'REMOTE'
+  $(remote_quote "$REMOTE_CAPTURE_EXIT") \
+  $(remote_quote "$SYNC_QML")" <<'REMOTE'
 set -euo pipefail
 
 mode="$1"
@@ -247,6 +248,7 @@ remote_backup="$5"
 remote_temp_qml="$6"
 delay_ms="$7"
 screenshot_exit="$8"
+sync_qml="$9"
 
 qml_escape_string() {
   printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\r//g'
@@ -287,10 +289,10 @@ else
 fi
 
 append_qml_env=0
+qml_dev_file="$remote_root/src/ui/MainV3.qml"
 if [ "$mode" = "wifi-signup" ] || [ "$mode" = "wifi-networks" ] || [ "$mode" = "wifi-password" ]; then
-  src="$remote_root/src/ui/MainV3.qml"
-  if [ ! -f "$src" ]; then
-    echo "[beagley-screenshot] missing QML dev source: $src" >&2
+  if [ ! -f "$qml_dev_file" ]; then
+    echo "[beagley-screenshot] missing QML dev source: $qml_dev_file" >&2
     exit 1
   fi
   awk '
@@ -334,8 +336,15 @@ if [ "$mode" = "wifi-signup" ] || [ "$mode" = "wifi-networks" ] || [ "$mode" = "
 	      }
       print lines[NR]
     }
-  ' "$src" > "$remote_temp_qml"
+  ' "$qml_dev_file" > "$remote_temp_qml"
   chmod 0644 "$remote_temp_qml"
+  qml_dev_file="$remote_temp_qml"
+  append_qml_env=1
+elif [ "$sync_qml" = "1" ]; then
+  if [ ! -f "$qml_dev_file" ]; then
+    echo "[beagley-screenshot] missing QML dev source: $qml_dev_file" >&2
+    exit 1
+  fi
   append_qml_env=1
 fi
 
@@ -357,7 +366,7 @@ BEGIN {
 {
   if [ "$append_qml_env" = "1" ]; then
     printf 'BEAGLEY_QML_DEV_ROOT=%s\n' "$remote_root"
-    printf 'BEAGLEY_QML_DEV_FILE=%s\n' "$remote_temp_qml"
+    printf 'BEAGLEY_QML_DEV_FILE=%s\n' "$qml_dev_file"
   fi
   printf 'BEAGLEY_SCREENSHOT_PATH=%s\n' "$remote_png"
   printf 'BEAGLEY_SCREENSHOT_DELAY_MS=%s\n' "$delay_ms"

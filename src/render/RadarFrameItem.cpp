@@ -5,32 +5,15 @@
 #include <QImageReader>
 #include <QPainter>
 #include <QPainterPath>
-#include <QQuickWindow>
-#include <QSGNode>
-#include <QSGSimpleTextureNode>
-#include <QSGTexture>
 #include <QtMath>
 
 namespace {
-class RadarTextureRoot final : public QSGNode
-{
-public:
-    RadarTextureRoot()
-    {
-        imageNode = new QSGSimpleTextureNode;
-        imageNode->setOwnsTexture(true);
-        appendChildNode(imageNode);
-    }
-
-    int revision = -1;
-    int mapRevision = -1;
-    int geometryRevision = -1;
-    QSize size;
-    QSGSimpleTextureNode *imageNode = nullptr;
-};
-
 bool radarSampleColor(QRgb pixel, QColor &color)
 {
+    if (qAlpha(pixel) < 24) {
+        return false;
+    }
+
     const int r = qRed(pixel);
     const int g = qGreen(pixel);
     const int b = qBlue(pixel);
@@ -135,8 +118,9 @@ int drawRadarSamples(QPainter &painter, const QImage &image, const QSize &target
                  int(qRound(qMax(sourceRect.width() / qMax(1, targetSize.width()),
                                  sourceRect.height() / qMax(1, targetSize.height())))),
                  5);
-    const qreal sampleWidth = qMax<qreal>(1.4, sampleStep * scaleX * 1.10);
-    const qreal sampleHeight = qMax<qreal>(1.4, sampleStep * scaleY * 1.10);
+    const qreal minimumSampleSize = targetSize.width() < 130 ? 4.2 : (targetSize.width() < 180 ? 2.8 : 1.4);
+    const qreal sampleWidth = qMax<qreal>(minimumSampleSize, sampleStep * scaleX * 1.10);
+    const qreal sampleHeight = qMax<qreal>(minimumSampleSize, sampleStep * scaleY * 1.10);
     const QPointF clipCenter(targetSize.width() * 0.5, targetSize.height() * 0.5);
     const qreal clipRadius = qMin(targetSize.width(), targetSize.height()) * 0.5 - 1.0;
     const qreal clipRadiusSquared = clipRadius * clipRadius;
@@ -224,16 +208,20 @@ QImage renderRadarFrameImage(const QImage &source,
 
     qInfo().noquote() << "[RadarFrameItem] palette samples" << totalSamples
                       << targetSize.width() << "x" << targetSize.height()
-                      << "texture true"
+                      << "painted true"
+                      << "map" << !mapSource.isNull()
                       << "circular" << circular;
     return output;
 }
 } // namespace
 
 RadarFrameItem::RadarFrameItem(QQuickItem *parent)
-    : QQuickItem(parent)
+    : QQuickPaintedItem(parent)
 {
-    setFlag(ItemHasContents, true);
+    setRenderTarget(QQuickPaintedItem::Image);
+    setAntialiasing(false);
+    setOpaquePainting(false);
+    setFillColor(Qt::transparent);
     setClip(true);
 }
 
@@ -267,7 +255,6 @@ void RadarFrameItem::setCircular(bool circular)
         return;
     }
     m_circular = circular;
-    ++m_geometryRevision;
     emit circularChanged();
     update();
 }
@@ -278,7 +265,6 @@ void RadarFrameItem::setBackgroundVisible(bool visible)
         return;
     }
     m_backgroundVisible = visible;
-    ++m_geometryRevision;
     emit backgroundVisibleChanged();
     update();
 }
@@ -289,14 +275,12 @@ void RadarFrameItem::setGuidesVisible(bool visible)
         return;
     }
     m_guidesVisible = visible;
-    ++m_geometryRevision;
     emit guidesVisibleChanged();
     update();
 }
 
 void RadarFrameItem::loadSource()
 {
-    ++m_sourceRevision;
     m_image = QImage();
 
     if (m_source.isEmpty()) {
@@ -338,7 +322,6 @@ void RadarFrameItem::loadSource()
 
 void RadarFrameItem::loadMapSource()
 {
-    ++m_mapRevision;
     m_mapImage = QImage();
 
     if (m_mapSource.isEmpty()) {
@@ -382,57 +365,21 @@ void RadarFrameItem::setReady(bool ready)
     emit readyChanged();
 }
 
-void RadarFrameItem::geometryChange(const QRectF &newGeometry, const QRectF &oldGeometry)
+void RadarFrameItem::paint(QPainter *painter)
 {
-    QQuickItem::geometryChange(newGeometry, oldGeometry);
-    if (newGeometry.size() == oldGeometry.size()) {
+    if (!painter || !m_ready || m_image.isNull() || width() <= 0 || height() <= 0) {
         return;
     }
-    ++m_geometryRevision;
-    update();
-}
 
-QSGNode *RadarFrameItem::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *)
-{
-    if (!m_ready || m_image.isNull() || width() <= 0 || height() <= 0 || !window()) {
-        delete oldNode;
-        return nullptr;
-    }
-
-    const QSize targetSize(qMax(1, int(width())), qMax(1, int(height())));
-    auto *root = static_cast<RadarTextureRoot *>(oldNode);
-    const bool rebuild = !root
-        || root->revision != m_sourceRevision
-        || root->mapRevision != m_mapRevision
-        || root->geometryRevision != m_geometryRevision
-        || root->size != targetSize;
-    if (!rebuild) {
-        return root;
-    }
-
-    delete root;
-    root = new RadarTextureRoot;
-    root->revision = m_sourceRevision;
-    root->mapRevision = m_mapRevision;
-    root->geometryRevision = m_geometryRevision;
-    root->size = targetSize;
-
+    const QSize targetSize(qMax(1, int(qCeil(width()))), qMax(1, int(qCeil(height()))));
     const QImage frame = renderRadarFrameImage(m_image,
                                                m_mapImage,
                                                targetSize,
                                                m_circular,
                                                m_backgroundVisible,
                                                m_guidesVisible);
-    QSGTexture *texture = window()->createTextureFromImage(frame);
-    if (!texture) {
-        delete root;
-        return nullptr;
-    }
-
-    root->imageNode->setTexture(texture);
-    root->imageNode->setFiltering(QSGTexture::Linear);
-    root->imageNode->setRect(0, 0, width(), height());
-    root->imageNode->markDirty(QSGNode::DirtyGeometry);
-    root->imageNode->markDirty(QSGNode::DirtyMaterial);
-    return root;
+    painter->save();
+    painter->setRenderHint(QPainter::SmoothPixmapTransform, true);
+    painter->drawImage(QRectF(0, 0, width(), height()), frame, QRectF(QPointF(0, 0), QSizeF(frame.size())));
+    painter->restore();
 }
