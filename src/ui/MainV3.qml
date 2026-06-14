@@ -490,10 +490,10 @@ Window {
         {
             id: "light",
             label: "Minimal",
-            detail: "Vector",
+            detail: "Clean",
             tileUrlTemplate: "https://a.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}.png",
-            styleUrl: "https://tiles.openfreemap.org/styles/positron",
-            mapLibre: true,
+            styleUrl: "",
+            mapLibre: false,
             maxZoom: 19,
             swatchA: "#F7F8F3",
             swatchB: "#ADBFD1"
@@ -501,10 +501,10 @@ Window {
         {
             id: "street",
             label: "Street",
-            detail: "Vector",
+            detail: "Roads",
             tileUrlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-            styleUrl: "https://tiles.openfreemap.org/styles/liberty",
-            mapLibre: true,
+            styleUrl: "",
+            mapLibre: false,
             maxZoom: 19,
             swatchA: "#F2EFE9",
             swatchB: "#91B3C5"
@@ -512,10 +512,10 @@ Window {
         {
             id: "dark",
             label: "Dark",
-            detail: "Vector night",
+            detail: "Night",
             tileUrlTemplate: "https://a.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png",
-            styleUrl: "https://tiles.openfreemap.org/styles/dark",
-            mapLibre: true,
+            styleUrl: "",
+            mapLibre: false,
             maxZoom: 19,
             swatchA: "#172132",
             swatchB: "#406179"
@@ -523,7 +523,7 @@ Window {
         {
             id: "terrain",
             label: "Terrain",
-            detail: "Raster topo",
+            detail: "Topo",
             tileUrlTemplate: "https://a.tile.opentopomap.org/{z}/{x}/{y}.png",
             styleUrl: "",
             mapLibre: false,
@@ -902,7 +902,7 @@ Window {
         if (root.mapLibreNativeAllowUntestedStyles)
             return
         if (root.mapLibreNativeRequested && !root.activeMapThemeUsesMapLibre) {
-            console.info("[MainV3] Map theme uses native raster fallback", root.activeMapThemeOption.id)
+            console.info("[MainV3] Map theme uses native raster tiles", root.activeMapThemeOption.id)
             return
         }
         if (root.mapLibreNativeRequested && root.effectiveMapRenderer !== "maplibre-native") {
