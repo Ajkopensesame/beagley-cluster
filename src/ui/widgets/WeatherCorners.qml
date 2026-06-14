@@ -1127,7 +1127,7 @@ Item {
 
     Rectangle {
         id: nowPlayingTicker
-        z: 20
+        z: 120
         width: Math.floor(Math.min(980, Math.max(520, parent.width - root.podSize * 2.35)))
         height: 54
         anchors.horizontalCenter: parent.horizontalCenter
@@ -1136,10 +1136,13 @@ Item {
         visible: root.musicTickerVisible()
         opacity: visible ? 1 : 0
         radius: 8
-        clip: true
+        clip: false
         color: "#04070D"
         border.width: 1
         border.color: root.musicPlaying ? "#1F6A65" : "#253145"
+        layer.enabled: root.embeddedSafeMode
+        layer.smooth: false
+        layer.mipmap: false
 
         Behavior on opacity { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
 
@@ -1192,6 +1195,9 @@ Item {
             anchors.top: parent.top
             anchors.bottom: parent.bottom
             clip: scrollNeeded
+            layer.enabled: scrollNeeded
+            layer.smooth: false
+            layer.mipmap: false
 
             property real scrollX: 0
             property bool scrollNeeded: tickerText.implicitWidth > width
