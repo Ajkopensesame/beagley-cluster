@@ -1340,7 +1340,7 @@ Item {
         effectLevel: root.effectLevel
         bleedFraction: root.podBleedFraction
         icon: "menu"
-        label: "MENU"
+        label: "SETUP"
         accentColor: "#9DB4FF"
         onClicked: {
             root.expandedMode = ""

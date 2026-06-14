@@ -490,7 +490,7 @@ Window {
         {
             id: "light",
             label: "Minimal",
-            detail: "Positron",
+            detail: "Vector",
             tileUrlTemplate: "https://a.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}.png",
             styleUrl: "https://tiles.openfreemap.org/styles/positron",
             mapLibre: true,
@@ -501,7 +501,7 @@ Window {
         {
             id: "street",
             label: "Street",
-            detail: "Liberty",
+            detail: "Vector",
             tileUrlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
             styleUrl: "https://tiles.openfreemap.org/styles/liberty",
             mapLibre: true,
@@ -512,7 +512,7 @@ Window {
         {
             id: "dark",
             label: "Dark",
-            detail: "Night",
+            detail: "Vector night",
             tileUrlTemplate: "https://a.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png",
             styleUrl: "https://tiles.openfreemap.org/styles/dark",
             mapLibre: true,
@@ -523,7 +523,7 @@ Window {
         {
             id: "terrain",
             label: "Terrain",
-            detail: "Topo",
+            detail: "Raster topo",
             tileUrlTemplate: "https://a.tile.opentopomap.org/{z}/{x}/{y}.png",
             styleUrl: "",
             mapLibre: false,
@@ -1013,7 +1013,7 @@ Window {
         if (root.mapMenuStage === "routing")
             return "Building route"
         if (root.mapMenuStage === "settings")
-            return root.mapMenuSystemMode ? "System controls" : "Map style"
+            return root.mapMenuSystemMode ? "System controls" : "Map view"
         if (root.mapMenuStage === "spotify")
             return "Spotify setup"
         return root.menuSearchTitle()
@@ -1337,10 +1337,10 @@ Window {
                 return "Scan the code to connect now playing"
             return "System controls and connections"
         }
-        const theme = root.normalizedThemeMode === "auto"
+        const displayMode = root.normalizedThemeMode === "auto"
             ? ("Auto " + (root.menuDarkChrome ? "dark" : "light"))
             : (root.menuDarkChrome ? "Dark" : "Light")
-        return theme + " / " + String(root.activeMapThemeOption.label || "Minimal") + " map"
+        return displayMode + " display / " + String(root.activeMapThemeOption.label || "Minimal") + " map"
     }
 
     Component.onCompleted: {
@@ -2890,7 +2890,7 @@ Window {
 
                                 Text {
                                     anchors.centerIn: parent
-                                    text: mapMenuTabs.systemTabs ? "Settings" : "Style"
+                                    text: mapMenuTabs.systemTabs ? "Settings" : "Map View"
                                     color: root.mapMenuStage === "settings" ? root.menuAccentColor : root.menuTextSecondaryColor
                                     font.family: appTheme.fontMono
                                     font.pixelSize: 13
@@ -3319,7 +3319,7 @@ Window {
 
                                         Text {
                                             width: parent.width
-                                            text: "Theme"
+                                            text: "Display"
                                             color: root.menuTextSecondaryColor
                                             font.family: appTheme.fontMono
                                             font.pixelSize: 13
@@ -3429,7 +3429,7 @@ Window {
 
                                         Text {
                                             width: parent.width
-                                            text: "Map style"
+                                            text: "Map view"
                                             color: root.menuTextSecondaryColor
                                             font.family: appTheme.fontMono
                                             font.pixelSize: 13
