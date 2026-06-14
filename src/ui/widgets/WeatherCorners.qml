@@ -1140,9 +1140,6 @@ Item {
         color: "#04070D"
         border.width: 1
         border.color: root.musicPlaying ? "#1F6A65" : "#253145"
-        layer.enabled: root.embeddedSafeMode
-        layer.smooth: false
-        layer.mipmap: false
 
         Behavior on opacity { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
 
@@ -1195,12 +1192,9 @@ Item {
             anchors.top: parent.top
             anchors.bottom: parent.bottom
             clip: scrollNeeded
-            layer.enabled: scrollNeeded
-            layer.smooth: false
-            layer.mipmap: false
 
             property real scrollX: 0
-            property bool scrollNeeded: tickerText.implicitWidth > width
+            property bool scrollNeeded: !root.embeddedSafeMode && tickerText.implicitWidth > width
             property real scrollEndX: Math.min(0, width - tickerText.implicitWidth - 48)
 
             onScrollNeededChanged: scrollX = 0

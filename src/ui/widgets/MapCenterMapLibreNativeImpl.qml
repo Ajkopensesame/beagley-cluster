@@ -543,8 +543,6 @@ Item {
         y: Math.round(parent.height * root.vehicleAnchorY - height * 0.54)
         rotation: root.nativeVehicleBearing
         transformOrigin: Item.Center
-        layer.enabled: true
-        layer.smooth: true
 
         Rectangle {
             anchors.centerIn: parent
