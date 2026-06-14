@@ -39,6 +39,18 @@ Item {
         accentColor: "#58FFE1"
         secondaryAccentColor: "#9DB4FF"
 
+        RadarFrameItem {
+            id: radarPreview
+            width: 0
+            height: 0
+            source: root.frameReady ? root.frameUrl : ""
+            mapSource: root.frameReady ? root.mapUrl : ""
+            circular: false
+            backgroundVisible: false
+            guidesVisible: false
+            visible: false
+        }
+
         Item {
             id: radarFace
             width: root.radarFaceSize
@@ -51,7 +63,7 @@ Item {
             anchors.verticalCenterOffset: root.corner === "topLeft" || root.corner === "topRight"
                 ? Math.round(frame.side * 0.060)
                 : -Math.round(frame.side * 0.060)
-            clip: true
+            clip: false
 
             Rectangle {
                 anchors.fill: parent
@@ -99,19 +111,6 @@ Item {
                     anchors.centerIn: parent
                     color: Qt.rgba(0.90, 0.98, 1.0, 0.94)
                 }
-            }
-
-            RadarFrameItem {
-                id: radarPreview
-                anchors.fill: parent
-                anchors.margins: root.radarInset
-                source: root.frameReady ? root.frameUrl : ""
-                mapSource: root.frameReady ? root.mapUrl : ""
-                circular: false
-                backgroundVisible: false
-                guidesVisible: false
-                visible: false
-                opacity: 1.0
             }
 
             Repeater {
