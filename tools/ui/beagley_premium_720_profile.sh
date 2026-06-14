@@ -6,6 +6,7 @@ HOST="${BEAGLEY_HOST:-root@beagley-ai.local}"
 HUB_URL="${VEHICLE_HUB_WS_URL:-ws://10.24.0.7:8765}"
 EFFECT_LEVEL="${BEAGLEY_EFFECT_LEVEL:-low}"
 GAUGE_DETAIL="${BEAGLEY_GAUGE_DETAIL:-rich}"
+CLUSTER_SIMULATION="${BEAGLEY_CLUSTER_SIMULATION:-0}"
 RENDER_LOOP="${QSG_RENDER_LOOP:-basic}"
 METRICS=0
 RESTART=1
@@ -28,6 +29,8 @@ Options:
   --hub-url URL           Vehicle hub URL. Default: ws://10.24.0.7:8765
   --effect-level LEVEL    off, low, or high. Default: low.
   --gauge-detail MODE     safe or rich. Default: rich.
+  --simulation            Run the cluster gauge/VIC sweep stimulus.
+  --no-simulation         Disable cluster simulation. Default.
   --render-loop LOOP      basic or threaded. Default: basic.
   --metrics               Enable BeagleY perf metrics.
   --no-restart            Write env without restarting.
@@ -53,6 +56,14 @@ while [[ $# -gt 0 ]]; do
     --gauge-detail)
       GAUGE_DETAIL="${2:-}"
       shift 2
+      ;;
+    --simulation)
+      CLUSTER_SIMULATION=1
+      shift
+      ;;
+    --no-simulation)
+      CLUSTER_SIMULATION=0
+      shift
       ;;
     --render-loop)
       RENDER_LOOP="${2:-}"
@@ -92,6 +103,19 @@ case "$(printf '%s' "$EFFECT_LEVEL" | tr '[:upper:]' '[:lower:]')" in
     ;;
 esac
 
+case "$(printf '%s' "$CLUSTER_SIMULATION" | tr '[:upper:]' '[:lower:]')" in
+  1|true|yes|on)
+    CLUSTER_SIMULATION=1
+    ;;
+  0|false|no|off)
+    CLUSTER_SIMULATION=0
+    ;;
+  *)
+    echo "[premium-720] BEAGLEY_CLUSTER_SIMULATION must be 0 or 1: $CLUSTER_SIMULATION" >&2
+    exit 2
+    ;;
+esac
+
 case "$(printf '%s' "$RENDER_LOOP" | tr '[:upper:]' '[:lower:]')" in
   basic|threaded)
     RENDER_LOOP="$(printf '%s' "$RENDER_LOOP" | tr '[:upper:]' '[:lower:]')"
@@ -102,7 +126,7 @@ case "$(printf '%s' "$RENDER_LOOP" | tr '[:upper:]' '[:lower:]')" in
     ;;
 esac
 
-for value in "$HOST" "$HUB_URL" "$EFFECT_LEVEL" "$GAUGE_DETAIL" "$RENDER_LOOP"; do
+for value in "$HOST" "$HUB_URL" "$EFFECT_LEVEL" "$GAUGE_DETAIL" "$CLUSTER_SIMULATION" "$RENDER_LOOP"; do
   if [[ "$value" == *"'"* ]]; then
     echo "[premium-720] values may not contain single quotes: $value" >&2
     exit 2
@@ -115,7 +139,15 @@ LIVE_ARGS=(
   --effect-level "$EFFECT_LEVEL"
   --gauge-detail "$GAUGE_DETAIL"
   --no-gauge-demo
-  --no-simulation
+)
+
+if [[ "$CLUSTER_SIMULATION" == "1" ]]; then
+  LIVE_ARGS+=(--simulation)
+else
+  LIVE_ARGS+=(--no-simulation)
+fi
+
+LIVE_ARGS+=(
   --map-renderer maplibre-native
   --maplibre-full-underlay
   --maplibre-max-zoom 14.0

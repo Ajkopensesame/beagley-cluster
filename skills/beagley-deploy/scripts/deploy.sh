@@ -3,6 +3,8 @@ set -euo pipefail
 
 REMOTE_TMP="/var/volatile/beagley_cluster.new"
 REMOTE_ROLLBACK="/var/volatile/beagley_cluster.rollback"
+REMOTE_LAUNCHER_TMP="/var/volatile/beagley-cluster-launch.sh.new"
+REMOTE_LAUNCHER_ROLLBACK="/var/volatile/beagley-cluster-launch.sh.rollback"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BASE="${BEAGLEY_CLUSTER_REPO_ROOT:-$(cd "$SCRIPT_DIR/../../.." && pwd)}"
@@ -31,6 +33,21 @@ if [[ -z "${BIN:-}" || ! -f "$BIN" ]]; then
   echo "[DEPLOY] Built binary not found" >&2
   exit 2
 fi
+DEPLOY_LAUNCHER=1
+LAUNCHER_SRC="${BEAGLEY_DEPLOY_LAUNCHER:-$BASE/yocto/meta-beagley-cluster/recipes-apps/beagley-cluster/files/beagley-cluster-launch.sh}"
+case "${BEAGLEY_DEPLOY_LAUNCHER:-}" in
+  0|false|False|FALSE|no|No|NO|off|Off|OFF)
+    DEPLOY_LAUNCHER=0
+    LAUNCHER_SRC=""
+    ;;
+esac
+if [[ "$DEPLOY_LAUNCHER" == "1" ]]; then
+  if [[ ! -f "$LAUNCHER_SRC" ]]; then
+    echo "[DEPLOY] Launcher source not found: $LAUNCHER_SRC" >&2
+    exit 2
+  fi
+  bash -n "$LAUNCHER_SRC"
+fi
 
 BIN_DESC=$(file "$BIN")
 
@@ -50,8 +67,12 @@ fi
 echo "[DEPLOY] Using SSH target: $BEAGLEY_SSH_TARGET"
 
 echo "[DEPLOY] Step 3: Transfer binary..."
-beagley_ssh "mkdir -p /var/volatile && rm -f '$REMOTE_TMP' '$REMOTE_ROLLBACK' /tmp/beagley_cluster.new"
+beagley_ssh "mkdir -p /var/volatile && rm -f '$REMOTE_TMP' '$REMOTE_ROLLBACK' '$REMOTE_LAUNCHER_TMP' '$REMOTE_LAUNCHER_ROLLBACK' /tmp/beagley_cluster.new"
 beagley_scp_to "$BIN" "$REMOTE_TMP"
+if [[ "$DEPLOY_LAUNCHER" == "1" ]]; then
+  echo "[DEPLOY] Step 3b: Transfer launcher..."
+  beagley_scp_to "$LAUNCHER_SRC" "$REMOTE_LAUNCHER_TMP"
+fi
 
 echo "[DEPLOY] Step 4: Free old generated deploy backups..."
 beagley_ssh "for path in /usr/bin/beagley_cluster.bak /usr/bin/beagley_cluster.bak.* /usr/bin/beagley_cluster.backup-* /usr/bin/beagley_cluster.compare.*; do [ -e \"\$path\" ] && rm -f \"\$path\"; done; true"
@@ -65,6 +86,10 @@ restore_on_error() {
     cp "$REMOTE_ROLLBACK" /usr/bin/beagley_cluster || true
     chmod 0755 /usr/bin/beagley_cluster || true
   fi
+  if [ -s "$REMOTE_LAUNCHER_ROLLBACK" ]; then
+    cp "$REMOTE_LAUNCHER_ROLLBACK" /usr/bin/beagley-cluster-launch.sh || true
+    chmod 0755 /usr/bin/beagley-cluster-launch.sh || true
+  fi
   systemctl start beagley_cluster || true
 }
 trap restore_on_error ERR
@@ -72,9 +97,17 @@ systemctl stop beagley_cluster || true
 if [ -x /usr/bin/beagley_cluster ]; then
   cp /usr/bin/beagley_cluster "$REMOTE_ROLLBACK" || true
 fi
+if [ -x /usr/bin/beagley-cluster-launch.sh ] && [ -s "$REMOTE_LAUNCHER_TMP" ]; then
+  cp /usr/bin/beagley-cluster-launch.sh "$REMOTE_LAUNCHER_ROLLBACK" || true
+fi
 cp "$REMOTE_TMP" /usr/bin/beagley_cluster
 chmod 0755 /usr/bin/beagley_cluster
+if [ -s "$REMOTE_LAUNCHER_TMP" ]; then
+  cp "$REMOTE_LAUNCHER_TMP" /usr/bin/beagley-cluster-launch.sh
+  chmod 0755 /usr/bin/beagley-cluster-launch.sh
+fi
 rm -f "$REMOTE_TMP"
+rm -f "$REMOTE_LAUNCHER_TMP"
 sync
 trap - ERR
 REMOTE

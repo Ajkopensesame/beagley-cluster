@@ -46,6 +46,10 @@ PowerVR B-Series BXS-4-64
 Software renderers such as `llvmpipe`, `swrast`, or `kms_swrast` are failures
 for this profile.
 
+The deployed runtime launcher is part of this contract. A binary-only deploy is
+not enough if `/usr/bin/beagley-cluster-launch.sh` is stale, because it can force
+old environment defaults such as `QSG_RENDER_LOOP=basic`.
+
 ## Named Runtime Profile
 
 Install the premium 720 profile:
@@ -64,6 +68,7 @@ The profile intentionally sets:
 - `BEAGLEY_GAUGE_DETAIL=rich`
 - `BEAGLEY_MAP_RENDERER=maplibre-native`
 - `BEAGLEY_MAPLIBRE_NATIVE_FULL_UNDERLAY=1`
+- optional `BEAGLEY_CLUSTER_SIMULATION=1` when running acceptance stimulus
 - explicit `QSG_RENDER_LOOP`
 
 Use `--metrics` when measuring frame time.
@@ -82,11 +87,15 @@ tools/perf/run_premium_720_matrix.sh \
 Default cases:
 
 ```text
-basic + effects off
-basic + effects low
-threaded + effects off
-threaded + effects low
+simulation + basic + effects off
+simulation + basic + effects low
+simulation + threaded + effects off
+simulation + threaded + effects low
 ```
+
+The default stimulus is `--simulation`, so the gauges and VIC keep moving during
+measurement. Use `--live` only when testing the real vehicle/GPS path rather
+than GPU headroom.
 
 Each run writes an artifact directory under:
 
@@ -105,7 +114,11 @@ Expected artifacts include:
 - per-case `display-status-before.txt`
 - per-case `display-status-after.txt`
 - per-case `screenshot.png`
-- per-case screenshot analysis JSON when available
+
+The matrix fails a case if the process environment does not match the requested
+render loop, effect level, and stimulus before measuring. Screenshots are
+captured as evidence; dark map styles are not treated as screenshot-analysis
+failures.
 
 Default temporary thresholds are:
 
@@ -189,6 +202,10 @@ After deploying a built binary:
 skills/cluster-source-truth/scripts/check.sh --strict
 tools/perf/run_premium_720_matrix.sh --host root@beagley-ai.local
 ```
+
+`skills/beagley-deploy/scripts/deploy.sh` deploys both the compiled binary and
+the production launcher by default. Set `BEAGLEY_DEPLOY_LAUNCHER=0` only for a
+deliberate binary-only emergency deploy.
 
 For long Yocto builds, start the build, report the log path/PID, then wait for
 explicit instructions before polling again.

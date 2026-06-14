@@ -6,6 +6,7 @@ HOST="${BEAGLEY_HOST:-root@beagley-ai.local}"
 HUB_URL="${VEHICLE_HUB_WS_URL:-ws://10.24.0.7:8765}"
 RENDER_LOOPS="${PREMIUM_720_RENDER_LOOPS:-basic threaded}"
 EFFECT_LEVELS="${PREMIUM_720_EFFECT_LEVELS:-off low}"
+STIMULUS="${PREMIUM_720_STIMULUS:-simulation}"
 DURATION_SECONDS=45
 WARMUP_SECONDS=15
 MIN_FPS=45
@@ -31,12 +32,15 @@ evidence, and optionally captures a real display screenshot.
 Default matrix:
   render loops: basic threaded
   effect levels: off low
+  stimulus: simulation
 
 Options:
   --host HOST             SSH target. Default: root@beagley-ai.local
   --hub-url URL           Vehicle hub URL. Default: ws://10.24.0.7:8765
   --render-loops LIST     Space-separated list. Default: "basic threaded"
   --effect-levels LIST    Space-separated list. Default: "off low"
+  --simulation            Use cluster gauge/VIC simulation stimulus. Default.
+  --live                  Use live vehicle/GPS updates only.
   --duration SECONDS      Measured sample duration. Default: 45
   --warmup SECONDS        Warmup before measurement. Default: 15
   --min-fps N             Perf check minimum FPS. Default: 45
@@ -69,6 +73,14 @@ while [[ $# -gt 0 ]]; do
     --effect-levels)
       EFFECT_LEVELS="${2:-}"
       shift 2
+      ;;
+    --simulation)
+      STIMULUS=simulation
+      shift
+      ;;
+    --live)
+      STIMULUS=live
+      shift
       ;;
     --duration)
       DURATION_SECONDS="${2:-}"
@@ -139,12 +151,27 @@ require_uint "--duration" "$DURATION_SECONDS"
 require_uint "--warmup" "$WARMUP_SECONDS"
 require_uint "--screenshot-delay-ms" "$SCREENSHOT_DELAY_MS"
 
-for value in "$HOST" "$HUB_URL" "$RENDER_LOOPS" "$EFFECT_LEVELS" "$OUT_DIR"; do
+for value in "$HOST" "$HUB_URL" "$RENDER_LOOPS" "$EFFECT_LEVELS" "$STIMULUS" "$OUT_DIR"; do
   if [[ "$value" == *"'"* ]]; then
     echo "[premium-720-matrix] values may not contain single quotes: $value" >&2
     exit 2
   fi
 done
+
+case "$STIMULUS" in
+  simulation|live) ;;
+  *)
+    echo "[premium-720-matrix] stimulus must be simulation or live: $STIMULUS" >&2
+    exit 2
+    ;;
+esac
+
+expected_simulation=0
+stimulus_arg=--no-simulation
+if [[ "$STIMULUS" == "simulation" ]]; then
+  expected_simulation=1
+  stimulus_arg=--simulation
+fi
 
 mkdir -p "$OUT_DIR"
 SUMMARY="$OUT_DIR/summary.md"
@@ -175,6 +202,7 @@ trap restore_remote_env EXIT
   printf 'commit: `%s`\n' "$(git -C "$ROOT" rev-parse --short=12 HEAD 2>/dev/null || printf unknown)"
   printf 'render_loops: `%s`\n' "$RENDER_LOOPS"
   printf 'effect_levels: `%s`\n' "$EFFECT_LEVELS"
+  printf 'stimulus: `%s`\n' "$STIMULUS"
   printf 'duration_seconds: `%s`\n' "$DURATION_SECONDS"
   printf 'warmup_seconds: `%s`\n' "$WARMUP_SECONDS"
   echo
@@ -243,6 +271,7 @@ for render_loop in $RENDER_LOOPS; do
       --render-loop "$render_loop" \
       --effect-level "$effect_level" \
       --gauge-detail rich \
+      "$stimulus_arg" \
       --metrics >"$case_dir/profile.txt" 2>&1; then
       echo "[premium-720-matrix] Case $case_name failed during profile install" >&2
       printf '%s\t%s\t%s\tprofile-failed\t%s\t%s\t%s\n' "$case_name" "$render_loop" "$effect_level" "" "$case_dir/profile.txt" "" >>"$RESULTS_TSV"
@@ -251,6 +280,15 @@ for render_loop in $RENDER_LOOPS; do
     fi
 
     "$ROOT/tools/ui/beagley_display_status.sh" --host "$HOST" >"$case_dir/display-status-before.txt" 2>&1 || true
+    actual_render_loop="$(awk -F= '$1 == "QSG_RENDER_LOOP" { print $2; exit }' "$case_dir/display-status-before.txt")"
+    actual_effect_level="$(awk -F= '$1 == "BEAGLEY_EFFECT_LEVEL" { print $2; exit }' "$case_dir/display-status-before.txt")"
+    actual_simulation="$(awk -F= '$1 == "BEAGLEY_CLUSTER_SIMULATION" { print $2; exit }' "$case_dir/display-status-before.txt")"
+    if [[ "$actual_render_loop" != "$render_loop" || "$actual_effect_level" != "$effect_level" || "$actual_simulation" != "$expected_simulation" ]]; then
+      echo "[premium-720-matrix] Case $case_name profile mismatch: render_loop=$actual_render_loop effect=$actual_effect_level simulation=$actual_simulation" >&2
+      printf '%s\t%s\t%s\tprofile-mismatch\t%s\t%s\t%s\n' "$case_name" "$render_loop" "$effect_level" "actual_render_loop=$actual_render_loop actual_effect_level=$actual_effect_level actual_simulation=$actual_simulation" "$case_dir/display-status-before.txt" "" >>"$RESULTS_TSV"
+      failures=$((failures + 1))
+      continue
+    fi
 
     echo "[premium-720-matrix] Case $case_name: warmup ${WARMUP_SECONDS}s..."
     restart_epoch="$(ssh "$HOST" "date +%s")"
@@ -278,6 +316,7 @@ for render_loop in $RENDER_LOOPS; do
         --host "$HOST" \
         --current \
         --delay-ms "$SCREENSHOT_DELAY_MS" \
+        --no-analyze \
         --out "$screenshot_path" >"$case_dir/screenshot-capture.txt" 2>&1 || {
           echo "[premium-720-matrix] Case $case_name screenshot failed" >&2
           failures=$((failures + 1))

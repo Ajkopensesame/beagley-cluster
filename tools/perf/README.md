@@ -51,8 +51,13 @@ tools/perf/run_premium_720_matrix.sh \
 ```
 
 The matrix installs the named `premium-720` profile, tests `basic` and
-`threaded` render loops across controlled effect levels, captures `[Perf]`
-logs, runs the frame-time checker, and captures real display screenshots.
+`threaded` render loops across controlled effect levels, runs a simulation
+stimulus by default, verifies the requested process environment before each
+measurement, captures `[Perf]` logs, runs the frame-time checker, and captures
+real display screenshots.
+
+Use `--live` when the goal is to measure real vehicle/GPS updates instead of the
+synthetic gauge/VIC stimulus.
 
 Static embedded-rendering risk scan:
 
