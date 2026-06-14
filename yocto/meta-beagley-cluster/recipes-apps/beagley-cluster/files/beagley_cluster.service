@@ -5,6 +5,7 @@ Wants=beagley-cluster-provision.service beagley-cluster-gpu-probe.service
 
 [Service]
 Type=simple
+Environment=HOME=/root
 Environment=QT_QPA_PLATFORM=eglfs
 Environment=QT_QPA_EGLFS_INTEGRATION=eglfs_kms
 Environment=QSG_RENDER_LOOP=basic

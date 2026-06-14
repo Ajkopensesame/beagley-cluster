@@ -158,6 +158,22 @@ static QString normalizedSetting(const QByteArray &rawValue, const QString &fall
     return trimmed.isEmpty() ? fallback : trimmed;
 }
 
+static void ensureHomeForQtSettings()
+{
+    const QByteArray home = qgetenv("HOME").trimmed();
+    if (!home.isEmpty()) {
+        return;
+    }
+
+    const QByteArray user = qgetenv("USER").trimmed();
+    if (user.isEmpty() || user == QByteArrayLiteral("root")) {
+        qputenv("HOME", QByteArrayLiteral("/root"));
+        return;
+    }
+
+    qputenv("HOME", QByteArrayLiteral("/home/") + user);
+}
+
 static QString normalizedGaugeDetail(const QByteArray &rawValue, const QString &fallback)
 {
     const QString value = normalizedSetting(rawValue, fallback);
@@ -260,6 +276,8 @@ static QString graphicsApiName(QSGRendererInterface::GraphicsApi api)
 
 int main(int argc, char *argv[])
 {
+    ensureHomeForQtSettings();
+
 #ifdef WITH_WEBENGINE
     const bool noMap =
         qEnvironmentVariableIsSet("BEAGLEY_NO_MAP") &&
