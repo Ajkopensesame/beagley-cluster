@@ -1128,37 +1128,38 @@ Item {
     Rectangle {
         id: nowPlayingTicker
         z: 20
-        width: Math.floor(Math.min(620, Math.max(320, parent.width - root.podSize * 2.42)))
-        height: 36
+        width: Math.floor(Math.min(980, Math.max(520, parent.width - root.podSize * 2.35)))
+        height: 54
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: parent.top
-        anchors.topMargin: Math.max(10, Math.round(root.podSize * 0.10))
+        anchors.topMargin: Math.max(8, Math.round(root.podSize * 0.06))
         visible: root.musicTickerVisible()
         opacity: visible ? 1 : 0
-        radius: height * 0.5
-        clip: false
-        color: "#05070B"
+        radius: 8
+        clip: true
+        color: "#04070D"
         border.width: 1
-        border.color: root.musicPlaying ? "#16464A" : "#253145"
+        border.color: root.musicPlaying ? "#1F6A65" : "#253145"
 
         Behavior on opacity { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
 
         OemIcon {
             id: tickerIcon
-            width: 20
-            height: 20
+            width: 26
+            height: 26
             anchors.left: parent.left
-            anchors.leftMargin: 12
+            anchors.leftMargin: 16
             anchors.verticalCenter: parent.verticalCenter
             icon: "audio"
             active: root.musicPlaying
             color: "#F7FBFF"
             accentColor: "#4FF3D2"
-            strokeWidth: 2.4
+            strokeWidth: 3.0
         }
 
         Text {
             id: tickerSource
+            visible: false
             anchors.left: tickerIcon.right
             anchors.leftMargin: 8
             anchors.verticalCenter: parent.verticalCenter
@@ -1172,6 +1173,7 @@ Item {
 
         Rectangle {
             id: tickerDivider
+            visible: false
             width: 1
             height: 18
             radius: 0
@@ -1183,17 +1185,17 @@ Item {
 
         Item {
             id: tickerTextClip
-            anchors.left: tickerDivider.right
-            anchors.leftMargin: 10
+            anchors.left: tickerIcon.right
+            anchors.leftMargin: 16
             anchors.right: parent.right
-            anchors.rightMargin: tickerSaveButton.visible ? 48 : 16
+            anchors.rightMargin: tickerSaveButton.visible ? 64 : 20
             anchors.top: parent.top
             anchors.bottom: parent.bottom
             clip: scrollNeeded
 
             property real scrollX: 0
-            property bool scrollNeeded: !root.embeddedSafeMode && tickerText.implicitWidth > width
-            property real scrollEndX: Math.min(0, width - tickerText.implicitWidth - 26)
+            property bool scrollNeeded: tickerText.implicitWidth > width
+            property real scrollEndX: Math.min(0, width - tickerText.implicitWidth - 48)
 
             onScrollNeededChanged: scrollX = 0
             onWidthChanged: scrollX = 0
@@ -1208,39 +1210,41 @@ Item {
                 text: root.musicTickerDisplayLine()
                 color: "#F7FBFF"
                 font.family: root.displayFont
-                font.pixelSize: 15
+                font.pixelSize: 24
                 font.weight: Font.Bold
                 font.letterSpacing: 0
                 horizontalAlignment: tickerTextClip.scrollNeeded ? Text.AlignLeft : Text.AlignHCenter
                 elide: tickerTextClip.scrollNeeded ? Text.ElideNone : Text.ElideRight
                 maximumLineCount: 1
                 wrapMode: Text.NoWrap
+
+                onTextChanged: tickerTextClip.scrollX = 0
             }
 
             SequentialAnimation {
                 running: tickerTextClip.scrollNeeded && nowPlayingTicker.visible
                 loops: Animation.Infinite
-                PauseAnimation { duration: 1000 }
+                PauseAnimation { duration: 700 }
                 NumberAnimation {
                     target: tickerTextClip
                     property: "scrollX"
                     from: 0
                     to: tickerTextClip.scrollEndX
-                    duration: Math.max(5200, Math.abs(tickerTextClip.scrollEndX) * 42)
+                    duration: Math.max(6400, Math.abs(tickerTextClip.scrollEndX) * 36)
                     easing.type: Easing.Linear
                 }
-                PauseAnimation { duration: 900 }
+                PauseAnimation { duration: 700 }
                 ScriptAction { script: tickerTextClip.scrollX = 0 }
             }
         }
 
         Rectangle {
             id: tickerSaveButton
-            width: 30
-            height: 30
-            radius: 15
+            width: 40
+            height: 40
+            radius: 20
             anchors.right: parent.right
-            anchors.rightMargin: 6
+            anchors.rightMargin: 8
             anchors.verticalCenter: parent.verticalCenter
             visible: root.spotifySaveVisible()
             enabled: root.spotifySaveEnabled()
@@ -1259,19 +1263,19 @@ Item {
                 text: root.spotifySaveButtonText()
                 color: "#F7FBFF"
                 font.family: root.monoFont
-                font.pixelSize: 10
+                font.pixelSize: 12
                 font.weight: Font.Bold
                 font.letterSpacing: 0
             }
 
             Item {
-                width: 14
-                height: 14
+                width: 18
+                height: 18
                 anchors.centerIn: parent
                 visible: !root.spotifySavePending && !root.spotifySaveSaved()
 
                 Rectangle {
-                    width: 14
+                    width: 18
                     height: 2
                     radius: 1
                     anchors.centerIn: parent
@@ -1280,7 +1284,7 @@ Item {
 
                 Rectangle {
                     width: 2
-                    height: 14
+                    height: 18
                     radius: 1
                     anchors.centerIn: parent
                     color: "#F7FBFF"
@@ -1288,27 +1292,27 @@ Item {
             }
 
             Item {
-                width: 16
-                height: 14
+                width: 19
+                height: 16
                 anchors.centerIn: parent
                 visible: !root.spotifySavePending && root.spotifySaveSaved()
 
                 Rectangle {
-                    width: 7
+                    width: 8
                     height: 3
                     radius: 1
                     x: 1
-                    y: 7
+                    y: 8
                     rotation: 45
                     color: "#06120A"
                 }
 
                 Rectangle {
-                    width: 13
+                    width: 15
                     height: 3
                     radius: 1
                     x: 5
-                    y: 5
+                    y: 6
                     rotation: -45
                     color: "#06120A"
                 }
