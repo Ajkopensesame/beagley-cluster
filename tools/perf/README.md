@@ -38,3 +38,27 @@ tools/perf/check_perf_log.sh /tmp/beagley_embedded_perf.log \
 
 For the BeagleY appliance contract, keep the replay file fixed across runs and
 raise `--min-fps` to the final 60 FPS target once hardware rendering is proven.
+
+## Premium 720 Matrix
+
+The real-display acceptance path for the premium 1920x720 cluster profile is:
+
+```bash
+tools/perf/run_premium_720_matrix.sh \
+  --host root@beagley-ai.local \
+  --duration 45 \
+  --warmup 15
+```
+
+The matrix installs the named `premium-720` profile, tests `basic` and
+`threaded` render loops across controlled effect levels, captures `[Perf]`
+logs, runs the frame-time checker, and captures real display screenshots.
+
+Static embedded-rendering risk scan:
+
+```bash
+tools/perf/qml_render_risk_scan.sh
+```
+
+See `docs/premium_720_display_plan.md` for the long-term display contract and
+thresholds.

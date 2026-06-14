@@ -13,6 +13,7 @@ MAPLIBRE_STYLE_URL="${BEAGLEY_MAPLIBRE_NATIVE_STYLE_URL:-https://tiles.openfreem
 MAPLIBRE_TRUSTED_STYLES="${BEAGLEY_MAPLIBRE_NATIVE_TRUSTED_STYLES:-$MAPLIBRE_STYLE_URL}"
 MAPLIBRE_FULL_UNDERLAY="${BEAGLEY_MAPLIBRE_NATIVE_FULL_UNDERLAY:-1}"
 MAPLIBRE_MAX_ZOOM="${BEAGLEY_MAPLIBRE_NATIVE_MAX_ZOOM:-14.0}"
+RENDER_LOOP="${QSG_RENDER_LOOP:-basic}"
 METRICS=0
 RESTART=1
 HEALTH=1
@@ -51,6 +52,8 @@ Options:
   --maplibre-safe-compositor
                           Keep MapLibre in the conservative center-only region.
   --maplibre-max-zoom Z   Max MapLibre zoom. Default: 14.0
+  --render-loop LOOP      Qt scenegraph render loop: basic or threaded.
+                          Default: basic.
   --metrics               Enable BeagleY perf metrics.
   --no-restart            Write env without restarting.
   --no-health             Skip post-restart health check.
@@ -111,6 +114,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --maplibre-max-zoom)
       MAPLIBRE_MAX_ZOOM="${2:-}"
+      shift 2
+      ;;
+    --render-loop)
+      RENDER_LOOP="${2:-}"
       shift 2
       ;;
     --metrics)
@@ -179,7 +186,18 @@ case "$CLUSTER_SIMULATION_NORMALIZED" in
     ;;
 esac
 
-for value in "$HOST" "$HUB_URL" "$EFFECT_LEVEL" "$GAUGE_DETAIL" "$GAUGE_DEMO" "$CLUSTER_SIMULATION" "$MAP_RENDERER" "$MAPLIBRE_STYLE_URL" "$MAPLIBRE_TRUSTED_STYLES" "$MAPLIBRE_FULL_UNDERLAY" "$MAPLIBRE_MAX_ZOOM"; do
+RENDER_LOOP_NORMALIZED="$(printf '%s' "$RENDER_LOOP" | tr '[:upper:]' '[:lower:]')"
+case "$RENDER_LOOP_NORMALIZED" in
+  basic|threaded)
+    RENDER_LOOP="$RENDER_LOOP_NORMALIZED"
+    ;;
+  *)
+    echo "[beagley-live] --render-loop must be basic or threaded: $RENDER_LOOP" >&2
+    exit 2
+    ;;
+esac
+
+for value in "$HOST" "$HUB_URL" "$EFFECT_LEVEL" "$GAUGE_DETAIL" "$GAUGE_DEMO" "$CLUSTER_SIMULATION" "$MAP_RENDERER" "$MAPLIBRE_STYLE_URL" "$MAPLIBRE_TRUSTED_STYLES" "$MAPLIBRE_FULL_UNDERLAY" "$MAPLIBRE_MAX_ZOOM" "$RENDER_LOOP"; do
   if [[ "$value" == *"'"* ]]; then
     echo "[beagley-live] values may not contain single quotes: $value" >&2
     exit 2
@@ -220,6 +238,7 @@ BEAGLEY_MAP_STYLE_MODE=embedded
 BEAGLEY_PROFILE_METRICS=$METRICS
 BEAGLEY_REPLAY_LOOP=0
 BEAGLEY_STRESS_SCENE=0
+QSG_RENDER_LOOP=$RENDER_LOOP
 VEHICLE_HUB_WS_URL=$HUB_URL
 BEAGLEY_MAPLIBRE_NATIVE_STYLE_URL=$MAPLIBRE_STYLE_URL
 BEAGLEY_MAPLIBRE_NATIVE_TRUSTED_STYLES=$MAPLIBRE_TRUSTED_STYLES
