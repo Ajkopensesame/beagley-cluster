@@ -1,13 +1,12 @@
 #pragma once
 
 #include <QImage>
-#include <QQuickPaintedItem>
-#include <QSize>
+#include <QQuickItem>
 #include <QUrl>
 
-class QPainter;
+class QSGNode;
 
-class RadarFrameItem : public QQuickPaintedItem
+class RadarFrameItem : public QQuickItem
 {
     Q_OBJECT
 
@@ -44,7 +43,8 @@ signals:
     void guidesVisibleChanged();
 
 protected:
-    void paint(QPainter *painter) override;
+    QSGNode *updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *) override;
+    void geometryChange(const QRectF &newGeometry, const QRectF &oldGeometry) override;
 
 private:
     void loadSource();
@@ -59,4 +59,7 @@ private:
     bool m_circular = false;
     bool m_backgroundVisible = true;
     bool m_guidesVisible = true;
+    int m_sourceRevision = 0;
+    int m_mapRevision = 0;
+    int m_geometryRevision = 0;
 };
