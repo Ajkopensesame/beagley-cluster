@@ -158,8 +158,13 @@ static QString normalizedSetting(const QByteArray &rawValue, const QString &fall
     return trimmed.isEmpty() ? fallback : trimmed;
 }
 
-static void ensureHomeForQtSettings()
+static void ensureConfigHomeForQtSettings()
 {
+    const QByteArray configHome = qgetenv("XDG_CONFIG_HOME").trimmed();
+    if (!configHome.isEmpty()) {
+        return;
+    }
+
     const QByteArray home = qgetenv("HOME").trimmed();
     if (!home.isEmpty()) {
         return;
@@ -167,11 +172,11 @@ static void ensureHomeForQtSettings()
 
     const QByteArray user = qgetenv("USER").trimmed();
     if (user.isEmpty() || user == QByteArrayLiteral("root")) {
-        qputenv("HOME", QByteArrayLiteral("/root"));
+        qputenv("XDG_CONFIG_HOME", QByteArrayLiteral("/root/.config"));
         return;
     }
 
-    qputenv("HOME", QByteArrayLiteral("/home/") + user);
+    qputenv("XDG_CONFIG_HOME", QByteArrayLiteral("/home/") + user + QByteArrayLiteral("/.config"));
 }
 
 static QString normalizedGaugeDetail(const QByteArray &rawValue, const QString &fallback)
@@ -276,7 +281,7 @@ static QString graphicsApiName(QSGRendererInterface::GraphicsApi api)
 
 int main(int argc, char *argv[])
 {
-    ensureHomeForQtSettings();
+    ensureConfigHomeForQtSettings();
 
 #ifdef WITH_WEBENGINE
     const bool noMap =

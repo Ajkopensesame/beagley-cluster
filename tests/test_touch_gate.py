@@ -71,7 +71,7 @@ def test_packaged_touch_gate_is_advisory_by_default() -> None:
     defaults = (SYSTEMD_FILES / "beagley-cluster.default").read_text()
     touch_probe = (SYSTEMD_FILES / "beagley-cluster-touch-probe.service").read_text()
 
-    assert "Environment=HOME=/root" in service
+    assert "Environment=XDG_CONFIG_HOME=/root/.config" in service
     assert "BEAGLEY_REQUIRE_TOUCH_GATE=0" in defaults
     assert "Environment=BEAGLEY_REQUIRE_TOUCH_GATE=0" in service
 
