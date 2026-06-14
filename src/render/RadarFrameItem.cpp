@@ -8,7 +8,10 @@
 #include <QSGGeometry>
 #include <QSGGeometryNode>
 #include <QSGNode>
+#include <QVariantMap>
 #include <QtMath>
+
+#include <algorithm>
 
 namespace {
 struct ColoredRect {
@@ -19,6 +22,14 @@ struct ColoredRect {
 struct ColoredLine {
     QPointF start;
     QPointF end;
+    QColor color;
+};
+
+struct RadarSampleBin {
+    qreal sumX = 0.0;
+    qreal sumY = 0.0;
+    int hits = 0;
+    int score = 0;
     QColor color;
 };
 
@@ -44,8 +55,19 @@ bool radarSampleColor(QRgb pixel, QColor &color)
     const int minChannel = qMin(r, qMin(g, b));
     const int spread = maxChannel - minChannel;
 
-    if (maxChannel < 96 || spread < 40) {
+    if (maxChannel < 88) {
         return false;
+    }
+
+    if (spread < 40) {
+        if (maxChannel >= 176) {
+            color = QColor(255, 226, 118, 255);
+        } else if (maxChannel >= 128) {
+            color = QColor(114, 216, 255, 255);
+        } else {
+            color = QColor(82, 255, 170, 255);
+        }
+        return true;
     }
 
     const bool blueReturn = b >= 140
@@ -80,17 +102,17 @@ bool radarSampleColor(QRgb pixel, QColor &color)
     }
 
     if (redReturn) {
-        color = QColor(255, 45, 60, 238);
+        color = QColor(255, 45, 60, 255);
     } else if (orangeReturn) {
-        color = QColor(255, 132, 38, 236);
+        color = QColor(255, 132, 38, 255);
     } else if (yellowReturn) {
-        color = QColor(255, 224, 64, 234);
+        color = QColor(255, 224, 64, 255);
     } else if (greenReturn) {
-        color = QColor(50, 255, 92, 232);
+        color = QColor(50, 255, 92, 255);
     } else if (purpleReturn) {
-        color = QColor(186, 112, 255, 232);
+        color = QColor(186, 112, 255, 255);
     } else {
-        color = QColor(64, 204, 255, 232);
+        color = QColor(64, 204, 255, 255);
     }
     return true;
 }
@@ -145,10 +167,18 @@ int appendRadarSamples(QVector<ColoredRect> &rects, const QImage &image, const Q
     const int right = qMin(image.width() - 1, int(qCeil(sourceRect.right())));
     const int top = qMax(0, int(qFloor(sourceRect.top())));
     const int bottom = qMin(image.height() - 1, int(qCeil(sourceRect.bottom())));
+    const qreal edgeInsetX = qMax<qreal>(4.0, sourceRect.width() * 0.018);
+    const qreal edgeInsetY = qMax<qreal>(4.0, sourceRect.height() * 0.018);
 
     for (int y = top; y <= bottom; y += sampleStep) {
+        if (y < sourceRect.top() + edgeInsetY || y > sourceRect.bottom() - edgeInsetY) {
+            continue;
+        }
         const QRgb *line = reinterpret_cast<const QRgb *>(image.constScanLine(y));
         for (int x = left; x <= right; x += sampleStep) {
+            if (x < sourceRect.left() + edgeInsetX || x > sourceRect.right() - edgeInsetX) {
+                continue;
+            }
             QColor color;
             if (!radarSampleColor(line[x], color)) {
                 continue;
@@ -167,6 +197,95 @@ int appendRadarSamples(QVector<ColoredRect> &rects, const QImage &image, const Q
         }
     }
     return totalSamples;
+}
+
+QVariantList buildRadarSampleModel(const QImage &image, bool circular)
+{
+    QVariantList samples;
+    if (image.isNull()) {
+        return samples;
+    }
+
+    const QRectF sourceRect = croppedSourceRect(image, QSize(120, 120));
+    const int gridSize = 28;
+    const int sampleStep = qBound(3, int(qRound(qMin(sourceRect.width(), sourceRect.height()) / 128.0)), 8);
+    const qreal edgeInsetX = qMax<qreal>(4.0, sourceRect.width() * 0.018);
+    const qreal edgeInsetY = qMax<qreal>(4.0, sourceRect.height() * 0.018);
+    QHash<int, RadarSampleBin> bins;
+
+    const int left = qMax(0, int(qFloor(sourceRect.left())));
+    const int right = qMin(image.width() - 1, int(qCeil(sourceRect.right())));
+    const int top = qMax(0, int(qFloor(sourceRect.top())));
+    const int bottom = qMin(image.height() - 1, int(qCeil(sourceRect.bottom())));
+
+    for (int y = top; y <= bottom; y += sampleStep) {
+        if (y < sourceRect.top() + edgeInsetY || y > sourceRect.bottom() - edgeInsetY) {
+            continue;
+        }
+        const QRgb *line = reinterpret_cast<const QRgb *>(image.constScanLine(y));
+        for (int x = left; x <= right; x += sampleStep) {
+            if (x < sourceRect.left() + edgeInsetX || x > sourceRect.right() - edgeInsetX) {
+                continue;
+            }
+
+            QColor color;
+            if (!radarSampleColor(line[x], color)) {
+                continue;
+            }
+
+            const qreal nx = qBound<qreal>(0.0, (x - sourceRect.left()) / sourceRect.width(), 1.0);
+            const qreal ny = qBound<qreal>(0.0, (y - sourceRect.top()) / sourceRect.height(), 1.0);
+            if (circular) {
+                const qreal dx = nx - 0.5;
+                const qreal dy = ny - 0.5;
+                if ((dx * dx) + (dy * dy) > 0.25) {
+                    continue;
+                }
+            }
+
+            const int binX = qBound(0, int(nx * gridSize), gridSize - 1);
+            const int binY = qBound(0, int(ny * gridSize), gridSize - 1);
+            RadarSampleBin &bin = bins[binY * gridSize + binX];
+            bin.sumX += nx;
+            bin.sumY += ny;
+            ++bin.hits;
+
+            const int score = qMax(color.red(), qMax(color.green(), color.blue())) * 2
+                + qAbs(color.red() - color.blue())
+                + qAbs(color.green() - color.blue());
+            if (score >= bin.score) {
+                bin.score = score;
+                bin.color = color;
+            }
+        }
+    }
+
+    QVector<RadarSampleBin> sorted;
+    sorted.reserve(bins.size());
+    for (auto it = bins.cbegin(); it != bins.cend(); ++it) {
+        if (it.value().hits > 0) {
+            sorted.append(it.value());
+        }
+    }
+    std::sort(sorted.begin(), sorted.end(), [](const RadarSampleBin &a, const RadarSampleBin &b) {
+        if (a.hits == b.hits) {
+            return a.score > b.score;
+        }
+        return a.hits > b.hits;
+    });
+
+    const int maxSamples = qMin(sorted.size(), 96);
+    for (int i = 0; i < maxSamples; ++i) {
+        const RadarSampleBin &bin = sorted.at(i);
+        QVariantMap sample;
+        sample.insert(QStringLiteral("x"), bin.sumX / bin.hits);
+        sample.insert(QStringLiteral("y"), bin.sumY / bin.hits);
+        sample.insert(QStringLiteral("color"), bin.color.name(QColor::HexRgb));
+        sample.insert(QStringLiteral("scale"), qBound<qreal>(0.9, 0.82 + qSqrt(bin.hits) * 0.24, 2.2));
+        samples.append(sample);
+    }
+
+    return samples;
 }
 
 void appendGuideLines(QVector<ColoredLine> &lines, const QSize &targetSize)
@@ -331,6 +450,7 @@ void RadarFrameItem::setCircular(bool circular)
     }
     m_circular = circular;
     ++m_geometryRevision;
+    refreshSamples();
     emit circularChanged();
     update();
 }
@@ -363,6 +483,7 @@ void RadarFrameItem::loadSource()
     m_image = QImage();
 
     if (m_source.isEmpty()) {
+        refreshSamples();
         setReady(false);
         update();
         return;
@@ -370,6 +491,7 @@ void RadarFrameItem::loadSource()
 
     if (!m_source.isLocalFile()) {
         qWarning().noquote() << "[RadarFrameItem] unsupported non-local source" << m_source;
+        refreshSamples();
         setReady(false);
         update();
         return;
@@ -378,6 +500,7 @@ void RadarFrameItem::loadSource()
     const QString path = m_source.toLocalFile();
     if (!QFileInfo::exists(path)) {
         qWarning().noquote() << "[RadarFrameItem] source missing" << path;
+        refreshSamples();
         setReady(false);
         update();
         return;
@@ -388,12 +511,14 @@ void RadarFrameItem::loadSource()
     QImage image = reader.read();
     if (image.isNull()) {
         qWarning().noquote() << "[RadarFrameItem] failed to read" << path << reader.errorString();
+        refreshSamples();
         setReady(false);
         update();
         return;
     }
 
     m_image = image.convertToFormat(QImage::Format_ARGB32);
+    refreshSamples();
     qInfo().noquote() << "[RadarFrameItem] loaded" << path << m_image.width() << "x" << m_image.height();
     setReady(true);
     update();
@@ -443,6 +568,12 @@ void RadarFrameItem::setReady(bool ready)
     }
     m_ready = ready;
     emit readyChanged();
+}
+
+void RadarFrameItem::refreshSamples()
+{
+    m_samples = buildRadarSampleModel(m_image, m_circular);
+    emit samplesChanged();
 }
 
 void RadarFrameItem::geometryChange(const QRectF &newGeometry, const QRectF &oldGeometry)

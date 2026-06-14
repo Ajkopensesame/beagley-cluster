@@ -22,6 +22,7 @@ Item {
     readonly property bool frameReady: root.live && String(root.frameUrl).length > 0
     readonly property real side: Math.min(width, height)
     readonly property int radarFaceSize: Math.round(side * 0.66)
+    readonly property int radarInset: Math.max(6, Math.round(side * 0.040))
     readonly property int radarBorderWidth: Math.max(2, Math.round(side * 0.014))
     readonly property int radarFaceRadius: Math.max(6, Math.round(side * 0.045))
     readonly property string compactLabel: root.live
@@ -55,20 +56,95 @@ Item {
             Rectangle {
                 anchors.fill: parent
                 radius: root.radarFaceRadius
-                color: "#071015"
+                color: "#050B10"
+            }
+
+            Item {
+                anchors.fill: parent
+                anchors.margins: root.radarBorderWidth + 2
+                opacity: root.live ? 1.0 : 0.58
+
+                Repeater {
+                    model: [0.36, 0.58, 0.80]
+
+                    Rectangle {
+                        width: Math.round(radarFace.width * modelData)
+                        height: width
+                        radius: width / 2
+                        anchors.centerIn: parent
+                        color: "transparent"
+                        border.width: 1
+                        border.color: Qt.rgba(0.36, 1.0, 0.88, index === 2 ? 0.17 : 0.105)
+                    }
+                }
+
+                Rectangle {
+                    width: 1
+                    height: Math.round(parent.height * 0.76)
+                    anchors.centerIn: parent
+                    color: Qt.rgba(0.36, 1.0, 0.88, 0.16)
+                }
+
+                Rectangle {
+                    width: Math.round(parent.width * 0.76)
+                    height: 1
+                    anchors.centerIn: parent
+                    color: Qt.rgba(0.36, 1.0, 0.88, 0.14)
+                }
+
+                Rectangle {
+                    width: Math.max(2, Math.round(parent.width * 0.030))
+                    height: width
+                    radius: width / 2
+                    anchors.centerIn: parent
+                    color: Qt.rgba(0.90, 0.98, 1.0, 0.94)
+                }
             }
 
             RadarFrameItem {
                 id: radarPreview
                 anchors.fill: parent
-                anchors.margins: 0
+                anchors.margins: root.radarInset
                 source: root.frameReady ? root.frameUrl : ""
                 mapSource: root.frameReady ? root.mapUrl : ""
                 circular: false
-                backgroundVisible: true
+                backgroundVisible: false
                 guidesVisible: false
-                visible: ready
+                visible: false
                 opacity: 1.0
+            }
+
+            Repeater {
+                model: radarPreview.ready ? radarPreview.samples : []
+
+                Rectangle {
+                    readonly property real blipScale: modelData.scale ? modelData.scale : 1.0
+                    readonly property int blipSize: Math.max(3, Math.round(root.side * 0.019 * blipScale))
+
+                    width: blipSize
+                    height: blipSize
+                    radius: blipSize / 2
+                    x: root.radarInset + Math.round((radarFace.width - root.radarInset * 2) * modelData.x - width / 2)
+                    y: root.radarInset + Math.round((radarFace.height - root.radarInset * 2) * modelData.y - height / 2)
+                    color: modelData.color ? modelData.color : "#72D8FF"
+                    border.width: 1
+                    border.color: Qt.rgba(0.96, 1.0, 1.0, 0.50)
+                    visible: root.frameReady
+                }
+            }
+
+            Text {
+                anchors.left: parent.left
+                anchors.top: parent.top
+                anchors.leftMargin: Math.round(root.side * 0.040)
+                anchors.topMargin: Math.round(root.side * 0.032)
+                text: "RADAR"
+                color: root.live ? Qt.rgba(0.36, 1.0, 0.88, 0.72) : Qt.rgba(1.0, 0.83, 0.42, 0.72)
+                font.family: root.monoFont
+                font.pixelSize: Math.max(7, Math.floor(root.side * 0.045))
+                font.weight: Font.Bold
+                font.letterSpacing: 0
+                renderType: Text.QtRendering
             }
 
             Rectangle {

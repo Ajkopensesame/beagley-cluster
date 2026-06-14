@@ -3,6 +3,7 @@
 #include <QImage>
 #include <QQuickItem>
 #include <QUrl>
+#include <QVariantList>
 
 class QSGNode;
 
@@ -16,6 +17,7 @@ class RadarFrameItem : public QQuickItem
     Q_PROPERTY(bool circular READ circular WRITE setCircular NOTIFY circularChanged)
     Q_PROPERTY(bool backgroundVisible READ backgroundVisible WRITE setBackgroundVisible NOTIFY backgroundVisibleChanged)
     Q_PROPERTY(bool guidesVisible READ guidesVisible WRITE setGuidesVisible NOTIFY guidesVisibleChanged)
+    Q_PROPERTY(QVariantList samples READ samples NOTIFY samplesChanged)
 
 public:
     explicit RadarFrameItem(QQuickItem *parent = nullptr);
@@ -27,6 +29,7 @@ public:
     bool circular() const { return m_circular; }
     bool backgroundVisible() const { return m_backgroundVisible; }
     bool guidesVisible() const { return m_guidesVisible; }
+    QVariantList samples() const { return m_samples; }
 
     void setSource(const QUrl &source);
     void setMapSource(const QUrl &source);
@@ -41,6 +44,7 @@ signals:
     void circularChanged();
     void backgroundVisibleChanged();
     void guidesVisibleChanged();
+    void samplesChanged();
 
 protected:
     QSGNode *updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *) override;
@@ -49,12 +53,14 @@ protected:
 private:
     void loadSource();
     void loadMapSource();
+    void refreshSamples();
     void setReady(bool ready);
 
     QUrl m_source;
     QUrl m_mapSource;
     QImage m_image;
     QImage m_mapImage;
+    QVariantList m_samples;
     bool m_ready = false;
     bool m_circular = false;
     bool m_backgroundVisible = true;
