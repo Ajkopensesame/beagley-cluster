@@ -82,7 +82,6 @@ Item {
         ? 30 * 60 * 1000
         : 2 * 60 * 60 * 1000
     readonly property int radarRefreshIntervalMs: 60 * 1000
-    readonly property real radarMapZoom: 7.0
 
     property real airTempC: NaN
     property real feelsLikeC: NaN
@@ -1376,7 +1375,9 @@ Item {
 
         Rectangle {
             anchors.fill: parent
-            color: root.expandedMode === "temp" || root.expandedMode === "radar"
+            color: root.expandedMode === "radar"
+                ? "#02050A"
+                : root.expandedMode === "temp"
                 ? Qt.rgba(0.0, 0.0, 0.0, 0.0)
                 : Qt.rgba(0.0, 0.0, 0.0, root.tallDetailMode ? 0.66 : 0.54)
         }
@@ -2328,9 +2329,9 @@ Item {
                             anchors.fill: parent
                             anchors.margins: 8
                             source: root.expandedMode === "radar" ? root.radarFrameUrl : ""
-                            mapSource: ""
+                            mapSource: root.expandedMode === "radar" ? root.radarMapUrl : ""
                             circular: false
-                            backgroundVisible: false
+                            backgroundVisible: true
                             guidesVisible: true
                             visible: ready
                         }
