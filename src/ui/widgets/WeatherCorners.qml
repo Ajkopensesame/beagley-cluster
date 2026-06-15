@@ -2375,7 +2375,7 @@ Item {
                                 }
 
                                 Text {
-                                    width: Math.min(320, detailRadarFrame.width * 0.70)
+                                    width: Math.min(320, detailRadarMap.width * 0.70)
                                     anchors.horizontalCenter: parent.horizontalCenter
                                     text: root.radarStatus === "LIVE" ? "RADAR LOADING" : root.radarStatus
                                     color: root.radarStatus === "LIVE" ? "#58FFE1" : "#FFD36B"
