@@ -142,15 +142,23 @@ int quantizeMapChannel(int value)
 QColor mapSampleColor(QRgb pixel)
 {
     if (qAlpha(pixel) < 16) {
-        return QColor(8, 14, 20, 255);
+        return QColor(184, 208, 208, 255);
     }
 
-    const int baseR = 8;
-    const int baseG = 14;
-    const int baseB = 20;
-    const int r = qBound(18, quantizeMapChannel((qRed(pixel) * 9 + baseR) / 10), 232);
-    const int g = qBound(24, quantizeMapChannel((qGreen(pixel) * 9 + baseG) / 10), 232);
-    const int b = qBound(30, quantizeMapChannel((qBlue(pixel) * 9 + baseB) / 10), 232);
+    const int sourceR = qRed(pixel);
+    const int sourceG = qGreen(pixel);
+    const int sourceB = qBlue(pixel);
+    const int luminance = (sourceR * 30 + sourceG * 59 + sourceB * 11) / 100;
+    if (luminance < 142) {
+        return QColor(184, 208, 208, 255);
+    }
+
+    const int baseR = 184;
+    const int baseG = 208;
+    const int baseB = 208;
+    const int r = qBound(150, quantizeMapChannel((sourceR * 8 + baseR * 2) / 10), 240);
+    const int g = qBound(164, quantizeMapChannel((sourceG * 8 + baseG * 2) / 10), 240);
+    const int b = qBound(164, quantizeMapChannel((sourceB * 8 + baseB * 2) / 10), 240);
     return QColor(r, g, b, 255);
 }
 
