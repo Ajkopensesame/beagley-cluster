@@ -205,7 +205,6 @@ set(BEAGLEY_QML_FILES
     src/ui/widgets/MapCenter.qml
     src/ui/widgets/MapCenterBootShell.qml
     src/ui/widgets/MapCenterMapLibreNative.qml
-    src/ui/widgets/RadarMapNative.qml
     src/ui/widgets/MapLibreGaugeBackplate.qml
     src/ui/widgets/MapVehicleMarker.qml
     src/ui/widgets/WeatherCorners.qml
@@ -230,7 +229,6 @@ endif()
 if(WITH_MAPLIBRE_NATIVE)
     list(APPEND BEAGLEY_QML_FILES
         src/ui/widgets/MapCenterMapLibreNativeImpl.qml
-        src/ui/widgets/RadarMapLibreNativeImpl.qml
     )
 endif()
 

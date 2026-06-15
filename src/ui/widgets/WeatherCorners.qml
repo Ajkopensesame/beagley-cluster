@@ -18,8 +18,6 @@ Item {
     property bool stressScene: false
     property real phase: 0.0
     property var nowPlayingService: null
-    property string mapTileUrlTemplate: ""
-    property string mapStyleUrl: ""
 
     readonly property bool lowEffectMode: effectLevel === "low" || effectLevel === "off"
     readonly property bool effectsOff: effectLevel === "off"
@@ -2320,25 +2318,21 @@ Item {
 
                         NativePanel {
                             anchors.fill: parent
-                            color: "#05070D"
-                            borderColor: "#1D4C4A"
+                            color: Qt.rgba(0.02, 0.03, 0.05, 0.18)
+                            borderColor: Qt.rgba(0.36, 1.0, 0.88, 0.34)
                             borderWidth: 1
                         }
 
-                        WidgetLocal.RadarMapNative {
-                            id: detailRadarMap
+                        RadarFrameItem {
+                            id: detailRadarOverlay
                             anchors.fill: parent
                             anchors.margins: 8
-                            lat: root.safeLat
-                            lng: root.safeLng
-                            zoom: root.radarMapZoom
-                            frameUrl: root.expandedMode === "radar" ? root.radarFrameUrl : ""
-                            mapUrl: root.radarMapUrl
-                            status: root.radarStatus
-                            tileUrlTemplate: root.mapTileUrlTemplate
-                            styleUrl: root.mapStyleUrl
-                            interactionEnabled: false
+                            source: root.expandedMode === "radar" ? root.radarFrameUrl : ""
+                            mapSource: ""
+                            circular: false
+                            backgroundVisible: false
                             guidesVisible: true
+                            visible: ready
                         }
 
                         Rectangle {
@@ -2346,12 +2340,12 @@ Item {
                             anchors.margins: 8
                             radius: 5
                             color: "#080913"
-                            opacity: detailRadarMap.radarReady ? 0.0 : 1.0
+                            opacity: detailRadarOverlay.ready ? 0.0 : 0.82
 
                             Column {
                                 anchors.centerIn: parent
                                 spacing: 10
-                                visible: !detailRadarMap.radarReady
+                                visible: !detailRadarOverlay.ready
 
                                 WidgetLocal.RadarGlyph {
                                     width: 78
@@ -2375,7 +2369,7 @@ Item {
                                 }
 
                                 Text {
-                                    width: Math.min(320, detailRadarMap.width * 0.70)
+                                    width: Math.min(320, detailRadarOverlay.width * 0.70)
                                     anchors.horizontalCenter: parent.horizontalCenter
                                     text: root.radarStatus === "LIVE" ? "RADAR LOADING" : root.radarStatus
                                     color: root.radarStatus === "LIVE" ? "#58FFE1" : "#FFD36B"

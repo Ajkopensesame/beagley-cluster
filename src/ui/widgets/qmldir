@@ -17,7 +17,6 @@ FuelGauge    1.0 FuelGauge.qml
 WeatherCorners 1.0 WeatherCorners.qml
 WeatherMoodIcon 1.0 WeatherMoodIcon.qml
 MapCenterMapLibreNative 1.0 MapCenterMapLibreNative.qml
-RadarMapNative 1.0 RadarMapNative.qml
 WiFiSetupOverlay 1.0 WiFiSetupOverlay.qml
 
 OemIcon 1.0 OemIcon.qml

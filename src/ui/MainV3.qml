@@ -114,6 +114,11 @@ Window {
         ? Math.round(gaugeFaceSize * 0.54)
         : 0
     readonly property int mapLibreSafeVerticalInset: mapLibreSafeCompositor ? 18 : 0
+    property string weatherExpandedMode: (typeof BEAGLEY_INITIAL_WEATHER_EXPANDED_MODE !== "undefined")
+        ? String(BEAGLEY_INITIAL_WEATHER_EXPANDED_MODE)
+        : ""
+    readonly property bool radarExpanded: weatherExpandedMode === "radar"
+    readonly property real radarMapZoom: 7.0
     readonly property bool lowEffectMode: effectLevel === "low" || effectLevel === "off"
     readonly property bool effectsOff: effectLevel === "off"
     readonly property bool embeddedSafeMode: Qt.platform.os === "linux"
@@ -1637,17 +1642,17 @@ Window {
             lat: root.displayMapLat
             lng: root.displayMapLng
             bearing: root.displayMapBearing
-            zoom: NaN
+            zoom: root.radarExpanded ? root.radarMapZoom : NaN
             speedKph: root.displayMapSpeed
-            fixedOriginEnabled: fallbackRouteOriginEnabled
+            fixedOriginEnabled: root.radarExpanded ? false : fallbackRouteOriginEnabled
             fixedOriginLat: fallbackRouteOriginLat
             fixedOriginLng: fallbackRouteOriginLng
             fixedOriginLabel: fallbackRouteOriginLabel
             navigationState: (root.effectiveMapRenderer === "web") ? navigation.mapPayload : ({})
             mapVehiclePose: root.displayMapVehiclePose
-            mapCameraHints: root.effectiveMapCameraHints
-            mapRouteOverlay: navigation.mapRouteOverlay
-            mapGuidanceBanner: navigation.mapGuidanceBanner
+            mapCameraHints: root.radarExpanded ? ({ zoomAnimationMs: 360 }) : root.effectiveMapCameraHints
+            mapRouteOverlay: root.radarExpanded ? ({}) : navigation.mapRouteOverlay
+            mapGuidanceBanner: root.radarExpanded ? ({}) : navigation.mapGuidanceBanner
             mapConnectivity: navigation.mapConnectivity
             tileUrlTemplate: root.activeMapTileUrlTemplate
             styleUrl: root.activeMapStyleUrl
@@ -1700,7 +1705,7 @@ Window {
             width: 54
             height: 64
             z: 180
-            visible: root.mapVehicleMarkerVisible && !root.mapMenuOpen
+            visible: root.mapVehicleMarkerVisible && !root.mapMenuOpen && !root.radarExpanded
             x: Math.round(parent.width * 0.5 - width * 0.5)
             y: Math.round(parent.height * (root.mapVehicleMarkerGuidanceAnchor ? 0.84 : 0.5) - height * 0.54)
             bearing: root.displayMapBearing
@@ -1719,12 +1724,12 @@ Window {
             stressScene: root.stressScene
             phase: root.sharedEffectPhase
             nowPlayingService: root.nowPlayingService
-            mapTileUrlTemplate: root.activeMapTileUrlTemplate
-            mapStyleUrl: root.activeMapStyleUrl
-            expandedMode: (typeof BEAGLEY_INITIAL_WEATHER_EXPANDED_MODE !== "undefined")
-                ? String(BEAGLEY_INITIAL_WEATHER_EXPANDED_MODE)
-                : ""
+            expandedMode: root.weatherExpandedMode
             active: !root.mapMenuOpen && !root.navControlsOpen
+
+            onExpandedModeChanged: {
+                root.weatherExpandedMode = expandedMode
+            }
 
             onMapMenuRequested: function(stage) {
                 root.openMapMenu(stage)
