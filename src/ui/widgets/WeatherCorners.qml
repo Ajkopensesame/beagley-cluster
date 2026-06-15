@@ -2323,14 +2323,26 @@ Item {
                             borderWidth: 1
                         }
 
+                        Image {
+                            anchors.fill: parent
+                            anchors.margins: 8
+                            source: root.expandedMode === "radar" ? root.radarMapUrl : ""
+                            fillMode: Image.PreserveAspectCrop
+                            asynchronous: false
+                            cache: false
+                            visible: root.expandedMode === "radar"
+                                && root.radarStatus === "LIVE"
+                                && String(root.radarMapUrl).length > 0
+                        }
+
                         RadarFrameItem {
                             id: detailRadarFrame
                             anchors.fill: parent
                             anchors.margins: 8
                             source: root.expandedMode === "radar" ? root.radarFrameUrl : ""
-                            mapSource: root.expandedMode === "radar" ? root.radarMapUrl : ""
+                            mapSource: ""
                             circular: false
-                            backgroundVisible: true
+                            backgroundVisible: false
                             guidesVisible: true
                             visible: ready
                         }
