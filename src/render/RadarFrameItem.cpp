@@ -424,17 +424,21 @@ void appendGpsMarker(QVector<ColoredRect> &rects, const QSize &targetSize)
                QColor(247, 251, 255, 232));
 }
 
-QSGGeometryNode *createFlatRectNode(const QVector<QRectF> &rects, const QColor &color)
+QSGGeometryNode *createFlatRectNode(const QVector<QRectF> &rects,
+                                    int start,
+                                    int count,
+                                    const QColor &color)
 {
-    if (rects.isEmpty()) {
+    if (count <= 0) {
         return nullptr;
     }
 
-    auto *geometry = new QSGGeometry(QSGGeometry::defaultAttributes_Point2D(), rects.size() * 6);
+    auto *geometry = new QSGGeometry(QSGGeometry::defaultAttributes_Point2D(), count * 6);
     geometry->setDrawingMode(QSGGeometry::DrawTriangles);
     auto *vertices = geometry->vertexDataAsPoint2D();
     int index = 0;
-    for (const QRectF &rect : rects) {
+    for (int i = start; i < start + count; ++i) {
+        const QRectF &rect = rects.at(i);
         const float x1 = float(rect.left());
         const float y1 = float(rect.top());
         const float x2 = float(rect.right());
@@ -494,13 +498,19 @@ QSGGeometryNode *createFlatCircleNode(const QSize &targetSize, const QColor &col
 
 void appendRectNodes(QSGNode *root, const QVector<ColoredRect> &rects)
 {
+    constexpr int maxRectsPerNode = 256;
     QHash<QRgb, QVector<QRectF>> groups;
     for (const ColoredRect &item : rects) {
         groups[item.color.rgba()].append(item.rect);
     }
     for (auto it = groups.cbegin(); it != groups.cend(); ++it) {
-        if (auto *node = createFlatRectNode(it.value(), QColor::fromRgba(it.key()))) {
-            root->appendChildNode(node);
+        const QVector<QRectF> &groupRects = it.value();
+        const QColor color = QColor::fromRgba(it.key());
+        for (int start = 0; start < groupRects.size(); start += maxRectsPerNode) {
+            const int count = qMin(maxRectsPerNode, groupRects.size() - start);
+            if (auto *node = createFlatRectNode(groupRects, start, count, color)) {
+                root->appendChildNode(node);
+            }
         }
     }
 }
