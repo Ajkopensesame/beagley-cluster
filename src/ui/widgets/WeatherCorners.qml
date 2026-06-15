@@ -18,6 +18,8 @@ Item {
     property bool stressScene: false
     property real phase: 0.0
     property var nowPlayingService: null
+    property string mapTileUrlTemplate: ""
+    property string mapStyleUrl: ""
 
     readonly property bool lowEffectMode: effectLevel === "low" || effectLevel === "off"
     readonly property bool effectsOff: effectLevel === "off"
@@ -2323,28 +2325,20 @@ Item {
                             borderWidth: 1
                         }
 
-                        Image {
+                        WidgetLocal.RadarMapNative {
+                            id: detailRadarMap
                             anchors.fill: parent
                             anchors.margins: 8
-                            source: root.expandedMode === "radar" ? root.radarMapUrl : ""
-                            fillMode: Image.PreserveAspectCrop
-                            asynchronous: false
-                            cache: false
-                            visible: root.expandedMode === "radar"
-                                && root.radarStatus === "LIVE"
-                                && String(root.radarMapUrl).length > 0
-                        }
-
-                        RadarFrameItem {
-                            id: detailRadarFrame
-                            anchors.fill: parent
-                            anchors.margins: 8
-                            source: root.expandedMode === "radar" ? root.radarFrameUrl : ""
-                            mapSource: ""
-                            circular: false
-                            backgroundVisible: false
+                            lat: root.safeLat
+                            lng: root.safeLng
+                            zoom: root.radarMapZoom
+                            frameUrl: root.expandedMode === "radar" ? root.radarFrameUrl : ""
+                            mapUrl: root.radarMapUrl
+                            status: root.radarStatus
+                            tileUrlTemplate: root.mapTileUrlTemplate
+                            styleUrl: root.mapStyleUrl
+                            interactionEnabled: false
                             guidesVisible: true
-                            visible: ready
                         }
 
                         Rectangle {
@@ -2352,12 +2346,12 @@ Item {
                             anchors.margins: 8
                             radius: 5
                             color: "#080913"
-                            opacity: detailRadarFrame.ready ? 0.0 : 1.0
+                            opacity: detailRadarMap.radarReady ? 0.0 : 1.0
 
                             Column {
                                 anchors.centerIn: parent
                                 spacing: 10
-                                visible: !detailRadarFrame.ready
+                                visible: !detailRadarMap.radarReady
 
                                 WidgetLocal.RadarGlyph {
                                     width: 78

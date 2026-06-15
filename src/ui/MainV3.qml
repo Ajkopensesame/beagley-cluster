@@ -1719,6 +1719,8 @@ Window {
             stressScene: root.stressScene
             phase: root.sharedEffectPhase
             nowPlayingService: root.nowPlayingService
+            mapTileUrlTemplate: root.activeMapTileUrlTemplate
+            mapStyleUrl: root.activeMapStyleUrl
             expandedMode: (typeof BEAGLEY_INITIAL_WEATHER_EXPANDED_MODE !== "undefined")
                 ? String(BEAGLEY_INITIAL_WEATHER_EXPANDED_MODE)
                 : ""
