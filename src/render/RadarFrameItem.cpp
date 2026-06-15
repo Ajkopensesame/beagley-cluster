@@ -4,10 +4,15 @@
 #include <QFileInfo>
 #include <QHash>
 #include <QImageReader>
+#include <QPainter>
+#include <QPainterPath>
+#include <QQuickWindow>
 #include <QSGFlatColorMaterial>
 #include <QSGGeometry>
 #include <QSGGeometryNode>
 #include <QSGNode>
+#include <QSGSimpleTextureNode>
+#include <QSGTexture>
 #include <QVariantMap>
 #include <QtMath>
 
@@ -132,6 +137,61 @@ QRectF croppedSourceRect(const QImage &image, const QSize &targetSize)
         sourceRect.setHeight(cropHeight);
     }
     return sourceRect;
+}
+
+void drawMapBackground(QPainter &painter, const QImage &image, const QSize &targetSize)
+{
+    const QRectF sourceRect = croppedSourceRect(image, targetSize);
+    painter.save();
+    painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+    painter.setOpacity(1.0);
+    painter.drawImage(QRectF(0, 0, targetSize.width(), targetSize.height()), image, sourceRect);
+    painter.fillRect(QRectF(0, 0, targetSize.width(), targetSize.height()), QColor(2, 4, 10, 64));
+    painter.restore();
+}
+
+QImage renderBackgroundImage(const QImage &mapSource,
+                             const QSize &targetSize,
+                             bool circular,
+                             bool backgroundVisible)
+{
+    QImage output(targetSize, QImage::Format_ARGB32_Premultiplied);
+    output.fill(Qt::transparent);
+
+    QPainter painter(&output);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    if (circular) {
+        QPainterPath path;
+        path.addEllipse(QRectF(0, 0, targetSize.width(), targetSize.height()));
+        painter.setClipPath(path);
+    }
+    if (backgroundVisible) {
+        painter.fillRect(QRectF(0, 0, targetSize.width(), targetSize.height()), QColor(3, 8, 13, 235));
+    }
+    if (!mapSource.isNull()) {
+        drawMapBackground(painter, mapSource, targetSize);
+    }
+    painter.end();
+    return output;
+}
+
+QSGSimpleTextureNode *createTextureNode(QQuickWindow *window, const QImage &image, const QRectF &rect)
+{
+    if (!window || image.isNull()) {
+        return nullptr;
+    }
+
+    QSGTexture *texture = window->createTextureFromImage(image);
+    if (!texture) {
+        return nullptr;
+    }
+
+    auto *node = new QSGSimpleTextureNode;
+    node->setOwnsTexture(true);
+    node->setTexture(texture);
+    node->setFiltering(QSGTexture::Linear);
+    node->setRect(rect);
+    return node;
 }
 
 void appendRect(QVector<ColoredRect> &rects, const QRectF &rect, const QColor &color)
@@ -588,7 +648,7 @@ void RadarFrameItem::geometryChange(const QRectF &newGeometry, const QRectF &old
 
 QSGNode *RadarFrameItem::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *)
 {
-    if (!m_ready || m_image.isNull() || width() <= 0 || height() <= 0) {
+    if (!m_ready || m_image.isNull() || width() <= 0 || height() <= 0 || !window()) {
         delete oldNode;
         return nullptr;
     }
@@ -613,8 +673,21 @@ QSGNode *RadarFrameItem::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *
 
     QVector<ColoredRect> rects;
     QVector<ColoredLine> lines;
-    if (m_backgroundVisible) {
-        appendRect(rects, QRectF(0, 0, targetSize.width(), targetSize.height()), QColor(3, 8, 13, 235));
+    const bool drawBackgroundTexture = m_backgroundVisible || !m_mapImage.isNull();
+    if (drawBackgroundTexture) {
+        const QImage background = renderBackgroundImage(m_mapImage,
+                                                        targetSize,
+                                                        m_circular,
+                                                        m_backgroundVisible);
+        if (auto *backgroundNode = createTextureNode(window(),
+                                                     background,
+                                                     QRectF(0, 0, width(), height()))) {
+            root->appendChildNode(backgroundNode);
+        } else if (m_backgroundVisible && !m_circular) {
+            appendRect(rects,
+                       QRectF(0, 0, targetSize.width(), targetSize.height()),
+                       QColor(3, 8, 13, 235));
+        }
     }
     if (m_guidesVisible) {
         appendGuideLines(lines, targetSize);
@@ -628,7 +701,7 @@ QSGNode *RadarFrameItem::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *
     qInfo().noquote() << "[RadarFrameItem] vector samples" << totalSamples
                       << targetSize.width() << "x" << targetSize.height()
                       << "flatColor true"
-                      << "mapIgnored" << !m_mapImage.isNull()
+                      << "mapDrawn" << !m_mapImage.isNull()
                       << "circular" << m_circular;
     return root;
 }
