@@ -4,10 +4,12 @@
 #include <QFileInfo>
 #include <QHash>
 #include <QImageReader>
+#include <QQuickWindow>
 #include <QSGFlatColorMaterial>
 #include <QSGGeometry>
 #include <QSGGeometryNode>
 #include <QSGNode>
+#include <QSGRectangleNode>
 #include <QVariantMap>
 #include <QtMath>
 
@@ -501,8 +503,32 @@ QSGGeometryNode *createFlatCircleNode(const QSize &targetSize, const QColor &col
     return node;
 }
 
-void appendRectNodes(QSGNode *root, const QVector<ColoredRect> &rects)
+QSGRectangleNode *createNativeRectNode(QQuickWindow *window, const QRectF &rect, const QColor &color)
 {
+    if (!window || rect.width() <= 0 || rect.height() <= 0 || color.alpha() <= 0) {
+        return nullptr;
+    }
+
+    QSGRectangleNode *node = window->createRectangleNode();
+    if (!node) {
+        return nullptr;
+    }
+    node->setRect(rect);
+    node->setColor(color);
+    return node;
+}
+
+void appendRectNodes(QSGNode *root, const QVector<ColoredRect> &rects, QQuickWindow *window)
+{
+    if (window) {
+        for (const ColoredRect &item : rects) {
+            if (auto *node = createNativeRectNode(window, item.rect, item.color)) {
+                root->appendChildNode(node);
+            }
+        }
+        return;
+    }
+
     constexpr int maxRectsPerNode = 256;
     QHash<QRgb, QVector<QRectF>> groups;
     for (const ColoredRect &item : rects) {
@@ -788,14 +814,14 @@ QSGNode *RadarFrameItem::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *
     const int totalSamples = appendRadarSamples(radarRects, m_image, targetSize, m_circular);
     appendGpsMarker(radarRects, targetSize);
 
-    appendRectNodes(root, backgroundRects);
+    appendRectNodes(root, backgroundRects, window());
     if (circularBackground.isValid()) {
         if (auto *node = createFlatCircleNode(targetSize, circularBackground)) {
             root->appendChildNode(node);
         }
     }
-    appendRectNodes(root, mapRects);
-    appendRectNodes(root, radarRects);
+    appendRectNodes(root, mapRects, window());
+    appendRectNodes(root, radarRects, window());
     appendLineNodes(root, lines);
 
     qInfo().noquote() << "[RadarFrameItem] vector samples" << totalSamples
