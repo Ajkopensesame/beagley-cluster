@@ -16,6 +16,7 @@ class RadarImageService : public QObject
     Q_OBJECT
 
     Q_PROPERTY(QUrl imageUrl READ imageUrl NOTIFY imageChanged)
+    Q_PROPERTY(QUrl displayUrl READ displayUrl NOTIFY displayChanged)
     Q_PROPERTY(QUrl mapUrl READ mapUrl NOTIFY mapChanged)
     Q_PROPERTY(QString status READ status NOTIFY statusChanged)
     Q_PROPERTY(QString frameTime READ frameTime NOTIFY frameTimeChanged)
@@ -28,6 +29,7 @@ public:
     explicit RadarImageService(const QByteArray &userAgent, QObject *parent = nullptr);
 
     QUrl imageUrl() const { return m_imageUrl; }
+    QUrl displayUrl() const { return m_displayUrl; }
     QUrl mapUrl() const { return m_mapUrl; }
     QString status() const { return m_status; }
     QString frameTime() const { return m_frameTime; }
@@ -41,6 +43,7 @@ public:
 
 signals:
     void imageChanged();
+    void displayChanged();
     void mapChanged();
     void statusChanged();
     void frameTimeChanged();
@@ -79,6 +82,7 @@ private:
     struct ComposedFrame {
         RadarFrame frame;
         QUrl imageUrl;
+        QUrl displayUrl;
         QUrl mapUrl;
         bool ready = false;
     };
@@ -100,8 +104,11 @@ private:
     QNetworkReply *get(const QUrl &url);
     QString compositeKey(const RadarFrame &frame, const CenterTile &center) const;
     QString compositePath(const RadarFrame &frame, const CenterTile &center) const;
+    QString displayCompositePath(const RadarFrame &frame, const CenterTile &center) const;
     QString mapCompositePath(const RadarFrame &frame, const CenterTile &center) const;
+    QString displayCompositePathForRadarPath(const QString &radarPath) const;
     QString mapCompositePathForRadarPath(const QString &radarPath) const;
+    QString latestDisplayCompositePath() const;
     QString latestMapCompositePath() const;
     bool tryPublishLatestCachedFrame(const QString &status);
     QList<RadarFrame> parseRadarFrames(const QByteArray &payload) const;
@@ -112,12 +119,14 @@ private:
     void setFrameTime(const QString &frameTime);
     void setFrameLabel(const QString &frameLabel);
     void setImageUrl(const QUrl &url);
+    void setDisplayUrl(const QUrl &url);
     void setMapUrl(const QUrl &url);
 
     QNetworkAccessManager m_network;
     QTimer m_refreshTimer;
     QByteArray m_userAgent;
     QUrl m_imageUrl;
+    QUrl m_displayUrl;
     QUrl m_mapUrl;
     QString m_status = QStringLiteral("SYNC");
     QString m_frameTime;

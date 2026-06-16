@@ -39,6 +39,7 @@ constexpr auto kTileOptions = "1_1";
 constexpr int kPastFramesWithNowcast = 3;
 constexpr int kPastFramesFallback = 3;
 constexpr int kNowcastFrames = 1;
+constexpr auto kRadarDisplayCachePrefix = "radar-map-v5-display";
 constexpr auto kRadarFrameCachePrefix = "radar-map-v4-radar";
 constexpr auto kRadarUnderlayCachePrefix = "radar-map-v4-map";
 constexpr auto kLightRadarFrameCachePrefix = "radar-map-v3-radar";
@@ -181,6 +182,7 @@ void RadarImageService::setPosition(double lat, double lng, bool valid)
         m_currentTimelineKey.clear();
         setReady(false);
         setImageUrl(QUrl());
+        setDisplayUrl(QUrl());
         setMapUrl(QUrl());
         setFrameTime(QString());
         setFrameLabel(QString());
@@ -302,8 +304,10 @@ void RadarImageService::startTimelineFetch(const QList<RadarFrame> &frames)
         ComposedFrame composed;
         composed.frame = frame;
         const QString path = compositePath(frame, center);
-        if (QFileInfo::exists(path)) {
+        const QString displayPath = displayCompositePath(frame, center);
+        if (QFileInfo::exists(path) && QFileInfo::exists(displayPath)) {
             composed.imageUrl = QUrl::fromLocalFile(path);
+            composed.displayUrl = QUrl::fromLocalFile(displayPath);
             const QString mapPath = mapCompositePath(frame, center);
             if (QFileInfo::exists(mapPath)) {
                 composed.mapUrl = QUrl::fromLocalFile(mapPath);
@@ -470,6 +474,7 @@ void RadarImageService::finishTileFetch(int sequence)
     if (composeRadarImage(tiles, m_currentCenter.valid ? m_currentCenter : centerTile(), m_currentFrame)) {
         if (m_buildFrameIndex >= 0 && m_buildFrameIndex < m_buildFrames.size()) {
             m_buildFrames[m_buildFrameIndex].imageUrl = QUrl::fromLocalFile(compositePath(m_currentFrame, m_currentCenter));
+            m_buildFrames[m_buildFrameIndex].displayUrl = QUrl::fromLocalFile(displayCompositePath(m_currentFrame, m_currentCenter));
             m_buildFrames[m_buildFrameIndex].mapUrl = QUrl::fromLocalFile(mapCompositePath(m_currentFrame, m_currentCenter));
             m_buildFrames[m_buildFrameIndex].ready = true;
         }
@@ -499,12 +504,13 @@ bool RadarImageService::composeRadarImage(const QList<RadarTile> &tiles,
     const double centerTileTop = kOutputHeight / 2.0 - center.fracY * kTileDrawSize;
 
     const QString mapPath = mapCompositePath(frame, center);
+    QImage mapOutput;
     const bool anyMapOk = std::any_of(tiles.cbegin(), tiles.cend(), [](const RadarTile &tile) {
         return tile.mapOk;
     });
     bool mapReady = QFileInfo::exists(mapPath);
     if (anyMapOk || !mapReady) {
-        QImage mapOutput(QSize(kOutputWidth, kOutputHeight), QImage::Format_ARGB32_Premultiplied);
+        mapOutput = QImage(QSize(kOutputWidth, kOutputHeight), QImage::Format_ARGB32_Premultiplied);
         mapOutput.fill(QColor(190, 221, 229));
 
         QPainter painter(&mapOutput);
@@ -529,6 +535,10 @@ bool RadarImageService::composeRadarImage(const QList<RadarTile> &tiles,
             return false;
         }
         mapReady = true;
+    } else if (!mapOutput.load(mapPath)) {
+        qWarning().noquote() << "[RadarImage] failed to read cached map" << mapPath;
+        mapOutput = QImage(QSize(kOutputWidth, kOutputHeight), QImage::Format_ARGB32_Premultiplied);
+        mapOutput.fill(QColor(190, 221, 229));
     }
 
     QImage radarOutput(QSize(kOutputWidth, kOutputHeight), QImage::Format_ARGB32_Premultiplied);
@@ -554,7 +564,21 @@ bool RadarImageService::composeRadarImage(const QList<RadarTile> &tiles,
         qWarning().noquote() << "[RadarImage] failed to write" << filePath;
         return false;
     }
+
+    QImage displayOutput = mapOutput.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+    QPainter displayPainter(&displayOutput);
+    displayPainter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+    displayPainter.setCompositionMode(QPainter::CompositionMode_SourceOver);
+    displayPainter.drawImage(displayOutput.rect(), radarOutput);
+    displayPainter.end();
+
+    const QString displayPath = displayCompositePath(frame, center);
+    if (!displayOutput.save(displayPath, "PNG")) {
+        qWarning().noquote() << "[RadarImage] failed to write" << displayPath;
+        return false;
+    }
     qInfo().noquote() << "[RadarImage] composed" << filePath
+                      << "displayPath" << displayPath
                       << "mapPath" << mapPath
                       << "frame" << frame.path
                       << "time" << formatFrameTime(frame.epochSeconds)
@@ -570,7 +594,11 @@ void RadarImageService::publishTimelineFrames()
     QList<ComposedFrame> frames;
     frames.reserve(m_buildFrames.size());
     for (const ComposedFrame &frame : m_buildFrames) {
-        if (frame.ready && frame.imageUrl.isLocalFile() && QFileInfo::exists(frame.imageUrl.toLocalFile())) {
+        if (frame.ready
+            && frame.imageUrl.isLocalFile()
+            && QFileInfo::exists(frame.imageUrl.toLocalFile())
+            && frame.displayUrl.isLocalFile()
+            && QFileInfo::exists(frame.displayUrl.toLocalFile())) {
             frames.append(frame);
         }
     }
@@ -616,6 +644,7 @@ void RadarImageService::advanceAnimationFrame()
     if (m_animationFrames.isEmpty()) {
         m_animationTimer.stop();
         setReady(false);
+        setDisplayUrl(QUrl());
         setMapUrl(QUrl());
         return;
     }
@@ -628,6 +657,7 @@ void RadarImageService::advanceAnimationFrame()
 
     const ComposedFrame &frame = m_animationFrames.at(m_animationIndex);
     setImageUrl(frame.imageUrl);
+    setDisplayUrl(frame.displayUrl);
     setMapUrl(frame.mapUrl);
     setFrameTime(formatFrameTime(frame.frame.epochSeconds));
     setFrameLabel(formatFrameLabel(frame.frame));
@@ -712,6 +742,22 @@ QString RadarImageService::compositePath(const RadarFrame &frame, const CenterTi
                                                .arg(QString::fromLatin1(kRadarFrameCachePrefix), digest));
 }
 
+QString RadarImageService::displayCompositePath(const RadarFrame &frame, const CenterTile &center) const
+{
+    const QByteArray key = QStringLiteral("%1:%2:%3:%4:%5")
+        .arg(QString::number(kTileZoom),
+             QString::number(center.row),
+             QString::number(center.col),
+             frame.path,
+             QString::number(frame.epochSeconds))
+        .append(QLatin1String(":radar-map-v5-display"))
+        .toUtf8();
+    const QString digest = QString::fromLatin1(
+        QCryptographicHash::hash(key, QCryptographicHash::Sha1).toHex().left(16));
+    return QDir(m_cacheDirectory).filePath(QStringLiteral("%1-%2.png")
+                                               .arg(QString::fromLatin1(kRadarDisplayCachePrefix), digest));
+}
+
 QString RadarImageService::mapCompositePath(const RadarFrame &frame, const CenterTile &center) const
 {
     Q_UNUSED(frame);
@@ -729,6 +775,16 @@ QString RadarImageService::mapCompositePath(const RadarFrame &frame, const Cente
                                                .arg(QString::fromLatin1(kRadarUnderlayCachePrefix), digest));
 }
 
+QString RadarImageService::displayCompositePathForRadarPath(const QString &radarPath) const
+{
+    const QFileInfo info(radarPath);
+    const QString fileName = info.fileName();
+    if (fileName.startsWith(QLatin1String(kRadarFrameCachePrefix))) {
+        return latestDisplayCompositePath();
+    }
+    return QString();
+}
+
 QString RadarImageService::mapCompositePathForRadarPath(const QString &radarPath) const
 {
     const QFileInfo info(radarPath);
@@ -741,6 +797,21 @@ QString RadarImageService::mapCompositePathForRadarPath(const QString &radarPath
     }
     const QString suffix = fileName.mid(QString::fromLatin1(kLightRadarFrameCachePrefix).size());
     return QDir(m_cacheDirectory).filePath(QStringLiteral("radar-map-v3-map") + suffix);
+}
+
+QString RadarImageService::latestDisplayCompositePath() const
+{
+    QDir dir(m_cacheDirectory);
+    const QFileInfoList candidates = dir.entryInfoList({QStringLiteral("%1-*.png")
+                                                            .arg(QString::fromLatin1(kRadarDisplayCachePrefix))},
+                                                       QDir::Files | QDir::Readable,
+                                                       QDir::Time);
+    for (const QFileInfo &info : candidates) {
+        if (info.size() > 0) {
+            return info.absoluteFilePath();
+        }
+    }
+    return QString();
 }
 
 QString RadarImageService::latestMapCompositePath() const
@@ -794,6 +865,8 @@ bool RadarImageService::tryPublishLatestCachedFrame(const QString &status)
         emit frameIndexChanged();
         m_cachedBootstrap = true;
         setImageUrl(QUrl::fromLocalFile(info.absoluteFilePath()));
+        const QString displayPath = displayCompositePathForRadarPath(info.absoluteFilePath());
+        setDisplayUrl(!displayPath.isEmpty() && QFileInfo::exists(displayPath) ? QUrl::fromLocalFile(displayPath) : QUrl());
         const QString mapPath = mapCompositePathForRadarPath(info.absoluteFilePath());
         setMapUrl(!mapPath.isEmpty() && QFileInfo::exists(mapPath) ? QUrl::fromLocalFile(mapPath) : QUrl());
         setFrameTime(info.lastModified().toLocalTime().toString(QStringLiteral("HH:mm")));
@@ -961,6 +1034,15 @@ void RadarImageService::setImageUrl(const QUrl &url)
     }
     m_imageUrl = url;
     emit imageChanged();
+}
+
+void RadarImageService::setDisplayUrl(const QUrl &url)
+{
+    if (m_displayUrl == url) {
+        return;
+    }
+    m_displayUrl = url;
+    emit displayChanged();
 }
 
 void RadarImageService::setMapUrl(const QUrl &url)

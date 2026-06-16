@@ -123,6 +123,7 @@ Item {
         && radarImage !== null
     readonly property bool radarServiceReady: radarServiceAvailable && radarImage.ready && String(radarImage.imageUrl).length > 0
     readonly property url radarFrameUrl: radarServiceReady ? radarImage.imageUrl : ""
+    readonly property url radarDisplayUrl: radarServiceReady && String(radarImage.displayUrl).length > 0 ? radarImage.displayUrl : ""
     readonly property url radarMapUrl: radarServiceReady && String(radarImage.mapUrl).length > 0 ? radarImage.mapUrl : ""
 
     opacity: active ? 1 : 0
@@ -2390,26 +2391,14 @@ Item {
                             anchors.fill: parent
                             anchors.margins: 8
                             color: "#CFE4EA"
-                            visible: detailRadarMap.status !== Image.Ready
+                            visible: detailRadarDisplay.status !== Image.Ready
                         }
 
                         Image {
-                            id: detailRadarMap
+                            id: detailRadarDisplay
                             anchors.fill: parent
                             anchors.margins: 8
-                            source: root.radarEnabled && root.expandedMode === "radar" ? root.radarMapUrl : ""
-                            fillMode: Image.PreserveAspectCrop
-                            asynchronous: true
-                            cache: false
-                            smooth: true
-                            visible: status === Image.Ready
-                        }
-
-                        Image {
-                            id: detailRadarOverlay
-                            anchors.fill: parent
-                            anchors.margins: 8
-                            source: root.radarEnabled && root.expandedMode === "radar" ? root.radarFrameUrl : ""
+                            source: root.radarEnabled && root.expandedMode === "radar" ? root.radarDisplayUrl : ""
                             fillMode: Image.PreserveAspectCrop
                             asynchronous: true
                             cache: false
@@ -2420,7 +2409,7 @@ Item {
                         Item {
                             anchors.fill: parent
                             anchors.margins: 8
-                            visible: detailRadarMap.status === Image.Ready || detailRadarOverlay.status === Image.Ready
+                            visible: detailRadarDisplay.status === Image.Ready
 
                             Rectangle {
                                 width: 1
@@ -2459,7 +2448,7 @@ Item {
                             color: Qt.rgba(0.02, 0.04, 0.08, 0.82)
                             border.width: 1
                             border.color: Qt.rgba(0.36, 1.0, 0.88, 0.36)
-                            visible: detailRadarOverlay.status !== Image.Ready
+                            visible: detailRadarDisplay.status !== Image.Ready
 
                             Column {
                                 anchors.fill: parent
@@ -2488,7 +2477,7 @@ Item {
                                 }
 
                                 Text {
-                                    width: Math.min(320, detailRadarOverlay.width * 0.70)
+                                    width: Math.min(320, detailRadarDisplay.width * 0.70)
                                     anchors.horizontalCenter: parent.horizontalCenter
                                     text: root.radarStatus === "LIVE" ? "RADAR LOADING" : root.radarStatus
                                     color: root.radarStatus === "LIVE" ? "#58FFE1" : "#FFD36B"
