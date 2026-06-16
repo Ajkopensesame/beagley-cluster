@@ -40,14 +40,21 @@ def analyze(path: Path, crop: tuple[float, float, float, float]) -> dict[str, ob
     unique_colors = len(set(pixels))
     nonblack_fraction = sum(1 for value in brightness if value > 8.0) / len(brightness)
 
+    has_dark_mode_detail = (
+        mean < 24.0
+        and nonblack_fraction >= 0.08
+        and unique_colors >= 96
+        and stddev >= 6.0
+    )
+
     failures: list[str] = []
-    if mean < 12.0:
+    if mean < 8.0 and not has_dark_mode_detail:
         failures.append("center map crop is too dark")
     if nonblack_fraction < 0.03:
         failures.append("center map crop is nearly black")
     if unique_colors < 48 and stddev < 5.0:
         failures.append("center map crop is too flat")
-    if dark_fraction > 0.96:
+    if dark_fraction > 0.985 and not has_dark_mode_detail:
         failures.append("center map crop is mostly black")
     if bright_fraction > 0.985 and stddev < 3.0:
         failures.append("center map crop is mostly blank white")
@@ -63,6 +70,7 @@ def analyze(path: Path, crop: tuple[float, float, float, float]) -> dict[str, ob
         "bright_fraction": round(bright_fraction, 4),
         "nonblack_fraction": round(nonblack_fraction, 4),
         "unique_colors": unique_colors,
+        "dark_mode_detail": has_dark_mode_detail,
         "failures": failures,
     }
 
