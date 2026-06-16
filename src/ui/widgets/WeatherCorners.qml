@@ -116,7 +116,9 @@ Item {
 
     signal mapMenuRequested(string stage)
 
-    readonly property bool radarServiceAvailable: typeof radarImage !== "undefined" && radarImage !== null
+    readonly property bool radarServiceAvailable: radarEnabled
+        && typeof radarImage !== "undefined"
+        && radarImage !== null
     readonly property bool radarServiceReady: radarServiceAvailable && radarImage.ready && String(radarImage.imageUrl).length > 0
     readonly property url radarFrameUrl: radarServiceReady ? radarImage.imageUrl : ""
     readonly property url radarMapUrl: radarServiceReady && String(radarImage.mapUrl).length > 0 ? radarImage.mapUrl : ""
@@ -626,6 +628,8 @@ Item {
         radarSiteName = ""
         radarProduct = ""
         radarSiteDistanceKm = NaN
+        radarFrameCount = 0
+        radarFrameIndex = -1
         if (radarServiceAvailable)
             radarImage.setPosition(0, 0, false)
     }
@@ -941,6 +945,11 @@ Item {
         if (!active)
             return
 
+        if (!radarEnabled) {
+            clearRadarData("OFF")
+            return
+        }
+
         if (!weatherPositionReady || !coordValid(safeLat, -90, 90) || !coordValid(safeLng, -180, 180)) {
             clearRadarData(coordinateStatusText())
             return
@@ -1008,7 +1017,7 @@ Item {
     Timer {
         interval: root.radarRefreshIntervalMs
         repeat: true
-        running: root.active
+        running: root.active && root.radarEnabled
         triggeredOnStart: false
         onTriggered: root.refreshRadar()
     }
@@ -1022,7 +1031,8 @@ Item {
             root.refreshLocationName()
             root.refreshWeather()
             root.refreshForecast()
-            root.refreshRadar()
+            if (root.radarEnabled)
+                root.refreshRadar()
         }
     }
 
@@ -1036,12 +1046,13 @@ Item {
             root.refreshLocationName()
             root.refreshWeather()
             root.refreshForecast()
-            root.refreshRadar()
+            if (root.radarEnabled)
+                root.refreshRadar()
         }
     }
 
     Connections {
-        target: root.radarServiceAvailable ? radarImage : null
+        target: root.radarEnabled && root.radarServiceAvailable ? radarImage : null
 
         function onImageChanged() {
             root.radarStatus = radarImage.status
@@ -1078,11 +1089,16 @@ Item {
     onExpandedModeChanged: {
         if (!root.active)
             return
-        if (root.expandedMode === "temp" || root.expandedMode === "radar") {
+        if (!root.radarEnabled && root.expandedMode === "radar") {
+            root.expandedMode = ""
+            return
+        }
+        if (root.expandedMode === "temp" || (root.radarEnabled && root.expandedMode === "radar")) {
             root.refreshLocationName()
             root.refreshWeather()
             root.refreshForecast()
-            root.refreshRadar()
+            if (root.radarEnabled)
+                root.refreshRadar()
         }
     }
 

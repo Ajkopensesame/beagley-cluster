@@ -23,6 +23,8 @@
 #include <QDateTime>
 #include <QImage>
 
+#include <memory>
+
 #include "data/VehicleStateClient.h"
 #include "navigation/NavigationService.h"
 #include "render/ClusterRenderModel.h"
@@ -483,10 +485,9 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("BEAGLEY_GAUGE_DETAIL", gaugeDetail);
     engine.rootContext()->setContextProperty("BEAGLEY_GAUGE_DEMO", gaugeDemo);
     engine.rootContext()->setContextProperty("BEAGLEY_CLUSTER_SIMULATION", clusterSimulation);
-    engine.rootContext()->setContextProperty(
-        "BEAGLEY_RADAR_ENABLED",
-        qEnvironmentVariableIsSet("BEAGLEY_RADAR_ENABLED")
-            && qEnvironmentVariableIntValue("BEAGLEY_RADAR_ENABLED") != 0);
+    const bool radarEnabled = qEnvironmentVariableIsSet("BEAGLEY_RADAR_ENABLED")
+        && qEnvironmentVariableIntValue("BEAGLEY_RADAR_ENABLED") != 0;
+    engine.rootContext()->setContextProperty("BEAGLEY_RADAR_ENABLED", radarEnabled);
     engine.rootContext()->setContextProperty(
         "BEAGLEY_INITIAL_WEATHER_EXPANDED_MODE",
         QString::fromUtf8(qgetenv("BEAGLEY_INITIAL_WEATHER_EXPANDED_MODE")).trimmed());
@@ -549,8 +550,13 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("clusterRenderModel", &clusterRenderModel);
     NowPlayingService nowPlaying;
     engine.rootContext()->setContextProperty("nowPlaying", &nowPlaying);
-    RadarImageService radarImage(mapUserAgent);
-    engine.rootContext()->setContextProperty("radarImage", &radarImage);
+    std::unique_ptr<RadarImageService> radarImage;
+    if (radarEnabled) {
+        radarImage = std::make_unique<RadarImageService>(mapUserAgent);
+        engine.rootContext()->setContextProperty("radarImage", radarImage.get());
+    } else {
+        engine.rootContext()->setContextProperty("radarImage", static_cast<QObject *>(nullptr));
+    }
 
     const QString uiVariantOverride = QString::fromUtf8(qgetenv("BEAGLEY_UI_VARIANT")).trimmed().toLower();
     const bool uiVariantExplicit = !uiVariantOverride.isEmpty();
