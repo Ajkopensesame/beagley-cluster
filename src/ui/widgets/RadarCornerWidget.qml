@@ -1,5 +1,4 @@
 import QtQuick 2.15
-import QtGraphicalEffects 1.15
 import BeagleY 1.0
 import "." as WidgetLocal
 
@@ -37,49 +36,15 @@ Item {
             anchors.fill: parent
             anchors.margins: frame.faceInset
 
-            Item {
-                id: radarPreviewSource
+            Image {
+                id: radarPreview
                 anchors.fill: parent
-                visible: false
-
-                Image {
-                    id: radarMapPreview
-                    anchors.fill: parent
-                    source: root.frameReady && String(root.mapUrl).length > 0 ? root.mapUrl : ""
-                    fillMode: Image.PreserveAspectCrop
-                    asynchronous: true
-                    cache: false
-                    smooth: true
-                    visible: status === Image.Ready
-                    opacity: 0.94
-                }
-
-                Image {
-                    id: radarPreview
-                    anchors.fill: parent
-                    source: root.frameReady ? root.frameUrl : ""
-                    fillMode: Image.PreserveAspectCrop
-                    asynchronous: true
-                    cache: false
-                    smooth: true
-                    visible: status === Image.Ready
-                }
-            }
-
-            Rectangle {
-                id: radarPreviewMask
-                width: radarFace.width
-                height: radarFace.height
-                radius: width / 2
-                visible: false
-            }
-
-            OpacityMask {
-                anchors.fill: parent
-                source: radarPreviewSource
-                maskSource: radarPreviewMask
-                cached: false
-                visible: radarMapPreview.status === Image.Ready || radarPreview.status === Image.Ready
+                source: root.frameReady ? root.frameUrl : ""
+                fillMode: Image.PreserveAspectCrop
+                asynchronous: true
+                cache: false
+                smooth: true
+                visible: status === Image.Ready
             }
 
             Rectangle {
@@ -103,7 +68,7 @@ Item {
             anchors.centerIn: parent
             width: Math.round(frame.side * 0.46)
             height: width
-            visible: radarMapPreview.status !== Image.Ready && radarPreview.status !== Image.Ready
+            visible: radarPreview.status !== Image.Ready
 
             WidgetLocal.RadarGlyph {
                 width: parent.width
