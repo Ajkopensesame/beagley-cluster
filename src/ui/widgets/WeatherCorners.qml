@@ -2391,53 +2391,19 @@ Item {
                             anchors.fill: parent
                             anchors.margins: 8
                             color: "#CFE4EA"
-                            visible: detailRadarDisplay.status !== Image.Ready
+                            visible: !detailRadarDisplay.ready
                         }
 
-                        Image {
+                        RadarFrameItem {
                             id: detailRadarDisplay
                             anchors.fill: parent
                             anchors.margins: 8
-                            source: root.radarEnabled && root.expandedMode === "radar" ? root.radarDisplayUrl : ""
-                            fillMode: Image.PreserveAspectCrop
-                            asynchronous: true
-                            cache: false
-                            smooth: true
-                            visible: status === Image.Ready
-                        }
-
-                        Item {
-                            anchors.fill: parent
-                            anchors.margins: 8
-                            visible: detailRadarDisplay.status === Image.Ready
-
-                            Rectangle {
-                                width: 1
-                                height: parent.height * 0.74
-                                anchors.centerIn: parent
-                                color: Qt.rgba(0.02, 0.20, 0.22, 0.22)
-                            }
-
-                            Rectangle {
-                                width: parent.width * 0.74
-                                height: 1
-                                anchors.centerIn: parent
-                                color: Qt.rgba(0.02, 0.20, 0.22, 0.22)
-                            }
-
-                            Repeater {
-                                model: 3
-
-                                Rectangle {
-                                    anchors.centerIn: parent
-                                    width: Math.min(parent.width, parent.height) * (0.27 + index * 0.19)
-                                    height: width
-                                    radius: width / 2
-                                    color: "transparent"
-                                    border.width: 1
-                                    border.color: Qt.rgba(0.02, 0.20, 0.22, 0.18)
-                                }
-                            }
+                            source: root.radarEnabled && root.expandedMode === "radar" ? root.radarFrameUrl : ""
+                            mapSource: root.radarEnabled && root.expandedMode === "radar" ? root.radarDisplayUrl : ""
+                            circular: false
+                            backgroundVisible: true
+                            guidesVisible: true
+                            visible: ready
                         }
 
                         Rectangle {
@@ -2448,7 +2414,7 @@ Item {
                             color: Qt.rgba(0.02, 0.04, 0.08, 0.82)
                             border.width: 1
                             border.color: Qt.rgba(0.36, 1.0, 0.88, 0.36)
-                            visible: detailRadarDisplay.status !== Image.Ready
+                            visible: !detailRadarDisplay.ready
 
                             Column {
                                 anchors.fill: parent
