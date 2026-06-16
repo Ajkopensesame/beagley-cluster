@@ -221,6 +221,23 @@ Item {
         return musicDetail.length > 0 ? musicDetail : "No media source"
     }
 
+    function musicConfigured() {
+        return !!nowPlayingService
+            && (musicSpotifyConfigured || musicSourceLine() === "SPOTIFY")
+    }
+
+    function musicCornerSecondaryLine() {
+        if (musicAuthRequired())
+            return "REPAIR"
+        if (musicPlaying)
+            return "PLAYING"
+        if (musicAvailable)
+            return musicStatus
+        if (musicConfigured())
+            return musicStatus.length > 0 ? musicStatus : "SETUP"
+        return musicSecondaryLine()
+    }
+
     function musicTickerLine() {
         if (musicTitle.length <= 0)
             return ""
@@ -240,15 +257,15 @@ Item {
             return musicDetail
         if ((musicSpotifyConfigured || musicSourceLine() === "SPOTIFY") && musicStatus.length > 0)
             return musicStatus
+        if (musicConfigured())
+            return "Open Spotify setup"
         return ""
     }
 
     function musicTickerVisible() {
-        if (musicAuthRequired())
-            return false
         if (musicAvailable && musicTickerDisplayLine().length > 0)
             return true
-        return (musicSpotifyConfigured || musicSourceLine() === "SPOTIFY")
+        return musicConfigured()
             && musicTickerDisplayLine().length > 0
     }
 
@@ -1144,6 +1161,27 @@ Item {
             if (root.radarEnabled)
                 root.expandedMode = root.expandedMode === "radar" ? "" : "radar"
         }
+    }
+
+    WidgetLocal.MediaCornerWidget {
+        id: mediaCorner
+        width: root.podSize
+        height: root.podSize
+        visible: !root.radarEnabled
+        enabled: !root.radarEnabled
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.rightMargin: root.cornerInset
+        anchors.topMargin: root.cornerInset
+        theme: root.theme
+        corner: "topRight"
+        effectLevel: root.effectLevel
+        bleedFraction: root.podBleedFraction
+        available: root.musicAvailable || root.musicConfigured()
+        playing: root.musicPlaying
+        primaryText: root.musicPrimaryLine()
+        secondaryText: root.musicCornerSecondaryLine()
+        onClicked: root.expandedMode = root.expandedMode === "music" ? "" : "music"
     }
 
     Rectangle {
