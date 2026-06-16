@@ -114,7 +114,10 @@ Window {
         ? Math.round(gaugeFaceSize * 0.54)
         : 0
     readonly property int mapLibreSafeVerticalInset: mapLibreSafeCompositor ? 18 : 0
-    property string weatherExpandedMode: (typeof BEAGLEY_INITIAL_WEATHER_EXPANDED_MODE !== "undefined")
+    readonly property bool radarFeatureEnabled: (typeof BEAGLEY_RADAR_ENABLED !== "undefined")
+        && BEAGLEY_RADAR_ENABLED
+    property string weatherExpandedMode: (typeof BEAGLEY_INITIAL_WEATHER_EXPANDED_MODE !== "undefined"
+        && (String(BEAGLEY_INITIAL_WEATHER_EXPANDED_MODE) !== "radar" || radarFeatureEnabled))
         ? String(BEAGLEY_INITIAL_WEATHER_EXPANDED_MODE)
         : ""
     readonly property bool lowEffectMode: effectLevel === "low" || effectLevel === "off"
@@ -1722,11 +1725,14 @@ Window {
             stressScene: root.stressScene
             phase: root.sharedEffectPhase
             nowPlayingService: root.nowPlayingService
+            radarEnabled: root.radarFeatureEnabled
             expandedMode: root.weatherExpandedMode
             active: !root.mapMenuOpen && !root.navControlsOpen
 
             onExpandedModeChanged: {
-                root.weatherExpandedMode = expandedMode
+                root.weatherExpandedMode = (!root.radarFeatureEnabled && expandedMode === "radar")
+                    ? ""
+                    : expandedMode
             }
 
             onMapMenuRequested: function(stage) {

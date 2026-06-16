@@ -18,13 +18,14 @@ Item {
     property bool stressScene: false
     property real phase: 0.0
     property var nowPlayingService: null
+    property bool radarEnabled: false
 
     readonly property bool lowEffectMode: effectLevel === "low" || effectLevel === "off"
     readonly property bool effectsOff: effectLevel === "off"
     readonly property string displayFont: theme && theme.fontDisplay ? theme.fontDisplay : "Oxanium"
     readonly property string monoFont: theme && theme.fontMono ? theme.fontMono : "Oxanium"
     readonly property bool embeddedSafeMode: Qt.platform.os === "linux"
-    readonly property bool tallDetailMode: expandedMode === "radar"
+    readonly property bool tallDetailMode: radarEnabled && expandedMode === "radar"
     readonly property int podSize: Math.floor(Math.min(164, Math.max(142, height * 0.228)))
     readonly property int cornerBleed: Math.round(podSize * 0.17)
     readonly property int cornerInset: -cornerBleed
@@ -1109,6 +1110,8 @@ Item {
         id: radarCorner
         width: root.podSize
         height: root.podSize
+        visible: root.radarEnabled
+        enabled: root.radarEnabled
         anchors.right: parent.right
         anchors.top: parent.top
         anchors.rightMargin: root.cornerInset
@@ -1121,7 +1124,10 @@ Item {
         mapUrl: root.radarMapUrl
         status: root.radarStatus
         frameLabel: root.radarFrameDisplayLabel()
-        onClicked: root.expandedMode = root.expandedMode === "radar" ? "" : "radar"
+        onClicked: {
+            if (root.radarEnabled)
+                root.expandedMode = root.expandedMode === "radar" ? "" : "radar"
+        }
     }
 
     Rectangle {
@@ -2275,7 +2281,7 @@ Item {
             Item {
                 anchors.fill: parent
                 anchors.margins: 20
-                visible: root.expandedMode === "radar"
+                visible: root.radarEnabled && root.expandedMode === "radar"
 
                 Column {
                     anchors.fill: parent
@@ -2328,8 +2334,8 @@ Item {
                             id: detailRadarOverlay
                             anchors.fill: parent
                             anchors.margins: 8
-                            source: root.expandedMode === "radar" ? root.radarFrameUrl : ""
-                            mapSource: root.expandedMode === "radar" ? root.radarMapUrl : ""
+                            source: root.radarEnabled && root.expandedMode === "radar" ? root.radarFrameUrl : ""
+                            mapSource: root.radarEnabled && root.expandedMode === "radar" ? root.radarMapUrl : ""
                             circular: false
                             backgroundVisible: true
                             guidesVisible: true

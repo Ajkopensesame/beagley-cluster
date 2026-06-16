@@ -484,6 +484,10 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("BEAGLEY_GAUGE_DEMO", gaugeDemo);
     engine.rootContext()->setContextProperty("BEAGLEY_CLUSTER_SIMULATION", clusterSimulation);
     engine.rootContext()->setContextProperty(
+        "BEAGLEY_RADAR_ENABLED",
+        qEnvironmentVariableIsSet("BEAGLEY_RADAR_ENABLED")
+            && qEnvironmentVariableIntValue("BEAGLEY_RADAR_ENABLED") != 0);
+    engine.rootContext()->setContextProperty(
         "BEAGLEY_INITIAL_WEATHER_EXPANDED_MODE",
         QString::fromUtf8(qgetenv("BEAGLEY_INITIAL_WEATHER_EXPANDED_MODE")).trimmed());
     engine.rootContext()->setContextProperty(
