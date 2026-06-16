@@ -4,10 +4,15 @@
 #include <QFileInfo>
 #include <QHash>
 #include <QImageReader>
+#include <QPainter>
+#include <QPainterPath>
+#include <QQuickWindow>
 #include <QSGFlatColorMaterial>
 #include <QSGGeometry>
 #include <QSGGeometryNode>
 #include <QSGNode>
+#include <QSGSimpleTextureNode>
+#include <QSGTexture>
 #include <QVariantMap>
 #include <QtMath>
 
@@ -496,6 +501,52 @@ QSGGeometryNode *createFlatCircleNode(const QSize &targetSize, const QColor &col
     return node;
 }
 
+QImage renderTextureFrameImage(const QImage &source,
+                               const QSize &targetSize,
+                               bool circular,
+                               const QColor &fillColor)
+{
+    QImage output(targetSize, QImage::Format_ARGB32_Premultiplied);
+    output.fill(circular ? Qt::transparent : fillColor);
+
+    QPainter painter(&output);
+    painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+    if (circular) {
+        QPainterPath path;
+        path.addEllipse(QRectF(0, 0, targetSize.width(), targetSize.height()));
+        painter.setClipPath(path);
+    }
+    painter.drawImage(QRectF(0, 0, targetSize.width(), targetSize.height()),
+                      source,
+                      croppedSourceRect(source, targetSize));
+    painter.end();
+    return output;
+}
+
+QSGSimpleTextureNode *createTextureFrameNode(QQuickWindow *window,
+                                             const QImage &source,
+                                             const QSize &targetSize,
+                                             bool circular,
+                                             const QColor &fillColor)
+{
+    if (!window || source.isNull() || targetSize.isEmpty()) {
+        return nullptr;
+    }
+
+    QSGTexture *texture = window->createTextureFromImage(
+        renderTextureFrameImage(source, targetSize, circular, fillColor));
+    if (!texture) {
+        return nullptr;
+    }
+
+    auto *node = new QSGSimpleTextureNode;
+    node->setOwnsTexture(true);
+    node->setTexture(texture);
+    node->setFiltering(QSGTexture::Linear);
+    node->setRect(0, 0, targetSize.width(), targetSize.height());
+    return node;
+}
+
 void appendRectNodes(QSGNode *root, const QVector<ColoredRect> &rects)
 {
     constexpr int maxRectsPerNode = 256;
@@ -759,11 +810,25 @@ QSGNode *RadarFrameItem::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *
     QVector<ColoredRect> mapRects;
     QVector<ColoredRect> radarRects;
     QVector<ColoredLine> lines;
-    const int mapSamples = appendMapSamples(mapRects, m_mapImage, targetSize, m_circular);
+    const QColor mapBaseColor = averageMapColor(m_mapImage);
+    bool textureBaseRendered = false;
+    if (!m_mapImage.isNull()) {
+        if (auto *node = createTextureFrameNode(window(),
+                                               m_mapImage,
+                                               targetSize,
+                                               m_circular,
+                                               mapBaseColor)) {
+            root->appendChildNode(node);
+            textureBaseRendered = true;
+        }
+    }
+
+    const int mapSamples = textureBaseRendered ? 0 : appendMapSamples(mapRects, m_mapImage, targetSize, m_circular);
     QColor circularBackground;
     if (m_backgroundVisible) {
-        if (mapSamples > 0) {
-            const QColor mapBaseColor = averageMapColor(m_mapImage);
+        if (textureBaseRendered) {
+            // The texture already carries the real map background.
+        } else if (mapSamples > 0) {
             if (m_circular) {
                 circularBackground = mapBaseColor;
             } else {
@@ -780,7 +845,7 @@ QSGNode *RadarFrameItem::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *
     if (m_guidesVisible) {
         appendGuideLines(lines, targetSize);
     }
-    const int totalSamples = appendRadarSamples(radarRects, m_image, targetSize, m_circular);
+    const int totalSamples = textureBaseRendered ? 0 : appendRadarSamples(radarRects, m_image, targetSize, m_circular);
     appendGpsMarker(radarRects, targetSize);
 
     appendRectNodes(root, backgroundRects);
@@ -795,7 +860,7 @@ QSGNode *RadarFrameItem::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *
 
     qInfo().noquote() << "[RadarFrameItem] vector samples" << totalSamples
                       << targetSize.width() << "x" << targetSize.height()
-                      << "flatColor true"
+                      << "textureBase" << textureBaseRendered
                       << "mapVectorSamples" << mapSamples
                       << "circular" << m_circular;
     return root;

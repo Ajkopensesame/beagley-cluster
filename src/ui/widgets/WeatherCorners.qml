@@ -1157,7 +1157,7 @@ Item {
         effectLevel: root.effectLevel
         bleedFraction: root.podBleedFraction
         frameUrl: root.radarFrameUrl
-        mapUrl: root.radarMapUrl
+        mapUrl: root.radarDisplayUrl
         status: root.radarStatus
         frameLabel: root.radarFrameDisplayLabel()
         onClicked: {

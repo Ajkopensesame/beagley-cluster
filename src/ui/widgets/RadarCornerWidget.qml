@@ -19,7 +19,8 @@ Item {
     readonly property string displayFont: theme && theme.fontDisplay ? theme.fontDisplay : "Oxanium"
     readonly property string monoFont: theme && theme.fontMono ? theme.fontMono : "Oxanium"
     readonly property bool live: root.status === "LIVE"
-    readonly property bool frameReady: root.live && String(root.frameUrl).length > 0
+    readonly property url previewUrl: String(root.mapUrl).length > 0 ? root.mapUrl : root.frameUrl
+    readonly property bool frameReady: root.live && String(root.previewUrl).length > 0
 
     CornerPodFrame {
         id: frame
@@ -36,15 +37,12 @@ Item {
             anchors.fill: parent
             anchors.margins: frame.faceInset
 
-            Image {
+            RasterFrameItem {
                 id: radarPreview
                 anchors.fill: parent
-                source: root.frameReady ? root.frameUrl : ""
-                fillMode: Image.PreserveAspectCrop
-                asynchronous: true
-                cache: false
-                smooth: true
-                visible: status === Image.Ready
+                source: root.frameReady ? root.previewUrl : ""
+                circular: true
+                visible: ready
             }
 
             Rectangle {
@@ -68,7 +66,7 @@ Item {
             anchors.centerIn: parent
             width: Math.round(frame.side * 0.46)
             height: width
-            visible: radarPreview.status !== Image.Ready
+            visible: !radarPreview.ready
 
             WidgetLocal.RadarGlyph {
                 width: parent.width
