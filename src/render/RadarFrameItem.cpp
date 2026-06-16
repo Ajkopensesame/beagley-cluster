@@ -433,22 +433,27 @@ QSGGeometryNode *createFlatRectNode(const QVector<QRectF> &rects,
         return nullptr;
     }
 
-    auto *geometry = new QSGGeometry(QSGGeometry::defaultAttributes_Point2D(), count * 6);
-    geometry->setDrawingMode(QSGGeometry::DrawTriangles);
+    const int vertexCount = count * 4 + qMax(0, count - 1) * 2;
+    auto *geometry = new QSGGeometry(QSGGeometry::defaultAttributes_Point2D(), vertexCount);
+    geometry->setDrawingMode(QSGGeometry::DrawTriangleStrip);
     auto *vertices = geometry->vertexDataAsPoint2D();
     int index = 0;
+    QPointF previous;
     for (int i = start; i < start + count; ++i) {
         const QRectF &rect = rects.at(i);
         const float x1 = float(rect.left());
         const float y1 = float(rect.top());
         const float x2 = float(rect.right());
         const float y2 = float(rect.bottom());
+        if (i != start) {
+            vertices[index++].set(float(previous.x()), float(previous.y()));
+            vertices[index++].set(x1, y1);
+        }
         vertices[index++].set(x1, y1);
-        vertices[index++].set(x2, y1);
         vertices[index++].set(x1, y2);
         vertices[index++].set(x2, y1);
         vertices[index++].set(x2, y2);
-        vertices[index++].set(x1, y2);
+        previous = QPointF(x2, y2);
     }
 
     auto *node = new QSGGeometryNode;
