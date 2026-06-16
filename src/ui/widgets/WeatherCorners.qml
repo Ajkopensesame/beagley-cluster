@@ -2386,45 +2386,69 @@ Item {
                             borderWidth: 1
                         }
 
-                        Loader {
+                        Rectangle {
                             anchors.fill: parent
                             anchors.margins: 8
-                            active: root.radarEnabled && root.expandedMode === "radar"
-                            sourceComponent: Component {
-                                WidgetLocal.MapCenterMapLibreNative {
-                                    anchors.fill: parent
-                                    lat: root.safeLat
-                                    lng: root.safeLng
-                                    bearing: 0
-                                    zoom: root.radarMapZoom
-                                    speedKph: 0
-                                    fixedOriginEnabled: true
-                                    fixedOriginLat: root.safeLat
-                                    fixedOriginLng: root.safeLng
-                                    fixedOriginLabel: root.radarSourceLabel()
-                                    navigationState: ({})
-                                    mapVehiclePose: ({})
-                                    mapCameraHints: ({})
-                                    mapRouteOverlay: ({})
-                                    mapGuidanceBanner: ({})
-                                    mapConnectivity: ({})
-                                    tileUrlTemplate: root.radarTileUrlTemplate
-                                    styleUrl: root.radarMapStyleUrl
-                                    interactionEnabled: false
-                                }
-                            }
+                            color: "#CFE4EA"
+                            visible: detailRadarMap.status !== Image.Ready
                         }
 
-                        RadarFrameItem {
+                        Image {
+                            id: detailRadarMap
+                            anchors.fill: parent
+                            anchors.margins: 8
+                            source: root.radarEnabled && root.expandedMode === "radar" ? root.radarMapUrl : ""
+                            fillMode: Image.PreserveAspectCrop
+                            asynchronous: true
+                            cache: false
+                            smooth: true
+                            visible: status === Image.Ready
+                        }
+
+                        Image {
                             id: detailRadarOverlay
                             anchors.fill: parent
                             anchors.margins: 8
                             source: root.radarEnabled && root.expandedMode === "radar" ? root.radarFrameUrl : ""
-                            mapSource: ""
-                            circular: false
-                            backgroundVisible: false
-                            guidesVisible: true
-                            visible: ready
+                            fillMode: Image.PreserveAspectCrop
+                            asynchronous: true
+                            cache: false
+                            smooth: true
+                            visible: status === Image.Ready
+                        }
+
+                        Item {
+                            anchors.fill: parent
+                            anchors.margins: 8
+                            visible: detailRadarMap.status === Image.Ready || detailRadarOverlay.status === Image.Ready
+
+                            Rectangle {
+                                width: 1
+                                height: parent.height * 0.74
+                                anchors.centerIn: parent
+                                color: Qt.rgba(0.02, 0.20, 0.22, 0.22)
+                            }
+
+                            Rectangle {
+                                width: parent.width * 0.74
+                                height: 1
+                                anchors.centerIn: parent
+                                color: Qt.rgba(0.02, 0.20, 0.22, 0.22)
+                            }
+
+                            Repeater {
+                                model: 3
+
+                                Rectangle {
+                                    anchors.centerIn: parent
+                                    width: Math.min(parent.width, parent.height) * (0.27 + index * 0.19)
+                                    height: width
+                                    radius: width / 2
+                                    color: "transparent"
+                                    border.width: 1
+                                    border.color: Qt.rgba(0.02, 0.20, 0.22, 0.18)
+                                }
+                            }
                         }
 
                         Rectangle {
@@ -2435,7 +2459,7 @@ Item {
                             color: Qt.rgba(0.02, 0.04, 0.08, 0.82)
                             border.width: 1
                             border.color: Qt.rgba(0.36, 1.0, 0.88, 0.36)
-                            visible: !detailRadarOverlay.ready
+                            visible: detailRadarOverlay.status !== Image.Ready
 
                             Column {
                                 anchors.fill: parent
