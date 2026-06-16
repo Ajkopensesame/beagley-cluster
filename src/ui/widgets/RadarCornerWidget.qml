@@ -40,9 +40,9 @@ Item {
                 id: radarPreview
                 anchors.fill: parent
                 source: root.frameReady ? root.frameUrl : ""
-                mapSource: root.frameReady ? root.mapUrl : ""
+                mapSource: ""
                 circular: true
-                backgroundVisible: true
+                backgroundVisible: false
                 guidesVisible: true
                 visible: ready
                 opacity: 1.0

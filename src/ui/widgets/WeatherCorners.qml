@@ -19,6 +19,8 @@ Item {
     property real phase: 0.0
     property var nowPlayingService: null
     property bool radarEnabled: false
+    property string radarMapStyleUrl: ""
+    property string radarTileUrlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
 
     readonly property bool lowEffectMode: effectLevel === "low" || effectLevel === "off"
     readonly property bool effectsOff: effectLevel === "off"
@@ -2375,7 +2377,7 @@ Item {
                     Item {
                         width: parent.width
                         height: Math.max(360, parent.height - 122)
-                        clip: false
+                        clip: true
 
                         NativePanel {
                             anchors.fill: parent
@@ -2384,29 +2386,61 @@ Item {
                             borderWidth: 1
                         }
 
+                        Loader {
+                            anchors.fill: parent
+                            anchors.margins: 8
+                            active: root.radarEnabled && root.expandedMode === "radar"
+                            sourceComponent: Component {
+                                WidgetLocal.MapCenterMapLibreNative {
+                                    anchors.fill: parent
+                                    lat: root.safeLat
+                                    lng: root.safeLng
+                                    bearing: 0
+                                    zoom: root.radarMapZoom
+                                    speedKph: 0
+                                    fixedOriginEnabled: true
+                                    fixedOriginLat: root.safeLat
+                                    fixedOriginLng: root.safeLng
+                                    fixedOriginLabel: root.radarSourceLabel()
+                                    navigationState: ({})
+                                    mapVehiclePose: ({})
+                                    mapCameraHints: ({})
+                                    mapRouteOverlay: ({})
+                                    mapGuidanceBanner: ({})
+                                    mapConnectivity: ({})
+                                    tileUrlTemplate: root.radarTileUrlTemplate
+                                    styleUrl: root.radarMapStyleUrl
+                                    interactionEnabled: false
+                                }
+                            }
+                        }
+
                         RadarFrameItem {
                             id: detailRadarOverlay
                             anchors.fill: parent
                             anchors.margins: 8
                             source: root.radarEnabled && root.expandedMode === "radar" ? root.radarFrameUrl : ""
-                            mapSource: root.radarEnabled && root.expandedMode === "radar" ? root.radarMapUrl : ""
+                            mapSource: ""
                             circular: false
-                            backgroundVisible: true
+                            backgroundVisible: false
                             guidesVisible: true
                             visible: ready
                         }
 
                         Rectangle {
-                            anchors.fill: parent
-                            anchors.margins: 8
-                            radius: 5
-                            color: "#080913"
-                            opacity: detailRadarOverlay.ready ? 0.0 : 0.82
+                            width: Math.min(320, parent.width * 0.74)
+                            height: 152
+                            anchors.centerIn: parent
+                            radius: 10
+                            color: Qt.rgba(0.02, 0.04, 0.08, 0.82)
+                            border.width: 1
+                            border.color: Qt.rgba(0.36, 1.0, 0.88, 0.36)
+                            visible: !detailRadarOverlay.ready
 
                             Column {
-                                anchors.centerIn: parent
+                                anchors.fill: parent
+                                anchors.margins: 16
                                 spacing: 10
-                                visible: !detailRadarOverlay.ready
 
                                 WidgetLocal.RadarGlyph {
                                     width: 78

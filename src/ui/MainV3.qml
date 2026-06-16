@@ -1726,6 +1726,8 @@ Window {
             phase: root.sharedEffectPhase
             nowPlayingService: root.nowPlayingService
             radarEnabled: root.radarFeatureEnabled
+            radarMapStyleUrl: root.activeMapStyleUrl
+            radarTileUrlTemplate: root.activeMapTileUrlTemplate
             expandedMode: root.weatherExpandedMode
             active: !root.mapMenuOpen && !root.navControlsOpen
 
