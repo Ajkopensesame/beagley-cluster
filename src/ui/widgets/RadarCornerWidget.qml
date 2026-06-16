@@ -37,11 +37,14 @@ Item {
             anchors.fill: parent
             anchors.margins: frame.faceInset
 
-            RasterFrameItem {
+            RadarFrameItem {
                 id: radarPreview
                 anchors.fill: parent
-                source: root.frameReady ? root.previewUrl : ""
+                source: root.frameReady ? root.frameUrl : ""
+                mapSource: root.frameReady ? root.previewUrl : ""
                 circular: true
+                backgroundVisible: true
+                guidesVisible: false
                 visible: ready
             }
 
