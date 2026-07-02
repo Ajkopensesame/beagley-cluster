@@ -27,6 +27,11 @@ DEFAULT_RULES = {
     "speedKph": SignalRule("speedKph", 0.0, 240.0, "kph", max_rate_per_sec=90.0, noisy_rate_stddev=75.0),
     "fuelPct": SignalRule("fuelPct", 0.0, 100.0, "pct", max_rate_per_sec=5.0, noisy_rate_stddev=4.0),
     "coolantC": SignalRule("coolantC", -40.0, 140.0, "C", max_rate_per_sec=10.0, noisy_rate_stddev=8.0),
+    "mafGps": SignalRule("mafGps", 0.0, 500.0, "g/s", max_rate_per_sec=400.0, noisy_rate_stddev=250.0),
+    "mapKpa": SignalRule("mapKpa", 5.0, 300.0, "kPa", max_rate_per_sec=500.0, noisy_rate_stddev=300.0),
+    "throttlePct": SignalRule("throttlePct", 0.0, 100.0, "pct", max_rate_per_sec=500.0, noisy_rate_stddev=250.0),
+    "intakeAirTempC": SignalRule("intakeAirTempC", -40.0, 120.0, "C", max_rate_per_sec=30.0, noisy_rate_stddev=20.0),
+    "engineLoadPct": SignalRule("engineLoadPct", 0.0, 100.0, "pct", max_rate_per_sec=700.0, noisy_rate_stddev=350.0),
 }
 
 

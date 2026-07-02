@@ -1,0 +1,2 @@
+{"type":"vehicle_state","version":1,"wallTimestamp":1700000100.0,"speedKph":0.0,"rpm":1800.0,"fuelPct":65.0,"coolantC":88.0,"gps":{"fixValid":true,"speedKph":55.0},"_health":{"stale":false,"canReplay":{"enabled":true,"stale":false},"serialVehicleInputs":{"enabled":true,"stale":false}}}
+{"type":"vehicle_state","version":1,"wallTimestamp":1700000100.1,"speedKph":0.0,"rpm":1800.0,"fuelPct":65.0,"coolantC":88.0,"gps":{"fixValid":true,"speedKph":56.0},"_health":{"stale":false,"canReplay":{"enabled":true,"stale":false},"serialVehicleInputs":{"enabled":true,"stale":false}}}

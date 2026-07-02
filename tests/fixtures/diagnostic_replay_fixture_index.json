@@ -1,0 +1,2392 @@
+{
+  "version": 1,
+  "kind": "bbb_diagnostic_replay_fixture_index",
+  "fixtures": [
+    {
+      "path": "tests/fixtures/diagnostic_replay_empty.jsonl",
+      "proves": "Zero-observed replay keeps sensorCoverage structurally present with zero ratios, empty surface buckets, zero CLI surface counts, and no diagnostic truth.",
+      "expected": {
+        "frames": 0,
+        "anomalyFrames": 0,
+        "faultEvents": 0,
+        "diagnosticStatusCounts": {},
+        "severityCounts": {},
+        "firstAnomaly": null,
+        "findingCounts": {},
+        "healthVerdictLabel": "capture_limited",
+        "healthVerdictAbstainRequired": true,
+        "transitionBaselineReady": false,
+        "lastDiagnostic": null,
+        "signalMonitor": {
+          "enabled": true,
+          "ok": true,
+          "faultCount": 0,
+          "watching": []
+        },
+        "sensorCoverage": {
+          "observedSensors": 0,
+          "coveredSensors": 0,
+          "lowTrustSensors": 0,
+          "unsupportedSensors": 0,
+          "lowTrustShapeFindings": 0,
+          "coverageRatio": 0.0,
+          "gapRatio": 0.0
+        },
+        "sensorCoverageSurfaceSummary": {
+          "gapSensors": [],
+          "statusSensors": {
+            "covered": [],
+            "low_trust": [],
+            "unsupported": []
+          },
+          "surfaceCounts": {
+            "learned_baseline_context": 0,
+            "learned_baseline_target": 0,
+            "signal_health": 0,
+            "source_agreement_anchor": 0,
+            "transition_event_input": 0,
+            "transition_reference": 0,
+            "transition_target": 0
+          },
+          "surfaceSensors": {
+            "learned_baseline_context": [],
+            "learned_baseline_target": [],
+            "signal_health": [],
+            "source_agreement_anchor": [],
+            "transition_event_input": [],
+            "transition_reference": [],
+            "transition_target": []
+          }
+        },
+        "cliSummaryIncludes": [
+          "[diagnostic-replay] sensor_coverage observed=0 covered=0 low_trust=0 unsupported=0 shape_findings=0 coverage_ratio=0.000 gap_ratio=0.000",
+          "[diagnostic-replay] sensor_surfaces signal_health=0 source_agreement_anchor=0 learned_baseline_target=0 learned_baseline_context=0 transition_target=0 transition_reference=0 transition_event_input=0 gaps=0"
+        ],
+        "faultRecorder": {
+          "enabled": true,
+          "writes": 0,
+          "hasLastEvent": false
+        }
+      }
+    },
+    {
+      "path": "tests/fixtures/diagnostic_replay_representative.jsonl",
+      "proves": "Representative nominal replay with enough signal variety to produce useful baseline guidance without deterministic anomalies.",
+      "expected": {
+        "frames": 12,
+        "anomalyFrames": 0,
+        "faultEvents": 0,
+        "diagnosticStatusCounts": {
+          "nominal": 12
+        },
+        "severityCounts": {
+          "ok": 12
+        },
+        "firstAnomaly": null,
+        "findingCounts": {},
+        "healthVerdictLabel": "insufficient_evidence",
+        "transitionBaselineReady": false,
+        "lastDiagnostic": {
+          "status": "nominal",
+          "severity": "ok",
+          "findingCount": 0,
+          "activeFindingCodes": []
+        },
+        "signalMonitor": {
+          "enabled": true,
+          "ok": true,
+          "faultCount": 0,
+          "watching": [
+            "coolantC",
+            "engineLoadPct",
+            "fuelPct",
+            "intakeAirTempC",
+            "mafGps",
+            "mapKpa",
+            "rpm",
+            "speedKph",
+            "throttlePct"
+          ]
+        },
+        "sensorCoverage": {
+          "observedSensors": 10,
+          "coveredSensors": 10,
+          "lowTrustSensors": 0,
+          "unsupportedSensors": 0,
+          "lowTrustShapeFindings": 0,
+          "coverageRatio": 1.0,
+          "gapRatio": 0.0
+        },
+        "sensorCoverageSurfaceSummary": {
+          "gapSensors": [],
+          "surfaceCounts": {
+            "learned_baseline_context": 6,
+            "learned_baseline_target": 2,
+            "signal_health": 9,
+            "source_agreement_anchor": 1,
+            "transition_event_input": 0,
+            "transition_reference": 6,
+            "transition_target": 3
+          },
+          "surfaceSensors": {
+            "learned_baseline_target": [
+              "mafGps",
+              "mapKpa"
+            ],
+            "signal_health": [
+              "coolantC",
+              "engineLoadPct",
+              "fuelPct",
+              "intakeAirTempC",
+              "mafGps",
+              "mapKpa",
+              "rpm",
+              "speedKph",
+              "throttlePct"
+            ],
+            "source_agreement_anchor": [
+              "gps.speedKph"
+            ],
+            "transition_target": [
+              "mafGps",
+              "mapKpa",
+              "rpm"
+            ]
+          }
+        },
+        "sensorCoverageSensors": {
+          "gps.speedKph": {
+            "sampleCount": 12,
+            "status": "covered",
+            "trustTier": "direct_anchor",
+            "surfaces": [
+              "source_agreement_anchor"
+            ],
+            "shapeFindingCodes": []
+          },
+          "rpm": {
+            "sampleCount": 12,
+            "status": "covered",
+            "trustTier": "verified_decoded",
+            "surfaces": [
+              "learned_baseline_context",
+              "signal_health",
+              "transition_reference",
+              "transition_target"
+            ],
+            "shapeFindingCodes": []
+          },
+          "speedKph": {
+            "sampleCount": 12,
+            "status": "covered",
+            "trustTier": "verified_decoded",
+            "surfaces": [
+              "signal_health",
+              "transition_reference"
+            ],
+            "shapeFindingCodes": []
+          }
+        },
+        "cliSummaryIncludes": [
+          "[diagnostic-replay] sensor_coverage observed=10 covered=10 low_trust=0 unsupported=0 shape_findings=0 coverage_ratio=1.000 gap_ratio=0.000",
+          "[diagnostic-replay] sensor_surfaces signal_health=9 source_agreement_anchor=1 learned_baseline_target=2 learned_baseline_context=6 transition_target=3 transition_reference=6 transition_event_input=0 gaps=0"
+        ],
+        "faultRecorder": {
+          "enabled": true,
+          "writes": 0,
+          "hasLastEvent": false
+        }
+      }
+    },
+    {
+      "path": "tests/fixtures/diagnostic_replay_nested_sensor_coverage.jsonl",
+      "proves": "Nested observed sensor replay where gps.speedKph direct anchors, gps.hdop remains explicitly unsupported, boolean gps.fix, non-gear string labels, and list/dict containers are ignored as non-observable, and gear/drivetrain/transmission gear strings enter sensorCoverage with deterministic surfaces.",
+      "expected": {
+        "frames": 2,
+        "anomalyFrames": 0,
+        "faultEvents": 0,
+        "diagnosticStatusCounts": {
+          "nominal": 2
+        },
+        "severityCounts": {
+          "ok": 2
+        },
+        "firstAnomaly": null,
+        "findingCounts": {},
+        "healthVerdictLabel": "capture_limited",
+        "healthVerdictAbstainRequired": true,
+        "transitionBaselineReady": false,
+        "lastDiagnostic": {
+          "status": "nominal",
+          "severity": "ok",
+          "findingCount": 0,
+          "activeFindingCodes": []
+        },
+        "signalMonitor": {
+          "enabled": true,
+          "ok": true,
+          "faultCount": 0,
+          "watching": [
+            "rpm",
+            "speedKph"
+          ]
+        },
+        "sensorCoverage": {
+          "observedSensors": 7,
+          "coveredSensors": 6,
+          "lowTrustSensors": 0,
+          "unsupportedSensors": 1,
+          "lowTrustShapeFindings": 0
+        },
+        "ignoredSensorCoverageSensors": [
+          "driveMode",
+          "gps.fix",
+          "gps.fixType",
+          "gps.rawReport",
+          "gps.satellites",
+          "rawCanFrame",
+          "rawCanPayloadBytes"
+        ],
+        "sensorCoverageSensors": {
+          "drivetrain.gear": {
+            "sampleCount": 2,
+            "status": "covered",
+            "trustTier": "verified_decoded",
+            "surfaces": [
+              "transition_event_input"
+            ],
+            "shapeFindingCodes": []
+          },
+          "gear": {
+            "sampleCount": 2,
+            "status": "covered",
+            "trustTier": "verified_decoded",
+            "surfaces": [
+              "transition_event_input"
+            ],
+            "shapeFindingCodes": []
+          },
+          "gps.speedKph": {
+            "sampleCount": 2,
+            "status": "covered",
+            "trustTier": "direct_anchor",
+            "surfaces": [
+              "source_agreement_anchor"
+            ],
+            "shapeFindingCodes": []
+          },
+          "gps.hdop": {
+            "sampleCount": 2,
+            "status": "unsupported",
+            "trustTier": "direct_anchor",
+            "surfaces": [],
+            "reason": "Observed but no deterministic rule, learned model, transition profile, or low-trust policy covers it yet.",
+            "shapeFindingCodes": []
+          },
+          "transmission.gear": {
+            "sampleCount": 2,
+            "status": "covered",
+            "trustTier": "verified_decoded",
+            "surfaces": [
+              "transition_event_input"
+            ],
+            "shapeFindingCodes": []
+          }
+        },
+        "faultRecorder": {
+          "enabled": true,
+          "writes": 0,
+          "hasLastEvent": false
+        }
+      }
+    },
+    {
+      "path": "tests/fixtures/diagnostic_replay_speed_disagreement.jsonl",
+      "proves": "Deterministic signal-health anomaly where CAN/top-level speed disagrees with GPS and one persisted fault event is written.",
+      "expected": {
+        "frames": 2,
+        "anomalyFrames": 2,
+        "faultEvents": 1,
+        "diagnosticStatusCounts": {
+          "anomaly_detected": 2
+        },
+        "severityCounts": {
+          "warning": 2
+        },
+        "firstAnomaly": {
+          "frame": 0,
+          "status": "anomaly_detected",
+          "severity": "warning",
+          "findingCount": 1,
+          "activeFindingCodes": ["source_disagreement"]
+        },
+        "findingCounts": {
+          "source_disagreement": 2
+        },
+        "healthVerdictLabel": "anomaly_likely",
+        "transitionBaselineReady": false,
+        "lastDiagnostic": {
+          "status": "anomaly_detected",
+          "severity": "warning",
+          "findingCount": 1,
+          "activeFindingCodes": ["source_disagreement"]
+        },
+        "signalMonitor": {
+          "enabled": true,
+          "ok": false,
+          "faultCount": 1,
+          "watching": ["coolantC", "fuelPct", "rpm", "speedKph"]
+        },
+        "sensorCoverage": {
+          "observedSensors": 5,
+          "coveredSensors": 5,
+          "lowTrustSensors": 0,
+          "unsupportedSensors": 0,
+          "lowTrustShapeFindings": 0
+        },
+        "sensorCoverageSensors": {
+          "gps.speedKph": {
+            "sampleCount": 2,
+            "status": "covered",
+            "trustTier": "direct_anchor",
+            "surfaces": [
+              "source_agreement_anchor"
+            ],
+            "shapeFindingCodes": []
+          },
+          "rpm": {
+            "sampleCount": 2,
+            "status": "covered",
+            "trustTier": "verified_decoded",
+            "surfaces": [
+              "learned_baseline_context",
+              "signal_health",
+              "transition_reference",
+              "transition_target"
+            ],
+            "shapeFindingCodes": []
+          },
+          "speedKph": {
+            "sampleCount": 2,
+            "status": "covered",
+            "trustTier": "verified_decoded",
+            "surfaces": [
+              "signal_health",
+              "transition_reference"
+            ],
+            "shapeFindingCodes": []
+          }
+        },
+        "faultRecorder": {
+          "enabled": true,
+          "writes": 1,
+          "hasLastEvent": true
+        }
+      }
+    },
+    {
+      "path": "tests/fixtures/diagnostic_replay_speed_disagreement_signal_health_disabled.jsonl",
+      "replayOptions": {
+        "signalHealthEnabled": false
+      },
+      "proves": "Speed-disagreement replay with signal health disabled: source-disagreement anomaly truth disappears and source-agreement coverage surfaces are removed.",
+      "expected": {
+        "frames": 2,
+        "anomalyFrames": 0,
+        "faultEvents": 0,
+        "diagnosticStatusCounts": {
+          "nominal": 2
+        },
+        "severityCounts": {
+          "ok": 2
+        },
+        "firstAnomaly": null,
+        "findingCounts": {},
+        "healthVerdictLabel": "insufficient_evidence",
+        "transitionBaselineReady": false,
+        "lastDiagnostic": {
+          "status": "nominal",
+          "severity": "ok",
+          "findingCount": 0,
+          "activeFindingCodes": []
+        },
+        "signalMonitor": {
+          "enabled": false,
+          "ok": true,
+          "faultCount": 0,
+          "watching": []
+        },
+        "sensorCoverage": {
+          "observedSensors": 5,
+          "coveredSensors": 3,
+          "lowTrustSensors": 0,
+          "unsupportedSensors": 2,
+          "lowTrustShapeFindings": 0
+        },
+        "sensorCoverageSensors": {
+          "gps.speedKph": {
+            "sampleCount": 2,
+            "status": "unsupported",
+            "trustTier": "direct_anchor",
+            "surfaces": [],
+            "shapeFindingCodes": []
+          },
+          "rpm": {
+            "sampleCount": 2,
+            "status": "covered",
+            "trustTier": "verified_decoded",
+            "surfaces": [
+              "learned_baseline_context",
+              "transition_reference",
+              "transition_target"
+            ],
+            "shapeFindingCodes": []
+          },
+          "speedKph": {
+            "sampleCount": 2,
+            "status": "covered",
+            "trustTier": "verified_decoded",
+            "surfaces": [
+              "transition_reference"
+            ],
+            "shapeFindingCodes": []
+          }
+        },
+        "faultRecorder": {
+          "enabled": true,
+          "writes": 0,
+          "hasLastEvent": false
+        }
+      }
+    },
+    {
+      "path": "tests/fixtures/diagnostic_replay_speed_disagreement_vehicle_baseline_disabled.jsonl",
+      "replayOptions": {
+        "vehicleBaselineEnabled": false
+      },
+      "proves": "Speed-disagreement replay with vehicle baselines disabled: learned-baseline coverage surfaces disappear while signal-health anomaly truth remains.",
+      "expected": {
+        "frames": 2,
+        "anomalyFrames": 2,
+        "faultEvents": 1,
+        "diagnosticStatusCounts": {
+          "anomaly_detected": 2
+        },
+        "severityCounts": {
+          "warning": 2
+        },
+        "firstAnomaly": {
+          "frame": 0,
+          "status": "anomaly_detected",
+          "severity": "warning",
+          "findingCount": 1,
+          "activeFindingCodes": ["source_disagreement"]
+        },
+        "findingCounts": {
+          "source_disagreement": 2
+        },
+        "healthVerdictLabel": "anomaly_likely",
+        "transitionBaselineReady": false,
+        "lastDiagnostic": {
+          "status": "anomaly_detected",
+          "severity": "warning",
+          "findingCount": 1,
+          "activeFindingCodes": ["source_disagreement"]
+        },
+        "signalMonitor": {
+          "enabled": true,
+          "ok": false,
+          "faultCount": 1,
+          "watching": ["coolantC", "fuelPct", "rpm", "speedKph"]
+        },
+        "sensorCoverage": {
+          "observedSensors": 5,
+          "coveredSensors": 5,
+          "lowTrustSensors": 0,
+          "unsupportedSensors": 0,
+          "lowTrustShapeFindings": 0
+        },
+        "sensorCoverageSensors": {
+          "coolantC": {
+            "sampleCount": 2,
+            "status": "covered",
+            "trustTier": "verified_decoded",
+            "surfaces": [
+              "signal_health"
+            ],
+            "shapeFindingCodes": []
+          },
+          "gps.speedKph": {
+            "sampleCount": 2,
+            "status": "covered",
+            "trustTier": "direct_anchor",
+            "surfaces": [
+              "source_agreement_anchor"
+            ],
+            "shapeFindingCodes": []
+          },
+          "rpm": {
+            "sampleCount": 2,
+            "status": "covered",
+            "trustTier": "verified_decoded",
+            "surfaces": [
+              "signal_health",
+              "transition_reference",
+              "transition_target"
+            ],
+            "shapeFindingCodes": []
+          },
+          "speedKph": {
+            "sampleCount": 2,
+            "status": "covered",
+            "trustTier": "verified_decoded",
+            "surfaces": [
+              "signal_health",
+              "transition_reference"
+            ],
+            "shapeFindingCodes": []
+          }
+        },
+        "faultRecorder": {
+          "enabled": true,
+          "writes": 1,
+          "hasLastEvent": true
+        }
+      }
+    },
+    {
+      "path": "tests/fixtures/diagnostic_replay_speed_disagreement_transition_monitor_disabled.jsonl",
+      "replayOptions": {
+        "transitionMonitorEnabled": false
+      },
+      "proves": "Speed-disagreement replay with transition monitoring disabled: transition coverage surfaces disappear while signal-health anomaly truth remains.",
+      "expected": {
+        "frames": 2,
+        "anomalyFrames": 2,
+        "faultEvents": 1,
+        "diagnosticStatusCounts": {
+          "anomaly_detected": 2
+        },
+        "severityCounts": {
+          "warning": 2
+        },
+        "firstAnomaly": {
+          "frame": 0,
+          "status": "anomaly_detected",
+          "severity": "warning",
+          "findingCount": 1,
+          "activeFindingCodes": ["source_disagreement"]
+        },
+        "findingCounts": {
+          "source_disagreement": 2
+        },
+        "healthVerdictLabel": "anomaly_likely",
+        "transitionBaselineReady": false,
+        "lastDiagnostic": {
+          "status": "anomaly_detected",
+          "severity": "warning",
+          "findingCount": 1,
+          "activeFindingCodes": ["source_disagreement"]
+        },
+        "signalMonitor": {
+          "enabled": true,
+          "ok": false,
+          "faultCount": 1,
+          "watching": ["coolantC", "fuelPct", "rpm", "speedKph"]
+        },
+        "sensorCoverage": {
+          "observedSensors": 5,
+          "coveredSensors": 5,
+          "lowTrustSensors": 0,
+          "unsupportedSensors": 0,
+          "lowTrustShapeFindings": 0
+        },
+        "sensorCoverageSensors": {
+          "gps.speedKph": {
+            "sampleCount": 2,
+            "status": "covered",
+            "trustTier": "direct_anchor",
+            "surfaces": [
+              "source_agreement_anchor"
+            ],
+            "shapeFindingCodes": []
+          },
+          "rpm": {
+            "sampleCount": 2,
+            "status": "covered",
+            "trustTier": "verified_decoded",
+            "surfaces": [
+              "learned_baseline_context",
+              "signal_health"
+            ],
+            "shapeFindingCodes": []
+          },
+          "speedKph": {
+            "sampleCount": 2,
+            "status": "covered",
+            "trustTier": "verified_decoded",
+            "surfaces": [
+              "signal_health"
+            ],
+            "shapeFindingCodes": []
+          }
+        },
+        "faultRecorder": {
+          "enabled": true,
+          "writes": 1,
+          "hasLastEvent": true
+        }
+      }
+    },
+    {
+      "path": "tests/fixtures/diagnostic_replay_speed_disagreement_fault_recorder_disabled.jsonl",
+      "replayOptions": {
+        "faultRecorderEnabled": false
+      },
+      "proves": "Speed-disagreement replay with fault recording disabled: deterministic anomaly truth remains while persisted fault-event paths and summaries stay empty.",
+      "expected": {
+        "frames": 2,
+        "anomalyFrames": 2,
+        "faultEvents": 0,
+        "diagnosticStatusCounts": {
+          "anomaly_detected": 2
+        },
+        "severityCounts": {
+          "warning": 2
+        },
+        "firstAnomaly": {
+          "frame": 0,
+          "status": "anomaly_detected",
+          "severity": "warning",
+          "findingCount": 1,
+          "activeFindingCodes": ["source_disagreement"]
+        },
+        "findingCounts": {
+          "source_disagreement": 2
+        },
+        "healthVerdictLabel": "anomaly_likely",
+        "transitionBaselineReady": false,
+        "lastDiagnostic": {
+          "status": "anomaly_detected",
+          "severity": "warning",
+          "findingCount": 1,
+          "activeFindingCodes": ["source_disagreement"]
+        },
+        "signalMonitor": {
+          "enabled": true,
+          "ok": false,
+          "faultCount": 1,
+          "watching": ["coolantC", "fuelPct", "rpm", "speedKph"]
+        },
+        "sensorCoverage": {
+          "observedSensors": 5,
+          "coveredSensors": 5,
+          "lowTrustSensors": 0,
+          "unsupportedSensors": 0,
+          "lowTrustShapeFindings": 0
+        },
+        "sensorCoverageSensors": {
+          "gps.speedKph": {
+            "sampleCount": 2,
+            "status": "covered",
+            "trustTier": "direct_anchor",
+            "surfaces": [
+              "source_agreement_anchor"
+            ],
+            "shapeFindingCodes": []
+          },
+          "rpm": {
+            "sampleCount": 2,
+            "status": "covered",
+            "trustTier": "verified_decoded",
+            "surfaces": [
+              "learned_baseline_context",
+              "signal_health",
+              "transition_reference",
+              "transition_target"
+            ],
+            "shapeFindingCodes": []
+          },
+          "speedKph": {
+            "sampleCount": 2,
+            "status": "covered",
+            "trustTier": "verified_decoded",
+            "surfaces": [
+              "signal_health",
+              "transition_reference"
+            ],
+            "shapeFindingCodes": []
+          }
+        },
+        "faultRecorder": {
+          "enabled": false,
+          "writes": 0,
+          "hasLastEvent": false
+        }
+      }
+    },
+    {
+      "path": "tests/fixtures/diagnostic_replay_suppression_expiry.jsonl",
+      "proves": "Fault-recorder duplicate suppression and expiry: three detected speed disagreements create two persisted events.",
+      "expected": {
+        "frames": 3,
+        "anomalyFrames": 3,
+        "faultEvents": 2,
+        "diagnosticStatusCounts": {
+          "anomaly_detected": 3
+        },
+        "severityCounts": {
+          "warning": 3
+        },
+        "firstAnomaly": {
+          "frame": 0,
+          "status": "anomaly_detected",
+          "severity": "warning",
+          "findingCount": 1,
+          "activeFindingCodes": ["source_disagreement"]
+        },
+        "findingCounts": {
+          "source_disagreement": 3
+        },
+        "healthVerdictLabel": "anomaly_likely",
+        "transitionBaselineReady": false,
+        "lastDiagnostic": {
+          "status": "anomaly_detected",
+          "severity": "warning",
+          "findingCount": 1,
+          "activeFindingCodes": ["source_disagreement"]
+        },
+        "signalMonitor": {
+          "enabled": true,
+          "ok": false,
+          "faultCount": 1,
+          "watching": ["coolantC", "fuelPct", "rpm", "speedKph"]
+        },
+        "sensorCoverage": {
+          "observedSensors": 5,
+          "coveredSensors": 5,
+          "lowTrustSensors": 0,
+          "unsupportedSensors": 0,
+          "lowTrustShapeFindings": 0
+        },
+        "faultRecorder": {
+          "enabled": true,
+          "writes": 2,
+          "hasLastEvent": true
+        }
+      }
+    },
+    {
+      "path": "tests/fixtures/diagnostic_replay_transition_flat_maf.jsonl",
+      "proves": "Learned transition baseline replay where four good starts teach startup response and one flat-MAF start emits transition findings.",
+      "expected": {
+        "frames": 30,
+        "anomalyFrames": 1,
+        "faultEvents": 1,
+        "diagnosticStatusCounts": {
+          "anomaly_detected": 1,
+          "nominal": 29
+        },
+        "severityCounts": {
+          "ok": 29,
+          "warning": 1
+        },
+        "firstAnomaly": {
+          "frame": 29,
+          "status": "anomaly_detected",
+          "severity": "warning",
+          "findingCount": 2,
+          "activeFindingCodes": [
+            "startup_maf_response_stuck_flat",
+            "startup_maf_response_no_response"
+          ]
+        },
+        "findingCounts": {
+          "startup_maf_response_no_response": 1,
+          "startup_maf_response_stuck_flat": 1
+        },
+        "healthVerdictLabel": "anomaly_likely",
+        "transitionBaselineReady": true,
+        "lastDiagnostic": {
+          "status": "anomaly_detected",
+          "severity": "warning",
+          "findingCount": 2,
+          "activeFindingCodes": [
+            "startup_maf_response_stuck_flat",
+            "startup_maf_response_no_response"
+          ]
+        },
+        "signalMonitor": {
+          "enabled": true,
+          "ok": true,
+          "faultCount": 0,
+          "watching": [
+            "coolantC",
+            "engineLoadPct",
+            "fuelPct",
+            "mafGps",
+            "mapKpa",
+            "rpm",
+            "speedKph",
+            "throttlePct"
+          ]
+        },
+        "sensorCoverage": {
+          "observedSensors": 8,
+          "coveredSensors": 8,
+          "lowTrustSensors": 0,
+          "unsupportedSensors": 0,
+          "lowTrustShapeFindings": 0
+        },
+        "faultRecorder": {
+          "enabled": true,
+          "writes": 1,
+          "hasLastEvent": true
+        }
+      }
+    },
+    {
+      "path": "tests/fixtures/diagnostic_replay_transition_flat_map.jsonl",
+      "proves": "Learned transition baseline replay where normal startup MAF response and flat MAP response emits non-MAF transition findings.",
+      "expected": {
+        "frames": 30,
+        "anomalyFrames": 1,
+        "faultEvents": 1,
+        "diagnosticStatusCounts": {
+          "anomaly_detected": 1,
+          "nominal": 29
+        },
+        "severityCounts": {
+          "ok": 29,
+          "warning": 1
+        },
+        "firstAnomaly": {
+          "frame": 29,
+          "status": "anomaly_detected",
+          "severity": "warning",
+          "findingCount": 2,
+          "activeFindingCodes": [
+            "startup_map_response_stuck_flat",
+            "startup_map_response_no_response"
+          ]
+        },
+        "findingCounts": {
+          "startup_map_response_no_response": 1,
+          "startup_map_response_stuck_flat": 1
+        },
+        "healthVerdictLabel": "anomaly_likely",
+        "transitionBaselineReady": true,
+        "lastDiagnostic": {
+          "status": "anomaly_detected",
+          "severity": "warning",
+          "findingCount": 2,
+          "activeFindingCodes": [
+            "startup_map_response_stuck_flat",
+            "startup_map_response_no_response"
+          ]
+        },
+        "signalMonitor": {
+          "enabled": true,
+          "ok": true,
+          "faultCount": 0,
+          "watching": [
+            "coolantC",
+            "engineLoadPct",
+            "fuelPct",
+            "mafGps",
+            "mapKpa",
+            "rpm",
+            "speedKph",
+            "throttlePct"
+          ]
+        },
+        "sensorCoverage": {
+          "observedSensors": 8,
+          "coveredSensors": 8,
+          "lowTrustSensors": 0,
+          "unsupportedSensors": 0,
+          "lowTrustShapeFindings": 0
+        },
+        "faultRecorder": {
+          "enabled": true,
+          "writes": 1,
+          "hasLastEvent": true
+        }
+      }
+    },
+    {
+      "path": "tests/fixtures/diagnostic_replay_transition_flat_rpm_shift.jsonl",
+      "proves": "Learned transition baseline replay where five normal gear shifts teach RPM response and one flat-RPM shift emits non-MAF transition findings.",
+      "expected": {
+        "frames": 36,
+        "anomalyFrames": 1,
+        "faultEvents": 1,
+        "diagnosticStatusCounts": {
+          "anomaly_detected": 1,
+          "nominal": 35
+        },
+        "severityCounts": {
+          "ok": 35,
+          "warning": 1
+        },
+        "firstAnomaly": {
+          "frame": 35,
+          "status": "anomaly_detected",
+          "severity": "warning",
+          "findingCount": 2,
+          "activeFindingCodes": [
+            "shift_rpm_response_stuck_flat",
+            "shift_rpm_response_no_response"
+          ]
+        },
+        "findingCounts": {
+          "shift_rpm_response_no_response": 1,
+          "shift_rpm_response_stuck_flat": 1
+        },
+        "healthVerdictLabel": "anomaly_likely",
+        "transitionBaselineReady": true,
+        "lastDiagnostic": {
+          "status": "anomaly_detected",
+          "severity": "warning",
+          "findingCount": 2,
+          "activeFindingCodes": [
+            "shift_rpm_response_stuck_flat",
+            "shift_rpm_response_no_response"
+          ]
+        },
+        "signalMonitor": {
+          "enabled": true,
+          "ok": true,
+          "faultCount": 0,
+          "watching": [
+            "coolantC",
+            "engineLoadPct",
+            "fuelPct",
+            "mafGps",
+            "mapKpa",
+            "rpm",
+            "speedKph",
+            "throttlePct"
+          ]
+        },
+        "sensorCoverage": {
+          "observedSensors": 9,
+          "coveredSensors": 9,
+          "lowTrustSensors": 0,
+          "unsupportedSensors": 0,
+          "lowTrustShapeFindings": 0
+        },
+        "faultRecorder": {
+          "enabled": true,
+          "writes": 1,
+          "hasLastEvent": true
+        }
+      }
+    },
+    {
+      "path": "tests/fixtures/diagnostic_replay_future_sensor_low_trust.jsonl",
+      "diagnosticCandidateSignals": "tests/fixtures/diagnostic_candidate_signals_low_trust.json",
+      "proves": "Future-sensor replay where diagnostic_candidate_signals.json marks one observed auto-detected sensor as low-trust, another observed sensor remains explicitly unsupported, and an unobserved sidecar-only candidate does not appear in sensorCoverage.",
+      "expected": {
+        "frames": 2,
+        "anomalyFrames": 0,
+        "faultEvents": 0,
+        "diagnosticStatusCounts": {
+          "nominal": 2
+        },
+        "severityCounts": {
+          "ok": 2
+        },
+        "firstAnomaly": null,
+        "findingCounts": {},
+        "healthVerdictLabel": "insufficient_evidence",
+        "healthVerdictAbstainRequired": true,
+        "transitionBaselineReady": false,
+        "lastDiagnostic": {
+          "status": "nominal",
+          "severity": "ok",
+          "findingCount": 0,
+          "activeFindingCodes": []
+        },
+        "signalMonitor": {
+          "enabled": true,
+          "ok": true,
+          "faultCount": 0,
+          "watching": [
+            "rpm",
+            "speedKph"
+          ]
+        },
+        "sensorCoverage": {
+          "observedSensors": 4,
+          "coveredSensors": 2,
+          "lowTrustSensors": 1,
+          "unsupportedSensors": 1,
+          "lowTrustShapeFindings": 0,
+          "coverageRatio": 0.5,
+          "gapRatio": 0.5
+        },
+        "sensorCoverageSurfaceSummary": {
+          "gapSensors": [
+            "autoWheelSpeedKph",
+            "mysteryVoltage"
+          ],
+          "statusSensors": {
+            "low_trust": [
+              "autoWheelSpeedKph"
+            ],
+            "unsupported": [
+              "mysteryVoltage"
+            ]
+          },
+          "surfaceCounts": {
+            "learned_baseline_context": 1,
+            "learned_baseline_target": 0,
+            "signal_health": 2,
+            "source_agreement_anchor": 0,
+            "transition_event_input": 0,
+            "transition_reference": 2,
+            "transition_target": 1
+          }
+        },
+        "absentSensorCoverageSensors": [
+          "autoBoostGuessKpa"
+        ],
+        "sensorCoverageSensors": {
+          "autoWheelSpeedKph": {
+            "sampleCount": 2,
+            "status": "low_trust",
+            "trustTier": "low_trust_candidate",
+            "surfaces": [],
+            "reason": "Observed as low-trust diagnostic evidence only; needs promotion, rules, or known-good baseline support.",
+            "shapeFindingCodes": []
+          },
+          "mysteryVoltage": {
+            "sampleCount": 2,
+            "status": "unsupported",
+            "trustTier": "unknown",
+            "surfaces": [],
+            "reason": "Observed but no deterministic rule, learned model, transition profile, or low-trust policy covers it yet.",
+            "shapeFindingCodes": []
+          }
+        },
+        "cliSummaryIncludes": [
+          "[diagnostic-replay] sensor_coverage observed=4 covered=2 low_trust=1 unsupported=1 shape_findings=0 coverage_ratio=0.500 gap_ratio=0.500",
+          "[diagnostic-replay] sensor_surfaces signal_health=2 source_agreement_anchor=0 learned_baseline_target=0 learned_baseline_context=1 transition_target=1 transition_reference=2 transition_event_input=0 gaps=2"
+        ],
+        "faultRecorder": {
+          "enabled": true,
+          "writes": 0,
+          "hasLastEvent": false
+        }
+      }
+    },
+    {
+      "path": "tests/fixtures/diagnostic_replay_future_sensor_low_trust_flat.jsonl",
+      "diagnosticCandidateSignals": "tests/fixtures/diagnostic_candidate_signals_low_trust.json",
+      "proves": "Future-sensor replay where a low-trust auto-detected sensor has stuck-flat shape evidence that stays in sensorCoverage and does not become diagnostic truth.",
+      "expected": {
+        "frames": 8,
+        "anomalyFrames": 0,
+        "faultEvents": 0,
+        "diagnosticStatusCounts": {
+          "nominal": 8
+        },
+        "severityCounts": {
+          "ok": 8
+        },
+        "firstAnomaly": null,
+        "findingCounts": {},
+        "healthVerdictLabel": "insufficient_evidence",
+        "healthVerdictAbstainRequired": true,
+        "transitionBaselineReady": false,
+        "lastDiagnostic": {
+          "status": "nominal",
+          "severity": "ok",
+          "findingCount": 0,
+          "activeFindingCodes": []
+        },
+        "signalMonitor": {
+          "enabled": true,
+          "ok": true,
+          "faultCount": 0,
+          "watching": [
+            "rpm",
+            "speedKph"
+          ]
+        },
+        "sensorCoverage": {
+          "observedSensors": 3,
+          "coveredSensors": 2,
+          "lowTrustSensors": 1,
+          "unsupportedSensors": 0,
+          "lowTrustShapeFindings": 1
+        },
+        "sensorCoverageSensors": {
+          "autoWheelSpeedKph": {
+            "status": "low_trust",
+            "trustTier": "low_trust_candidate",
+            "surfaces": [],
+            "reason": "Observed as low-trust diagnostic evidence only; needs promotion, rules, or known-good baseline support.",
+            "shapeFindingCodes": [
+              "low_trust_candidate_stuck_flat"
+            ],
+            "shapeFindingCandidateIds": [
+              "0x221:b16:l16:little:u"
+            ],
+            "shapeFindingTrustMetadataSources": [
+              "diagnostic_candidate_signals_sidecar"
+            ]
+          }
+        },
+        "faultRecorder": {
+          "enabled": true,
+          "writes": 0,
+          "hasLastEvent": false
+        }
+      }
+    },
+    {
+      "path": "tests/fixtures/diagnostic_replay_future_sensor_row_trust.jsonl",
+      "proves": "Future-sensor replay where row-level vehicle_state trust metadata marks auto-detected sensors as low-trust without a CLI candidate export file.",
+      "expected": {
+        "frames": 2,
+        "anomalyFrames": 0,
+        "faultEvents": 0,
+        "diagnosticStatusCounts": {
+          "nominal": 2
+        },
+        "severityCounts": {
+          "ok": 2
+        },
+        "firstAnomaly": null,
+        "findingCounts": {},
+        "healthVerdictLabel": "insufficient_evidence",
+        "healthVerdictAbstainRequired": true,
+        "transitionBaselineReady": false,
+        "lastDiagnostic": {
+          "status": "nominal",
+          "severity": "ok",
+          "findingCount": 0,
+          "activeFindingCodes": []
+        },
+        "signalMonitor": {
+          "enabled": true,
+          "ok": true,
+          "faultCount": 0,
+          "watching": [
+            "rpm",
+            "speedKph"
+          ]
+        },
+        "sensorCoverage": {
+          "observedSensors": 5,
+          "coveredSensors": 2,
+          "lowTrustSensors": 2,
+          "unsupportedSensors": 1,
+          "lowTrustShapeFindings": 0
+        },
+        "sensorCoverageSensors": {
+          "autoBoostGuessKpa": {
+            "status": "low_trust",
+            "trustTier": "low_trust_candidate",
+            "surfaces": [],
+            "reason": "Observed as low-trust diagnostic evidence only; needs promotion, rules, or known-good baseline support.",
+            "shapeFindingCodes": []
+          },
+          "autoWheelSpeedKph": {
+            "status": "low_trust",
+            "trustTier": "low_trust_candidate",
+            "surfaces": [],
+            "reason": "Observed as low-trust diagnostic evidence only; needs promotion, rules, or known-good baseline support.",
+            "shapeFindingCodes": []
+          },
+          "mysteryVoltage": {
+            "status": "unsupported",
+            "trustTier": "unknown",
+            "surfaces": [],
+            "reason": "Observed but no deterministic rule, learned model, transition profile, or low-trust policy covers it yet.",
+            "shapeFindingCodes": []
+          }
+        },
+        "faultRecorder": {
+          "enabled": true,
+          "writes": 0,
+          "hasLastEvent": false
+        }
+      }
+    },
+    {
+      "path": "tests/fixtures/diagnostic_replay_future_sensor_inline_trust_unobserved.jsonl",
+      "proves": "Future-sensor replay where inline low-trust metadata names candidate sensors but the values are not observed in vehicle_state, so metadata-only names do not appear in sensorCoverage.",
+      "expected": {
+        "frames": 2,
+        "anomalyFrames": 0,
+        "faultEvents": 0,
+        "diagnosticStatusCounts": {
+          "nominal": 2
+        },
+        "severityCounts": {
+          "ok": 2
+        },
+        "firstAnomaly": null,
+        "findingCounts": {},
+        "healthVerdictLabel": "insufficient_evidence",
+        "healthVerdictAbstainRequired": true,
+        "transitionBaselineReady": false,
+        "lastDiagnostic": {
+          "status": "nominal",
+          "severity": "ok",
+          "findingCount": 0,
+          "activeFindingCodes": []
+        },
+        "signalMonitor": {
+          "enabled": true,
+          "ok": true,
+          "faultCount": 0,
+          "watching": [
+            "rpm",
+            "speedKph"
+          ]
+        },
+        "sensorCoverage": {
+          "observedSensors": 2,
+          "coveredSensors": 2,
+          "lowTrustSensors": 0,
+          "unsupportedSensors": 0,
+          "lowTrustShapeFindings": 0
+        },
+        "absentSensorCoverageSensors": [
+          "autoBoostGuessKpa",
+          "autoWheelSpeedKph"
+        ],
+        "faultRecorder": {
+          "enabled": true,
+          "writes": 0,
+          "hasLastEvent": false
+        }
+      }
+    },
+    {
+      "path": "tests/fixtures/diagnostic_replay_future_sensor_row_trust_shape.jsonl",
+      "proves": "Future-sensor replay where row-level _health trust metadata with candidateId but no input trustMetadataSource produces low-trust shape findings while normalizing output provenance from the metadata path.",
+      "expected": {
+        "frames": 8,
+        "anomalyFrames": 0,
+        "faultEvents": 0,
+        "diagnosticStatusCounts": {
+          "nominal": 8
+        },
+        "severityCounts": {
+          "ok": 8
+        },
+        "firstAnomaly": null,
+        "findingCounts": {},
+        "healthVerdictLabel": "insufficient_evidence",
+        "healthVerdictAbstainRequired": true,
+        "transitionBaselineReady": false,
+        "lastDiagnostic": {
+          "status": "nominal",
+          "severity": "ok",
+          "findingCount": 0,
+          "activeFindingCodes": []
+        },
+        "signalMonitor": {
+          "enabled": true,
+          "ok": true,
+          "faultCount": 0,
+          "watching": [
+            "rpm",
+            "speedKph"
+          ]
+        },
+        "sensorCoverage": {
+          "observedSensors": 4,
+          "coveredSensors": 2,
+          "lowTrustSensors": 2,
+          "unsupportedSensors": 0,
+          "lowTrustShapeFindings": 2
+        },
+        "sensorCoverageSensors": {
+          "autoBoostGuessKpa": {
+            "sampleCount": 8,
+            "status": "low_trust",
+            "trustTier": "low_trust_candidate",
+            "surfaces": [],
+            "reason": "Observed as low-trust diagnostic evidence only; needs promotion, rules, or known-good baseline support.",
+            "shapeFindingCodes": [
+              "low_trust_candidate_stuck_flat"
+            ],
+            "shapeFindingCandidateIds": [
+              "0x330:b8:l8:u"
+            ],
+            "shapeFindingTrustMetadataSources": [
+              "_health.diagnosticCandidateSignals"
+            ]
+          },
+          "autoWheelSpeedKph": {
+            "sampleCount": 8,
+            "status": "low_trust",
+            "trustTier": "low_trust_candidate",
+            "surfaces": [],
+            "reason": "Observed as low-trust diagnostic evidence only; needs promotion, rules, or known-good baseline support.",
+            "shapeFindingCodes": [
+              "low_trust_candidate_noisy_or_flapping"
+            ],
+            "shapeFindingCandidateIds": [
+              "0x221:b16:l16:little:u"
+            ],
+            "shapeFindingTrustMetadataSources": [
+              "_health.sensorTrust"
+            ]
+          }
+        },
+        "faultRecorder": {
+          "enabled": true,
+          "writes": 0,
+          "hasLastEvent": false
+        }
+      }
+    },
+    {
+      "path": "tests/fixtures/diagnostic_replay_future_sensor_top_level_trust.jsonl",
+      "proves": "Future-sensor replay where top-level vehicle_state trust metadata marks auto-detected sensors as low-trust without a CLI candidate export file.",
+      "expected": {
+        "frames": 2,
+        "anomalyFrames": 0,
+        "faultEvents": 0,
+        "diagnosticStatusCounts": {
+          "nominal": 2
+        },
+        "severityCounts": {
+          "ok": 2
+        },
+        "firstAnomaly": null,
+        "findingCounts": {},
+        "healthVerdictLabel": "insufficient_evidence",
+        "healthVerdictAbstainRequired": true,
+        "transitionBaselineReady": false,
+        "lastDiagnostic": {
+          "status": "nominal",
+          "severity": "ok",
+          "findingCount": 0,
+          "activeFindingCodes": []
+        },
+        "signalMonitor": {
+          "enabled": true,
+          "ok": true,
+          "faultCount": 0,
+          "watching": [
+            "rpm",
+            "speedKph"
+          ]
+        },
+        "sensorCoverage": {
+          "observedSensors": 5,
+          "coveredSensors": 2,
+          "lowTrustSensors": 2,
+          "unsupportedSensors": 1,
+          "lowTrustShapeFindings": 0
+        },
+        "sensorCoverageSensors": {
+          "autoTorqueGuessNm": {
+            "status": "low_trust",
+            "trustTier": "low_trust_candidate",
+            "surfaces": [],
+            "reason": "Observed as low-trust diagnostic evidence only; needs promotion, rules, or known-good baseline support.",
+            "shapeFindingCodes": []
+          },
+          "autoWheelSpeedKph": {
+            "status": "low_trust",
+            "trustTier": "low_trust_candidate",
+            "surfaces": [],
+            "reason": "Observed as low-trust diagnostic evidence only; needs promotion, rules, or known-good baseline support.",
+            "shapeFindingCodes": []
+          },
+          "mysteryVoltage": {
+            "status": "unsupported",
+            "trustTier": "unknown",
+            "surfaces": [],
+            "reason": "Observed but no deterministic rule, learned model, transition profile, or low-trust policy covers it yet.",
+            "shapeFindingCodes": []
+          }
+        },
+        "faultRecorder": {
+          "enabled": true,
+          "writes": 0,
+          "hasLastEvent": false
+        }
+      }
+    },
+    {
+      "path": "tests/fixtures/diagnostic_replay_future_sensor_top_level_trust_shape.jsonl",
+      "proves": "Future-sensor replay where top-level vehicle_state trust metadata with candidateId but no input trustMetadataSource produces low-trust shape findings while normalizing output provenance from the metadata path.",
+      "expected": {
+        "frames": 8,
+        "anomalyFrames": 0,
+        "faultEvents": 0,
+        "diagnosticStatusCounts": {
+          "nominal": 8
+        },
+        "severityCounts": {
+          "ok": 8
+        },
+        "firstAnomaly": null,
+        "findingCounts": {},
+        "healthVerdictLabel": "insufficient_evidence",
+        "healthVerdictAbstainRequired": true,
+        "transitionBaselineReady": false,
+        "lastDiagnostic": {
+          "status": "nominal",
+          "severity": "ok",
+          "findingCount": 0,
+          "activeFindingCodes": []
+        },
+        "signalMonitor": {
+          "enabled": true,
+          "ok": true,
+          "faultCount": 0,
+          "watching": [
+            "rpm",
+            "speedKph"
+          ]
+        },
+        "sensorCoverage": {
+          "observedSensors": 4,
+          "coveredSensors": 2,
+          "lowTrustSensors": 2,
+          "unsupportedSensors": 0,
+          "lowTrustShapeFindings": 2
+        },
+        "sensorCoverageSensors": {
+          "autoTorqueGuessNm": {
+            "sampleCount": 8,
+            "status": "low_trust",
+            "trustTier": "low_trust_candidate",
+            "surfaces": [],
+            "reason": "Observed as low-trust diagnostic evidence only; needs promotion, rules, or known-good baseline support.",
+            "shapeFindingCodes": [
+              "low_trust_candidate_stuck_flat"
+            ],
+            "shapeFindingCandidateIds": [
+              "0x331:b16:l16:u"
+            ],
+            "shapeFindingTrustMetadataSources": [
+              "diagnosticCandidateSignals"
+            ]
+          },
+          "autoWheelSpeedKph": {
+            "sampleCount": 8,
+            "status": "low_trust",
+            "trustTier": "low_trust_candidate",
+            "surfaces": [],
+            "reason": "Observed as low-trust diagnostic evidence only; needs promotion, rules, or known-good baseline support.",
+            "shapeFindingCodes": [
+              "low_trust_candidate_noisy_or_flapping"
+            ],
+            "shapeFindingCandidateIds": [
+              "0x221:b16:l16:little:u"
+            ],
+            "shapeFindingTrustMetadataSources": [
+              "sensorTrust"
+            ]
+          }
+        },
+        "faultRecorder": {
+          "enabled": true,
+          "writes": 0,
+          "hasLastEvent": false
+        }
+      }
+    },
+    {
+      "path": "tests/fixtures/diagnostic_replay_future_sensor_verified_unsupported.jsonl",
+      "proves": "Future-sensor replay where a verified decoded sensor without a deterministic rule, baseline, or transition surface is explicitly unsupported rather than low-trust or covered.",
+      "expected": {
+        "frames": 2,
+        "anomalyFrames": 0,
+        "faultEvents": 0,
+        "diagnosticStatusCounts": {
+          "nominal": 2
+        },
+        "severityCounts": {
+          "ok": 2
+        },
+        "firstAnomaly": null,
+        "findingCounts": {},
+        "healthVerdictLabel": "insufficient_evidence",
+        "healthVerdictAbstainRequired": true,
+        "transitionBaselineReady": false,
+        "lastDiagnostic": {
+          "status": "nominal",
+          "severity": "ok",
+          "findingCount": 0,
+          "activeFindingCodes": []
+        },
+        "signalMonitor": {
+          "enabled": true,
+          "ok": true,
+          "faultCount": 0,
+          "watching": [
+            "rpm",
+            "speedKph"
+          ]
+        },
+        "sensorCoverage": {
+          "observedSensors": 3,
+          "coveredSensors": 2,
+          "lowTrustSensors": 0,
+          "unsupportedSensors": 1,
+          "lowTrustShapeFindings": 0,
+          "coverageRatio": 0.666667,
+          "gapRatio": 0.333333
+        },
+        "sensorCoverageSurfaceSummary": {
+          "gapSensors": [
+            "futureCabinPressureKpa"
+          ],
+          "statusSensors": {
+            "unsupported": [
+              "futureCabinPressureKpa"
+            ]
+          },
+          "surfaceCounts": {
+            "learned_baseline_context": 1,
+            "learned_baseline_target": 0,
+            "signal_health": 2,
+            "source_agreement_anchor": 0,
+            "transition_event_input": 0,
+            "transition_reference": 2,
+            "transition_target": 1
+          }
+        },
+        "sensorCoverageSensors": {
+          "futureCabinPressureKpa": {
+            "status": "unsupported",
+            "trustTier": "verified_decoded",
+            "surfaces": [],
+            "reason": "Observed but no deterministic rule, learned model, transition profile, or low-trust policy covers it yet.",
+            "shapeFindingCodes": []
+          }
+        },
+        "cliSummaryIncludes": [
+          "[diagnostic-replay] sensor_coverage observed=3 covered=2 low_trust=0 unsupported=1 shape_findings=0 coverage_ratio=0.667 gap_ratio=0.333",
+          "[diagnostic-replay] sensor_surfaces signal_health=2 source_agreement_anchor=0 learned_baseline_target=0 learned_baseline_context=1 transition_target=1 transition_reference=2 transition_event_input=0 gaps=1"
+        ],
+        "faultRecorder": {
+          "enabled": true,
+          "writes": 0,
+          "hasLastEvent": false
+        }
+      }
+    },
+    {
+      "path": "tests/fixtures/diagnostic_replay_future_sensor_verified_baseline.jsonl",
+      "replayOptions": {
+        "transitionMonitorEnabled": false
+      },
+      "baselineProfiles": [
+        {
+          "name": "future_cabin_pressure",
+          "target": "futureCabinPressureKpa",
+          "unit": "kPa",
+          "features": [
+            {
+              "signal": "rpm",
+              "bucketSize": 250.0
+            },
+            {
+              "signal": "futureCabinHumidityPct",
+              "bucketSize": 5.0
+            }
+          ]
+        }
+      ],
+      "proves": "Future-sensor replay where verified auto-detected scalar sensors gain learned-baseline target/context coverage from a fixture-scoped profile without adding a hard-coded signal-health rule.",
+      "expected": {
+        "frames": 2,
+        "anomalyFrames": 0,
+        "faultEvents": 0,
+        "diagnosticStatusCounts": {
+          "nominal": 2
+        },
+        "severityCounts": {
+          "ok": 2
+        },
+        "firstAnomaly": null,
+        "findingCounts": {},
+        "healthVerdictLabel": "insufficient_evidence",
+        "healthVerdictAbstainRequired": true,
+        "transitionBaselineReady": false,
+        "lastDiagnostic": {
+          "status": "nominal",
+          "severity": "ok",
+          "findingCount": 0,
+          "activeFindingCodes": []
+        },
+        "signalMonitor": {
+          "enabled": true,
+          "ok": true,
+          "faultCount": 0,
+          "watching": [
+            "rpm",
+            "speedKph"
+          ]
+        },
+        "sensorCoverage": {
+          "observedSensors": 4,
+          "coveredSensors": 4,
+          "lowTrustSensors": 0,
+          "unsupportedSensors": 0,
+          "lowTrustShapeFindings": 0,
+          "coverageRatio": 1.0,
+          "gapRatio": 0.0
+        },
+        "sensorCoverageSurfaceSummary": {
+          "gapSensors": [],
+          "surfaceCounts": {
+            "learned_baseline_context": 2,
+            "learned_baseline_target": 1,
+            "signal_health": 2,
+            "source_agreement_anchor": 0,
+            "transition_event_input": 0,
+            "transition_reference": 0,
+            "transition_target": 0
+          },
+          "surfaceSensors": {
+            "learned_baseline_context": [
+              "futureCabinHumidityPct",
+              "rpm"
+            ],
+            "learned_baseline_target": [
+              "futureCabinPressureKpa"
+            ]
+          }
+        },
+        "sensorCoverageSensors": {
+          "futureCabinHumidityPct": {
+            "sampleCount": 2,
+            "status": "covered",
+            "trustTier": "verified_decoded",
+            "surfaces": [
+              "learned_baseline_context"
+            ],
+            "reason": "Observed with deterministic signal-health, baseline, transition, or source-agreement coverage.",
+            "shapeFindingCodes": []
+          },
+          "futureCabinPressureKpa": {
+            "sampleCount": 2,
+            "status": "covered",
+            "trustTier": "verified_decoded",
+            "surfaces": [
+              "learned_baseline_target"
+            ],
+            "reason": "Observed with deterministic signal-health, baseline, transition, or source-agreement coverage.",
+            "shapeFindingCodes": []
+          }
+        },
+        "baselineCoverage": {
+          "steadyState": {
+            "readyModels": []
+          }
+        },
+        "cliSummaryIncludes": [
+          "[diagnostic-replay] sensor_coverage observed=4 covered=4 low_trust=0 unsupported=0 shape_findings=0 coverage_ratio=1.000 gap_ratio=0.000",
+          "[diagnostic-replay] sensor_surfaces signal_health=2 source_agreement_anchor=0 learned_baseline_target=1 learned_baseline_context=2 transition_target=0 transition_reference=0 transition_event_input=0 gaps=0",
+          "[diagnostic-replay] vehicle_baseline enabled=true ready_models=none",
+          "[diagnostic-replay] next baseline steps:"
+        ],
+        "cliSummaryExcludes": [
+          "sensor coverage guidance: inspect sensorCoverage",
+          "vehicle baseline guidance: vehicle baseline disabled for this replay"
+        ],
+        "faultRecorder": {
+          "enabled": true,
+          "writes": 0,
+          "hasLastEvent": false
+        }
+      }
+    },
+    {
+      "path": "tests/fixtures/diagnostic_replay_future_sensor_verified_baseline_disabled.jsonl",
+      "replayOptions": {
+        "vehicleBaselineEnabled": false,
+        "transitionMonitorEnabled": false
+      },
+      "baselineProfiles": [
+        {
+          "name": "future_cabin_pressure",
+          "target": "futureCabinPressureKpa",
+          "unit": "kPa",
+          "features": [
+            {
+              "signal": "rpm",
+              "bucketSize": 250.0
+            },
+            {
+              "signal": "futureCabinHumidityPct",
+              "bucketSize": 5.0
+            }
+          ]
+        }
+      ],
+      "proves": "Future-sensor replay where verified auto-detected scalar sensors lose learned-baseline target/context coverage when vehicle baselines are disabled, leaving them explicitly unsupported without changing diagnostic truth.",
+      "expected": {
+        "frames": 2,
+        "anomalyFrames": 0,
+        "faultEvents": 0,
+        "diagnosticStatusCounts": {
+          "nominal": 2
+        },
+        "severityCounts": {
+          "ok": 2
+        },
+        "firstAnomaly": null,
+        "findingCounts": {},
+        "healthVerdictLabel": "insufficient_evidence",
+        "healthVerdictAbstainRequired": true,
+        "transitionBaselineReady": false,
+        "lastDiagnostic": {
+          "status": "nominal",
+          "severity": "ok",
+          "findingCount": 0,
+          "activeFindingCodes": []
+        },
+        "signalMonitor": {
+          "enabled": true,
+          "ok": true,
+          "faultCount": 0,
+          "watching": [
+            "rpm",
+            "speedKph"
+          ]
+        },
+        "sensorCoverage": {
+          "observedSensors": 4,
+          "coveredSensors": 2,
+          "lowTrustSensors": 0,
+          "unsupportedSensors": 2,
+          "lowTrustShapeFindings": 0,
+          "coverageRatio": 0.5,
+          "gapRatio": 0.5
+        },
+        "sensorCoverageSurfaceSummary": {
+          "gapSensors": [
+            "futureCabinHumidityPct",
+            "futureCabinPressureKpa"
+          ],
+          "statusSensors": {
+            "covered": [
+              "rpm",
+              "speedKph"
+            ],
+            "unsupported": [
+              "futureCabinHumidityPct",
+              "futureCabinPressureKpa"
+            ]
+          },
+          "surfaceCounts": {
+            "learned_baseline_context": 0,
+            "learned_baseline_target": 0,
+            "signal_health": 2,
+            "source_agreement_anchor": 0,
+            "transition_event_input": 0,
+            "transition_reference": 0,
+            "transition_target": 0
+          },
+          "surfaceSensors": {
+            "learned_baseline_context": [],
+            "learned_baseline_target": [],
+            "signal_health": [
+              "rpm",
+              "speedKph"
+            ],
+            "transition_reference": [],
+            "transition_target": []
+          }
+        },
+        "sensorCoverageSensors": {
+          "futureCabinHumidityPct": {
+            "sampleCount": 2,
+            "status": "unsupported",
+            "trustTier": "verified_decoded",
+            "surfaces": [],
+            "reason": "Observed but no deterministic rule, learned model, transition profile, or low-trust policy covers it yet.",
+            "shapeFindingCodes": []
+          },
+          "futureCabinPressureKpa": {
+            "sampleCount": 2,
+            "status": "unsupported",
+            "trustTier": "verified_decoded",
+            "surfaces": [],
+            "reason": "Observed but no deterministic rule, learned model, transition profile, or low-trust policy covers it yet.",
+            "shapeFindingCodes": []
+          }
+        },
+        "baselineCoverage": {
+          "steadyState": {
+            "readyModels": []
+          }
+        },
+        "cliSummaryIncludes": [
+          "[diagnostic-replay] sensor_coverage observed=4 covered=2 low_trust=0 unsupported=2 shape_findings=0 coverage_ratio=0.500 gap_ratio=0.500",
+          "[diagnostic-replay] sensor_surfaces signal_health=2 source_agreement_anchor=0 learned_baseline_target=0 learned_baseline_context=0 transition_target=0 transition_reference=0 transition_event_input=0 gaps=2",
+          "sensor coverage guidance: inspect sensorCoverage",
+          "[diagnostic-replay] vehicle_baseline enabled=false ready_models=none",
+          "vehicle baseline guidance: vehicle baseline disabled for this replay"
+        ],
+        "cliSummaryExcludes": [
+          "[diagnostic-replay] next baseline steps:"
+        ],
+        "faultRecorder": {
+          "enabled": true,
+          "writes": 0,
+          "hasLastEvent": false
+        }
+      }
+    },
+    {
+      "path": "tests/fixtures/diagnostic_replay_future_sensor_verified_transition.jsonl",
+      "replayOptions": {
+        "vehicleBaselineEnabled": false
+      },
+      "transitionProfiles": [
+        {
+          "name": "startup_future_cabin_pressure_response",
+          "eventType": "first_fire",
+          "target": "futureCabinPressureKpa",
+          "unit": "kPa",
+          "referenceSignals": [
+            "rpm",
+            "futureCabinHumidityPct"
+          ]
+        }
+      ],
+      "proves": "Future-sensor replay where verified auto-detected scalar sensors gain transition target/reference coverage from a fixture-scoped profile without signal-health or learned-baseline coverage.",
+      "expected": {
+        "frames": 2,
+        "anomalyFrames": 0,
+        "faultEvents": 0,
+        "diagnosticStatusCounts": {
+          "nominal": 2
+        },
+        "severityCounts": {
+          "ok": 2
+        },
+        "firstAnomaly": null,
+        "findingCounts": {},
+        "healthVerdictLabel": "insufficient_evidence",
+        "healthVerdictAbstainRequired": true,
+        "transitionBaselineReady": false,
+        "lastDiagnostic": {
+          "status": "nominal",
+          "severity": "ok",
+          "findingCount": 0,
+          "activeFindingCodes": []
+        },
+        "signalMonitor": {
+          "enabled": true,
+          "ok": true,
+          "faultCount": 0,
+          "watching": [
+            "rpm",
+            "speedKph"
+          ]
+        },
+        "sensorCoverage": {
+          "observedSensors": 4,
+          "coveredSensors": 4,
+          "lowTrustSensors": 0,
+          "unsupportedSensors": 0,
+          "lowTrustShapeFindings": 0,
+          "coverageRatio": 1.0,
+          "gapRatio": 0.0
+        },
+        "sensorCoverageSurfaceSummary": {
+          "gapSensors": [],
+          "surfaceCounts": {
+            "learned_baseline_context": 0,
+            "learned_baseline_target": 0,
+            "signal_health": 2,
+            "source_agreement_anchor": 0,
+            "transition_event_input": 0,
+            "transition_reference": 3,
+            "transition_target": 2
+          },
+          "surfaceSensors": {
+            "transition_reference": [
+              "futureCabinHumidityPct",
+              "rpm",
+              "speedKph"
+            ],
+            "transition_target": [
+              "futureCabinPressureKpa",
+              "rpm"
+            ]
+          }
+        },
+        "sensorCoverageSensors": {
+          "futureCabinHumidityPct": {
+            "sampleCount": 2,
+            "status": "covered",
+            "trustTier": "verified_decoded",
+            "surfaces": [
+              "transition_reference"
+            ],
+            "reason": "Observed with deterministic signal-health, baseline, transition, or source-agreement coverage.",
+            "shapeFindingCodes": []
+          },
+          "futureCabinPressureKpa": {
+            "sampleCount": 2,
+            "status": "covered",
+            "trustTier": "verified_decoded",
+            "surfaces": [
+              "transition_target"
+            ],
+            "reason": "Observed with deterministic signal-health, baseline, transition, or source-agreement coverage.",
+            "shapeFindingCodes": []
+          }
+        },
+        "transitionCoverage": {
+          "windowsScored": 0,
+          "windowsLearned": 0,
+          "pendingWindows": 0,
+          "readyModels": []
+        },
+        "cliSummaryIncludes": [
+          "[diagnostic-replay] sensor_coverage observed=4 covered=4 low_trust=0 unsupported=0 shape_findings=0 coverage_ratio=1.000 gap_ratio=0.000",
+          "[diagnostic-replay] sensor_surfaces signal_health=2 source_agreement_anchor=0 learned_baseline_target=0 learned_baseline_context=0 transition_target=2 transition_reference=3 transition_event_input=0 gaps=0",
+          "[diagnostic-replay] transitions enabled=true baseline_ready=false findings=0 ready_models=none",
+          "transition guidance: capture repeated known-good transition events"
+        ],
+        "cliSummaryExcludes": [
+          "sensor coverage guidance: inspect sensorCoverage",
+          "transition guidance: transition monitor disabled for this replay",
+          "transition guidance: inspect transitionFindings"
+        ],
+        "faultRecorder": {
+          "enabled": true,
+          "writes": 0,
+          "hasLastEvent": false
+        }
+      }
+    },
+    {
+      "path": "tests/fixtures/diagnostic_replay_future_sensor_verified_transition_disabled.jsonl",
+      "replayOptions": {
+        "vehicleBaselineEnabled": false,
+        "transitionMonitorEnabled": false
+      },
+      "transitionProfiles": [
+        {
+          "name": "startup_future_cabin_pressure_response",
+          "eventType": "first_fire",
+          "target": "futureCabinPressureKpa",
+          "unit": "kPa",
+          "referenceSignals": [
+            "rpm",
+            "futureCabinHumidityPct"
+          ]
+        }
+      ],
+      "proves": "Future-sensor replay where verified auto-detected scalar sensors lose fixture-scoped transition target/reference coverage when transition monitoring is disabled, leaving them explicitly unsupported without changing diagnostic truth.",
+      "expected": {
+        "frames": 2,
+        "anomalyFrames": 0,
+        "faultEvents": 0,
+        "diagnosticStatusCounts": {
+          "nominal": 2
+        },
+        "severityCounts": {
+          "ok": 2
+        },
+        "firstAnomaly": null,
+        "findingCounts": {},
+        "healthVerdictLabel": "insufficient_evidence",
+        "healthVerdictAbstainRequired": true,
+        "transitionBaselineReady": false,
+        "lastDiagnostic": {
+          "status": "nominal",
+          "severity": "ok",
+          "findingCount": 0,
+          "activeFindingCodes": []
+        },
+        "signalMonitor": {
+          "enabled": true,
+          "ok": true,
+          "faultCount": 0,
+          "watching": [
+            "rpm",
+            "speedKph"
+          ]
+        },
+        "sensorCoverage": {
+          "observedSensors": 4,
+          "coveredSensors": 2,
+          "lowTrustSensors": 0,
+          "unsupportedSensors": 2,
+          "lowTrustShapeFindings": 0,
+          "coverageRatio": 0.5,
+          "gapRatio": 0.5
+        },
+        "sensorCoverageSurfaceSummary": {
+          "gapSensors": [
+            "futureCabinHumidityPct",
+            "futureCabinPressureKpa"
+          ],
+          "statusSensors": {
+            "covered": [
+              "rpm",
+              "speedKph"
+            ],
+            "unsupported": [
+              "futureCabinHumidityPct",
+              "futureCabinPressureKpa"
+            ]
+          },
+          "surfaceCounts": {
+            "learned_baseline_context": 0,
+            "learned_baseline_target": 0,
+            "signal_health": 2,
+            "source_agreement_anchor": 0,
+            "transition_event_input": 0,
+            "transition_reference": 0,
+            "transition_target": 0
+          },
+          "surfaceSensors": {
+            "learned_baseline_context": [],
+            "learned_baseline_target": [],
+            "signal_health": [
+              "rpm",
+              "speedKph"
+            ],
+            "transition_reference": [],
+            "transition_target": []
+          }
+        },
+        "sensorCoverageSensors": {
+          "futureCabinHumidityPct": {
+            "sampleCount": 2,
+            "status": "unsupported",
+            "trustTier": "verified_decoded",
+            "surfaces": [],
+            "reason": "Observed but no deterministic rule, learned model, transition profile, or low-trust policy covers it yet.",
+            "shapeFindingCodes": []
+          },
+          "futureCabinPressureKpa": {
+            "sampleCount": 2,
+            "status": "unsupported",
+            "trustTier": "verified_decoded",
+            "surfaces": [],
+            "reason": "Observed but no deterministic rule, learned model, transition profile, or low-trust policy covers it yet.",
+            "shapeFindingCodes": []
+          }
+        },
+        "transitionCoverage": {
+          "windowsScored": 0,
+          "windowsLearned": 0,
+          "pendingWindows": 0,
+          "readyModels": []
+        },
+        "cliSummaryIncludes": [
+          "[diagnostic-replay] sensor_coverage observed=4 covered=2 low_trust=0 unsupported=2 shape_findings=0 coverage_ratio=0.500 gap_ratio=0.500",
+          "[diagnostic-replay] sensor_surfaces signal_health=2 source_agreement_anchor=0 learned_baseline_target=0 learned_baseline_context=0 transition_target=0 transition_reference=0 transition_event_input=0 gaps=2",
+          "sensor coverage guidance: inspect sensorCoverage",
+          "[diagnostic-replay] transitions enabled=false baseline_ready=false findings=0 ready_models=none",
+          "transition guidance: transition monitor disabled for this replay"
+        ],
+        "cliSummaryExcludes": [
+          "transition guidance: capture repeated known-good transition events",
+          "transition guidance: inspect transitionFindings"
+        ],
+        "faultRecorder": {
+          "enabled": true,
+          "writes": 0,
+          "hasLastEvent": false
+        }
+      }
+    },
+    {
+      "path": "tests/fixtures/diagnostic_replay_future_sensor_low_trust_noisy.jsonl",
+      "diagnosticCandidateSignals": "tests/fixtures/diagnostic_candidate_signals_low_trust.json",
+      "proves": "Future-sensor replay where a low-trust auto-detected sensor has noisy/flapping shape evidence that stays in sensorCoverage and does not become diagnostic truth.",
+      "expected": {
+        "frames": 8,
+        "anomalyFrames": 0,
+        "faultEvents": 0,
+        "diagnosticStatusCounts": {
+          "nominal": 8
+        },
+        "severityCounts": {
+          "ok": 8
+        },
+        "firstAnomaly": null,
+        "findingCounts": {},
+        "healthVerdictLabel": "insufficient_evidence",
+        "healthVerdictAbstainRequired": true,
+        "transitionBaselineReady": false,
+        "lastDiagnostic": {
+          "status": "nominal",
+          "severity": "ok",
+          "findingCount": 0,
+          "activeFindingCodes": []
+        },
+        "signalMonitor": {
+          "enabled": true,
+          "ok": true,
+          "faultCount": 0,
+          "watching": [
+            "rpm",
+            "speedKph"
+          ]
+        },
+        "sensorCoverage": {
+          "observedSensors": 3,
+          "coveredSensors": 2,
+          "lowTrustSensors": 1,
+          "unsupportedSensors": 0,
+          "lowTrustShapeFindings": 1
+        },
+        "sensorCoverageSensors": {
+          "autoWheelSpeedKph": {
+            "status": "low_trust",
+            "trustTier": "low_trust_candidate",
+            "surfaces": [],
+            "reason": "Observed as low-trust diagnostic evidence only; needs promotion, rules, or known-good baseline support.",
+            "shapeFindingCodes": [
+              "low_trust_candidate_noisy_or_flapping"
+            ],
+            "shapeFindingCandidateIds": [
+              "0x221:b16:l16:little:u"
+            ],
+            "shapeFindingTrustMetadataSources": [
+              "diagnostic_candidate_signals_sidecar"
+            ]
+          }
+        },
+        "faultRecorder": {
+          "enabled": true,
+          "writes": 0,
+          "hasLastEvent": false
+        }
+      }
+    },
+    {
+      "path": "tests/fixtures/diagnostic_replay_future_sensor_low_trust_multi_shape.jsonl",
+      "diagnosticCandidateSignals": "tests/fixtures/diagnostic_candidate_signals_low_trust.json",
+      "proves": "Future-sensor replay where two low-trust auto-detected sensors produce separate report-only shape findings, preserving flattened ordering and subject traceability.",
+      "expected": {
+        "frames": 8,
+        "anomalyFrames": 0,
+        "faultEvents": 0,
+        "diagnosticStatusCounts": {
+          "nominal": 8
+        },
+        "severityCounts": {
+          "ok": 8
+        },
+        "firstAnomaly": null,
+        "findingCounts": {},
+        "healthVerdictLabel": "insufficient_evidence",
+        "healthVerdictAbstainRequired": true,
+        "transitionBaselineReady": false,
+        "lastDiagnostic": {
+          "status": "nominal",
+          "severity": "ok",
+          "findingCount": 0,
+          "activeFindingCodes": []
+        },
+        "signalMonitor": {
+          "enabled": true,
+          "ok": true,
+          "faultCount": 0,
+          "watching": [
+            "rpm",
+            "speedKph"
+          ]
+        },
+        "sensorCoverage": {
+          "observedSensors": 4,
+          "coveredSensors": 2,
+          "lowTrustSensors": 2,
+          "unsupportedSensors": 0,
+          "lowTrustShapeFindings": 2
+        },
+        "sensorCoverageSensors": {
+          "autoBoostGuessKpa": {
+            "sampleCount": 8,
+            "status": "low_trust",
+            "trustTier": "low_trust_candidate",
+            "surfaces": [],
+            "reason": "Observed as low-trust diagnostic evidence only; needs promotion, rules, or known-good baseline support.",
+            "shapeFindingCodes": [
+              "low_trust_candidate_stuck_flat"
+            ],
+            "shapeFindingCandidateIds": [
+              "0x330:b8:l8:u"
+            ],
+            "shapeFindingTrustMetadataSources": [
+              "diagnostic_candidate_signals_sidecar"
+            ]
+          },
+          "autoWheelSpeedKph": {
+            "sampleCount": 8,
+            "status": "low_trust",
+            "trustTier": "low_trust_candidate",
+            "surfaces": [],
+            "reason": "Observed as low-trust diagnostic evidence only; needs promotion, rules, or known-good baseline support.",
+            "shapeFindingCodes": [
+              "low_trust_candidate_noisy_or_flapping"
+            ],
+            "shapeFindingCandidateIds": [
+              "0x221:b16:l16:little:u"
+            ],
+            "shapeFindingTrustMetadataSources": [
+              "diagnostic_candidate_signals_sidecar"
+            ]
+          }
+        },
+        "faultRecorder": {
+          "enabled": true,
+          "writes": 0,
+          "hasLastEvent": false
+        }
+      }
+    },
+    {
+      "path": "tests/fixtures/diagnostic_replay_future_sensor_sidecar_low_trust_missing_candidate_id_shape.jsonl",
+      "diagnosticCandidateSignals": "tests/fixtures/diagnostic_candidate_signals_low_trust_missing_candidate_id.json",
+      "proves": "Future-sensor replay where sidecar low-trust metadata has missing and blank candidateId values, so flat/noisy shape evidence is explicitly suppressed and stays out of diagnostic truth.",
+      "expected": {
+        "frames": 8,
+        "anomalyFrames": 0,
+        "faultEvents": 0,
+        "diagnosticStatusCounts": {
+          "nominal": 8
+        },
+        "severityCounts": {
+          "ok": 8
+        },
+        "firstAnomaly": null,
+        "findingCounts": {},
+        "healthVerdictLabel": "insufficient_evidence",
+        "healthVerdictAbstainRequired": true,
+        "transitionBaselineReady": false,
+        "lastDiagnostic": {
+          "status": "nominal",
+          "severity": "ok",
+          "findingCount": 0,
+          "activeFindingCodes": []
+        },
+        "signalMonitor": {
+          "enabled": true,
+          "ok": true,
+          "faultCount": 0,
+          "watching": [
+            "rpm",
+            "speedKph"
+          ]
+        },
+        "sensorCoverage": {
+          "observedSensors": 4,
+          "coveredSensors": 2,
+          "lowTrustSensors": 2,
+          "unsupportedSensors": 0,
+          "lowTrustShapeFindings": 0
+        },
+        "sensorCoverageSensors": {
+          "autoTorqueGuessNm": {
+            "sampleCount": 8,
+            "status": "low_trust",
+            "trustTier": "low_trust_candidate",
+            "surfaces": [],
+            "reason": "Observed as low-trust diagnostic evidence only; needs promotion, rules, or known-good baseline support.",
+            "shapeFindingCodes": [],
+            "shapeFindingSuppressedReason": "Low-trust shape evidence suppressed because trust metadata lacks stable candidateId provenance."
+          },
+          "autoWheelSpeedKph": {
+            "sampleCount": 8,
+            "status": "low_trust",
+            "trustTier": "low_trust_candidate",
+            "surfaces": [],
+            "reason": "Observed as low-trust diagnostic evidence only; needs promotion, rules, or known-good baseline support.",
+            "shapeFindingCodes": [],
+            "shapeFindingSuppressedReason": "Low-trust shape evidence suppressed because trust metadata lacks stable candidateId provenance."
+          }
+        },
+        "faultRecorder": {
+          "enabled": true,
+          "writes": 0,
+          "hasLastEvent": false
+        }
+      }
+    },
+    {
+      "path": "tests/fixtures/diagnostic_replay_future_sensor_low_trust_missing_candidate_id_shape.jsonl",
+      "proves": "Future-sensor replay where low-trust inline metadata lacks candidateId provenance, so flat/noisy shape evidence is explicitly suppressed and stays out of diagnostic truth.",
+      "expected": {
+        "frames": 8,
+        "anomalyFrames": 0,
+        "faultEvents": 0,
+        "diagnosticStatusCounts": {
+          "nominal": 8
+        },
+        "severityCounts": {
+          "ok": 8
+        },
+        "firstAnomaly": null,
+        "findingCounts": {},
+        "healthVerdictLabel": "insufficient_evidence",
+        "healthVerdictAbstainRequired": true,
+        "transitionBaselineReady": false,
+        "lastDiagnostic": {
+          "status": "nominal",
+          "severity": "ok",
+          "findingCount": 0,
+          "activeFindingCodes": []
+        },
+        "signalMonitor": {
+          "enabled": true,
+          "ok": true,
+          "faultCount": 0,
+          "watching": [
+            "rpm",
+            "speedKph"
+          ]
+        },
+        "sensorCoverage": {
+          "observedSensors": 4,
+          "coveredSensors": 2,
+          "lowTrustSensors": 2,
+          "unsupportedSensors": 0,
+          "lowTrustShapeFindings": 0
+        },
+        "sensorCoverageSensors": {
+          "autoTorqueGuessNm": {
+            "sampleCount": 8,
+            "status": "low_trust",
+            "trustTier": "low_trust_candidate",
+            "surfaces": [],
+            "reason": "Observed as low-trust diagnostic evidence only; needs promotion, rules, or known-good baseline support.",
+            "shapeFindingCodes": [],
+            "shapeFindingSuppressedReason": "Low-trust shape evidence suppressed because trust metadata lacks stable candidateId provenance."
+          },
+          "autoWheelSpeedKph": {
+            "sampleCount": 8,
+            "status": "low_trust",
+            "trustTier": "low_trust_candidate",
+            "surfaces": [],
+            "reason": "Observed as low-trust diagnostic evidence only; needs promotion, rules, or known-good baseline support.",
+            "shapeFindingCodes": [],
+            "shapeFindingSuppressedReason": "Low-trust shape evidence suppressed because trust metadata lacks stable candidateId provenance."
+          }
+        },
+        "faultRecorder": {
+          "enabled": true,
+          "writes": 0,
+          "hasLastEvent": false
+        }
+      }
+    }
+  ]
+}

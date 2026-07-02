@@ -1,0 +1,2 @@
+{"futureCabinPressureKpa":100.1,"rpm":1800.0,"sensorTrust":{"futureCabinPressureKpa":{"source":"confirmed_dictionary","trust":"verified_decoded","verified":true}},"speedKph":42.0,"type":"vehicle_state","version":1,"wallTimestamp":1700000700.0}
+{"futureCabinPressureKpa":100.3,"rpm":1810.0,"sensorTrust":{"futureCabinPressureKpa":{"source":"confirmed_dictionary","trust":"verified_decoded","verified":true}},"speedKph":43.0,"type":"vehicle_state","version":1,"wallTimestamp":1700000700.1}
