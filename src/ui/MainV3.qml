@@ -136,10 +136,10 @@ Window {
         : NaN
     readonly property bool sharedEffectClockEnabled: !effectsOff && !embeddedEffectBudgetMode
     readonly property bool stressMapMotionEnabled: stressScene && !lowEffectMode && renderProfile !== "embedded"
-    readonly property int gaugeShellSize: 840
-    readonly property int gaugePodSize: 704
-    readonly property int gaugeFaceSize: 724
-    readonly property int gaugeEdgeBleed: -48
+    readonly property int gaugeShellSize: 780
+    readonly property int gaugePodSize: 642
+    readonly property int gaugeFaceSize: 656
+    readonly property int gaugeEdgeBleed: -18
     property real sharedEffectPhase: 0.0
     property real stressPhase: 0.0
     property real clusterSimulationPhase: 0.0
@@ -1660,6 +1660,30 @@ Window {
             snapshotRefreshMs: 0
             videoEnabled: false
             videoUrl: ""
+        }
+
+        Item {
+            id: mapLegibilityVeil
+            anchors.fill: parent
+            z: 4
+            visible: !root.mapMenuOpen && !root.navControlsOpen
+
+            Rectangle {
+                anchors.fill: parent
+                color: "#07111A"
+                opacity: root.mapLibreSafeCompositor ? 0.18 : 0.12
+            }
+
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: 120
+                gradient: Gradient {
+                    GradientStop { position: 0.0; color: "#00000000" }
+                    GradientStop { position: 1.0; color: "#02060BCC" }
+                }
+            }
         }
 
         Item {
