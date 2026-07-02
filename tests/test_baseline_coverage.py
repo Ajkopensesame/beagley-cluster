@@ -52,6 +52,12 @@ class BaselineCoverageReportTest(unittest.TestCase):
         self.assertIn("intake_airflow", report["steadyState"]["readyModels"])
         self.assertGreater(report["summary"]["strongScenarios"], 0)
         self.assertGreater(report["summary"]["missingScenarios"], 0)
+        next_steps = report["summary"]["nextSteps"]
+        self.assertLessEqual(len(next_steps), 5)
+        self.assertEqual(next_steps[0]["status"], "missing")
+        self.assertIn("nextStep", next_steps[0])
+        self.assertIn("missing", next_steps[0])
+        self.assertIn(next_steps[0]["scenario"], {scenario["key"] for scenario in report["scenarios"]})
 
 
 if __name__ == "__main__":

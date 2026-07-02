@@ -87,7 +87,15 @@ FAULT_RECORDER_DIR = os.getenv("FAULT_RECORDER_DIR", "/var/log/beagley-cluster/f
 FAULT_RECORDER_BUFFER_SECONDS = float(os.getenv("FAULT_RECORDER_BUFFER_SECONDS", "20.0"))
 FAULT_RECORDER_MAX_BUFFER_FRAMES = int(os.getenv("FAULT_RECORDER_MAX_BUFFER_FRAMES", "300"))
 FAULT_RECORDER_MIN_INTERVAL_SECONDS = float(os.getenv("FAULT_RECORDER_MIN_INTERVAL_SECONDS", "10.0"))
+FAULT_RECORDER_MAX_EVENT_FILES = int(os.getenv("FAULT_RECORDER_MAX_EVENT_FILES", "500"))
+FAULT_RECORDER_MAX_TOTAL_BYTES = int(os.getenv("FAULT_RECORDER_MAX_TOTAL_BYTES", str(64 * 1024 * 1024)))
 DIAGNOSTIC_MODE = os.getenv("DIAGNOSTIC_MODE", "normal").strip().lower()
+DIAGNOSTIC_STACK_STRICT = os.getenv("DIAGNOSTIC_STACK_STRICT", "0").strip().lower() not in {
+    "0",
+    "false",
+    "off",
+    "no",
+}
 VEHICLE_BENCH_SIM_ENABLED = os.getenv("BBB_VEHICLE_BENCH_SIM", "0").strip().lower() not in {
     "0",
     "false",
@@ -148,6 +156,44 @@ class VehicleHub:
         self._vehicle_baseline = self._build_vehicle_baseline()
         self._transition_monitor = self._build_transition_monitor()
         self._fault_recorder = self._build_fault_recorder()
+        self._diagnostic_stack_status = self._build_diagnostic_stack_status()
+
+    def _build_diagnostic_stack_status(self) -> dict[str, object]:
+        degraded = False
+        reasons: list[str] = []
+        if build_diagnostic_status is None:
+            degraded = True
+            reasons.append("diagnostic_status_unavailable")
+        if SIGNAL_HEALTH_ENABLED and self._signal_health is None:
+            degraded = True
+            reasons.append("signal_health_unavailable")
+        if VEHICLE_BASELINE_ENABLED and self._vehicle_baseline is None:
+            degraded = True
+            reasons.append("vehicle_baseline_unavailable")
+        if TRANSITION_MONITOR_ENABLED and self._transition_monitor is None:
+            degraded = True
+            reasons.append("transition_monitor_unavailable")
+        if FAULT_RECORDER_ENABLED and self._fault_recorder is None:
+            degraded = True
+            reasons.append("fault_recorder_unavailable")
+        if _CAN_DECODER_IMPORT_ERROR is not None and (
+            CAN_SIGNAL_DICTIONARY or CAN_RAW_LOG or CAN_LIVE_INTERFACE or VEHICLE_INPUT_SERIAL_DEVICE
+        ):
+            degraded = True
+            reasons.append("vehicle_input_stack_unavailable")
+        return {"degraded": degraded, "reasons": reasons}
+
+    def _apply_diagnostic_stack_status(self, state: dict) -> None:
+        health = state.setdefault("_health", {})
+        if not isinstance(health, dict):
+            health = {}
+            state["_health"] = health
+        health["diagnosticStackDegraded"] = bool(self._diagnostic_stack_status.get("degraded"))
+        reasons = self._diagnostic_stack_status.get("reasons")
+        if isinstance(reasons, list) and reasons:
+            health["diagnosticStackReasons"] = list(reasons)
+        elif "diagnosticStackReasons" in health:
+            health.pop("diagnosticStackReasons", None)
 
     async def add_client(self, ws: websockets.WebSocketServerProtocol) -> None:
         self.clients.add(ws)
@@ -465,6 +511,8 @@ class VehicleHub:
             buffer_seconds=FAULT_RECORDER_BUFFER_SECONDS,
             max_buffer_frames=FAULT_RECORDER_MAX_BUFFER_FRAMES,
             min_interval_seconds=FAULT_RECORDER_MIN_INTERVAL_SECONDS,
+            max_event_files=FAULT_RECORDER_MAX_EVENT_FILES,
+            max_total_bytes=FAULT_RECORDER_MAX_TOTAL_BYTES,
         )
 
     def _apply_can_overlay(self, state: dict) -> None:
@@ -624,6 +672,7 @@ class VehicleHub:
             }
         self._apply_transition_monitor(state)
         self._apply_diagnostic_status(state)
+        self._apply_diagnostic_stack_status(state)
         self._apply_fault_recording(state)
         return state
 
@@ -655,6 +704,13 @@ async def main() -> None:
         print(f"[bbb_hub] forcing GPS_SOURCE_POLICY=hardware_only (got {GPS_SOURCE_POLICY})")
 
     hub = VehicleHub()
+    if hub._diagnostic_stack_status.get("degraded"):
+        reasons = hub._diagnostic_stack_status.get("reasons", [])
+        reason_text = ",".join(str(reason) for reason in reasons) if isinstance(reasons, list) else "unknown"
+        print(f"[bbb_hub] diagnostic stack degraded: {reason_text}")
+        if DIAGNOSTIC_STACK_STRICT:
+            raise SystemExit(1)
+
     ws_server = await websockets.serve(lambda ws: ws_handler(ws, hub), WS_HOST, WS_PORT)
 
     print(f"[bbb_hub] vehicle_state ws://{WS_HOST}:{WS_PORT}")

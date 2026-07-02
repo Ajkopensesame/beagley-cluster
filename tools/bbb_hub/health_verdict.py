@@ -64,6 +64,7 @@ def build_vehicle_health_verdict(
     baseline_snapshot: dict[str, Any] | None = None,
     direct_anchors: Iterable[str] | None = None,
     derived_anchors: Iterable[dict[str, Any]] | None = None,
+    generated_at: str | None = None,
 ) -> dict[str, Any]:
     health = state.get("_health") if isinstance(state.get("_health"), dict) else {}
     diagnostic = state.get("_diagnostic") if isinstance(state.get("_diagnostic"), dict) else {}
@@ -145,7 +146,7 @@ def build_vehicle_health_verdict(
     return {
         "version": 1,
         "kind": "vehicle_health_verdict",
-        "generatedAt": datetime.now(timezone.utc).isoformat(),
+        "generatedAt": generated_at or datetime.now(timezone.utc).isoformat(),
         "mode": str(mode or diagnostic.get("mode") or "normal").strip().lower(),
         "vehicleProfile": vehicle_profile,
         "captureRef": dict(capture_ref or {}),

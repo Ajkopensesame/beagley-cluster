@@ -7,6 +7,7 @@ workbench and the BBB runtime without coupling their execution paths.
 __all__ = [
     "baseline_coverage",
     "context",
+    "fault_events",
     "findings",
     "stats",
     "transitions",

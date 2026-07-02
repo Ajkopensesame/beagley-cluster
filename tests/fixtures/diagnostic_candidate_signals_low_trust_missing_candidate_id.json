@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "kind": "diagnostic_candidate_signals",
+  "generatedAt": "2026-06-07T03:22:00+00:00",
+  "sourceReportGeneratedAt": "2026-06-07T03:21:30+00:00",
+  "source": {
+    "log": "synthetic-low-trust-missing-candidate-id.candump",
+    "labels": "synthetic-guided-session.json"
+  },
+  "exportPolicy": {
+    "requiresPromotionStatus": "probable",
+    "trust": "low",
+    "allowedUses": ["diagnostic_low_trust"],
+    "blockedUses": [
+      "cluster_display",
+      "authoritative_health_verdict",
+      "repair_recommendation",
+      "can_signals_merge"
+    ],
+    "mustNotMergeIntoCanSignals": true,
+    "mustNotDriveClusterDisplay": true,
+    "mustNotBeSoleHealthVerdictEvidence": true
+  },
+  "candidates": {
+    "autoTorqueGuessNm": {
+      "canId": "0x331",
+      "startBit": 16,
+      "length": 16,
+      "endian": "little",
+      "signed": false,
+      "scale": 1.0,
+      "offset": 0.0,
+      "unit": "raw",
+      "suggestedClass": "torque_like",
+      "confidence": 0.69,
+      "promotionStatus": "probable",
+      "trust": "low",
+      "allowedUses": ["diagnostic_low_trust"],
+      "blockedUses": [
+        "cluster_display",
+        "authoritative_health_verdict",
+        "repair_recommendation",
+        "can_signals_merge"
+      ],
+      "evidence": {
+        "bestCorrelationScore": 0.88,
+        "sampleCount": 8
+      }
+    },
+    "autoWheelSpeedKph": {
+      "candidateId": "   ",
+      "canId": "0x221",
+      "startBit": 16,
+      "length": 16,
+      "endian": "little",
+      "signed": false,
+      "scale": 1.0,
+      "offset": 0.0,
+      "unit": "raw",
+      "suggestedClass": "speed_like",
+      "confidence": 0.82,
+      "promotionStatus": "probable",
+      "trust": "low",
+      "allowedUses": ["diagnostic_low_trust"],
+      "blockedUses": [
+        "cluster_display",
+        "authoritative_health_verdict",
+        "repair_recommendation",
+        "can_signals_merge"
+      ],
+      "evidence": {
+        "bestCorrelationScore": 0.96,
+        "sampleCount": 8
+      }
+    }
+  }
+}

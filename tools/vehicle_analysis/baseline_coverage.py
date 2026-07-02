@@ -138,6 +138,7 @@ def build_baseline_coverage_report(
     counts = {status: sum(1 for item in scenario_reports if item["status"] == status) for status in COVERAGE_STATUSES}
     total = max(len(scenario_reports), 1)
     score = clamp(sum(float(item["score"]) for item in scenario_reports) / total)
+    next_steps = _next_steps(scenario_reports)
     return {
         "version": 1,
         "kind": "baseline_coverage_report",
@@ -148,6 +149,7 @@ def build_baseline_coverage_report(
             "weakScenarios": counts["weak"],
             "missingScenarios": counts["missing"],
             "ready": counts["missing"] == 0 and counts["weak"] <= max(1, total // 4),
+            "nextSteps": next_steps,
         },
         "scenarios": scenario_reports,
         "operatingContexts": {
@@ -212,6 +214,40 @@ def _scenario_report(
         "missing": {key: value for key, value in missing.items() if value},
         "nextStep": scenario.next_step if status != "strong" else None,
     }
+
+
+def _next_steps(scenario_reports: list[dict[str, Any]], *, limit: int = 5) -> list[dict[str, Any]]:
+    candidates = [
+        scenario
+        for scenario in scenario_reports
+        if scenario.get("status") != "strong" and scenario.get("nextStep")
+    ]
+    candidates.sort(
+        key=lambda scenario: (
+            _status_priority(str(scenario.get("status", "missing"))),
+            float(scenario.get("score", 0.0)),
+            str(scenario.get("key", "")),
+        )
+    )
+    return [
+        {
+            "scenario": str(scenario.get("key", "")),
+            "label": str(scenario.get("label", "")),
+            "status": str(scenario.get("status", "")),
+            "score": float(scenario.get("score", 0.0)),
+            "nextStep": str(scenario.get("nextStep", "")),
+            "missing": dict(scenario.get("missing", {})) if isinstance(scenario.get("missing"), dict) else {},
+        }
+        for scenario in candidates[: max(0, limit)]
+    ]
+
+
+def _status_priority(status: str) -> int:
+    if status == "missing":
+        return 0
+    if status == "weak":
+        return 1
+    return 2
 
 
 def _observed_contexts(coverage: dict[str, Any] | None) -> set[str]:
