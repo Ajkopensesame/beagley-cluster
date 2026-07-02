@@ -31,5 +31,8 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install test dependencies
+        run: python3 -m pip install --upgrade pip pytest
+
       - name: Run diagnostic replay contract tests
         run: python3 -m pytest tests/test_diagnostic_replay.py tests/test_fault_recorder.py -q
