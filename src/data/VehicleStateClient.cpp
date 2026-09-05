@@ -10,7 +10,7 @@ static const int WATCHDOG_TICK_MS = 200;
 static const int MAX_BACKOFF_MS   = 5000;
 
 VehicleStateClient::VehicleStateClient(QObject *parent)
-    : QObject(parent)
+    : VehicleStateSource(parent)
 {
     m_url = qEnvironmentVariableIsSet("VEHICLE_HUB_WS_URL")
                 ? QString::fromUtf8(qgetenv("VEHICLE_HUB_WS_URL"))
@@ -74,30 +74,63 @@ void VehicleStateClient::onTextMessageReceived(const QString &msg)
         return;
 
     const QJsonObject obj = doc.object();
-    const QString type = obj.value("type").toString();
-    if (type != QStringLiteral("vehicle_state"))
+    if (obj.value(QStringLiteral("type")).toString() != QStringLiteral("vehicle_state"))
         return;
 
-    const QJsonObject indicators = obj.value("indicators").toObject();
-    const QJsonObject warnings   = obj.value("warnings").toObject();
-    const QJsonObject health     = obj.value("_health").toObject();
+    // Ignore unknown fields. Never derive gauges from analog.*.
+    const QJsonValue indicatorsVal = obj.value(QStringLiteral("indicators"));
+    const QJsonValue warningsVal   = obj.value(QStringLiteral("warnings"));
+    const QJsonValue healthVal     = obj.value(QStringLiteral("_health"));
 
-    // Consider this a "good" frame
-    m_lastGoodRxMs = QDateTime::currentMSecsSinceEpoch();
+    if (indicatorsVal.isObject()) {
+        const QJsonObject indicators = indicatorsVal.toObject();
+        setLeftIndicator(indicators.value(QStringLiteral("left")).toBool());
+        setRightIndicator(indicators.value(QStringLiteral("right")).toBool());
+        setHighBeam(indicators.value(QStringLiteral("high_beam")).toBool());
+    }
 
-    setLeftIndicator(indicators.value("left").toBool(false));
-    setRightIndicator(indicators.value("right").toBool(false));
-    setHighBeam(indicators.value("high_beam").toBool(false));
+    if (warningsVal.isObject()) {
+        const QJsonObject warnings = warningsVal.toObject();
+        setWarnBrake(warnings.value(QStringLiteral("brake")).toBool());
+        setWarnOil(warnings.value(QStringLiteral("oil")).toBool());
+        setWarnCharge(warnings.value(QStringLiteral("charge")).toBool());
+        setWarnDoor(warnings.value(QStringLiteral("door")).toBool());
+        setWarnCheckEngine(warnings.value(QStringLiteral("check")).toBool());
+        setWarnAT(warnings.value(QStringLiteral("at")).toBool());
+        setWarnFuelLow(warnings.value(QStringLiteral("fuel_low")).toBool());
+    }
 
-    setWarnBrake(warnings.value("brake").toBool(false));
-    setWarnOil(warnings.value("oil").toBool(false));
-    setWarnCharge(warnings.value("charge").toBool(false));
-    setWarnDoor(warnings.value("door").toBool(false));
+    if (healthVal.isObject()) {
+        setBbbStale(healthVal.toObject().value(QStringLiteral("stale")).toBool(true));
+    }
 
-    setBbbStale(health.value("stale").toBool(true));
+    if (obj.contains(QStringLiteral("speedKph")))
+        setSpeedKph(obj.value(QStringLiteral("speedKph")).toDouble());
+    if (obj.contains(QStringLiteral("rpm")))
+        setRpm(obj.value(QStringLiteral("rpm")).toDouble());
+    if (obj.contains(QStringLiteral("fuelPct")))
+        setFuelPct(obj.value(QStringLiteral("fuelPct")).toDouble());
+    if (obj.contains(QStringLiteral("coolantC")))
+        setCoolantC(obj.value(QStringLiteral("coolantC")).toDouble());
+    if (obj.contains(QStringLiteral("gear")))
+        setGear(obj.value(QStringLiteral("gear")).toString());
+    if (obj.contains(QStringLiteral("overdrive")))
+        setOverdrive(obj.value(QStringLiteral("overdrive")).toBool());
 
-    // Link stale is determined by watchdog timing; watchdog will clear it
-    // once age is within threshold.
+    // Good-frame: all gauge keys present plus indicators/warnings/_health objects.
+    // Partial frames may still apply indicators/warnings/health, but must not
+    // refresh last-good RX (link stale watchdog stays honest).
+    const bool goodFrame =
+        obj.contains(QStringLiteral("speedKph")) &&
+        obj.contains(QStringLiteral("rpm")) &&
+        obj.contains(QStringLiteral("fuelPct")) &&
+        obj.contains(QStringLiteral("coolantC")) &&
+        indicatorsVal.isObject() &&
+        warningsVal.isObject() &&
+        healthVal.isObject();
+
+    if (goodFrame)
+        m_lastGoodRxMs = QDateTime::currentMSecsSinceEpoch();
 }
 
 void VehicleStateClient::checkStale()
@@ -119,81 +152,4 @@ void VehicleStateClient::checkStale()
     if (staleNow) {
         setBbbStale(true);
     }
-}
-
-void VehicleStateClient::setConnected(bool v)
-{
-    if (m_connected == v) return;
-    m_connected = v;
-    emit connectedChanged();
-}
-
-void VehicleStateClient::setLinkStale(bool v)
-{
-    if (m_linkStale == v) return;
-    m_linkStale = v;
-    emit linkStaleChanged();
-}
-
-void VehicleStateClient::setRxAgeMs(int v)
-{
-    if (m_rxAgeMs == v) return;
-    m_rxAgeMs = v;
-    emit rxAgeMsChanged();
-}
-
-void VehicleStateClient::setLeftIndicator(bool v)
-{
-    if (m_leftIndicator == v) return;
-    m_leftIndicator = v;
-    emit leftIndicatorChanged();
-}
-
-void VehicleStateClient::setRightIndicator(bool v)
-{
-    if (m_rightIndicator == v) return;
-    m_rightIndicator = v;
-    emit rightIndicatorChanged();
-}
-
-void VehicleStateClient::setHighBeam(bool v)
-{
-    if (m_highBeam == v) return;
-    m_highBeam = v;
-    emit highBeamChanged();
-}
-
-void VehicleStateClient::setWarnBrake(bool v)
-{
-    if (m_warnBrake == v) return;
-    m_warnBrake = v;
-    emit warnBrakeChanged();
-}
-
-void VehicleStateClient::setWarnOil(bool v)
-{
-    if (m_warnOil == v) return;
-    m_warnOil = v;
-    emit warnOilChanged();
-}
-
-void VehicleStateClient::setWarnCharge(bool v)
-{
-    if (m_warnCharge == v) return;
-    m_warnCharge = v;
-    emit warnChargeChanged();
-}
-
-void VehicleStateClient::setWarnDoor(bool v)
-{
-    if (m_warnDoor == v) return;
-    m_warnDoor = v;
-    emit warnDoorChanged();
-}
-
-void VehicleStateClient::setBbbStale(bool v)
-{
-    if (m_bbbStale == v) return;
-    m_bbbStale = v;
-    emit bbbStaleChanged();
 }

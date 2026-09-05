@@ -32,7 +32,12 @@ qt_policy(SET QTP0004 NEW)
 # --------------------
 qt_add_executable(beagley_cluster
     src/main.cpp
+    src/data/VehicleStateSource.cpp
+    src/data/VehicleStateSource.h
     src/data/VehicleStateClient.cpp
+    src/data/VehicleStateClient.h
+    src/data/MockVehicleStateClient.cpp
+    src/data/MockVehicleStateClient.h
 )
 
 # --------------------
@@ -92,8 +97,6 @@ set(BEAGLEY_QML_FILES
     src/ui/widgets/TachGauge.qml
     src/ui/widgets/MatrixRain.qml
     src/ui/widgets/MapCenter.qml
-
-    # Mock data (temporary – will be replaced by BBB later)
 )
 
 # Only include the WebEngine QML file when WebEngine is enabled
