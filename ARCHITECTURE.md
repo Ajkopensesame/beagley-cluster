@@ -60,16 +60,20 @@ VehicleStateSource          (abstract API)
 | Map off | `BEAGLEY_NO_MAP=1` (also forced when built with `WITH_WEBENGINE=OFF`) |
 | macOS geometry | `./run_1920x720.sh` → cocoa `1920x720+0+0` |
 
+## Optional map path
+
+- CMake `WITH_WEBENGINE` gates linking `Qt6::WebEngineQuick`, compiling `MapCenterWeb.qml` into the BeagleY module, and packaging `src/ui/web/map/`.
+- `main.cpp` exposes context property `BEAGLEY_NO_MAP` (forced true when built OFF) and only calls `QtWebEngineQuick::initialize()` when ON and map is enabled.
+- `Main.qml` uses a `Loader` (`MapCenter.qml` vs `MapCenterWeb.qml`) — no unconditional `import QtWebEngine`.
+
 ## Known debt
 
 1. **Dual assets** — `assets/` vs `src/assets/`; unclear single source of truth for packaging.
 2. **Legacy QRC** — `src/qml.qrc` and `src/resources/web.qrc` remain but are not used by the current `qt_add_executable` / `qt_add_qml_module` / `qt_add_resources` path.
-3. **WebEngine hard-import** — `src/ui/Main.qml` always `import QtWebEngine`, so `WITH_WEBENGINE=OFF` builds can fail at QML even though C++/`MapCenterWeb.qml` are gated. Follow-up: Loader / conditional import.
-4. **web/test vs CMake** — CMake still lists `src/ui/web/test/index.html` under `WITH_WEBENGINE`, but `src/ui/web/test/` is gitignored (local scratch). ON builds may miss that file unless present locally.
+3. **web/test scratch** — `src/ui/web/test/` is gitignored and not referenced by CMake; only `map/` is shipped when WebEngine is ON.
 
 ## Out of scope (pointers)
 
-- Fixing the WebEngine hard-import / Loader split (separate follow-up).
 - Collapsing dual assets or deleting legacy QRC without a dedicated PR.
 - Hub protocol changes (own them in [vehicle-hub](https://github.com/Ajkopensesame/vehicle-hub)).
 - Inventing fake vehicle metrics beyond the existing mock client.

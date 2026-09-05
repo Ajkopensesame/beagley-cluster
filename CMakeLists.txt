@@ -43,8 +43,9 @@ qt_add_executable(beagley_cluster
 # --------------------
 # Optional Web resources (only when WebEngine is enabled)
 # Goal:
-#   qrc:/web/test/index.html  ->  :/web/test/index.html
 #   qrc:/web/map/index.html   ->  :/web/map/index.html
+#
+# Note: src/ui/web/test/ is gitignored local scratch — do not list it here.
 #
 # IMPORTANT:
 # - FILES are real paths on disk (relative to repo root here).
@@ -53,10 +54,9 @@ qt_add_executable(beagley_cluster
 # --------------------
 if(WITH_WEBENGINE)
     qt_add_resources(beagley_cluster web_resources
-     PREFIX "/web"
+        PREFIX "/web"
         BASE "src/ui/web"
         FILES
-            src/ui/web/test/index.html
             src/ui/web/map/index.html
     )
 endif()

@@ -41,11 +41,7 @@ jobs:
             -DWITH_WEBENGINE=OFF \
             -DCMAKE_BUILD_TYPE=Release
 
-      - name: Build (continue-on-error until WebEngine Loader fix)
-        # KNOWN DEBT: src/ui/Main.qml hard-imports QtWebEngine even when
-        # WITH_WEBENGINE=OFF, so the QML compile/link step often fails on this
-        # matrix. Configure above remains the required gate; this build step is
-        # advisory until a follow-up replaces the hard import with a Loader /
-        # conditional module. See README.md "Known debt".
-        continue-on-error: true
+      - name: Build (required)
+        # WITH_WEBENGINE=OFF must compile and link: Main.qml uses a Loader and
+        # never imports QtWebEngine; MapCenterWeb.qml is omitted from the module.
         run: cmake --build build
