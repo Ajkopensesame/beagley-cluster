@@ -380,10 +380,9 @@ Item {
         warnBrake:  root.linkOk && !!root.vehicleState && root.vehicleState.warnBrake
         warnOil:    root.linkOk && !!root.vehicleState && root.vehicleState.warnOil
 
-        // Not implemented on BBB yet in this step; keep false.
-        warnCheckEngine: false
-        warnAT: false
-        warnFuelLow: false
+        warnCheckEngine: root.linkOk && !!root.vehicleState && root.vehicleState.warnCheckEngine
+        warnAT:          root.linkOk && !!root.vehicleState && root.vehicleState.warnAT
+        warnFuelLow:     root.linkOk && !!root.vehicleState && root.vehicleState.warnFuelLow
 
         // Drivetrain is currently UI-only in your mock.
         // Keep deterministic defaults until BBB exports real fields.

@@ -5,6 +5,8 @@
 #include <QDebug>
 
 #include "data/VehicleStateClient.h"
+#include "data/MockVehicleStateClient.h"
+#include "data/VehicleStateSource.h"
 
 #ifdef WITH_WEBENGINE
 #include <QtWebEngineQuick/QtWebEngineQuick>
@@ -38,9 +40,23 @@ int main(int argc, char *argv[])
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("BEAGLEY_NO_MAP", noMap);
 
-    // Live vehicle_state from BBB (WebSocket) exposed to QML as `vehicleState`
-    VehicleStateClient vehicleState;
-    engine.rootContext()->setContextProperty("vehicleState", &vehicleState);
+    // vehicle_state backend: BEAGLEY_VEHICLE_BACKEND=mock|live (default live).
+    // Context property is always `vehicleState` (same QML property names).
+    const QString backend =
+        qEnvironmentVariable("BEAGLEY_VEHICLE_BACKEND", QStringLiteral("live"))
+            .trimmed()
+            .toLower();
+    const bool useMock = (backend == QLatin1String("mock"));
+
+    VehicleStateSource *vehicleState = nullptr;
+    if (useMock) {
+        vehicleState = new MockVehicleStateClient(&app);
+        qDebug() << "[main] BEAGLEY_VEHICLE_BACKEND=mock";
+    } else {
+        vehicleState = new VehicleStateClient(&app);
+        qDebug() << "[main] BEAGLEY_VEHICLE_BACKEND=live";
+    }
+    engine.rootContext()->setContextProperty("vehicleState", vehicleState);
 
     engine.loadFromModule("BeagleY", "Main");
     if (engine.rootObjects().isEmpty())
