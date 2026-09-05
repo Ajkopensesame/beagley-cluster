@@ -31,7 +31,7 @@ jobs:
         uses: jurplel/install-qt-action@v4
         with:
           version: '6.6.3'
-          modules: 'qtwebsockets qtsvg'
+          modules: 'qtwebsockets'
           cache: true
 
       - name: Configure (required)
