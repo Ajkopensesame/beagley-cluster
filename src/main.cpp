@@ -31,9 +31,9 @@ int main(int argc, char *argv[])
         QtWebEngineQuick::initialize();
 
         // Optional resource sanity check (only meaningful when WebEngine is enabled)
-        const QString testPath = QStringLiteral(":/web/test/index.html");
-        qDebug() << "[RES] exists" << testPath << "=" << QFile(testPath).exists();
-        qDebug() << "[RES] size  " << testPath << "=" << QFile(testPath).size();
+        const QString mapPath = QStringLiteral(":/web/map/index.html");
+        qDebug() << "[RES] exists" << mapPath << "=" << QFile(mapPath).exists();
+        qDebug() << "[RES] size  " << mapPath << "=" << QFile(mapPath).size();
     }
 #endif
 

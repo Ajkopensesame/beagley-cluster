@@ -1,6 +1,5 @@
 import QtQuick 2.15
 import QtQuick.Window 2.15
-import QtWebEngine
 
 import "./theme" as Theme
 import BeagleY 1.0
@@ -120,10 +119,16 @@ Window {
     }
 
     // ===============================
-    // Center — WebEngine
+    // Center — map (optional WebEngine) or placeholder
+    // BEAGLEY_NO_MAP is always true when built with WITH_WEBENGINE=OFF.
+    // MapCenterWeb.qml is only in the QML module when WITH_WEBENGINE=ON,
+    // so use a string Loader URL (no static type / QtWebEngine import).
     // ===============================
-    MapCenterWeb {
+    Loader {
         anchors.fill: centerPanel
+        source: BEAGLEY_NO_MAP
+               ? Qt.resolvedUrl("widgets/MapCenter.qml")
+               : Qt.resolvedUrl("widgets/MapCenterWeb.qml")
     }
 
     // ===============================

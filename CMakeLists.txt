@@ -25,7 +25,10 @@ endif()
 qt_standard_project_setup()
 
 qt_policy(SET QTP0001 NEW)
-qt_policy(SET QTP0004 NEW)
+# QTP0004 exists only since Qt 6.8; CI uses 6.6.3.
+if(QT_KNOWN_POLICY_QTP0004)
+    qt_policy(SET QTP0004 NEW)
+endif()
 
 # --------------------
 # Executable
@@ -43,8 +46,9 @@ qt_add_executable(beagley_cluster
 # --------------------
 # Optional Web resources (only when WebEngine is enabled)
 # Goal:
-#   qrc:/web/test/index.html  ->  :/web/test/index.html
 #   qrc:/web/map/index.html   ->  :/web/map/index.html
+#
+# Note: src/ui/web/test/ is gitignored local scratch — do not list it here.
 #
 # IMPORTANT:
 # - FILES are real paths on disk (relative to repo root here).
@@ -53,10 +57,9 @@ qt_add_executable(beagley_cluster
 # --------------------
 if(WITH_WEBENGINE)
     qt_add_resources(beagley_cluster web_resources
-     PREFIX "/web"
+        PREFIX "/web"
         BASE "src/ui/web"
         FILES
-            src/ui/web/test/index.html
             src/ui/web/map/index.html
     )
 endif()

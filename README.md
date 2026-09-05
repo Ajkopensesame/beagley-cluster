@@ -70,13 +70,19 @@ BEAGLEY_VEHICLE_BACKEND=live \
 
 `./run_1920x720.sh` forces cocoa geometry `1920×720` so macOS does not restore an off-screen position.
 
-### Disable map
+### Disable map / WebEngine optional path
 
 ```bash
 BEAGLEY_NO_MAP=1 ./build/beagley_cluster
 ```
 
-When built with `WITH_WEBENGINE=OFF`, map init is skipped in C++ (`BEAGLEY_NO_MAP` is forced true in `main.cpp`).
+| Build / run | Center panel |
+| --- | --- |
+| `WITH_WEBENGINE=ON` and `BEAGLEY_NO_MAP` unset/0 | `MapCenterWeb.qml` (Qt WebEngine map) |
+| `WITH_WEBENGINE=ON` and `BEAGLEY_NO_MAP=1` | `MapCenter.qml` placeholder (no WebEngine init) |
+| `WITH_WEBENGINE=OFF` | `BEAGLEY_NO_MAP` forced true in `main.cpp`; UI loads `MapCenter.qml` — **no** `QtWebEngine` QML import required |
+
+`Main.qml` never hard-imports `QtWebEngine`; it uses a `Loader` with a string URL so OFF builds do not need the WebEngine QML module.
 
 ## Vehicle hub
 
@@ -91,7 +97,7 @@ Companion hub and wire protocol:
 | --- | --- | --- |
 | `BEAGLEY_VEHICLE_BACKEND` | env | `mock` or `live` (default **`live`**) |
 | `VEHICLE_HUB_WS_URL` | env | WebSocket URL for live hub (e.g. `ws://HOST:8765`) |
-| `BEAGLEY_NO_MAP` | env | Non-zero → skip WebEngine map init |
+| `BEAGLEY_NO_MAP` | env | Non-zero → skip WebEngine init and load `MapCenter.qml` placeholder |
 | `WITH_WEBENGINE` | CMake | `ON`/`OFF` — link WebEngine, ship map QML/resources |
 
 ## Known debt
@@ -100,8 +106,7 @@ Honest current gaps (not rubber-stamped as fine):
 
 1. **Dual assets** — both `assets/` and `src/assets/` exist; packaging/source-of-truth is unclear.
 2. **Legacy QRC** — `src/qml.qrc` and `src/resources/web.qrc` are not wired into the current `qt_add_*` build path.
-3. **WebEngine hard-import** — `Main.qml` always `import QtWebEngine`, even when `WITH_WEBENGINE=OFF`. A separate follow-up should use a Loader / conditional module so OFF builds work end-to-end.
-4. **web/test vs CMake** — with WebEngine ON, CMake still references `src/ui/web/test/index.html`, but `src/ui/web/test/` is **gitignored** (local scratch). Clean clones may miss that file.
+3. **web/test scratch** — `src/ui/web/test/` remains gitignored for local experiments; it is **not** part of the build (only `src/ui/web/map/` is packaged when `WITH_WEBENGINE=ON`).
 
 Do not drive-by refactor these in unrelated PRs — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
@@ -111,8 +116,7 @@ GitHub Actions (`.github/workflows/ci.yml`) on `push` / `pull_request` to `main`
 
 1. **Hygiene job** — asserts `README.md`, `LICENSE`, and `CMakeLists.txt` exist.
 2. **Build job** (ubuntu-22.04, Qt **6.6.3** via `jurplel/install-qt-action`, modules `qtwebsockets` + `qtsvg`, **no** WebEngine):
-   - **Configure** (`-DWITH_WEBENGINE=OFF`) is a **required** success step.
-   - **Build** runs with **`continue-on-error: true`** because the `Main.qml` QtWebEngine hard-import commonly fails OFF builds until the Loader fix lands. Configure remains the hard gate.
+   - **Configure** (`-DWITH_WEBENGINE=OFF`) and **build** are both **required** success steps (hard gate).
 
 ## License
 
