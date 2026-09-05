@@ -25,7 +25,10 @@ endif()
 qt_standard_project_setup()
 
 qt_policy(SET QTP0001 NEW)
-qt_policy(SET QTP0004 NEW)
+# QTP0004 exists only since Qt 6.8; CI uses 6.6.3.
+if(QT_KNOWN_POLICY_QTP0004)
+    qt_policy(SET QTP0004 NEW)
+endif()
 
 # --------------------
 # Executable
