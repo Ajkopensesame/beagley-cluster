@@ -2355,11 +2355,11 @@ Window {
                     z: 1
                     visible: root.gaugeMatrixDepthEnabled && !root.mapMenuOpen
                     effectEnabled: visible
-                    rainColor: "#7AFFFF"
+                    rainColor: "#B8FFFF"
                     density: 0.72
                     columns: 14
-                    fontPx: 13
-                    opacityScale: 0.88
+                    fontPx: 14
+                    opacityScale: 0.95
                     faceFactor: 0.68
                 }
 
