@@ -31,7 +31,7 @@ Item {
         endProgress: root.clampedProgress
         radiusFactor: root.radiusFactor
         strokeWidth: root.strokePx * (root.richMode ? 1.35 : 1.15)
-        color: Qt.rgba(1.0, 0.35, 0.06, root.richMode ? 0.34 : 0.22)
+        color: Qt.rgba(1.0, 0.42, 0.08, root.richMode ? 0.42 : 0.30)
         segments: root.richMode ? 40 : 28
         roundedCaps: true
     }
@@ -97,7 +97,7 @@ Item {
         property real sweepAngleDeg: root.sweepAngleDeg
         property real radiusFactor: root.radiusFactor
         // Half-band in UV units (radius is diameter*factor / side = factor when square)
-        property real bandHalf: (root.strokePx * 0.52) / Math.max(1.0, root.side)
+        property real bandHalf: (root.strokePx * 0.58) / Math.max(1.0, root.side)
         property real soft: root.richMode ? 0.0045 : 0.0035
 
         fragmentShader: "
@@ -125,8 +125,12 @@ Item {
                 highp float inSweep = step(0.0, u) * step(u, max(progress, 0.0));
                 highp float band = 1.0 - smoothstep(bandHalf, bandHalf + soft, abs(r - radiusFactor));
                 lowp vec4 tex = texture2D(source, qt_TexCoord0);
+                // Lift concept magma midtones (baked atlas tends dark under eglfs)
+                highp vec3 rgb = tex.rgb;
+                rgb = mix(rgb, rgb * vec3(1.35, 1.18, 0.85) + vec3(0.08, 0.03, 0.0), 0.55);
+                rgb = clamp(rgb, 0.0, 1.0);
                 lowp float a = tex.a * band * inSweep;
-                gl_FragColor = vec4(tex.rgb * a, a) * qt_Opacity;
+                gl_FragColor = vec4(rgb * a, a) * qt_Opacity;
             }
         "
     }
@@ -138,11 +142,11 @@ Item {
         visible: root.showBand && root.clampedProgress > 0.01
         startAngleDeg: root.startAngleDeg
         sweepAngleDeg: root.sweepAngleDeg
-        startProgress: Math.max(0.0, root.clampedProgress - (root.richMode ? 0.10 : 0.12))
+        startProgress: Math.max(0.0, root.clampedProgress - (root.richMode ? 0.14 : 0.16))
         endProgress: root.clampedProgress
         radiusFactor: root.radiusFactor
         strokeWidth: root.strokePx * 0.72
-        color: Qt.rgba(1.0, 0.97, 0.78, root.richMode ? 0.72 : 0.55)
+        color: Qt.rgba(1.0, 0.96, 0.72, root.richMode ? 0.88 : 0.78)
         segments: 20
         roundedCaps: true
     }

@@ -146,6 +146,6 @@ Item {
         visible: root.atlasRimEnabled && !root.lowEffectMode
         showFacePlate: root.atlasFaceEnabled
         faceOpacity: 0.38
-        rimOpacity: root.embeddedSafeMode ? 0.88 : 0.95
+        rimOpacity: root.embeddedSafeMode ? 1.0 : 1.0
     }
 }
