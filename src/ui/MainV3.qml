@@ -265,7 +265,7 @@ Window {
     readonly property var simulationGearSequence: ["P", "R", "N", "D", "2", "1", "L"]
     readonly property string displayGearValue: clusterSimulation
         ? simulationGearSequence[Math.floor(clusterSimulationDiscretePhase / 1.25) % simulationGearSequence.length]
-        : (gaugeReviewMode ? "D" : gearText)
+        : (gaugeReviewMode ? "D" : root.gearText)
     readonly property bool displayOverdriveValue: clusterSimulation
         ? (Math.floor(clusterSimulationDiscretePhase / 4.0) % 3) === 1
         : (gaugeReviewMode ? false : truthOk && !!(hub && hub.overdrive))
@@ -2285,7 +2285,7 @@ Window {
                     height: parent.height * 0.088
 
                     Text {
-                        id: gearText
+                        id: gearValueText
                         anchors.centerIn: parent
                         text: root.displayGearValue
                         color: root.gearColorFor(text)
@@ -2299,7 +2299,7 @@ Window {
                         styleColor: "#F0000000"
 
                         SequentialAnimation on opacity {
-                            running: root.normGear(gearText.text) === "R"
+                            running: root.normGear(gearValueText.text) === "R"
                             loops: Animation.Infinite
                             NumberAnimation { from: 1.0; to: 0.20; duration: 220 }
                             NumberAnimation { from: 0.20; to: 1.0; duration: 220 }
