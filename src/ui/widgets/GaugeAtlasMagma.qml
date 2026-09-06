@@ -75,7 +75,7 @@ Item {
 
     Connections {
         target: atlasImage
-        function onStatusChanged() {
+        onStatusChanged: {
             if (atlasImage.status === Image.Ready)
                 atlasSrc.scheduleUpdate()
         }

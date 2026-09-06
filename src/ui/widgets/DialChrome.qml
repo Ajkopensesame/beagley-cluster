@@ -343,7 +343,7 @@ Item {
         roundedCaps: false
     }
 
-    // ---- Concept atlas magma (embedded): Image + OpacityMask ----
+    // ---- Concept atlas magma (embedded): Image + ShaderEffect ----
     GaugeAtlasMagma {
         anchors.fill: parent
         z: 19
