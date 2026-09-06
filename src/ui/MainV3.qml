@@ -120,9 +120,9 @@ Window {
     readonly property bool mapLibreSafeCompositor: mapLibreNativeActive && !mapLibreNativeFullUnderlay
     readonly property real gaugeFaceBackgroundOpacity: 1.0
     readonly property int mapLibreSafeSideInset: mapLibreSafeCompositor
-        ? Math.round(gaugeFaceSize * 0.54)
+        ? Math.round(gaugeFaceSize * 0.50)
         : 0
-    readonly property int mapLibreSafeVerticalInset: mapLibreSafeCompositor ? 18 : 0
+    readonly property int mapLibreSafeVerticalInset: mapLibreSafeCompositor ? 14 : 0
     readonly property bool radarFeatureEnabled: (typeof BEAGLEY_RADAR_ENABLED !== "undefined")
         && BEAGLEY_RADAR_ENABLED
     property string weatherExpandedMode: (typeof BEAGLEY_INITIAL_WEATHER_EXPANDED_MODE !== "undefined"
@@ -145,10 +145,11 @@ Window {
         : NaN
     readonly property bool sharedEffectClockEnabled: !effectsOff && !embeddedEffectBudgetMode
     readonly property bool stressMapMotionEnabled: stressScene && !lowEffectMode && renderProfile !== "embedded"
-    readonly property int gaugeShellSize: 780
-    readonly property int gaugePodSize: 642
-    readonly property int gaugeFaceSize: 656
-    readonly property int gaugeEdgeBleed: -18
+    // Slice 5: tighten dual-gauge vs map band — slight edge bleed, open center window
+    readonly property int gaugeShellSize: 768
+    readonly property int gaugePodSize: 632
+    readonly property int gaugeFaceSize: 644
+    readonly property int gaugeEdgeBleed: -26
     property real sharedEffectPhase: 0.0
     property real stressPhase: 0.0
     property real clusterSimulationPhase: 0.0
@@ -240,6 +241,25 @@ Window {
         : (stressScene
         ? (70 + 42 * Math.sin(stressPhase * 0.42 + 1.3))
         : (gaugeReviewMode ? 104 : coolantValue))
+
+    // Slice 5: Tesla-class gauge motion — exponential lag into native needles/numerals
+    property real smoothedSpeedValue: 0
+    property real smoothedRpmValue: 0
+    property real smoothedCoolantValue: 70
+    property real smoothedFuelValue: 100
+    readonly property real gaugeSpeedResponse: gaugeLowEffectMode ? 9.0 : 13.5
+    readonly property real gaugeRpmResponse: gaugeLowEffectMode ? 10.0 : 15.5
+    readonly property real gaugeAuxResponse: gaugeLowEffectMode ? 7.0 : 10.0
+    readonly property real gaugeSpeedMaxStep: gaugeLowEffectMode ? 7.5 : 11.0
+    readonly property real gaugeRpmMaxStep: gaugeLowEffectMode ? 280.0 : 420.0
+    readonly property real liveGaugeSpeed: smoothedSpeedValue
+    readonly property real liveGaugeRpm: smoothedRpmValue
+    readonly property real liveGaugeCoolant: smoothedCoolantValue
+    readonly property real liveGaugeFuel: smoothedFuelValue
+    readonly property bool gaugePearlBreatheActive: !gaugeEffectsOff
+        && !clusterSimulation
+        && Math.abs(liveGaugeSpeed) < 1.5
+        && Math.abs(liveGaugeRpm) < 80
     readonly property var simulationGearSequence: ["P", "R", "N", "D", "2", "1", "L"]
     readonly property string displayGearValue: clusterSimulation
         ? simulationGearSequence[Math.floor(clusterSimulationDiscretePhase / 1.25) % simulationGearSequence.length]
@@ -1503,6 +1523,27 @@ Window {
     }
 
     Timer {
+        id: gaugeMotionClock
+        interval: 16
+        running: true
+        repeat: true
+        onTriggered: {
+            const dt = interval / 1000.0
+            function approach(current, target, response, maxStep) {
+                const diff = target - current
+                let step = diff * (1.0 - Math.exp(-response * dt))
+                if (step > maxStep) step = maxStep
+                if (step < -maxStep) step = -maxStep
+                return current + step
+            }
+            root.smoothedSpeedValue = approach(root.smoothedSpeedValue, root.displaySpeedValue, root.gaugeSpeedResponse, root.gaugeSpeedMaxStep)
+            root.smoothedRpmValue = approach(root.smoothedRpmValue, root.displayRpmValue, root.gaugeRpmResponse, root.gaugeRpmMaxStep)
+            root.smoothedCoolantValue = approach(root.smoothedCoolantValue, root.displayCoolantValue, root.gaugeAuxResponse, 3.5)
+            root.smoothedFuelValue = approach(root.smoothedFuelValue, root.displayFuelValue, root.gaugeAuxResponse, 6.0)
+        }
+    }
+
+    Timer {
         id: effectClock
         interval: root.embeddedHighEffectBudgetMode ? 300 : (root.lowEffectMode ? 140 : 90)
         running: root.sharedEffectClockEnabled
@@ -1747,12 +1788,12 @@ Window {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
-                height: 132
+                height: 118
                 gradient: Gradient {
-                    // Slice 4: lighter foot fade — keep dial hierarchy without voiding the map
+                    // Slice 5: slightly shorter foot fade — more readable map band under gauges
                     GradientStop { position: 0.0; color: "#00000000" }
-                    GradientStop { position: 0.55; color: root.mapNavProductActive ? "#02060B22" : "#02060B33" }
-                    GradientStop { position: 1.0; color: root.mapNavProductActive ? "#01050A88" : "#01050AB8" }
+                    GradientStop { position: 0.52; color: root.mapNavProductActive ? "#02060B1A" : "#02060B2A" }
+                    GradientStop { position: 1.0; color: root.mapNavProductActive ? "#01050A78" : "#01050AA8" }
                 }
             }
         }
@@ -1959,6 +2000,26 @@ Window {
                 color: "#010309FE"
             }
 
+            // Slice 5: soft idle pearl breathe — only when meaningfully parked/idle
+            Rectangle {
+                anchors.centerIn: parent
+                width: root.gaugeFaceSize + 28
+                height: width
+                radius: width / 2
+                z: root.mapLibreSafeCompositor ? 115 : 15
+                visible: root.gaugePearlBreatheActive
+                color: "transparent"
+                border.width: 2
+                border.color: Qt.rgba(appTheme.pearlLow.r, appTheme.pearlLow.g, appTheme.pearlLow.b, 0.16)
+                opacity: 0.0
+                SequentialAnimation on opacity {
+                    running: root.gaugePearlBreatheActive
+                    loops: Animation.Infinite
+                    NumberAnimation { from: 0.10; to: 0.28; duration: 1600; easing.type: Easing.InOutSine }
+                    NumberAnimation { from: 0.28; to: 0.10; duration: 1600; easing.type: Easing.InOutSine }
+                }
+            }
+
             NativeGaugeInstrument {
                 id: speedGauge
                 anchors.centerIn: parent
@@ -1966,11 +2027,11 @@ Window {
                 height: root.gaugeFaceSize
                 z: root.mapLibreSafeCompositor ? 120 : 20
                 kind: "speed"
-                value: root.displaySpeedValue
+                value: root.liveGaugeSpeed
                 maxValue: 140
-                auxProgress: Math.max(0.14, Math.min(1, (root.displayCoolantValue - 40) / 70))
-                primaryColor: appTheme.speedColor(root.displaySpeedValue)
-                auxColor: root.displayCoolantValue >= 100 ? appTheme.danger : (root.displayCoolantValue < 40 ? "#63C9FF" : appTheme.pearlLow)
+                auxProgress: Math.max(0.14, Math.min(1, (root.liveGaugeCoolant - 40) / 70))
+                primaryColor: appTheme.speedColor(root.liveGaugeSpeed)
+                auxColor: root.liveGaugeCoolant >= 100 ? appTheme.danger : (root.liveGaugeCoolant < 40 ? "#63C9FF" : appTheme.pearlLow)
                 chromeColor: appTheme.pearlLow
                 lowEffectMode: root.gaugeLowEffectMode
                 backgroundOpacity: root.gaugeFaceBackgroundOpacity
@@ -2069,8 +2130,8 @@ Window {
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.verticalCenter: parent.verticalCenter
                     anchors.verticalCenterOffset: -parent.height * 0.030
-                    text: root.formatSpeedValue(root.displaySpeedValue)
-                    color: appTheme.speedColor(root.displaySpeedValue)
+                    text: root.formatSpeedValue(root.liveGaugeSpeed)
+                    color: appTheme.speedColor(root.liveGaugeSpeed)
                     font.family: "Oxanium"
                     font.pixelSize: parent.width * 0.158
                     font.bold: true
@@ -2222,6 +2283,25 @@ Window {
                 color: "#010309FE"
             }
 
+            Rectangle {
+                anchors.centerIn: parent
+                width: root.gaugeFaceSize + 28
+                height: width
+                radius: width / 2
+                z: root.mapLibreSafeCompositor ? 115 : 15
+                visible: root.gaugePearlBreatheActive
+                color: "transparent"
+                border.width: 2
+                border.color: Qt.rgba(appTheme.pearlLow.r, appTheme.pearlLow.g, appTheme.pearlLow.b, 0.14)
+                opacity: 0.0
+                SequentialAnimation on opacity {
+                    running: root.gaugePearlBreatheActive
+                    loops: Animation.Infinite
+                    NumberAnimation { from: 0.08; to: 0.24; duration: 1700; easing.type: Easing.InOutSine }
+                    NumberAnimation { from: 0.24; to: 0.08; duration: 1700; easing.type: Easing.InOutSine }
+                }
+            }
+
             NativeGaugeInstrument {
                 id: tachGauge
                 anchors.centerIn: parent
@@ -2229,11 +2309,11 @@ Window {
                 height: root.gaugeFaceSize
                 z: root.mapLibreSafeCompositor ? 120 : 20
                 kind: "tach"
-                value: root.displayRpmValue
+                value: root.liveGaugeRpm
                 maxValue: 8000
-                auxProgress: Math.max(0, Math.min(1, root.displayFuelValue / 100))
-                primaryColor: appTheme.rpmColor(root.displayRpmValue)
-                auxColor: root.displayFuelValue <= 12 ? appTheme.danger : appTheme.pearlLow
+                auxProgress: Math.max(0, Math.min(1, root.liveGaugeFuel / 100))
+                primaryColor: appTheme.rpmColor(root.liveGaugeRpm)
+                auxColor: root.liveGaugeFuel <= 12 ? appTheme.danger : appTheme.pearlLow
                 chromeColor: appTheme.pearlLow
                 lowEffectMode: root.gaugeLowEffectMode
                 backgroundOpacity: root.gaugeFaceBackgroundOpacity

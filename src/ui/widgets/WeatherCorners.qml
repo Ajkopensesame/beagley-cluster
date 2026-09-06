@@ -29,8 +29,9 @@ Item {
     readonly property bool embeddedSafeMode: Qt.platform.os === "linux"
     // Slice 3: radar expands as a card/sheet under weather — not a full-canopy peer corner.
     readonly property bool tallDetailMode: false
-    readonly property int podSize: Math.floor(Math.min(164, Math.max(142, height * 0.228)))
-    readonly property int cornerBleed: Math.round(podSize * 0.17)
+    // Slice 5: slightly quieter corner bleed — arm's-length jobs, no numeral crowd
+    readonly property int podSize: Math.floor(Math.min(158, Math.max(138, height * 0.218)))
+    readonly property int cornerBleed: Math.round(podSize * 0.15)
     readonly property int cornerInset: -cornerBleed
     readonly property real podBleedFraction: cornerBleed / podSize
     readonly property int podFaceInset: Math.round(podSize * 0.190)
@@ -1486,20 +1487,26 @@ Item {
         id: detailLayer
         anchors.fill: parent
         z: 500
-        visible: root.expandedMode !== ""
-        opacity: visible ? 1 : 0
+        // Slice 5: card sheets animate in (opacity/y); keep dim light so gauges stay lit
+        readonly property bool open: root.expandedMode !== ""
+        visible: opacity > 0.01 || open
+        opacity: open ? 1 : 0
+        Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
 
         Rectangle {
             anchors.fill: parent
             color: root.expandedMode === "temp"
                 ? Qt.rgba(0.0, 0.0, 0.0, 0.0)
                 : root.expandedMode === "radar"
-                ? Qt.rgba(0.0, 0.0, 0.0, 0.34)
-                : Qt.rgba(0.0, 0.0, 0.0, 0.54)
+                ? Qt.rgba(0.0, 0.0, 0.0, 0.18)
+                : Qt.rgba(0.0, 0.0, 0.0, 0.22)
+            opacity: detailLayer.open ? 1 : 0
+            Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
         }
 
         MouseArea {
             anchors.fill: parent
+            enabled: detailLayer.open
             onClicked: root.expandedMode = ""
         }
 
@@ -1520,7 +1527,13 @@ Item {
                 ? 410
                 : Math.floor(Math.min(360, Math.max(272, parent.height * 0.46)))
             anchors.horizontalCenter: parent.horizontalCenter
-            anchors.verticalCenter: parent.verticalCenter
+            // Slice 5: rise into place rather than hard-cut canopy takeover
+            y: Math.round((parent.height - height) / 2) + (detailLayer.open ? 0 : 22)
+            opacity: detailLayer.open ? 1 : 0
+            scale: detailLayer.open ? 1.0 : 0.985
+            Behavior on y { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+            Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+            Behavior on scale { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
             clip: false
 
             NativePanel {

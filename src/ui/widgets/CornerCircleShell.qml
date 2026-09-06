@@ -93,6 +93,15 @@ Item {
             border.color: Qt.rgba(0.0, 0.0, 0.0, 0.88)
         }
 
+        property real activeBreathe: 1.0
+        SequentialAnimation on activeBreathe {
+            running: root.active && !root.lowEffectMode && root.embeddedSafeMode
+            loops: Animation.Infinite
+            NumberAnimation { from: 0.82; to: 1.0; duration: 1400; easing.type: Easing.InOutSine }
+            NumberAnimation { from: 1.0; to: 0.82; duration: 1400; easing.type: Easing.InOutSine }
+            onStopped: embeddedShell.activeBreathe = 1.0
+        }
+
         Rectangle {
             anchors.fill: parent
             anchors.margins: Math.max(2, embeddedShell.side * 0.018)
@@ -100,7 +109,8 @@ Item {
             color: "transparent"
             border.width: 1
             border.color: Qt.rgba(0.86, 0.90, 0.98, root.active ? (root.lowEffectMode ? 0.14 : 0.24) : (root.lowEffectMode ? 0.10 : 0.16))
-            opacity: root.lowEffectMode ? 0.78 : 1.0
+            // Slice 5: soft alive pulse only when the corner job is meaningfully active
+            opacity: (root.lowEffectMode ? 0.78 : 1.0) * (root.active ? embeddedShell.activeBreathe : 1.0)
         }
     }
 
