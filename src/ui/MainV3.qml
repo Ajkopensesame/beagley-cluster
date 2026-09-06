@@ -321,7 +321,7 @@ Window {
         : (gaugeReviewMode ? true : truthOk && !!(hub && hub.warnCheckEngine))
     readonly property bool displayWarnATValue: clusterSimulation
         ? (simulationWarningStep === 6 || simulationWarningStep === 8)
-        : (gaugeReviewMode ? true : truthOk && !!(hub && hub.warnAT))
+        : (gaugeReviewMode ? false : truthOk && !!(hub && hub.warnAT))
     readonly property bool displayWarnFuelLowValue: clusterSimulation
         ? (simulationWarningStep === 7 || simulationWarningStep === 8)
         : (gaugeReviewMode ? true : truthOk && !!(hub && hub.warnFuelLow))
@@ -336,7 +336,13 @@ Window {
         : (gaugeReviewMode ? "4WD" : ((hub && hub.drivetrainMode) ? String(hub.drivetrainMode).toUpperCase() : "2WD"))
     readonly property string displayOdometerText: clusterSimulation
         ? formatOdometerKm(284613 + Math.floor(clusterSimulationDiscretePhase * 12))
-        : "------"
+        : (gaugeReviewMode
+            ? formatOdometerKm(12580)
+            : (truthOk && hub && isFinite(Number(hub.odometerKm))
+                ? formatOdometerKm(hub.odometerKm)
+                : (truthOk && hub && isFinite(Number(hub.odoKm))
+                    ? formatOdometerKm(hub.odoKm)
+                    : "------")))
     function formatOdometerKm(value) {
         const text = String(Math.max(0, Math.round(Number(value) || 0)))
         let out = ""
@@ -1870,6 +1876,59 @@ Window {
             }
         }
 
+        // Skin v2: concept purple top/bottom map frame accents
+        Item {
+            id: mapFrameAccents
+            anchors.fill: parent
+            z: 9
+            visible: !root.mapMenuOpen && !root.navControlsOpen
+
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.leftMargin: root.mapLibreSafeSideInset + 8
+                anchors.rightMargin: root.mapLibreSafeSideInset + 8
+                y: root.mapLibreSafeVerticalInset
+                height: 2
+                radius: 1
+                color: appTheme.mapFramePurple
+                opacity: 0.88
+            }
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.leftMargin: root.mapLibreSafeSideInset + 28
+                anchors.rightMargin: root.mapLibreSafeSideInset + 28
+                y: root.mapLibreSafeVerticalInset + 2
+                height: 1
+                color: appTheme.mapFramePurple
+                opacity: 0.35
+            }
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.leftMargin: root.mapLibreSafeSideInset + 8
+                anchors.rightMargin: root.mapLibreSafeSideInset + 8
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: root.mapLibreSafeVerticalInset
+                height: 2
+                radius: 1
+                color: appTheme.mapFramePurple
+                opacity: 0.82
+            }
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.leftMargin: root.mapLibreSafeSideInset + 28
+                anchors.rightMargin: root.mapLibreSafeSideInset + 28
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: root.mapLibreSafeVerticalInset + 2
+                height: 1
+                color: appTheme.mapFramePurple
+                opacity: 0.32
+            }
+        }
+
         W.MapVehicleMarker {
             id: mapVehicleMarker
             width: 54
@@ -1975,31 +2034,72 @@ Window {
             }
         }
 
-        // Slice 6: light single MAP affordance (not twin settings chrome)
-        Rectangle {
-            id: mapDiscoverChip
+        // Skin v2: concept bottom swipe caret + light MAP affordance
+        Item {
+            id: mapDiscoverCluster
             z: 271
             visible: !root.mapMenuOpen && !root.navControlsOpen
-            width: 74
-            height: 28
-            radius: 14
+            width: 86
+            height: 46
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.bottom: parent.bottom
-            anchors.bottomMargin: 10
-            color: Qt.rgba(0.02, 0.03, 0.06, 0.55)
-            border.width: 1
-            border.color: Qt.rgba(0.35, 0.95, 0.88, 0.28)
-            opacity: 0.72
+            anchors.bottomMargin: 6
 
-            Text {
-                anchors.centerIn: parent
-                text: "MAP"
-                color: "#9EF6E8"
-                font.family: "Oxanium"
-                font.pixelSize: 11
-                font.weight: Font.DemiBold
-                font.letterSpacing: 1.2
-                renderType: root.menuTextRenderType
+            // Concept still: rounded tab with upward caret
+            Rectangle {
+                id: swipeCaretTab
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.top: parent.top
+                width: 42
+                height: 18
+                radius: 9
+                color: Qt.rgba(0.03, 0.04, 0.08, 0.72)
+                border.width: 1
+                border.color: Qt.rgba(appTheme.mapFramePurple.r, appTheme.mapFramePurple.g, appTheme.mapFramePurple.b, 0.45)
+
+                Canvas {
+                    anchors.centerIn: parent
+                    width: 16
+                    height: 10
+                    onWidthChanged: requestPaint()
+                    onHeightChanged: requestPaint()
+                    Component.onCompleted: requestPaint()
+                    onPaint: {
+                        const ctx = getContext("2d")
+                        ctx.clearRect(0, 0, width, height)
+                        ctx.beginPath()
+                        ctx.moveTo(width * 0.5, 1)
+                        ctx.lineTo(width - 1, height - 1)
+                        ctx.lineTo(1, height - 1)
+                        ctx.closePath()
+                        ctx.fillStyle = "#F4F1FF"
+                        ctx.fill()
+                    }
+                }
+            }
+
+            Rectangle {
+                id: mapDiscoverChip
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.bottom: parent.bottom
+                width: 74
+                height: 26
+                radius: 13
+                color: Qt.rgba(0.02, 0.03, 0.06, 0.55)
+                border.width: 1
+                border.color: Qt.rgba(appTheme.mapFramePurple.r, appTheme.mapFramePurple.g, appTheme.mapFramePurple.b, 0.38)
+                opacity: 0.78
+
+                Text {
+                    anchors.centerIn: parent
+                    text: "MAP"
+                    color: "#E8DEFF"
+                    font.family: "Oxanium"
+                    font.pixelSize: 11
+                    font.weight: Font.DemiBold
+                    font.letterSpacing: 1.2
+                    renderType: root.menuTextRenderType
+                }
             }
 
             MouseArea {
@@ -2176,10 +2276,10 @@ Window {
                 // Coolant moves to tach twin micro-arcs (Skin v2); keep a quiet residual track
                 auxProgress: 0.0
                 primaryColor: root.gaugeLavaAccentEnabled
-                    ? Qt.rgba(appTheme.lavaMagenta.r, appTheme.lavaMagenta.g, appTheme.lavaMagenta.b, 0.04)
+                    ? Qt.rgba(appTheme.lavaOrange.r, appTheme.lavaOrange.g, appTheme.lavaOrange.b, 0.03)
                     : appTheme.speedColor(root.liveGaugeSpeed)
                 auxColor: "transparent"
-                chromeColor: root.gaugeLavaAccentEnabled ? appTheme.lavaRemainder : appTheme.pearlLow
+                chromeColor: root.gaugeLavaAccentEnabled ? appTheme.lavaTrack : appTheme.pearlLow
                 lowEffectMode: root.gaugeLowEffectMode
                 backgroundOpacity: root.gaugeFaceBackgroundOpacity
             }
@@ -2233,7 +2333,7 @@ Window {
                 detailMode: root.gaugeAccentDetailMode
                 accentOverlayMode: true
                 gaugeColor: appTheme.lavaOrange
-                chromeColor: appTheme.lavaRemainder
+                chromeColor: appTheme.lavaTrack
                 progress: Math.max(0, Math.min(1, root.liveGaugeSpeed / 140))
                 showArcHead: true
                 maxValue: 140
@@ -2555,10 +2655,10 @@ Window {
                 // Twin micro-arcs own fuel/temp; mute native aux to avoid double rings
                 auxProgress: 0.0
                 primaryColor: root.gaugeLavaAccentEnabled
-                    ? Qt.rgba(appTheme.lavaMagenta.r, appTheme.lavaMagenta.g, appTheme.lavaMagenta.b, 0.04)
+                    ? Qt.rgba(appTheme.lavaOrange.r, appTheme.lavaOrange.g, appTheme.lavaOrange.b, 0.03)
                     : appTheme.rpmColor(root.liveGaugeRpm)
                 auxColor: "transparent"
-                chromeColor: root.gaugeLavaAccentEnabled ? appTheme.lavaRemainder : appTheme.pearlLow
+                chromeColor: root.gaugeLavaAccentEnabled ? appTheme.lavaTrack : appTheme.pearlLow
                 lowEffectMode: root.gaugeLowEffectMode
                 backgroundOpacity: root.gaugeFaceBackgroundOpacity
             }
@@ -2611,7 +2711,7 @@ Window {
                 detailMode: root.gaugeAccentDetailMode
                 accentOverlayMode: true
                 gaugeColor: appTheme.lavaOrange
-                chromeColor: appTheme.lavaRemainder
+                chromeColor: appTheme.lavaTrack
                 progress: Math.max(0, Math.min(1, root.liveGaugeRpm / 8000))
                 showArcHead: true
                 maxValue: 8000

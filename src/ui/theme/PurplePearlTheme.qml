@@ -39,11 +39,13 @@ QtObject {
     readonly property color neonPurple:    isNight ? "#B388FF" : "#7E57C2"
     readonly property color speedGlow:     isNight ? "#E8DEFF" : "#5E35B1"
     readonly property color matrixCyan:    isNight ? "#5FF7FF" : "#00ACC1"
-    readonly property color lavaAmber:     "#FFB020"
-    readonly property color lavaOrange:    "#FF6A18"
-    readonly property color lavaMagenta:   "#FF2D7A"
-    readonly property color lavaHot:       "#FFE9A8"
-    readonly property color lavaRemainder: isNight ? "#FF4DA8" : "#C2185B"
+    // Molten amber palette: hot core yellow→orange; magenta is hairline only (not neon pink)
+    readonly property color lavaAmber:     "#FFC028"
+    readonly property color lavaOrange:    "#FF7A14"
+    readonly property color lavaMagenta:   "#C41848"
+    readonly property color lavaHot:       "#FFF2A8"
+    readonly property color lavaRemainder: isNight ? "#1C1528" : "#5E35B1"
+    readonly property color lavaTrack:     isNight ? "#2A2240" : "#7E57C2"
     readonly property color mapGold:       "#F5C542"
     readonly property color mapFramePurple: isNight ? "#7B5CFF" : "#5E35B1"
 
@@ -64,8 +66,9 @@ QtObject {
         }
 
         // Skin v2: luminous purple-white speed reading; danger only at overspeed
-        const luminous = mix(pearlLow, Qt.rgba(1, 1, 1, 1), 0.62);
-        const base = mix(luminous, pearlHigh, t1 * 0.28);
+        // Concept still: purple-white luminous (not pink)
+        const luminous = mix(pearlLow, Qt.rgba(1, 1, 1, 1), 0.82);
+        const base = mix(luminous, pearlHigh, t1 * 0.14);
         return mix(base, danger, t2);
     }
 
@@ -87,8 +90,8 @@ QtObject {
             );
         }
 
-        const luminous = mix(pearlLow, Qt.rgba(1, 1, 1, 1), 0.28);
-        const base = mix(luminous, pearlHigh, t1 * 0.45);
+        const luminous = mix(pearlLow, Qt.rgba(1, 1, 1, 1), 0.62);
+        const base = mix(luminous, pearlHigh, t1 * 0.22);
         return mix(base, danger, t2);
     }
 

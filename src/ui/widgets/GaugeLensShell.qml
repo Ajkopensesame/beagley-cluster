@@ -70,7 +70,7 @@ Item {
             const accent = root.mix(root.gaugeColor, root.chromeColor, 0.42, 1.0)
             const bright = root.mix(accent, Qt.color("#FFFFFF"), 0.38, 1.0)
             const cyan = root.theme?.matrixCyan ?? Qt.color("#5FF7FF")
-            const lava = root.theme?.lavaMagenta ?? Qt.color("#FF2D7A")
+            const lava = root.theme?.lavaOrange ?? Qt.color("#FF7A14")
 
             // Deep black bezel lip — curved depth vs flat disc
             ctx.beginPath()
@@ -84,7 +84,7 @@ Item {
             rim.addColorStop(0.00, root.css(bright, 0.58))
             rim.addColorStop(0.16, root.css(cyan, 0.18))
             rim.addColorStop(0.38, root.css(rimGlow, 0.34))
-            rim.addColorStop(0.55, root.css(lava, 0.10))
+            rim.addColorStop(0.55, root.css(lava, 0.08))
             rim.addColorStop(0.72, "rgba(0,0,0,0.78)")
             rim.addColorStop(0.90, root.css(pearlLow, 0.28))
             rim.addColorStop(1.00, root.css(bright, 0.40))

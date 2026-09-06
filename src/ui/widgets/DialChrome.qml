@@ -408,12 +408,13 @@ Item {
                 return;
             }
 
-            // Skin v2 molten lava: thick orange → magenta (concept), not pearl purple
-            const lavaAmber = (root.theme && root.theme.lavaAmber) ? root.theme.lavaAmber : Qt.color("#FFB020");
-            const lavaOrange = (root.theme && root.theme.lavaOrange) ? root.theme.lavaOrange : Qt.color("#FF6A18");
-            const lavaMagenta = (root.theme && root.theme.lavaMagenta) ? root.theme.lavaMagenta : Qt.color("#FF2D7A");
-            const lavaHot = (root.theme && root.theme.lavaHot) ? root.theme.lavaHot : Qt.color("#FFE9A8");
-            const lavaRemainder = (root.theme && root.theme.lavaRemainder) ? root.theme.lavaRemainder : Qt.color("#FF4DA8");
+            // Skin v2 molten lava: hot yellow→orange core; magenta hairline tail only
+            const lavaAmber = (root.theme && root.theme.lavaAmber) ? root.theme.lavaAmber : Qt.color("#FFC028");
+            const lavaOrange = (root.theme && root.theme.lavaOrange) ? root.theme.lavaOrange : Qt.color("#FF7A14");
+            const lavaMagenta = (root.theme && root.theme.lavaMagenta) ? root.theme.lavaMagenta : Qt.color("#C41848");
+            const lavaHot = (root.theme && root.theme.lavaHot) ? root.theme.lavaHot : Qt.color("#FFF2A8");
+            const lavaRemainder = (root.theme && root.theme.lavaRemainder) ? root.theme.lavaRemainder : Qt.color("#1C1528");
+            const lavaTrack = (root.theme && root.theme.lavaTrack) ? root.theme.lavaTrack : Qt.color("#2A2240");
             const neonCyan = lavaAmber;
             const neonLime = lavaOrange;
             const neonPink = lavaMagenta;
@@ -507,56 +508,79 @@ Item {
 
                 const fill = ctx.createLinearGradient(cx - r, cy + r, cx + r, cy - r);
                 if (lite) {
-                    // Drive lava-lite: orange-dominant molten, magenta only at tail (concept)
-                    fill.addColorStop(0.00, rgba(lavaMagenta, 0.55));
-                    fill.addColorStop(0.22, rgba(lavaOrange, 0.92));
-                    fill.addColorStop(0.55, rgba(lavaAmber, 0.98));
-                    fill.addColorStop(0.82, rgba(lavaHot, 0.96));
-                    fill.addColorStop(1.00, rgba(lavaHot, 0.88));
+                    // Drive lava-lite: amber/orange molten readable at arm's length
+                    fill.addColorStop(0.00, rgba(lavaOrange, 0.78));
+                    fill.addColorStop(0.10, rgba(lavaOrange, 0.96));
+                    fill.addColorStop(0.42, rgba(lavaAmber, 1.00));
+                    fill.addColorStop(0.72, rgba(lavaHot, 0.98));
+                    fill.addColorStop(1.00, rgba(lavaHot, 0.90));
                 } else {
-                    fill.addColorStop(0.00, rgba(lavaMagenta, root.lowEffectMode ? 0.55 : 0.62));
-                    fill.addColorStop(0.20, rgba(lavaOrange, root.lowEffectMode ? 0.88 : 0.92));
-                    fill.addColorStop(0.48, rgba(lavaAmber, root.lowEffectMode ? 0.94 : 0.97));
-                    fill.addColorStop(0.78, rgba(lavaHot, root.lowEffectMode ? 0.90 : 0.95));
-                    fill.addColorStop(1.00, rgba(brightColor, root.lowEffectMode ? 0.78 : 0.85));
+                    fill.addColorStop(0.00, rgba(lavaOrange, root.lowEffectMode ? 0.72 : 0.80));
+                    fill.addColorStop(0.12, rgba(lavaOrange, root.lowEffectMode ? 0.90 : 0.96));
+                    fill.addColorStop(0.40, rgba(lavaAmber, root.lowEffectMode ? 0.96 : 1.00));
+                    fill.addColorStop(0.72, rgba(lavaHot, root.lowEffectMode ? 0.92 : 0.98));
+                    fill.addColorStop(1.00, rgba(brightColor, root.lowEffectMode ? 0.80 : 0.88));
                 }
                 ctx.fillStyle = fill;
                 ctx.fillRect(0, 0, width, height);
 
-                const blobs = lite ? Math.min(1, blobCount) : blobCount;
+                // Magenta only as a hairline at the cold tail (not a pink band)
+                if (sweep > 0.04) {
+                    const tailEnd = fromRad + Math.min(sweep * 0.07, 0.12);
+                    ctx.beginPath();
+                    ctx.strokeStyle = rgba(lavaMagenta, lite ? 0.28 : 0.34);
+                    ctx.lineWidth = Math.max(1.5, (lite ? 2.2 : 2.8) * root.dynamicArcTune);
+                    ctx.lineCap = "round";
+                    ctx.arc(cx, cy, r, fromRad, tailEnd);
+                    ctx.stroke();
+                }
+
+                // Organic molten texture: keep a few blobs even on drive-lite
+                const blobs = lite ? Math.max(3, Math.min(4, blobCount + 2)) : blobCount;
                 for (let i = 0; i < blobs; i++) {
-                    const blobColor = lite
-                        ? lavaHot
-                        : [lavaOrange, lavaAmber, lavaHot, lavaOrange, lavaMagenta][i % 5];
+                    const blobColor = [lavaHot, lavaAmber, lavaOrange, lavaHot, lavaAmber][i % 5];
                     const u = (phase * (0.11 + i * 0.015) + i * 0.23) % 1.0;
                     const angle = fromRad + sweep * u;
                     const wobble = Math.sin(phase * (1.1 + i * 0.2) + i * 1.7);
                     const blobRadius = root.lowEffectMode
                         ? (5.0 + i * 1.0)
-                        : ((lite ? 11.0 : 9.0)
-                            + i * (lite ? 0.0 : 1.35)) * root.dynamicArcTune;
+                        : ((lite ? 9.5 : 9.0)
+                            + i * (lite ? 1.1 : 1.35)) * root.dynamicArcTune;
                     drawBlob(
                         angle,
-                        wobble * (root.lowEffectMode ? 1.1 : (lite ? 1.4 : 2.1)),
+                        wobble * (root.lowEffectMode ? 1.1 : (lite ? 1.6 : 2.1)),
                         blobRadius,
                         blobColor,
-                        root.lowEffectMode ? 0.64 : (lite ? 0.82 : 0.54),
-                        lite ? 1.35 : 1.55,
+                        root.lowEffectMode ? 0.64 : (lite ? 0.70 : 0.54),
+                        lite ? 1.40 : 1.55,
                         phase + i
                     );
+                }
+
+                // Cheap noise speckles for cracked-magma read without heavy atlas
+                const speckles = lite ? 10 : 18;
+                for (let s = 0; s < speckles; s++) {
+                    const u = (s * 0.137 + phase * 0.04) % 1.0;
+                    const angle = fromRad + sweep * u;
+                    const p = point(angle, r + Math.sin(phase + s) * 1.2);
+                    const hot = (s % 3) === 0;
+                    ctx.beginPath();
+                    ctx.fillStyle = rgba(hot ? lavaHot : lavaAmber, lite ? 0.34 : 0.28);
+                    ctx.arc(p.x, p.y, (hot ? 1.8 : 1.2) * root.dynamicArcTune, 0, Math.PI * 2);
+                    ctx.fill();
                 }
                 ctx.restore();
 
                 ctx.save();
                 buildTaperedPath(fromRad, toRad, tailWidth, headWidth, segments, capScale);
-                ctx.fillStyle = rgba(lavaHot, root.lowEffectMode ? 0.22 : (lite ? 0.28 : 0.16));
+                ctx.fillStyle = rgba(lavaHot, root.lowEffectMode ? 0.22 : (lite ? 0.32 : 0.18));
                 ctx.fill();
                 ctx.restore();
             }
 
-            // Faint pink remainder ring (concept) under molten progress
+            // Quiet dark track under molten progress — no pink remainder glow
             ctx.beginPath();
-            ctx.strokeStyle = rgba(lavaRemainder, root.embeddedHighEffectBudgetMode ? 0.12 : 0.10);
+            ctx.strokeStyle = rgba(lavaTrack, root.embeddedHighEffectBudgetMode ? 0.34 : 0.28);
             ctx.lineCap = "round";
             ctx.lineWidth = root.lowEffectMode
                 ? (16 * root.lowEffectArcTune)
@@ -564,7 +588,7 @@ Item {
             ctx.arc(cx, cy, r, startRad, fullEndRad);
             ctx.stroke();
             ctx.beginPath();
-            ctx.strokeStyle = rgba(lavaMagenta, root.embeddedHighEffectBudgetMode ? 0.06 : 0.05);
+            ctx.strokeStyle = rgba(lavaRemainder, root.embeddedHighEffectBudgetMode ? 0.22 : 0.18);
             ctx.lineWidth = root.lowEffectMode
                 ? (6 * root.lowEffectArcTune)
                 : ((root.embeddedHighEffectBudgetMode ? 8 : 10) * root.dynamicArcTune);
@@ -585,12 +609,12 @@ Item {
                     // One animated family per gauge. Embedded: thicker + brighter for glance.
                     // Thick molten ribbon (concept): drive uses fewer blobs, show uses organic blobs
                     drawLavaBand(startRad, endRad,
-                                 (root.embeddedHighEffectBudgetMode ? 12.0 : 8.0) * root.dynamicArcTune,
-                                 (root.embeddedHighEffectBudgetMode ? 34.0 : 28.0) * root.dynamicArcTune,
+                                 (root.embeddedHighEffectBudgetMode ? 13.0 : 8.0) * root.dynamicArcTune,
+                                 (root.embeddedHighEffectBudgetMode ? 36.0 : 28.0) * root.dynamicArcTune,
                                  base, bright,
-                                 root.embeddedHighEffectBudgetMode ? 28 : 128,
+                                 root.embeddedHighEffectBudgetMode ? 32 : 128,
                                  0.50,
-                                 root.embeddedHighEffectBudgetMode ? 1 : 5);
+                                 root.embeddedHighEffectBudgetMode ? 3 : 6);
                 }
             } else if (!root.lowEffectMode) {
                 // Idle ambient crawl on same cheap path (visible at 0 progress).
@@ -608,7 +632,7 @@ Item {
                              1);
                 // Soft track shimmer so the ring never looks fully dead
                 ctx.beginPath();
-                ctx.strokeStyle = rgba(bright, (root.embeddedHighEffectBudgetMode ? 0.18 : 0.10)
+                ctx.strokeStyle = rgba(lavaAmber, (root.embeddedHighEffectBudgetMode ? 0.20 : 0.12)
                     + 0.08 * (0.5 + 0.5 * Math.sin(phase * 0.9)));
                 ctx.lineCap = "round";
                 ctx.lineWidth = (root.embeddedHighEffectBudgetMode ? 5.5 : 4.0) * root.dynamicArcTune;

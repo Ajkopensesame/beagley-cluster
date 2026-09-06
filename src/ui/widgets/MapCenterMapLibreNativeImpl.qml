@@ -461,18 +461,18 @@ Item {
             id: routeCasing
             visible: root.nativeRouteVisible
             path: root.nativeRouteCoordinates
-            line.width: 9
-            line.color: "#07101B"
-            opacity: 0.82
+            line.width: 11
+            line.color: "#1A1208"
+            opacity: 0.88
         }
 
         MapPolyline {
             id: routeLine
             visible: root.nativeRouteVisible
             path: root.nativeRouteCoordinates
-            line.width: 5
-            line.color: "#25B8FF"
-            opacity: 0.96
+            line.width: 7
+            line.color: "#F5C542"
+            opacity: 0.98
         }
 
         MapQuickItem {
