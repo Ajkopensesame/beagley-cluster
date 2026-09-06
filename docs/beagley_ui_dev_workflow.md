@@ -76,6 +76,15 @@ cd /Users/joshkomant/projects/beagley-cluster
 This removes the systemd drop-in and returns the BeagleY to compiled QML from
 the deployed binary.
 
+## Skin v2 profiles (drive / show)
+
+| Profile | Default when | Matrix | Lava |
+| --- | --- | --- | --- |
+| `drive` | `RENDER_PROFILE=embedded` | off | lava-lite molten |
+| `show` | desktop, or `BEAGLEY_SKIN_PROFILE=show` | cyan depth (cheap on embedded; MatrixRain on desktop) | richer molten |
+
+Override with `BEAGLEY_SKIN_PROFILE=drive|show`. Score screenshots against `docs/vision/skin-v2-concept-1920x720.png`.
+
 ## Product-night lava / matrix
 
 Product-night dial **lava-lite** on the appliance requires:

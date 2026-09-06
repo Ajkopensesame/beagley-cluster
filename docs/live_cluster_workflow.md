@@ -38,6 +38,12 @@ VEHICLE_HUB_WS_URL=ws://10.24.0.7:8765
 - `rich`: gauges show the full ticks, lens, arcs, chevrons, and gauge detail
   while the map can stay on a conservative profile.
 
+### Skin v2 drive / show
+
+- `BEAGLEY_SKIN_PROFILE=drive` (embedded default): glass + molten lava-lite; matrix off
+- `BEAGLEY_SKIN_PROFILE=show`: concept match — matrix depth + richer lava
+- Vision still: `docs/vision/skin-v2-concept-1920x720.png`
+
 ### Product-night lava / matrix
 
 Slice 6 product-night dial **lava** requires `BEAGLEY_EFFECT_LEVEL=high`.

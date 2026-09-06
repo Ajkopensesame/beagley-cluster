@@ -23,14 +23,29 @@ QtObject {
     readonly property string fontMono: "monospace";
 
     // Core semantic colors
-    readonly property color bg:    isNight ? "#000000" : "#F5F3FF"
-    readonly property color panel: isNight ? "#0B0714" : "#FFFFFF"
+    readonly property color bg:    isNight ? "#010105" : "#F5F3FF"
+    readonly property color panel: isNight ? "#05060C" : "#FFFFFF"
     readonly property color text:  isNight ? "#E6FFFFFF" : "#1A0F2E"
 
-    readonly property color pearlLow:  isNight ? "#C7B7FF" : "#7E57C2"
-    readonly property color pearlHigh: isNight ? "#5E35B1" : "#311B92"
+    readonly property color pearlLow:  isNight ? "#D4C4FF" : "#7E57C2"
+    readonly property color pearlHigh: isNight ? "#6E35FF" : "#311B92"
     readonly property color amber:     isNight ? "#FFC107" : "#FFB300"
     readonly property color danger:    isNight ? "#FF3B3B" : "#C62828"
+
+    // ---- Skin v2 concept palette (docs/vision/skin-v2-concept-1920x720.png) ----
+    readonly property color deepBlack:     isNight ? "#010105" : "#F5F3FF"
+    readonly property color faceBlack:     isNight ? "#05060C" : "#FFFFFF"
+    readonly property color rimGlow:       isNight ? "#D4C4FF" : "#7E57C2"
+    readonly property color neonPurple:    isNight ? "#B388FF" : "#7E57C2"
+    readonly property color speedGlow:     isNight ? "#E8DEFF" : "#5E35B1"
+    readonly property color matrixCyan:    isNight ? "#5FF7FF" : "#00ACC1"
+    readonly property color lavaAmber:     "#FFB020"
+    readonly property color lavaOrange:    "#FF6A18"
+    readonly property color lavaMagenta:   "#FF2D7A"
+    readonly property color lavaHot:       "#FFE9A8"
+    readonly property color lavaRemainder: isNight ? "#FF4DA8" : "#C2185B"
+    readonly property color mapGold:       "#F5C542"
+    readonly property color mapFramePurple: isNight ? "#7B5CFF" : "#5E35B1"
 
     function speedColor(speedKph) {
         const s = Math.max(0, Number(speedKph) || 0);
@@ -48,7 +63,9 @@ QtObject {
             );
         }
 
-        const base = mix(pearlLow, pearlHigh, t1);
+        // Skin v2: luminous purple-white speed reading; danger only at overspeed
+        const luminous = mix(pearlLow, Qt.rgba(1, 1, 1, 1), 0.42);
+        const base = mix(luminous, pearlHigh, t1 * 0.55);
         return mix(base, danger, t2);
     }
 
@@ -70,12 +87,13 @@ QtObject {
             );
         }
 
-        const base = mix(pearlLow, pearlHigh, t1);
+        const luminous = mix(pearlLow, Qt.rgba(1, 1, 1, 1), 0.28);
+        const base = mix(luminous, pearlHigh, t1 * 0.45);
         return mix(base, danger, t2);
     }
 
     function tickAlpha(isMajor) {
-        if (isNight) return isMajor ? 0.55 : 0.32;
+        if (isNight) return isMajor ? 0.72 : 0.40;
         return isMajor ? 0.70 : 0.45;
     }
 

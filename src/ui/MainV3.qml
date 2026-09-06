@@ -36,7 +36,7 @@ Window {
         property string cachedSunDate: ""
     }
 
-    color: "#02060B"
+    color: appTheme.deepBlack
     readonly property var cluster: clusterRenderModel
     readonly property real defaultMapLat: -27.4698
     readonly property real defaultMapLng: 153.0251
@@ -77,13 +77,32 @@ Window {
     readonly property string gaugeEffectLevel: effectLevel
     readonly property bool gaugeLowEffectMode: gaugeEffectLevel === "low" || gaugeEffectLevel === "off"
     readonly property bool gaugeEffectsOff: gaugeEffectLevel === "off"
-    // FPS-first: matrix never on appliance/embedded; desktop/high may still show rain
+    // Skin v2 visual profiles:
+    //   drive = appliance default (glass + lava-lite + map; matrix off/sparse)
+    //   show  = concept still match (matrix depth + richer lava)
+    readonly property string skinVisualProfile: {
+        const raw = (typeof BEAGLEY_SKIN_PROFILE !== "undefined" && BEAGLEY_SKIN_PROFILE)
+            ? String(BEAGLEY_SKIN_PROFILE).trim().toLowerCase()
+            : ""
+        if (raw === "show" || raw === "drive")
+            return raw
+        return renderProfile === "embedded" ? "drive" : "show"
+    }
+    readonly property bool skinShowProfile: skinVisualProfile === "show"
+    // Drive: matrix hard-off on embedded. Show: full MatrixRain on desktop; cheap depth on embedded.
     readonly property bool gaugeMatrixRainEnabled: gaugeEffectLevel === "high"
         && !clusterSimulation
+        && skinShowProfile
         && renderProfile !== "embedded"
+    readonly property bool gaugeMatrixDepthEnabled: gaugeEffectLevel === "high"
+        && !clusterSimulation
+        && skinShowProfile
+        && renderProfile === "embedded"
     // Lava is independent of matrix — embedded high uses lava-lite, never rain
     readonly property bool gaugeLavaAccentEnabled: gaugeEffectLevel === "high" && !clusterSimulation
-    readonly property string gaugeAccentDetailMode: gaugeLavaAccentEnabled ? "rich" : gaugeDetail
+    readonly property string gaugeAccentDetailMode: gaugeLavaAccentEnabled
+        ? (skinShowProfile ? "rich" : "rich")
+        : gaugeDetail
     readonly property int gaugeIndicatorCascadeCycleMs: gaugeLowEffectMode ? 2300 : 2100
     readonly property string mapRenderer: (typeof BEAGLEY_MAP_RENDERER !== "undefined" && BEAGLEY_MAP_RENDERER)
         ? String(BEAGLEY_MAP_RENDERER)
@@ -2132,6 +2151,19 @@ Window {
                 }
             }
 
+            W.GaugeLensShell {
+                anchors.centerIn: parent
+                width: root.gaugeFaceSize + 36
+                height: width
+                z: root.mapLibreSafeCompositor ? 118 : 18
+                theme: appTheme
+                effectLevel: root.gaugeEffectLevel
+                gaugeColor: appTheme.speedGlow
+                chromeColor: appTheme.rimGlow
+                faceSize: root.gaugeFaceSize
+                podSize: root.gaugeFaceSize
+            }
+
             NativeGaugeInstrument {
                 id: speedGauge
                 anchors.centerIn: parent
@@ -2141,15 +2173,30 @@ Window {
                 kind: "speed"
                 value: root.liveGaugeSpeed
                 maxValue: 140
-                auxProgress: Math.max(0.14, Math.min(1, (root.liveGaugeCoolant - 40) / 70))
-                primaryColor: appTheme.speedColor(root.liveGaugeSpeed)
-                auxColor: root.liveGaugeCoolant >= 100 ? appTheme.danger : (root.liveGaugeCoolant < 40 ? "#63C9FF" : appTheme.pearlLow)
-                chromeColor: appTheme.pearlLow
+                // Coolant moves to tach twin micro-arcs (Skin v2); keep a quiet residual track
+                auxProgress: 0.0
+                primaryColor: root.gaugeLavaAccentEnabled
+                    ? Qt.rgba(appTheme.lavaMagenta.r, appTheme.lavaMagenta.g, appTheme.lavaMagenta.b, 0.04)
+                    : appTheme.speedColor(root.liveGaugeSpeed)
+                auxColor: "transparent"
+                chromeColor: root.gaugeLavaAccentEnabled ? appTheme.lavaRemainder : appTheme.pearlLow
                 lowEffectMode: root.gaugeLowEffectMode
                 backgroundOpacity: root.gaugeFaceBackgroundOpacity
             }
 
-            // Desktop/high showy only — gated off entirely when renderProfile=embedded
+            // Show profile: cyan matrix depth behind numerals (drive keeps this off)
+            W.GaugeMatrixDepth {
+                anchors.fill: speedGauge
+                z: root.mapLibreSafeCompositor ? 121 : 21
+                visible: root.gaugeMatrixDepthEnabled && !root.mapMenuOpen
+                effectEnabled: visible
+                rainColor: appTheme.matrixCyan
+                density: 0.28
+                columns: 9
+                fontPx: 10
+                opacityScale: 0.22
+            }
+
             W.MatrixRain {
                 anchors.fill: speedGauge
                 z: root.mapLibreSafeCompositor ? 122 : 22
@@ -2159,8 +2206,8 @@ Window {
                 effectEnabled: visible && !root.mapMenuOpen
                 effectLevel: root.gaugeEffectLevel
                 sharedPhase: root.gaugeMatrixRainSharedPhase
-                rainColor: Qt.rgba(appTheme.pearlLow.r, appTheme.pearlLow.g, appTheme.pearlLow.b, 0.82)
-                glowColor: Qt.rgba(1, 1, 1, 0.62)
+                rainColor: Qt.rgba(appTheme.matrixCyan.r, appTheme.matrixCyan.g, appTheme.matrixCyan.b, 0.72)
+                glowColor: Qt.rgba(appTheme.matrixCyan.r, appTheme.matrixCyan.g, appTheme.matrixCyan.b, 0.45)
                 fps: root.embeddedHighEffectBudgetMode ? 3.0 : 8.0
                 speedMultiplier: root.embeddedHighEffectBudgetMode ? 0.18 : 0.16
                 density: root.embeddedHighEffectBudgetMode ? 0.28 : 0.22
@@ -2185,8 +2232,8 @@ Window {
                 effectLevel: root.gaugeEffectLevel
                 detailMode: root.gaugeAccentDetailMode
                 accentOverlayMode: true
-                gaugeColor: appTheme.speedColor(root.liveGaugeSpeed)
-                chromeColor: appTheme.pearlLow
+                gaugeColor: appTheme.lavaOrange
+                chromeColor: appTheme.lavaRemainder
                 progress: Math.max(0, Math.min(1, root.liveGaugeSpeed / 140))
                 showArcHead: true
                 maxValue: 140
@@ -2288,6 +2335,23 @@ Window {
                 }
 
                 Text {
+                    id: speedUnitText
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.verticalCenterOffset: -parent.height * 0.168
+                    text: "KM/H"
+                    color: Qt.rgba(appTheme.speedGlow.r, appTheme.speedGlow.g, appTheme.speedGlow.b, 0.78)
+                    font.family: "Oxanium"
+                    font.pixelSize: parent.width * 0.028
+                    font.bold: true
+                    font.letterSpacing: 2
+                    renderType: root.menuTextRenderType
+                    horizontalAlignment: Text.AlignHCenter
+                    style: Text.Outline
+                    styleColor: "#C0000000"
+                }
+
+                Text {
                     id: speedValueText
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.verticalCenter: parent.verticalCenter
@@ -2295,7 +2359,7 @@ Window {
                     text: root.formatSpeedValue(root.liveGaugeSpeed)
                     color: appTheme.speedColor(root.liveGaugeSpeed)
                     font.family: "Oxanium"
-                    font.pixelSize: parent.width * 0.158
+                    font.pixelSize: parent.width * 0.168
                     font.bold: true
                     renderType: root.menuTextRenderType
                     horizontalAlignment: Text.AlignHCenter
@@ -2373,6 +2437,7 @@ Window {
                     height: parent.height * 0.034
                     x: root.gaugePointX(parent.width, root.gaugeAuxStartDeg + root.gaugeAuxSweepDeg, parent.width * 0.36 + 24) - width / 2
                     y: root.gaugePointY(parent.height, root.gaugeAuxStartDeg + root.gaugeAuxSweepDeg, parent.width * 0.36 + 24) - height / 2
+                    visible: false
                     text: "C"
                     color: appTheme.pearlLow
                     opacity: 0.86
@@ -2389,6 +2454,7 @@ Window {
                     height: parent.height * 0.034
                     x: root.gaugePointX(parent.width, root.gaugeAuxStartDeg, parent.width * 0.36 + 24) - width / 2
                     y: root.gaugePointY(parent.height, root.gaugeAuxStartDeg, parent.width * 0.36 + 24) - height / 2
+                    visible: false
                     text: "H"
                     color: appTheme.pearlLow
                     opacity: 0.86
@@ -2464,6 +2530,19 @@ Window {
                 }
             }
 
+            W.GaugeLensShell {
+                anchors.centerIn: parent
+                width: root.gaugeFaceSize + 36
+                height: width
+                z: root.mapLibreSafeCompositor ? 118 : 18
+                theme: appTheme
+                effectLevel: root.gaugeEffectLevel
+                gaugeColor: appTheme.pearlLow
+                chromeColor: appTheme.rimGlow
+                faceSize: root.gaugeFaceSize
+                podSize: root.gaugeFaceSize
+            }
+
             NativeGaugeInstrument {
                 id: tachGauge
                 anchors.centerIn: parent
@@ -2473,15 +2552,29 @@ Window {
                 kind: "tach"
                 value: root.liveGaugeRpm
                 maxValue: 8000
-                auxProgress: Math.max(0, Math.min(1, root.liveGaugeFuel / 100))
-                primaryColor: appTheme.rpmColor(root.liveGaugeRpm)
-                auxColor: root.liveGaugeFuel <= 12 ? appTheme.danger : appTheme.pearlLow
-                chromeColor: appTheme.pearlLow
+                // Twin micro-arcs own fuel/temp; mute native aux to avoid double rings
+                auxProgress: 0.0
+                primaryColor: root.gaugeLavaAccentEnabled
+                    ? Qt.rgba(appTheme.lavaMagenta.r, appTheme.lavaMagenta.g, appTheme.lavaMagenta.b, 0.04)
+                    : appTheme.rpmColor(root.liveGaugeRpm)
+                auxColor: "transparent"
+                chromeColor: root.gaugeLavaAccentEnabled ? appTheme.lavaRemainder : appTheme.pearlLow
                 lowEffectMode: root.gaugeLowEffectMode
                 backgroundOpacity: root.gaugeFaceBackgroundOpacity
             }
 
-            // Desktop/high showy only — gated off entirely when renderProfile=embedded
+            W.GaugeMatrixDepth {
+                anchors.fill: tachGauge
+                z: root.mapLibreSafeCompositor ? 121 : 21
+                visible: root.gaugeMatrixDepthEnabled && !root.mapMenuOpen
+                effectEnabled: visible
+                rainColor: appTheme.matrixCyan
+                density: 0.24
+                columns: 9
+                fontPx: 10
+                opacityScale: 0.20
+            }
+
             W.MatrixRain {
                 anchors.fill: tachGauge
                 z: root.mapLibreSafeCompositor ? 122 : 22
@@ -2491,8 +2584,8 @@ Window {
                 effectEnabled: visible && !root.mapMenuOpen
                 effectLevel: root.gaugeEffectLevel
                 sharedPhase: root.gaugeMatrixRainSharedPhase
-                rainColor: Qt.rgba(appTheme.pearlLow.r, appTheme.pearlLow.g, appTheme.pearlLow.b, 0.78)
-                glowColor: Qt.rgba(1, 1, 1, 0.58)
+                rainColor: Qt.rgba(appTheme.matrixCyan.r, appTheme.matrixCyan.g, appTheme.matrixCyan.b, 0.68)
+                glowColor: Qt.rgba(appTheme.matrixCyan.r, appTheme.matrixCyan.g, appTheme.matrixCyan.b, 0.40)
                 fps: root.embeddedHighEffectBudgetMode ? 3.0 : 8.0
                 speedMultiplier: root.embeddedHighEffectBudgetMode ? 0.17 : 0.16
                 density: root.embeddedHighEffectBudgetMode ? 0.24 : 0.20
@@ -2517,8 +2610,8 @@ Window {
                 effectLevel: root.gaugeEffectLevel
                 detailMode: root.gaugeAccentDetailMode
                 accentOverlayMode: true
-                gaugeColor: appTheme.rpmColor(root.liveGaugeRpm)
-                chromeColor: appTheme.pearlLow
+                gaugeColor: appTheme.lavaOrange
+                chromeColor: appTheme.lavaRemainder
                 progress: Math.max(0, Math.min(1, root.liveGaugeRpm / 8000))
                 showArcHead: true
                 maxValue: 8000
@@ -2562,14 +2655,58 @@ Window {
                     }
                 }
 
+                // Skin v2: calm RPM×1000 center (concept); VIC faults stay secondary
+                Text {
+                    id: rpmUnitText
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.verticalCenterOffset: -parent.height * 0.168
+                    z: 155
+                    text: "RPM x1000"
+                    color: Qt.rgba(appTheme.pearlLow.r, appTheme.pearlLow.g, appTheme.pearlLow.b, 0.72)
+                    font.family: "Oxanium"
+                    font.pixelSize: parent.width * 0.026
+                    font.bold: true
+                    font.letterSpacing: 1
+                    renderType: root.menuTextRenderType
+                    horizontalAlignment: Text.AlignHCenter
+                    style: Text.Outline
+                    styleColor: "#C0000000"
+                }
+
+                Text {
+                    id: rpmValueText
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.verticalCenterOffset: -parent.height * 0.028
+                    z: 156
+                    text: (root.liveGaugeRpm / 1000.0).toFixed(1)
+                    color: appTheme.rpmColor(root.liveGaugeRpm)
+                    font.family: "Oxanium"
+                    font.pixelSize: parent.width * 0.150
+                    font.bold: true
+                    renderType: root.menuTextRenderType
+                    horizontalAlignment: Text.AlignHCenter
+                    style: Text.Outline
+                    styleColor: "#F0000000"
+                }
+
                 W.VehicleInfoCenter {
                     id: vicCenter
-                    anchors.centerIn: parent
-                    width: Math.min(parent.width, parent.height) * 0.50
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.top: rpmValueText.bottom
+                    anchors.topMargin: parent.height * 0.012
+                    width: Math.min(parent.width, parent.height) * 0.28
                     height: width
                     z: 150
+                    visible: root.displayWarnDoorValue || root.displayWarnChargeValue
+                        || root.displayWarnBrakeValue || root.displayWarnOilValue
+                        || root.displayWarnCheckEngineValue || root.displayWarnATValue
+                        || root.displayWarnFuelLowValue || root.displayHighBeamValue
+                        || String(root.displayDrivetrainModeValue || "").toLowerCase().indexOf("4") !== -1
+                        || root.displayTransferLockValue
                     theme: appTheme
-                    simplified: root.gaugeLowEffectMode
+                    simplified: true
                     pulseEnabled: !root.gaugeLowEffectMode
                     warnDoor: root.displayWarnDoorValue
                     warnCharge: root.displayWarnChargeValue
@@ -2585,11 +2722,24 @@ Window {
                 W.HighBeamHalo {
                     anchors.centerIn: vicCenter
                     z: 140
+                    visible: vicCenter.visible
                     vicDiameter: vicCenter.width
-                    ringThickness: 16
-                    gapPx: 3
+                    ringThickness: 10
+                    gapPx: 2
                     heartbeat: true
                     active: root.displayHighBeamValue
+                }
+
+                W.TwinMicroArcs {
+                    anchors.fill: parent
+                    z: 148
+                    theme: appTheme
+                    effectLevel: root.gaugeEffectLevel
+                    lowEffectMode: root.gaugeLowEffectMode
+                    fuelNorm: Math.max(0, Math.min(1, root.liveGaugeFuel / 100))
+                    fuelPct: root.liveGaugeFuel
+                    coolantNorm: Math.max(0.14, Math.min(1, (root.liveGaugeCoolant - 40) / 70))
+                    coolantC: root.liveGaugeCoolant
                 }
 
                 Text {
@@ -2597,6 +2747,7 @@ Window {
                     height: parent.height * 0.034
                     x: root.gaugePointX(parent.width, root.gaugeAuxStartDeg + root.gaugeAuxSweepDeg, parent.width * 0.36 + 24) - width / 2
                     y: root.gaugePointY(parent.height, root.gaugeAuxStartDeg + root.gaugeAuxSweepDeg, parent.width * 0.36 + 24) - height / 2
+                    visible: false
                     text: "E"
                     color: appTheme.pearlLow
                     opacity: 0.86
@@ -2613,6 +2764,7 @@ Window {
                     height: parent.height * 0.034
                     x: root.gaugePointX(parent.width, root.gaugeAuxStartDeg, parent.width * 0.36 + 24) - width / 2
                     y: root.gaugePointY(parent.height, root.gaugeAuxStartDeg, parent.width * 0.36 + 24) - height / 2
+                    visible: false
                     text: "F"
                     color: appTheme.pearlLow
                     opacity: 0.86

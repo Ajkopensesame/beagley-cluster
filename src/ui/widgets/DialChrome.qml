@@ -408,11 +408,17 @@ Item {
                 return;
             }
 
-            const neonCyan = Qt.color("#73F6FF");
-            const neonLime = Qt.color("#9B5CFF");
-            const neonPink = Qt.color("#FF4DFF");
-            const neonOrange = Qt.color("#6E35FF");
-            const neonYellow = Qt.color("#EAD7FF");
+            // Skin v2 molten lava: thick orange → magenta (concept), not pearl purple
+            const lavaAmber = (root.theme && root.theme.lavaAmber) ? root.theme.lavaAmber : Qt.color("#FFB020");
+            const lavaOrange = (root.theme && root.theme.lavaOrange) ? root.theme.lavaOrange : Qt.color("#FF6A18");
+            const lavaMagenta = (root.theme && root.theme.lavaMagenta) ? root.theme.lavaMagenta : Qt.color("#FF2D7A");
+            const lavaHot = (root.theme && root.theme.lavaHot) ? root.theme.lavaHot : Qt.color("#FFE9A8");
+            const lavaRemainder = (root.theme && root.theme.lavaRemainder) ? root.theme.lavaRemainder : Qt.color("#FF4DA8");
+            const neonCyan = lavaAmber;
+            const neonLime = lavaOrange;
+            const neonPink = lavaMagenta;
+            const neonOrange = lavaOrange;
+            const neonYellow = lavaHot;
 
             function point(angle, radius) {
                 return {
@@ -501,16 +507,17 @@ Item {
 
                 const fill = ctx.createLinearGradient(cx - r, cy + r, cx + r, cy - r);
                 if (lite) {
-                    // One simple family: cyan → pink → hot white. Fewer stops, higher alpha.
-                    fill.addColorStop(0.00, rgba(neonCyan, 0.78));
-                    fill.addColorStop(0.55, rgba(neonPink, 0.92));
-                    fill.addColorStop(1.00, rgba(brightColor, 0.88));
+                    // Drive lava-lite: amber → orange → magenta → hot tip (concept molten)
+                    fill.addColorStop(0.00, rgba(lavaMagenta, 0.82));
+                    fill.addColorStop(0.42, rgba(lavaOrange, 0.94));
+                    fill.addColorStop(0.78, rgba(lavaAmber, 0.96));
+                    fill.addColorStop(1.00, rgba(lavaHot, 0.92));
                 } else {
-                    fill.addColorStop(0.00, rgba(neonCyan, root.lowEffectMode ? 0.54 : 0.46));
-                    fill.addColorStop(0.24, rgba(neonPink, root.lowEffectMode ? 0.72 : 0.62));
-                    fill.addColorStop(0.54, rgba(neonLime, root.lowEffectMode ? 0.88 : 0.76));
-                    fill.addColorStop(0.78, rgba(brightColor, root.lowEffectMode ? 0.76 : 0.64));
-                    fill.addColorStop(1.00, rgba(neonOrange, root.lowEffectMode ? 0.62 : 0.52));
+                    fill.addColorStop(0.00, rgba(lavaMagenta, root.lowEffectMode ? 0.70 : 0.78));
+                    fill.addColorStop(0.28, rgba(lavaOrange, root.lowEffectMode ? 0.84 : 0.90));
+                    fill.addColorStop(0.58, rgba(lavaAmber, root.lowEffectMode ? 0.90 : 0.94));
+                    fill.addColorStop(0.82, rgba(lavaHot, root.lowEffectMode ? 0.86 : 0.92));
+                    fill.addColorStop(1.00, rgba(brightColor, root.lowEffectMode ? 0.72 : 0.80));
                 }
                 ctx.fillStyle = fill;
                 ctx.fillRect(0, 0, width, height);
@@ -518,8 +525,8 @@ Item {
                 const blobs = lite ? Math.min(1, blobCount) : blobCount;
                 for (let i = 0; i < blobs; i++) {
                     const blobColor = lite
-                        ? neonPink
-                        : [neonCyan, neonPink, neonLime, neonOrange, neonYellow][i % 5];
+                        ? lavaAmber
+                        : [lavaMagenta, lavaOrange, lavaAmber, lavaHot, lavaOrange][i % 5];
                     const u = (phase * (0.11 + i * 0.015) + i * 0.23) % 1.0;
                     const angle = fromRad + sweep * u;
                     const wobble = Math.sin(phase * (1.1 + i * 0.2) + i * 1.7);
@@ -541,17 +548,25 @@ Item {
 
                 ctx.save();
                 buildTaperedPath(fromRad, toRad, tailWidth, headWidth, segments, capScale);
-                ctx.fillStyle = rgba(neonYellow, root.lowEffectMode ? 0.28 : (lite ? 0.34 : 0.18));
+                ctx.fillStyle = rgba(lavaHot, root.lowEffectMode ? 0.22 : (lite ? 0.28 : 0.16));
                 ctx.fill();
                 ctx.restore();
             }
 
+            // Faint pink remainder ring (concept) under molten progress
             ctx.beginPath();
-            ctx.strokeStyle = rgba(base, root.embeddedHighEffectBudgetMode ? 0.14 : 0.06);
+            ctx.strokeStyle = rgba(lavaRemainder, root.embeddedHighEffectBudgetMode ? 0.22 : 0.16);
             ctx.lineCap = "round";
             ctx.lineWidth = root.lowEffectMode
                 ? (16 * root.lowEffectArcTune)
-                : ((root.embeddedHighEffectBudgetMode ? 22 : 30) * root.dynamicArcTune);
+                : ((root.embeddedHighEffectBudgetMode ? 24 : 32) * root.dynamicArcTune);
+            ctx.arc(cx, cy, r, startRad, fullEndRad);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.strokeStyle = rgba(lavaMagenta, root.embeddedHighEffectBudgetMode ? 0.10 : 0.08);
+            ctx.lineWidth = root.lowEffectMode
+                ? (6 * root.lowEffectArcTune)
+                : ((root.embeddedHighEffectBudgetMode ? 8 : 10) * root.dynamicArcTune);
             ctx.arc(cx, cy, r, startRad, fullEndRad);
             ctx.stroke();
 
@@ -567,13 +582,14 @@ Item {
                                     bright, 0.26, 16, 0.22);
                 } else {
                     // One animated family per gauge. Embedded: thicker + brighter for glance.
+                    // Thick molten ribbon (concept): drive uses fewer blobs, show uses organic blobs
                     drawLavaBand(startRad, endRad,
-                                 (root.embeddedHighEffectBudgetMode ? 9.0 : 5.5) * root.dynamicArcTune,
-                                 (root.embeddedHighEffectBudgetMode ? 28.0 : 22.0) * root.dynamicArcTune,
+                                 (root.embeddedHighEffectBudgetMode ? 12.0 : 8.0) * root.dynamicArcTune,
+                                 (root.embeddedHighEffectBudgetMode ? 34.0 : 28.0) * root.dynamicArcTune,
                                  base, bright,
                                  root.embeddedHighEffectBudgetMode ? 28 : 128,
                                  0.50,
-                                 root.embeddedHighEffectBudgetMode ? 1 : 4);
+                                 root.embeddedHighEffectBudgetMode ? 1 : 5);
                 }
             } else if (!root.lowEffectMode) {
                 // Idle ambient crawl on same cheap path (visible at 0 progress).
