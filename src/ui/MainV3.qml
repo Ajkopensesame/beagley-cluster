@@ -2107,6 +2107,8 @@ Window {
         }
 
 
+        // Probe show-profile marker without needing BEAGLEY_SKIN_PROFILE in binary.
+        // Place /opt/beagley-cluster/qml-dev/.skin-show.png to force show on qml-dev.
         Image {
             id: skinShowMarker
             width: 1
@@ -2114,7 +2116,12 @@ Window {
             visible: false
             asynchronous: false
             cache: false
+            // Prefer absolute path; also try relative to qml-dev root parent of MainV3
             source: "file:///opt/beagley-cluster/qml-dev/.skin-show.png"
+            onStatusChanged: {
+                if (status === Image.Error)
+                    source = Qt.resolvedUrl("../../.skin-show.png")
+            }
         }
 
         Item {
@@ -2301,10 +2308,10 @@ Window {
                 visible: root.gaugeMatrixDepthEnabled && !root.mapMenuOpen
                 effectEnabled: visible
                 rainColor: appTheme.matrixCyan
-                density: 0.28
-                columns: 9
-                fontPx: 10
-                opacityScale: 0.22
+                density: 0.42
+                columns: 11
+                fontPx: 11
+                opacityScale: 0.38
             }
 
             W.MatrixRain {
@@ -2515,7 +2522,7 @@ Window {
                             height: speedValueText.height
                             text: speedValueText.text
                             color: "#FFFFFFFF"
-                            opacity: 0.62
+                            opacity: 0.78
                             font: speedValueText.font
                             renderType: speedValueText.renderType
                             horizontalAlignment: Text.AlignHCenter
@@ -2725,10 +2732,10 @@ Window {
                 visible: root.gaugeMatrixDepthEnabled && !root.mapMenuOpen
                 effectEnabled: visible
                 rainColor: appTheme.matrixCyan
-                density: 0.24
-                columns: 9
-                fontPx: 10
-                opacityScale: 0.20
+                density: 0.38
+                columns: 11
+                fontPx: 11
+                opacityScale: 0.34
             }
 
             W.MatrixRain {
@@ -2884,7 +2891,7 @@ Window {
                             height: rpmValueText.height
                             text: rpmValueText.text
                             color: "#FFFFFFFF"
-                            opacity: 0.60
+                            opacity: 0.74
                             font: rpmValueText.font
                             renderType: rpmValueText.renderType
                             horizontalAlignment: Text.AlignHCenter

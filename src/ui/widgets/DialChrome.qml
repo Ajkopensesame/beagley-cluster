@@ -347,10 +347,10 @@ Item {
     readonly property color _lavaTrack: (theme && theme.lavaTrack) ? theme.lavaTrack : Qt.color("#2A2240")
     readonly property color _lavaRemainder: (theme && theme.lavaRemainder) ? theme.lavaRemainder : Qt.color("#1C1528")
     readonly property real _sgTipStart: root.clampedProgress > 0.002
-        ? Math.max(0.0, root.clampedProgress - 0.10)
+        ? Math.max(0.0, root.clampedProgress - 0.14)
         : 0.0
     readonly property real _sgCoreStart: root.clampedProgress > 0.002
-        ? Math.max(0.0, root.clampedProgress - 0.28)
+        ? Math.max(0.0, root.clampedProgress - 0.36)
         : 0.0
     // Slow crust gaps driven by lavaPhase (property-only; no Canvas)
     readonly property real _sgCrackU0: (lavaPhase * 0.07) % 1.0
@@ -439,8 +439,8 @@ Item {
         startProgress: root._sgTipStart
         endProgress: root.clampedProgress
         radiusFactor: root.arcRadiusFactor
-        strokeWidth: root.embeddedHighEffectBudgetMode ? 14 : 11
-        color: root.colorWithAlpha(Qt.color("#FFF8D0"), 0.96)
+        strokeWidth: root.embeddedHighEffectBudgetMode ? 18 : 14
+        color: root.colorWithAlpha(Qt.color("#FFFFE6"), 0.98)
         segments: 24
         roundedCaps: true
     }
