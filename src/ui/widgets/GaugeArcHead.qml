@@ -10,7 +10,7 @@ Item {
 
     readonly property real padding: Math.max(6, headRadius * 0.36)
     readonly property real badgeExtent: Math.ceil((headRadius + padding) * 2)
-    readonly property color faceColor: Qt.color("#FFD84A")
+    readonly property color faceColor: Qt.color("#FFF2A8")
     readonly property color faceEdge: Qt.color("#4A2300")
     readonly property color inkColor: Qt.color("#070A0F")
     readonly property color tearColor: Qt.color("#63C9FF")

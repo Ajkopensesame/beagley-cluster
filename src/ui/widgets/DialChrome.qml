@@ -42,6 +42,10 @@ Item {
         && (richDetailMode || accentOverlayMode || embeddedHighEffectBudgetMode)
         && (!embeddedSafeMode || embeddedHighEffectBudgetMode || accentOverlayMode)
     readonly property bool staticArcMode: !lavaAnimationEnabled
+    // Embedded/drive: scene-graph magma only — never ~10Hz Canvas crust.
+    // Desktop show keeps Canvas organic path when not embedded.
+    readonly property bool sgMagmaMode: (lavaAnimationEnabled || accentOverlayMode) && embeddedSafeMode
+    readonly property bool canvasMagmaMode: (lavaAnimationEnabled || accentOverlayMode) && !embeddedSafeMode
     readonly property real lowEffectArcScale: 0.36
     readonly property real lowEffectArcTune: lowEffectArcScale / 0.42
     // Embedded lava-lite: near-full canvas so arcs stay readable at arm's length;
@@ -103,15 +107,22 @@ Item {
 
     function requestDynamicPaint() {
         const force = arguments.length > 0 && arguments[0] === true;
+        root.paintedProgress = root.clampedProgress;
+        // SG magma: progress binds GaugeArcItem directly — no Canvas paints.
+        if (root.sgMagmaMode) {
+            root.lastPaintedProgress = root.clampedProgress;
+            if (typeof performanceMetrics !== "undefined" && performanceMetrics)
+                performanceMetrics.recordCounter("gauge.sgMagma")
+            return;
+        }
         if (!force
                 && root.progressRepaintThreshold > 0
                 && root.lastPaintedProgress >= 0
                 && Math.abs(root.clampedProgress - root.lastPaintedProgress) < root.progressRepaintThreshold) {
             return;
         }
-        root.paintedProgress = root.clampedProgress;
         root.lastPaintedProgress = root.clampedProgress;
-        if (root.lavaAnimationEnabled || root.accentOverlayMode)
+        if (root.canvasMagmaMode)
             arcCanvas.requestPaint();
         if (typeof performanceMetrics !== "undefined" && performanceMetrics)
             performanceMetrics.recordCounter("gauge.nativeDialArc")
@@ -159,13 +170,16 @@ Item {
     }
 
     Timer {
-        // Embedded lava-lite ~10Hz; desktop high ~30Hz. Needle lag stays on MainV3 33ms clock.
-        interval: root.lowEffectMode ? 120 : (root.embeddedHighEffectBudgetMode ? 100 : 33)
+        // SG magma: ~4Hz property crawl only (no Canvas). Desktop Canvas: ~30Hz.
+        // Needle lag stays on MainV3 33ms clock — never hijack it for particles.
+        interval: root.sgMagmaMode ? 250 : (root.lowEffectMode ? 120 : 33)
         running: root.effectLevel !== "off" && root.lavaAnimationEnabled
+            && (root.sgMagmaMode || root.canvasMagmaMode)
         repeat: true
         onTriggered: {
             root.lavaPhase += interval / 1000.0
-            root.requestDynamicPaint(true)
+            if (root.canvasMagmaMode)
+                root.requestDynamicPaint(true)
         }
     }
 
@@ -325,34 +339,153 @@ Item {
         roundedCaps: false
     }
 
-    // Embedded accent: scene-graph molten ribbon (Canvas.Image clip/fill was unreliable).
-    // Texture cracks/bubbles still paint on arcCanvas above.
+    // ---- Scene-graph magma (embedded/drive): no Canvas crust ----
+    // Stacked GaugeArcItem = orange body + amber mid + hot yellow core/tip.
+    readonly property color _lavaOrange: (theme && theme.lavaOrange) ? theme.lavaOrange : Qt.color("#FF7A14")
+    readonly property color _lavaAmber: (theme && theme.lavaAmber) ? theme.lavaAmber : Qt.color("#FFC028")
+    readonly property color _lavaHot: (theme && theme.lavaHot) ? theme.lavaHot : Qt.color("#FFF2A8")
+    readonly property color _lavaTrack: (theme && theme.lavaTrack) ? theme.lavaTrack : Qt.color("#2A2240")
+    readonly property color _lavaRemainder: (theme && theme.lavaRemainder) ? theme.lavaRemainder : Qt.color("#1C1528")
+    readonly property real _sgTipStart: root.clampedProgress > 0.002
+        ? Math.max(0.0, root.clampedProgress - 0.10)
+        : 0.0
+    readonly property real _sgCoreStart: root.clampedProgress > 0.002
+        ? Math.max(0.0, root.clampedProgress - 0.28)
+        : 0.0
+    // Slow crust gaps driven by lavaPhase (property-only; no Canvas)
+    readonly property real _sgCrackU0: (lavaPhase * 0.07) % 1.0
+    readonly property real _sgCrackU1: (_sgCrackU0 + 0.37) % 1.0
+
     GaugeArcItem {
         anchors.fill: parent
-        z: 19
-        visible: (root.lavaAnimationEnabled || root.accentOverlayMode) && root.embeddedSafeMode && root.paintedProgress > 0.002
+        z: 18
+        visible: root.sgMagmaMode
         startAngleDeg: root.startAngleDeg
         sweepAngleDeg: root.sweepAngleDeg
         startProgress: 0.0
-        endProgress: root.paintedProgress
+        endProgress: 1.0
         radiusFactor: root.arcRadiusFactor
-        strokeWidth: root.embeddedHighEffectBudgetMode ? 22 : 16
-        color: root.colorWithAlpha((root.theme && root.theme.lavaOrange) ? root.theme.lavaOrange : Qt.color("#FF7A14"), 0.92)
-        segments: 48
+        strokeWidth: root.embeddedHighEffectBudgetMode ? 24 : 18
+        color: root.colorWithAlpha(root._lavaTrack, 0.36)
+        segments: 40
         roundedCaps: true
     }
     GaugeArcItem {
         anchors.fill: parent
-        z: 19
-        visible: (root.lavaAnimationEnabled || root.accentOverlayMode) && root.embeddedSafeMode && root.paintedProgress > 0.002
+        z: 18
+        visible: root.sgMagmaMode
         startAngleDeg: root.startAngleDeg
         sweepAngleDeg: root.sweepAngleDeg
         startProgress: 0.0
-        endProgress: root.paintedProgress
+        endProgress: 1.0
         radiusFactor: root.arcRadiusFactor
-        strokeWidth: root.embeddedHighEffectBudgetMode ? 9 : 7
-        color: root.colorWithAlpha((root.theme && root.theme.lavaHot) ? root.theme.lavaHot : Qt.color("#FFF2A8"), 0.72)
+        strokeWidth: root.embeddedHighEffectBudgetMode ? 8 : 6
+        color: root.colorWithAlpha(root._lavaRemainder, 0.22)
+        segments: 40
+        roundedCaps: true
+    }
+    // Orange magma body
+    GaugeArcItem {
+        anchors.fill: parent
+        z: 19
+        visible: root.sgMagmaMode && root.clampedProgress > 0.002
+        startAngleDeg: root.startAngleDeg
+        sweepAngleDeg: root.sweepAngleDeg
+        startProgress: 0.0
+        endProgress: root.clampedProgress
+        radiusFactor: root.arcRadiusFactor
+        strokeWidth: root.embeddedHighEffectBudgetMode ? 22 : 16
+        color: root.colorWithAlpha(root._lavaOrange, 0.94)
         segments: 48
+        roundedCaps: true
+    }
+    // Amber mid ribbon
+    GaugeArcItem {
+        anchors.fill: parent
+        z: 19
+        visible: root.sgMagmaMode && root.clampedProgress > 0.002
+        startAngleDeg: root.startAngleDeg
+        sweepAngleDeg: root.sweepAngleDeg
+        startProgress: 0.0
+        endProgress: root.clampedProgress
+        radiusFactor: root.arcRadiusFactor
+        strokeWidth: root.embeddedHighEffectBudgetMode ? 12 : 9
+        color: root.colorWithAlpha(root._lavaAmber, 0.78)
+        segments: 48
+        roundedCaps: true
+    }
+    // Hot yellow core (forward half)
+    GaugeArcItem {
+        anchors.fill: parent
+        z: 20
+        visible: root.sgMagmaMode && root.clampedProgress > 0.002
+        startAngleDeg: root.startAngleDeg
+        sweepAngleDeg: root.sweepAngleDeg
+        startProgress: root._sgCoreStart
+        endProgress: root.clampedProgress
+        radiusFactor: root.arcRadiusFactor
+        strokeWidth: root.embeddedHighEffectBudgetMode ? 8 : 6
+        color: root.colorWithAlpha(root._lavaHot, 0.88)
+        segments: 36
+        roundedCaps: true
+    }
+    // Hotter yellow tip / head punch
+    GaugeArcItem {
+        anchors.fill: parent
+        z: 21
+        visible: root.sgMagmaMode && root.clampedProgress > 0.002
+        startAngleDeg: root.startAngleDeg
+        sweepAngleDeg: root.sweepAngleDeg
+        startProgress: root._sgTipStart
+        endProgress: root.clampedProgress
+        radiusFactor: root.arcRadiusFactor
+        strokeWidth: root.embeddedHighEffectBudgetMode ? 14 : 11
+        color: root.colorWithAlpha(Qt.color("#FFF8D0"), 0.96)
+        segments: 24
+        roundedCaps: true
+    }
+    // Dark crust cracks (2 windows crawl with phase — SG only)
+    GaugeArcItem {
+        anchors.fill: parent
+        z: 20
+        visible: root.sgMagmaMode && root.clampedProgress > 0.08
+        startAngleDeg: root.startAngleDeg
+        sweepAngleDeg: root.sweepAngleDeg
+        startProgress: Math.min(root.clampedProgress, root._sgCrackU0 * root.clampedProgress)
+        endProgress: Math.min(root.clampedProgress, root._sgCrackU0 * root.clampedProgress + 0.055)
+        radiusFactor: root.arcRadiusFactor
+        strokeWidth: root.embeddedHighEffectBudgetMode ? 18 : 13
+        color: root.colorWithAlpha(Qt.color("#0C0400"), 0.72)
+        segments: 16
+        roundedCaps: true
+    }
+    GaugeArcItem {
+        anchors.fill: parent
+        z: 20
+        visible: root.sgMagmaMode && root.clampedProgress > 0.08
+        startAngleDeg: root.startAngleDeg
+        sweepAngleDeg: root.sweepAngleDeg
+        startProgress: Math.min(root.clampedProgress, root._sgCrackU1 * root.clampedProgress)
+        endProgress: Math.min(root.clampedProgress, root._sgCrackU1 * root.clampedProgress + 0.04)
+        radiusFactor: root.arcRadiusFactor
+        strokeWidth: root.embeddedHighEffectBudgetMode ? 10 : 7
+        color: root.colorWithAlpha(Qt.color("#1A0800"), 0.55)
+        segments: 16
+        roundedCaps: true
+    }
+    // Ember flecks in cracks (amber punch through dark)
+    GaugeArcItem {
+        anchors.fill: parent
+        z: 20
+        visible: root.sgMagmaMode && root.clampedProgress > 0.08
+        startAngleDeg: root.startAngleDeg
+        sweepAngleDeg: root.sweepAngleDeg
+        startProgress: Math.min(root.clampedProgress, root._sgCrackU0 * root.clampedProgress + 0.012)
+        endProgress: Math.min(root.clampedProgress, root._sgCrackU0 * root.clampedProgress + 0.035)
+        radiusFactor: root.arcRadiusFactor
+        strokeWidth: root.embeddedHighEffectBudgetMode ? 5 : 4
+        color: root.colorWithAlpha(root._lavaHot, 0.90)
+        segments: 12
         roundedCaps: true
     }
 
@@ -362,7 +495,7 @@ Item {
         width: parent.width * root.dynamicArcCanvasScale
         height: parent.height * root.dynamicArcCanvasScale
         z: 20
-        visible: root.lavaAnimationEnabled || root.accentOverlayMode
+        visible: root.canvasMagmaMode
         scale: root.dynamicArcCanvasScale < 1.0 ? (1.0 / root.dynamicArcCanvasScale) : 1.0
         renderTarget: root.embeddedSafeMode ? Canvas.Image : Canvas.FramebufferObject
         antialiasing: !root.lowEffectMode && !root.embeddedSafeMode
@@ -713,10 +846,10 @@ Item {
     GaugeArcHead {
         id: arcHead
         z: 24
-        visible: root.lavaAnimationEnabled || root.accentOverlayMode && root.showArcHead && root.headVisible
+        visible: (root.lavaAnimationEnabled || root.accentOverlayMode) && root.showArcHead && root.headVisible
         lowEffectMode: root.lowEffectMode
         scared: root.scaredHead
-        headRadius: root.headScreenRadius
+        headRadius: root.sgMagmaMode ? (root.headScreenRadius * 1.15) : root.headScreenRadius
         x: (root.width / 2) + Math.cos(root.headAngleRad) * root.arcRadiusOnScreen - (width / 2)
         y: (root.height / 2) + Math.sin(root.headAngleRad) * root.arcRadiusOnScreen - (height / 2)
     }

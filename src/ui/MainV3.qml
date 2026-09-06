@@ -78,10 +78,11 @@ Window {
     readonly property bool gaugeLowEffectMode: gaugeEffectLevel === "low" || gaugeEffectLevel === "off"
     readonly property bool gaugeEffectsOff: gaugeEffectLevel === "off"
     // Skin v2 visual profiles:
-    //   drive = appliance default (glass + lava-lite + map; matrix off/sparse)
+    //   drive = appliance default (glass + SG magma + map; matrix hard-off)
     //   show  = concept still match (matrix depth + richer lava)
-    // qml-dev show override without binary rebuild: touch marker enables show
-    // (BEAGLEY_SKIN_PROFILE context property lands with next appliance rebuild)
+    // Toggle without binary rebuild (qml-dev): place/remove
+    //   /opt/beagley-cluster/qml-dev/.skin-show.png
+    // Binary/env: BEAGLEY_SKIN_PROFILE=drive|show (context property from main.cpp)
     readonly property bool skinShowMarkerPresent: skinShowMarker.status === Image.Ready
     readonly property string skinVisualProfile: {
         const raw = (typeof BEAGLEY_SKIN_PROFILE !== "undefined" && BEAGLEY_SKIN_PROFILE)
@@ -2481,12 +2482,31 @@ Window {
                         style: Text.Outline
                         styleColor: "#F0000000"
                     }
-                    // Soft white top wash ≈ purple→white vertical gradient (keeps outline)
+                    // Purple→white vertical gradient (concept numeral punch)
+                    Item {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        height: parent.height * 0.42
+                        clip: true
+                        Text {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            anchors.bottom: parent.bottom
+                            width: speedValueText.width
+                            height: speedValueText.height
+                            text: speedValueText.text
+                            color: appTheme.pearlHigh
+                            opacity: 0.55
+                            font: speedValueText.font
+                            renderType: speedValueText.renderType
+                            horizontalAlignment: Text.AlignHCenter
+                        }
+                    }
                     Item {
                         anchors.left: parent.left
                         anchors.right: parent.right
                         anchors.top: parent.top
-                        height: parent.height * 0.52
+                        height: parent.height * 0.58
                         clip: true
                         Text {
                             anchors.horizontalCenter: parent.horizontalCenter
@@ -2495,7 +2515,7 @@ Window {
                             height: speedValueText.height
                             text: speedValueText.text
                             color: "#FFFFFFFF"
-                            opacity: 0.42
+                            opacity: 0.62
                             font: speedValueText.font
                             renderType: speedValueText.renderType
                             horizontalAlignment: Text.AlignHCenter
@@ -2835,8 +2855,27 @@ Window {
                     Item {
                         anchors.left: parent.left
                         anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        height: parent.height * 0.42
+                        clip: true
+                        Text {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            anchors.bottom: parent.bottom
+                            width: rpmValueText.width
+                            height: rpmValueText.height
+                            text: rpmValueText.text
+                            color: appTheme.pearlHigh
+                            opacity: 0.52
+                            font: rpmValueText.font
+                            renderType: rpmValueText.renderType
+                            horizontalAlignment: Text.AlignHCenter
+                        }
+                    }
+                    Item {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
                         anchors.top: parent.top
-                        height: parent.height * 0.52
+                        height: parent.height * 0.58
                         clip: true
                         Text {
                             anchors.horizontalCenter: parent.horizontalCenter
@@ -2845,7 +2884,7 @@ Window {
                             height: rpmValueText.height
                             text: rpmValueText.text
                             color: "#FFFFFFFF"
-                            opacity: 0.40
+                            opacity: 0.60
                             font: rpmValueText.font
                             renderType: rpmValueText.renderType
                             horizontalAlignment: Text.AlignHCenter

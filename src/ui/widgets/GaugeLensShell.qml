@@ -72,54 +72,55 @@ Item {
             const cyan = root.theme?.matrixCyan ?? Qt.color("#5FF7FF")
             const lava = root.theme?.lavaOrange ?? Qt.color("#FF7A14")
 
-            // Deep black bezel lip — curved depth vs flat disc
+            // Deep black bezel lip — thicker curved depth vs flat disc
             ctx.beginPath()
-            ctx.strokeStyle = "rgba(0,0,0,0.96)"
-            ctx.lineWidth = Math.max(10, side * 0.028)
+            ctx.strokeStyle = "rgba(0,0,0,0.98)"
+            ctx.lineWidth = Math.max(14, side * 0.036)
             ctx.arc(cx, cy, rimRadius, 0, Math.PI * 2)
             ctx.stroke()
 
-            // Outer metal/glass rim gradient
+            // Outer metal/glass rim gradient (brighter glass catch)
             const rim = ctx.createLinearGradient(cx - rimRadius, cy - rimRadius, cx + rimRadius, cy + rimRadius)
-            rim.addColorStop(0.00, root.css(bright, 0.58))
-            rim.addColorStop(0.16, root.css(cyan, 0.18))
-            rim.addColorStop(0.38, root.css(rimGlow, 0.34))
-            rim.addColorStop(0.55, root.css(lava, 0.08))
-            rim.addColorStop(0.72, "rgba(0,0,0,0.78)")
-            rim.addColorStop(0.90, root.css(pearlLow, 0.28))
-            rim.addColorStop(1.00, root.css(bright, 0.40))
+            rim.addColorStop(0.00, root.css(bright, 0.78))
+            rim.addColorStop(0.12, "rgba(255,255,255,0.55)")
+            rim.addColorStop(0.22, root.css(cyan, 0.14))
+            rim.addColorStop(0.40, root.css(rimGlow, 0.38))
+            rim.addColorStop(0.58, root.css(lava, 0.06))
+            rim.addColorStop(0.74, "rgba(0,0,0,0.86)")
+            rim.addColorStop(0.90, root.css(pearlLow, 0.32))
+            rim.addColorStop(1.00, root.css(bright, 0.52))
             ctx.beginPath()
             ctx.strokeStyle = rim
-            ctx.lineWidth = Math.max(3.5, side * 0.008)
+            ctx.lineWidth = Math.max(4.2, side * 0.010)
             ctx.arc(cx, cy, rimRadius, 0, Math.PI * 2)
             ctx.stroke()
 
-            // Inner glass recess
+            // Inner glass recess (deeper lip)
             ctx.beginPath()
-            ctx.strokeStyle = "rgba(0,0,0,0.88)"
-            ctx.lineWidth = Math.max(3, side * 0.006)
+            ctx.strokeStyle = "rgba(0,0,0,0.94)"
+            ctx.lineWidth = Math.max(4.5, side * 0.009)
             ctx.arc(cx, cy, faceOuter - ctx.lineWidth * 0.35, 0, Math.PI * 2)
             ctx.stroke()
 
-            // Specular highlight arc (top-left glass catch)
+            // Specular highlight arc (top-left glass catch) — concept white rim punch
             ctx.beginPath()
-            ctx.strokeStyle = root.css(bright, 0.42)
-            ctx.lineWidth = Math.max(2.0, side * 0.004)
+            ctx.strokeStyle = "rgba(255,255,255,0.72)"
+            ctx.lineWidth = Math.max(2.6, side * 0.0055)
             ctx.lineCap = "round"
-            ctx.arc(cx, cy, rimRadius - side * 0.010, Math.PI * 0.88, Math.PI * 1.48)
+            ctx.arc(cx, cy, rimRadius - side * 0.009, Math.PI * 0.86, Math.PI * 1.52)
             ctx.stroke()
 
             // Soft cyan secondary glint
             ctx.beginPath()
-            ctx.strokeStyle = root.css(cyan, 0.16)
+            ctx.strokeStyle = root.css(cyan, 0.12)
             ctx.lineWidth = Math.max(1.5, side * 0.0028)
             ctx.arc(cx, cy, rimRadius - side * 0.014, Math.PI * 0.95, Math.PI * 1.28)
             ctx.stroke()
 
             // Bottom shadow bite for curved depth
             ctx.beginPath()
-            ctx.strokeStyle = "rgba(0,0,0,0.80)"
-            ctx.lineWidth = Math.max(2.5, side * 0.005)
+            ctx.strokeStyle = "rgba(0,0,0,0.88)"
+            ctx.lineWidth = Math.max(3.2, side * 0.0065)
             ctx.lineCap = "round"
             ctx.arc(cx, cy, rimRadius - side * 0.010, Math.PI * 0.05, Math.PI * 0.55)
             ctx.stroke()

@@ -43,7 +43,7 @@ QtObject {
     readonly property color lavaAmber:     "#FFC028"
     readonly property color lavaOrange:    "#FF7A14"
     readonly property color lavaMagenta:   "#C41848"
-    readonly property color lavaHot:       "#FFF2A8"
+    readonly property color lavaHot:       "#FFF8C8"
     readonly property color lavaRemainder: isNight ? "#1C1528" : "#5E35B1"
     readonly property color lavaTrack:     isNight ? "#2A2240" : "#7E57C2"
     readonly property color mapGold:       "#F5C542"

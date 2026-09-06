@@ -30,12 +30,12 @@ Item {
 
     Item {
         id: fuelPod
-        width: parent.width * 0.30
-        height: parent.height * 0.28
+        width: parent.width * 0.28
+        height: parent.height * 0.26
         anchors.left: parent.left
-        anchors.leftMargin: parent.width * 0.16
+        anchors.leftMargin: parent.width * 0.18
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: parent.height * 0.09
+        anchors.bottomMargin: parent.height * 0.115
         z: 2
 
         GaugeArcItem {
@@ -80,9 +80,9 @@ Item {
                 width: parent.width * 0.44
                 height: parent.height * 0.66
                 radius: parent.width * 0.07
-                color: "#48F2EAFF"
-                border.color: "#F2EAFF"
-                border.width: Math.max(2, parent.width * 0.07)
+                color: "#28F2EAFF"
+                border.color: "#A8F2EAFF"
+                border.width: Math.max(1.5, parent.width * 0.05)
             }
             Rectangle {
                 x: pumpBody.x + pumpBody.width * 0.18
@@ -159,12 +159,12 @@ Item {
 
     Item {
         id: tempPod
-        width: parent.width * 0.30
-        height: parent.height * 0.28
+        width: parent.width * 0.28
+        height: parent.height * 0.26
         anchors.right: parent.right
-        anchors.rightMargin: parent.width * 0.16
+        anchors.rightMargin: parent.width * 0.18
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: parent.height * 0.09
+        anchors.bottomMargin: parent.height * 0.115
         z: 2
 
         GaugeArcItem {
@@ -208,9 +208,9 @@ Item {
                 width: Math.max(8, parent.width * 0.30)
                 height: parent.height * 0.55
                 radius: width / 2
-                color: "#48F2EAFF"
-                border.color: "#F2EAFF"
-                border.width: Math.max(2, parent.width * 0.08)
+                color: "#28F2EAFF"
+                border.color: "#A8F2EAFF"
+                border.width: Math.max(1.5, parent.width * 0.055)
             }
             Rectangle {
                 anchors.horizontalCenter: stem.horizontalCenter
@@ -240,8 +240,8 @@ Item {
                 height: width
                 radius: width / 2
                 color: root.tempColor
-                border.color: "#F2EAFF"
-                border.width: Math.max(2, parent.width * 0.08)
+                border.color: "#A8F2EAFF"
+                border.width: Math.max(1.5, parent.width * 0.055)
             }
         }
 

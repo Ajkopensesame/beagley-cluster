@@ -100,8 +100,10 @@ Confirm on device with `tools/ui/beagley_display_status.sh`. Lab appliance
 
 **FPS-first appliance rule:** `renderProfile=embedded` never enables in-face
 matrix rain (`gaugeMatrixRainEnabled` is hard-off). Matrix code remains for
-desktop/high showy only. Embedded high runs one lava band/gauge at ~10Hz with
-a simpler/brighter gradient — pearl breathe stays off while lava is on.
+desktop/high showy only. Embedded magma is **scene-graph GaugeArcItem only**
+(no Canvas crust / no ~10Hz blobs). A ~4Hz property crawl moves crust gaps;
+pearl breathe stays off while lava is on. Desktop show may still use Canvas
+organic lava.
 
 For review without hub values, set `BEAGLEY_GAUGE_DEMO=1` (turn off with `=0`
 in `/etc/default/beagley-cluster.local` then `systemctl restart beagley_cluster`).
