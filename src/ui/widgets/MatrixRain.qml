@@ -89,7 +89,7 @@ Item {
 
     Timer {
         interval: Math.round(1000 / Math.max(1, root.fps))
-        running: true
+        running: root.visible
         repeat: true
         onTriggered: canvas.requestPaint()
     }

@@ -37,8 +37,16 @@ int main(int argc, char *argv[])
     }
 #endif
 
+    // Demo / DIY skin (Matrix rain + debug HUD). Default OFF = product skin.
+    const bool demoSkin =
+        qEnvironmentVariableIsSet("BEAGLEY_DEMO_SKIN") &&
+        qEnvironmentVariableIntValue("BEAGLEY_DEMO_SKIN") != 0;
+
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("BEAGLEY_NO_MAP", noMap);
+    engine.rootContext()->setContextProperty("BEAGLEY_DEMO_SKIN", demoSkin);
+    if (demoSkin)
+        qDebug() << "[main] BEAGLEY_DEMO_SKIN=1 (demo flair enabled)";
 
     // vehicle_state backend: BEAGLEY_VEHICLE_BACKEND=mock|live (default live).
     // Context property is always `vehicleState` (same QML property names).
