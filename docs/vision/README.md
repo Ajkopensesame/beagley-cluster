@@ -9,7 +9,7 @@ Pixel-close visual match to this still beats incremental Pearl polish.
 ## What “done” looks like
 
 - Deep glass gauge lenses on a near-black face
-- Thick **molten lava** progress arcs (orange → magenta), not thin Pearl purple
+- Thick **molten lava** progress arcs (orange → hot yellow tip), not thin Pearl purple
 - Subtle cyan **matrix depth** inside the glass (show profile)
 - Speedo left / tach right with calm center readouts (KM/H + gear/odo; RPM×1000)
 - Twin micro fuel% + coolant°C arcs in the tach
@@ -20,8 +20,8 @@ Pixel-close visual match to this still beats incremental Pearl polish.
 
 | Profile | Env | Intent |
 | --- | --- | --- |
-| **drive** (appliance default) | `BEAGLEY_SKIN_PROFILE=drive` or embedded default | Glass + visible lava-lite + map; matrix off |
-| **show** | `BEAGLEY_SKIN_PROFILE=show` | Concept still match: matrix depth + richer lava |
+| **drive** (appliance default) | `BEAGLEY_SKIN_PROFILE=drive` or embedded default | Glass + SG magma + map; matrix hard-off |
+| **show** | `BEAGLEY_SKIN_PROFILE=show` or qml-dev override | Concept still match: matrix depth + richer lava |
 
 Score captures against the concept PNG with the profile named in the filename.
 
@@ -36,18 +36,17 @@ BEAGLEY_GAUGE_DEMO=1              # review needles without hub
 
 ## Toggle drive vs show (no binary rebuild)
 
-On a **qml-dev** appliance, a marker file forces **show** (matrix depth):
+On a **qml-dev** appliance, drop a tiny QML override next to MainV3:
 
 ```bash
 # SHOW
-ssh beagley-ai "touch /opt/beagley-cluster/qml-dev/src/ui/skin-show.on && systemctl restart beagley_cluster"
+ssh beagley-ai "printf '%s\n' 'import QtQuick 2.15; QtObject {}' > /opt/beagley-cluster/qml-dev/src/ui/SkinShowOverride.qml && systemctl restart beagley_cluster"
 
 # DRIVE (embedded default)
-ssh beagley-ai "rm -f /opt/beagley-cluster/qml-dev/src/ui/skin-show.on /opt/beagley-cluster/qml-dev/.skin-show /opt/beagley-cluster/qml-dev/.skin-show.png && systemctl restart beagley_cluster"
+ssh beagley-ai "rm -f /opt/beagley-cluster/qml-dev/src/ui/SkinShowOverride.qml /opt/beagley-cluster/qml-dev/src/ui/skin-show.on && systemctl restart beagley_cluster"
 ```
 
-With a binary that exposes `BEAGLEY_SKIN_PROFILE` (already in `main.cpp`), set it in
-`/etc/default/beagley-cluster.local` instead of using the marker:
+With a rebuilt binary that exposes `BEAGLEY_SKIN_PROFILE` (already in `main.cpp` on this branch), set it in `/etc/default/beagley-cluster.local` instead:
 
 ```text
 BEAGLEY_SKIN_PROFILE=show   # or drive

@@ -1,5 +1,4 @@
 import QtQuick 2.15
-import Qt.labs.folderlistmodel 2.15
 import QtQuick.Window 2.15
 import Qt.labs.settings
 import BeagleY 1.0
@@ -84,7 +83,7 @@ Window {
     // Toggle without binary rebuild (qml-dev): place/remove
     //   /opt/beagley-cluster/qml-dev/src/ui/skin-show.on
     // Binary/env: BEAGLEY_SKIN_PROFILE=drive|show (context property from main.cpp)
-    readonly property bool skinShowMarkerPresent: skinShowDir.count > 0
+    readonly property bool skinShowMarkerPresent: skinShowLoader.status === Loader.Ready
     readonly property string skinVisualProfile: {
         const raw = (typeof BEAGLEY_SKIN_PROFILE !== "undefined" && BEAGLEY_SKIN_PROFILE)
             ? String(BEAGLEY_SKIN_PROFILE).trim().toLowerCase()
@@ -2110,15 +2109,14 @@ Window {
 
         // Probe show-profile marker without needing BEAGLEY_SKIN_PROFILE in binary.
         // Place /opt/beagley-cluster/qml-dev/src/ui/skin-show.on (any file) to force show on qml-dev.
-        // Marker lives beside MainV3 so FolderListModel shares the QML dir.
-        // touch /opt/beagley-cluster/qml-dev/src/ui/skin-show.on
-        FolderListModel {
-            id: skinShowDir
-            folder: Qt.resolvedUrl("./")
-            nameFilters: ["skin-show.on"]
-            showDirs: false
-            showDotAndDotDot: false
-            showHidden: true
+        // Reliable qml-dev show probe: Loader succeeds only when override QML exists.
+        // SHOW:  printf '%s\n' 'import QtQuick 2.15; QtObject{}' > /opt/beagley-cluster/qml-dev/src/ui/SkinShowOverride.qml
+        // DRIVE: rm -f /opt/beagley-cluster/qml-dev/src/ui/SkinShowOverride.qml
+        Loader {
+            id: skinShowLoader
+            active: true
+            asynchronous: false
+            source: Qt.resolvedUrl("SkinShowOverride.qml")
         }
 
         Item {
