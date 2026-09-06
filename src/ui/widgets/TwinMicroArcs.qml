@@ -30,12 +30,12 @@ Item {
 
     Item {
         id: fuelPod
-        width: parent.width * 0.28
-        height: parent.height * 0.26
+        width: parent.width * 0.30
+        height: parent.height * 0.275
         anchors.left: parent.left
-        anchors.leftMargin: parent.width * 0.18
+        anchors.leftMargin: parent.width * 0.155
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: parent.height * 0.115
+        anchors.bottomMargin: parent.height * 0.098
         z: 2
 
         GaugeArcItem {
@@ -159,12 +159,12 @@ Item {
 
     Item {
         id: tempPod
-        width: parent.width * 0.28
-        height: parent.height * 0.26
+        width: parent.width * 0.30
+        height: parent.height * 0.275
         anchors.right: parent.right
-        anchors.rightMargin: parent.width * 0.18
+        anchors.rightMargin: parent.width * 0.155
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: parent.height * 0.115
+        anchors.bottomMargin: parent.height * 0.098
         z: 2
 
         GaugeArcItem {

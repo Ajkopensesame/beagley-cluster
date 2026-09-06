@@ -79,48 +79,56 @@ Item {
             ctx.arc(cx, cy, rimRadius, 0, Math.PI * 2)
             ctx.stroke()
 
-            // Outer metal/glass rim gradient (brighter glass catch)
+            // Outer metal/glass rim gradient (concept thick beveled lens)
             const rim = ctx.createLinearGradient(cx - rimRadius, cy - rimRadius, cx + rimRadius, cy + rimRadius)
-            rim.addColorStop(0.00, root.css(bright, 0.78))
-            rim.addColorStop(0.12, "rgba(255,255,255,0.55)")
-            rim.addColorStop(0.22, root.css(cyan, 0.14))
-            rim.addColorStop(0.40, root.css(rimGlow, 0.38))
-            rim.addColorStop(0.58, root.css(lava, 0.06))
-            rim.addColorStop(0.74, "rgba(0,0,0,0.86)")
-            rim.addColorStop(0.90, root.css(pearlLow, 0.32))
-            rim.addColorStop(1.00, root.css(bright, 0.52))
+            rim.addColorStop(0.00, "rgba(255,255,255,0.88)")
+            rim.addColorStop(0.10, root.css(bright, 0.72))
+            rim.addColorStop(0.20, root.css(cyan, 0.16))
+            rim.addColorStop(0.38, root.css(rimGlow, 0.42))
+            rim.addColorStop(0.55, root.css(lava, 0.08))
+            rim.addColorStop(0.72, "rgba(0,0,0,0.90)")
+            rim.addColorStop(0.88, root.css(pearlLow, 0.36))
+            rim.addColorStop(1.00, root.css(bright, 0.58))
             ctx.beginPath()
             ctx.strokeStyle = rim
-            ctx.lineWidth = Math.max(4.2, side * 0.010)
+            ctx.lineWidth = Math.max(5.0, side * 0.012)
             ctx.arc(cx, cy, rimRadius, 0, Math.PI * 2)
             ctx.stroke()
 
             // Inner glass recess (deeper lip)
             ctx.beginPath()
-            ctx.strokeStyle = "rgba(0,0,0,0.94)"
-            ctx.lineWidth = Math.max(4.5, side * 0.009)
+            ctx.strokeStyle = "rgba(0,0,0,0.96)"
+            ctx.lineWidth = Math.max(5.0, side * 0.010)
             ctx.arc(cx, cy, faceOuter - ctx.lineWidth * 0.35, 0, Math.PI * 2)
             ctx.stroke()
 
             // Specular highlight arc (top-left glass catch) — concept white rim punch
             ctx.beginPath()
-            ctx.strokeStyle = "rgba(255,255,255,0.72)"
-            ctx.lineWidth = Math.max(2.6, side * 0.0055)
+            ctx.strokeStyle = "rgba(255,255,255,0.86)"
+            ctx.lineWidth = Math.max(3.0, side * 0.0065)
             ctx.lineCap = "round"
-            ctx.arc(cx, cy, rimRadius - side * 0.009, Math.PI * 0.86, Math.PI * 1.52)
+            ctx.arc(cx, cy, rimRadius - side * 0.008, Math.PI * 0.84, Math.PI * 1.54)
+            ctx.stroke()
+
+            // Soft white secondary specular (shorter)
+            ctx.beginPath()
+            ctx.strokeStyle = "rgba(255,255,255,0.35)"
+            ctx.lineWidth = Math.max(1.8, side * 0.0035)
+            ctx.lineCap = "round"
+            ctx.arc(cx, cy, rimRadius - side * 0.016, Math.PI * 0.92, Math.PI * 1.22)
             ctx.stroke()
 
             // Soft cyan secondary glint
             ctx.beginPath()
-            ctx.strokeStyle = root.css(cyan, 0.12)
+            ctx.strokeStyle = root.css(cyan, 0.14)
             ctx.lineWidth = Math.max(1.5, side * 0.0028)
             ctx.arc(cx, cy, rimRadius - side * 0.014, Math.PI * 0.95, Math.PI * 1.28)
             ctx.stroke()
 
             // Bottom shadow bite for curved depth
             ctx.beginPath()
-            ctx.strokeStyle = "rgba(0,0,0,0.88)"
-            ctx.lineWidth = Math.max(3.2, side * 0.0065)
+            ctx.strokeStyle = "rgba(0,0,0,0.92)"
+            ctx.lineWidth = Math.max(3.6, side * 0.0075)
             ctx.lineCap = "round"
             ctx.arc(cx, cy, rimRadius - side * 0.010, Math.PI * 0.05, Math.PI * 0.55)
             ctx.stroke()

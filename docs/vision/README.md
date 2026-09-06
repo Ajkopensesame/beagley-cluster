@@ -36,14 +36,16 @@ BEAGLEY_GAUGE_DEMO=1              # review needles without hub
 
 ## Toggle drive vs show (no binary rebuild)
 
-On a **qml-dev** appliance, drop a tiny QML override next to MainV3:
+On a **qml-dev** appliance, drop a tiny QML override next to MainV3
+(`Loader` → `SkinShowOverride.qml`). No binary rebuild required for show/drive
+toggle (running appliance binary may predate `BEAGLEY_SKIN_PROFILE`):
 
 ```bash
 # SHOW
-ssh beagley-ai "printf '%s\n' 'import QtQuick 2.15; QtObject {}' > /opt/beagley-cluster/qml-dev/src/ui/SkinShowOverride.qml && systemctl restart beagley_cluster"
+ssh beagley-ai "printf '%s\n' 'import QtQuick 2.15; QtObject { objectName: "skinShow" }' > /opt/beagley-cluster/qml-dev/src/ui/SkinShowOverride.qml && systemctl restart beagley_cluster"
 
 # DRIVE (embedded default)
-ssh beagley-ai "rm -f /opt/beagley-cluster/qml-dev/src/ui/SkinShowOverride.qml /opt/beagley-cluster/qml-dev/src/ui/skin-show.on && systemctl restart beagley_cluster"
+ssh beagley-ai "rm -f /opt/beagley-cluster/qml-dev/src/ui/SkinShowOverride.qml && systemctl restart beagley_cluster"
 ```
 
 With a rebuilt binary that exposes `BEAGLEY_SKIN_PROFILE` (already in `main.cpp` on this branch), set it in `/etc/default/beagley-cluster.local` instead:

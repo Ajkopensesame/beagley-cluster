@@ -352,9 +352,16 @@ Item {
     readonly property real _sgCoreStart: root.clampedProgress > 0.002
         ? Math.max(0.0, root.clampedProgress - 0.36)
         : 0.0
-    // Slow crust gaps driven by lavaPhase (property-only; no Canvas)
+    // Slow crust gaps + ember windows (property-only; no Canvas)
     readonly property real _sgCrackU0: (lavaPhase * 0.07) % 1.0
     readonly property real _sgCrackU1: (_sgCrackU0 + 0.37) % 1.0
+    readonly property real _sgCrackU2: (_sgCrackU0 + 0.61) % 1.0
+    readonly property real _sgEmberU0: (_sgCrackU0 + 0.19) % 1.0
+    readonly property real _sgFilamentU: (_sgCrackU0 + 0.48) % 1.0
+    readonly property color _lavaMagenta: Qt.color("#C4183A")
+    readonly property real _sgROuter: root.arcRadiusFactor + 0.010
+    readonly property real _sgRInner: root.arcRadiusFactor - 0.014
+    readonly property real _sgRCore: root.arcRadiusFactor - 0.006
 
     GaugeArcItem {
         anchors.fill: parent
@@ -382,6 +389,36 @@ Item {
         strokeWidth: root.embeddedHighEffectBudgetMode ? 8 : 6
         color: root.colorWithAlpha(root._lavaRemainder, 0.22)
         segments: 40
+        roundedCaps: true
+    }
+    // Soft outer bloom (organic thickness beyond body)
+    GaugeArcItem {
+        anchors.fill: parent
+        z: 18
+        visible: root.sgMagmaMode && root.clampedProgress > 0.002
+        startAngleDeg: root.startAngleDeg
+        sweepAngleDeg: root.sweepAngleDeg
+        startProgress: 0.0
+        endProgress: root.clampedProgress
+        radiusFactor: root._sgROuter
+        strokeWidth: root.embeddedHighEffectBudgetMode ? 10 : 7
+        color: root.colorWithAlpha(root._lavaOrange, 0.28)
+        segments: 40
+        roundedCaps: true
+    }
+    // Magenta depth underbelly (concept red→orange lip)
+    GaugeArcItem {
+        anchors.fill: parent
+        z: 18
+        visible: root.sgMagmaMode && root.clampedProgress > 0.002
+        startAngleDeg: root.startAngleDeg
+        sweepAngleDeg: root.sweepAngleDeg
+        startProgress: 0.0
+        endProgress: Math.min(root.clampedProgress, Math.max(0.08, root.clampedProgress * 0.55))
+        radiusFactor: root._sgROuter
+        strokeWidth: root.embeddedHighEffectBudgetMode ? 14 : 10
+        color: root.colorWithAlpha(root._lavaMagenta, 0.42)
+        segments: 36
         roundedCaps: true
     }
     // Orange magma body
@@ -414,6 +451,21 @@ Item {
         segments: 48
         roundedCaps: true
     }
+    // Inner ember ribbon (radius offset = granular thickness)
+    GaugeArcItem {
+        anchors.fill: parent
+        z: 19
+        visible: root.sgMagmaMode && root.clampedProgress > 0.002
+        startAngleDeg: root.startAngleDeg
+        sweepAngleDeg: root.sweepAngleDeg
+        startProgress: 0.0
+        endProgress: root.clampedProgress
+        radiusFactor: root._sgRInner
+        strokeWidth: root.embeddedHighEffectBudgetMode ? 6 : 4.5
+        color: root.colorWithAlpha(root._lavaAmber, 0.55)
+        segments: 40
+        roundedCaps: true
+    }
     // Hot yellow core (forward half)
     GaugeArcItem {
         anchors.fill: parent
@@ -423,7 +475,7 @@ Item {
         sweepAngleDeg: root.sweepAngleDeg
         startProgress: root._sgCoreStart
         endProgress: root.clampedProgress
-        radiusFactor: root.arcRadiusFactor
+        radiusFactor: root._sgRCore
         strokeWidth: root.embeddedHighEffectBudgetMode ? 8 : 6
         color: root.colorWithAlpha(root._lavaHot, 0.88)
         segments: 36
@@ -444,7 +496,22 @@ Item {
         segments: 24
         roundedCaps: true
     }
-    // Dark crust cracks (2 windows crawl with phase — SG only)
+    // Crawling hot filament (thin organic streak)
+    GaugeArcItem {
+        anchors.fill: parent
+        z: 20
+        visible: root.sgMagmaMode && root.clampedProgress > 0.10
+        startAngleDeg: root.startAngleDeg
+        sweepAngleDeg: root.sweepAngleDeg
+        startProgress: Math.min(root.clampedProgress, root._sgFilamentU * root.clampedProgress)
+        endProgress: Math.min(root.clampedProgress, root._sgFilamentU * root.clampedProgress + 0.11)
+        radiusFactor: root._sgRInner
+        strokeWidth: root.embeddedHighEffectBudgetMode ? 3.5 : 2.8
+        color: root.colorWithAlpha(Qt.color("#FFF8D0"), 0.82)
+        segments: 20
+        roundedCaps: true
+    }
+    // Dark crust cracks (3 windows crawl with phase — SG only)
     GaugeArcItem {
         anchors.fill: parent
         z: 20
@@ -473,6 +540,20 @@ Item {
         segments: 16
         roundedCaps: true
     }
+    GaugeArcItem {
+        anchors.fill: parent
+        z: 20
+        visible: root.sgMagmaMode && root.clampedProgress > 0.12
+        startAngleDeg: root.startAngleDeg
+        sweepAngleDeg: root.sweepAngleDeg
+        startProgress: Math.min(root.clampedProgress, root._sgCrackU2 * root.clampedProgress)
+        endProgress: Math.min(root.clampedProgress, root._sgCrackU2 * root.clampedProgress + 0.032)
+        radiusFactor: root._sgROuter
+        strokeWidth: root.embeddedHighEffectBudgetMode ? 8 : 6
+        color: root.colorWithAlpha(Qt.color("#140600"), 0.48)
+        segments: 14
+        roundedCaps: true
+    }
     // Ember flecks in cracks (amber punch through dark)
     GaugeArcItem {
         anchors.fill: parent
@@ -486,6 +567,35 @@ Item {
         strokeWidth: root.embeddedHighEffectBudgetMode ? 5 : 4
         color: root.colorWithAlpha(root._lavaHot, 0.90)
         segments: 12
+        roundedCaps: true
+    }
+    GaugeArcItem {
+        anchors.fill: parent
+        z: 20
+        visible: root.sgMagmaMode && root.clampedProgress > 0.10
+        startAngleDeg: root.startAngleDeg
+        sweepAngleDeg: root.sweepAngleDeg
+        startProgress: Math.min(root.clampedProgress, root._sgEmberU0 * root.clampedProgress)
+        endProgress: Math.min(root.clampedProgress, root._sgEmberU0 * root.clampedProgress + 0.022)
+        radiusFactor: root._sgRInner
+        strokeWidth: root.embeddedHighEffectBudgetMode ? 4 : 3
+        color: root.colorWithAlpha(root._lavaAmber, 0.95)
+        segments: 10
+        roundedCaps: true
+    }
+    // Outer crumbly rim flecks (phase-crawled)
+    GaugeArcItem {
+        anchors.fill: parent
+        z: 20
+        visible: root.sgMagmaMode && root.clampedProgress > 0.14
+        startAngleDeg: root.startAngleDeg
+        sweepAngleDeg: root.sweepAngleDeg
+        startProgress: Math.min(root.clampedProgress, root._sgCrackU1 * root.clampedProgress + 0.008)
+        endProgress: Math.min(root.clampedProgress, root._sgCrackU1 * root.clampedProgress + 0.018)
+        radiusFactor: root._sgROuter
+        strokeWidth: root.embeddedHighEffectBudgetMode ? 3.2 : 2.5
+        color: root.colorWithAlpha(Qt.color("#FFE08A"), 0.70)
+        segments: 8
         roundedCaps: true
     }
 

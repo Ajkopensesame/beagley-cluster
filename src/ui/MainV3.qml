@@ -2107,11 +2107,11 @@ Window {
         }
 
 
-        // Probe show-profile marker without needing BEAGLEY_SKIN_PROFILE in binary.
-        // Place /opt/beagley-cluster/qml-dev/src/ui/skin-show.on (any file) to force show on qml-dev.
-        // Reliable qml-dev show probe: Loader succeeds only when override QML exists.
-        // SHOW:  printf '%s\n' 'import QtQuick 2.15; QtObject{}' > /opt/beagley-cluster/qml-dev/src/ui/SkinShowOverride.qml
-        // DRIVE: rm -f /opt/beagley-cluster/qml-dev/src/ui/SkinShowOverride.qml
+        // Probe show-profile without BEAGLEY_SKIN_PROFILE in the running binary.
+        // Loader.Ready only when SkinShowOverride.qml exists beside MainV3 (qml-dev).
+        // SHOW:  printf '%s\n' 'import QtQuick 2.15; QtObject { objectName: "skinShow" }' \
+        //          > /opt/beagley-cluster/qml-dev/src/ui/SkinShowOverride.qml && systemctl restart beagley_cluster
+        // DRIVE: rm -f /opt/beagley-cluster/qml-dev/src/ui/SkinShowOverride.qml && systemctl restart beagley_cluster
         Loader {
             id: skinShowLoader
             active: true
@@ -2296,17 +2296,19 @@ Window {
                 backgroundOpacity: root.gaugeFaceBackgroundOpacity
             }
 
-            // Show profile: cyan matrix depth behind numerals (drive keeps this off)
+            // Show profile: cyan matrix depth behind numerals (drive keeps this off).
+            // z above NativeGauge face, below DialChrome magma + numeral overlay.
             W.GaugeMatrixDepth {
                 anchors.fill: speedGauge
-                z: root.mapLibreSafeCompositor ? 121 : 21
+                z: root.mapLibreSafeCompositor ? 124 : 24
                 visible: root.gaugeMatrixDepthEnabled && !root.mapMenuOpen
                 effectEnabled: visible
                 rainColor: appTheme.matrixCyan
-                density: 0.42
-                columns: 11
-                fontPx: 11
-                opacityScale: 0.38
+                density: 0.58
+                columns: 13
+                fontPx: 12
+                opacityScale: 0.62
+                faceFactor: 0.70
             }
 
             W.MatrixRain {
@@ -2721,16 +2723,18 @@ Window {
                 backgroundOpacity: root.gaugeFaceBackgroundOpacity
             }
 
+            // Concept still: matrix reads mainly on speedo; keep tach quieter.
             W.GaugeMatrixDepth {
                 anchors.fill: tachGauge
-                z: root.mapLibreSafeCompositor ? 121 : 21
+                z: root.mapLibreSafeCompositor ? 124 : 24
                 visible: root.gaugeMatrixDepthEnabled && !root.mapMenuOpen
                 effectEnabled: visible
                 rainColor: appTheme.matrixCyan
-                density: 0.38
-                columns: 11
+                density: 0.32
+                columns: 10
                 fontPx: 11
-                opacityScale: 0.34
+                opacityScale: 0.28
+                faceFactor: 0.66
             }
 
             W.MatrixRain {

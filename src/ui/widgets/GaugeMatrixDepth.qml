@@ -2,6 +2,7 @@ import QtQuick 2.15
 
 // Low-cost in-gauge matrix depth: scrolling Text columns (concept cyan glyphs).
 // Prefer this over MatrixRain Canvas on embedded/show budgets.
+// Keep glyphs inside an inner rounded disc so magma arcs stay clean.
 Item {
     id: root
     anchors.fill: parent
@@ -14,73 +15,78 @@ Item {
     property int fontPx: 11
     property real opacityScale: 0.28
     property bool circularMask: true
+    // Face-only radius so arcs (rim) are not washed with cyan
+    property real faceFactor: 0.72
 
     visible: effectEnabled
     opacity: opacityScale
+    // Sit above NativeGauge face; parent MainV3 sets absolute z under DialChrome
+    z: 0
 
-    readonly property var glyphs: ["0","1","ｱ","ｶ","ｻ","ﾀ","ﾅ","ﾊ","ﾏ","ﾔ","ﾗ","ﾝ","Φ","λ"]
+    readonly property var glyphs: ["0","1","ｱ","ｶ","ｻ","ﾀ","ﾅ","ﾊ","ﾏ","ﾔ","ﾗ","ﾝ","Φ","λ","7","3"]
 
+    // Rounded clip disc — Qt clips to radius, no OpacityMask/ShaderEffect cost
     Rectangle {
-        id: maskDisc
+        id: faceDisc
         anchors.centerIn: parent
-        width: Math.min(parent.width, parent.height) * 0.92
+        width: Math.min(parent.width, parent.height) * root.faceFactor
         height: width
         radius: width / 2
         color: "transparent"
-        visible: false
-    }
+        clip: root.circularMask
+        border.width: 0
 
-    Item {
-        id: rainLayer
-        anchors.fill: parent
-        layer.enabled: root.circularMask
-        layer.smooth: false
+        Item {
+            id: rainLayer
+            anchors.fill: parent
 
-        Repeater {
-            model: Math.max(4, Math.min(16, root.columns))
-            delegate: Item {
-                id: col
-                width: root.fontPx + 2
-                height: root.height * 2.2
-                x: (index + 0.5) * (root.width / Math.max(1, root.columns)) - width / 2
-                y: -height * 0.15
-                opacity: (index % 3 === 0) ? 0.9 : 0.45
-                visible: (index / Math.max(1, root.columns)) <= root.density
-                    || ((index * 17) % 10) < (root.density * 10)
+            Repeater {
+                model: Math.max(4, Math.min(16, root.columns))
+                delegate: Item {
+                    id: col
+                    width: root.fontPx + 2
+                    height: faceDisc.height * 2.4
+                    x: (index + 0.5) * (faceDisc.width / Math.max(1, root.columns)) - width / 2
+                    y: -height * 0.15
+                    opacity: (index % 3 === 0) ? 1.0 : 0.55
+                    visible: (index / Math.max(1, root.columns)) <= root.density
+                        || ((index * 17) % 10) < (root.density * 10)
 
-                Column {
-                    spacing: 2
-                    Repeater {
-                        model: 18
-                        delegate: Text {
-                            text: root.glyphs[Math.floor(Math.abs(index * 3 + Math.floor(col.x))) % root.glyphs.length]
-                            color: root.rainColor
-                            font.pixelSize: root.fontPx
-                            font.family: "monospace"
-                            opacity: 0.15 + (index % 5) * 0.12
+                    Column {
+                        spacing: 1
+                        Repeater {
+                            model: 22
+                            delegate: Text {
+                                text: root.glyphs[Math.floor(Math.abs(index * 3 + Math.floor(col.x))) % root.glyphs.length]
+                                color: root.rainColor
+                                font.pixelSize: root.fontPx
+                                font.family: "monospace"
+                                opacity: 0.22 + (index % 5) * 0.14
+                                style: Text.Normal
+                            }
                         }
                     }
-                }
 
-                NumberAnimation on y {
-                    from: -col.height * 0.35
-                    to: root.height * 0.55
-                    duration: 9000 + (index % 5) * 1400
-                    loops: Animation.Infinite
-                    running: root.effectEnabled && root.visible
+                    NumberAnimation on y {
+                        from: -col.height * 0.35
+                        to: faceDisc.height * 0.65
+                        duration: 9000 + (index % 5) * 1400
+                        loops: Animation.Infinite
+                        running: root.effectEnabled && root.visible
+                    }
                 }
             }
         }
-    }
 
-    // Soft circular veil so glyphs only read as depth behind numerals
-    Rectangle {
-        anchors.centerIn: parent
-        width: Math.min(parent.width, parent.height) * 0.55
-        height: width
-        radius: width / 2
-        color: "#CC010105"
-        visible: root.circularMask
-        z: 5
+        // Soft center dim only — keep glyphs readable behind numerals (was #CC opaque)
+        Rectangle {
+            anchors.centerIn: parent
+            width: parent.width * 0.42
+            height: width
+            radius: width / 2
+            color: "#33010108"
+            visible: root.circularMask
+            z: 5
+        }
     }
 }
