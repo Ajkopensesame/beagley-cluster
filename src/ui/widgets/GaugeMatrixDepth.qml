@@ -61,7 +61,7 @@ Item {
                                 color: root.rainColor
                                 font.pixelSize: root.fontPx
                                 font.family: "monospace"
-                                opacity: 0.22 + (index % 5) * 0.14
+                                opacity: 0.40 + (index % 5) * 0.12
                                 style: Text.Normal
                             }
                         }
@@ -84,7 +84,7 @@ Item {
             width: parent.width * 0.42
             height: width
             radius: width / 2
-            color: "#33010108"
+            color: "#18010108"
             visible: root.circularMask
             z: 5
         }

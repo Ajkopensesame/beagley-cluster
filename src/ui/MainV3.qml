@@ -2296,21 +2296,6 @@ Window {
                 backgroundOpacity: root.gaugeFaceBackgroundOpacity
             }
 
-            // Show profile: cyan matrix depth behind numerals (drive keeps this off).
-            // z above NativeGauge face, below DialChrome magma + numeral overlay.
-            W.GaugeMatrixDepth {
-                anchors.fill: speedGauge
-                z: root.mapLibreSafeCompositor ? 124 : 24
-                visible: root.gaugeMatrixDepthEnabled && !root.mapMenuOpen
-                effectEnabled: visible
-                rainColor: appTheme.matrixCyan
-                density: 0.58
-                columns: 13
-                fontPx: 12
-                opacityScale: 0.62
-                faceFactor: 0.70
-            }
-
             W.MatrixRain {
                 anchors.fill: speedGauge
                 z: root.mapLibreSafeCompositor ? 122 : 22
@@ -2363,6 +2348,20 @@ Window {
             Item {
                 anchors.fill: speedGauge
                 z: root.mapLibreSafeCompositor ? 130 : 30
+
+                // Show matrix in numeral stack (above NativeGauge/DialChrome face, under digits)
+                W.GaugeMatrixDepth {
+                    anchors.fill: parent
+                    z: 1
+                    visible: root.gaugeMatrixDepthEnabled && !root.mapMenuOpen
+                    effectEnabled: visible
+                    rainColor: "#7AFFFF"
+                    density: 0.72
+                    columns: 14
+                    fontPx: 13
+                    opacityScale: 0.88
+                    faceFactor: 0.68
+                }
 
                 Repeater {
                     model: [
@@ -2723,20 +2722,6 @@ Window {
                 backgroundOpacity: root.gaugeFaceBackgroundOpacity
             }
 
-            // Concept still: matrix reads mainly on speedo; keep tach quieter.
-            W.GaugeMatrixDepth {
-                anchors.fill: tachGauge
-                z: root.mapLibreSafeCompositor ? 124 : 24
-                visible: root.gaugeMatrixDepthEnabled && !root.mapMenuOpen
-                effectEnabled: visible
-                rainColor: appTheme.matrixCyan
-                density: 0.32
-                columns: 10
-                fontPx: 11
-                opacityScale: 0.28
-                faceFactor: 0.66
-            }
-
             W.MatrixRain {
                 anchors.fill: tachGauge
                 z: root.mapLibreSafeCompositor ? 122 : 22
@@ -2789,6 +2774,19 @@ Window {
             Item {
                 anchors.fill: tachGauge
                 z: root.mapLibreSafeCompositor ? 130 : 30
+
+                W.GaugeMatrixDepth {
+                    anchors.fill: parent
+                    z: 1
+                    visible: root.gaugeMatrixDepthEnabled && !root.mapMenuOpen
+                    effectEnabled: visible
+                    rainColor: "#66F0FF"
+                    density: 0.40
+                    columns: 11
+                    fontPx: 11
+                    opacityScale: 0.42
+                    faceFactor: 0.62
+                }
 
                 Repeater {
                     model: [

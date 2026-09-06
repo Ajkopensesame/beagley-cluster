@@ -417,7 +417,7 @@ Item {
         endProgress: Math.min(root.clampedProgress, Math.max(0.08, root.clampedProgress * 0.55))
         radiusFactor: root._sgROuter
         strokeWidth: root.embeddedHighEffectBudgetMode ? 14 : 10
-        color: root.colorWithAlpha(root._lavaMagenta, 0.42)
+        color: root.colorWithAlpha(root._lavaMagenta, 0.22)
         segments: 36
         roundedCaps: true
     }
