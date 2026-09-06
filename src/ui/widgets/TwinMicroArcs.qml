@@ -69,6 +69,8 @@ Item {
 
         Canvas {
             id: fuelIcon
+            renderTarget: Qt.platform.os === "linux" ? Canvas.Image : Canvas.FramebufferObject
+            antialiasing: true
             width: Math.max(18, parent.width * 0.28)
             height: width
             anchors.horizontalCenter: parent.horizontalCenter
@@ -176,6 +178,8 @@ Item {
 
         Canvas {
             id: thermoIcon
+            renderTarget: Qt.platform.os === "linux" ? Canvas.Image : Canvas.FramebufferObject
+            antialiasing: true
             width: Math.max(16, parent.width * 0.22)
             height: width * 1.35
             anchors.horizontalCenter: parent.horizontalCenter

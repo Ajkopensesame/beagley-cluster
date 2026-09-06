@@ -497,7 +497,7 @@ Item {
             function drawLavaBand(fromRad, toRad, tailWidth, headWidth, color, brightColor, segments, capScale, blobCount) {
                 const sweep = toRad - fromRad;
                 if (sweep <= 0.0001) return;
-                const lite = root.embeddedHighEffectBudgetMode;
+                const lite = root.embeddedHighEffectBudgetMode && !root.richDetailMode;
 
                 ctx.save();
                 if (!buildTaperedPath(fromRad, toRad, tailWidth, headWidth, segments, capScale)) {

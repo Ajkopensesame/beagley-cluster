@@ -80,15 +80,21 @@ Window {
     // Skin v2 visual profiles:
     //   drive = appliance default (glass + lava-lite + map; matrix off/sparse)
     //   show  = concept still match (matrix depth + richer lava)
+    // qml-dev show override without binary rebuild: touch marker enables show
+    // (BEAGLEY_SKIN_PROFILE context property lands with next appliance rebuild)
+    readonly property bool skinShowMarkerPresent: skinShowMarker.status === Image.Ready
     readonly property string skinVisualProfile: {
         const raw = (typeof BEAGLEY_SKIN_PROFILE !== "undefined" && BEAGLEY_SKIN_PROFILE)
             ? String(BEAGLEY_SKIN_PROFILE).trim().toLowerCase()
             : ""
         if (raw === "show" || raw === "drive")
             return raw
+        if (skinShowMarkerPresent)
+            return "show"
         return renderProfile === "embedded" ? "drive" : "show"
     }
     readonly property bool skinShowProfile: skinVisualProfile === "show"
+
     // Drive: matrix hard-off on embedded. Show: full MatrixRain on desktop; cheap depth on embedded.
     readonly property bool gaugeMatrixRainEnabled: gaugeEffectLevel === "high"
         && !clusterSimulation
@@ -101,7 +107,7 @@ Window {
     // Lava is independent of matrix — embedded high uses lava-lite, never rain
     readonly property bool gaugeLavaAccentEnabled: gaugeEffectLevel === "high" && !clusterSimulation
     readonly property string gaugeAccentDetailMode: gaugeLavaAccentEnabled
-        ? (skinShowProfile ? "rich" : "rich")
+        ? (skinShowProfile ? "rich" : "safe")
         : gaugeDetail
     readonly property int gaugeIndicatorCascadeCycleMs: gaugeLowEffectMode ? 2300 : 2100
     readonly property string mapRenderer: (typeof BEAGLEY_MAP_RENDERER !== "undefined" && BEAGLEY_MAP_RENDERER)
@@ -2099,6 +2105,16 @@ Window {
             }
         }
 
+
+        Image {
+            id: skinShowMarker
+            width: 1
+            height: 1
+            visible: false
+            asynchronous: false
+            cache: false
+            source: "file:///opt/beagley-cluster/qml-dev/.skin-show.png"
+        }
 
         Item {
             id: leftSideMass
