@@ -27,7 +27,8 @@ Item {
     readonly property string displayFont: theme && theme.fontDisplay ? theme.fontDisplay : "Oxanium"
     readonly property string monoFont: theme && theme.fontMono ? theme.fontMono : "Oxanium"
     readonly property bool embeddedSafeMode: Qt.platform.os === "linux"
-    readonly property bool tallDetailMode: radarEnabled && expandedMode === "radar"
+    // Slice 3: radar expands as a card/sheet under weather — not a full-canopy peer corner.
+    readonly property bool tallDetailMode: false
     readonly property int podSize: Math.floor(Math.min(164, Math.max(142, height * 0.228)))
     readonly property int cornerBleed: Math.round(podSize * 0.17)
     readonly property int cornerInset: -cornerBleed
@@ -197,6 +198,11 @@ Item {
     function musicPrimaryLine() {
         if (musicTitle.length > 0)
             return musicTitle
+        var status = String(musicStatus).toUpperCase()
+        if (status === "PERMISSION")
+            return "PERMISSION"
+        if (status === "AUTH" || musicAuthRequired())
+            return "AUTH"
         if (musicAvailable)
             return musicStatus
         return "SPOTIFY"
@@ -238,7 +244,7 @@ Item {
         if (musicPlaying)
             return "PLAYING"
         if (musicAvailable)
-            return "IDLE"
+            return "TAP"
         if (musicConfigured())
             return "SETUP"
         return musicSecondaryLine()
@@ -667,10 +673,28 @@ Item {
     function coordinateStatusText() {
         if (weatherPositionReady) {
             if (positionLive || stressScene)
-                return "SYNC"
+                return "GPS…"
             return positionWeak ? "GPS WEAK" : "GPS HOLD"
         }
-        return "GPS WAIT"
+        return "GPS…"
+    }
+
+    function weatherCornerStatusText() {
+        if (weatherStatus === "LIVE")
+            return weatherCompactLabel()
+        if (!weatherPositionReady)
+            return coordinateStatusText()
+        if (weatherStatus === "SYNC")
+            return "SYNC…"
+        if (weatherStatus === "OFFLINE")
+            return "OFFLINE"
+        if (weatherStatus === "NO DATA")
+            return "NO DATA"
+        return weatherStatus.length > 0 ? weatherStatus : "SYNC…"
+    }
+
+    function weatherCornerLive() {
+        return weatherStatus === "LIVE" && isFinite(Number(displayTempC))
     }
 
     function requestLocationFallback(latValue, lngValue) {
@@ -836,17 +860,28 @@ Item {
     function requestWeatherCandidate(candidates, index) {
         if (index >= candidates.length) {
             weatherStatus = "OFFLINE"
+            if (!isFinite(Number(airTempC)))
+                clearWeatherData("OFFLINE")
             return
         }
 
         const candidate = candidates[index]
         const xhr = new XMLHttpRequest()
+        var settled = false
+        function advance() {
+            if (settled)
+                return
+            settled = true
+            requestWeatherCandidate(candidates, index + 1)
+        }
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== 4)
                 return
+            if (settled)
+                return
 
             if (xhr.status < 200 || xhr.status >= 300) {
-                requestWeatherCandidate(candidates, index + 1)
+                advance()
                 return
             }
 
@@ -856,23 +891,29 @@ Item {
                     ? payload.observations.data
                     : []
                 if (!data || data.length === 0) {
-                    requestWeatherCandidate(candidates, index + 1)
+                    advance()
                     return
                 }
 
                 const row = data[0]
                 if (!isFinite(Number(row.air_temp))) {
-                    requestWeatherCandidate(candidates, index + 1)
+                    advance()
                     return
                 }
 
+                settled = true
                 applyWeatherRow(candidate, payload, row)
             } catch (err) {
                 console.warn("[WeatherCorners] BOM weather parse failed:", err)
-                requestWeatherCandidate(candidates, index + 1)
+                advance()
             }
         }
+        xhr.ontimeout = function() {
+            console.warn("[WeatherCorners] BOM weather timeout:", candidate && candidate.name)
+            advance()
+        }
         xhr.open("GET", bomStationUrl(candidate), true)
+        try { xhr.timeout = 12000 } catch (err) { }
         xhr.send()
     }
 
@@ -954,7 +995,8 @@ Item {
             return
         }
 
-        weatherStatus = "SYNC"
+        if (!isFinite(Number(airTempC)))
+            weatherStatus = "SYNC"
         requestWeatherCandidate(candidates, 0)
     }
 
@@ -1008,8 +1050,12 @@ Item {
             return
         }
 
-        if (!root.sameLocationAnchor(Number(root.safeLat), Number(root.safeLng)))
-            root.clearLiveWeatherState("SYNC")
+        // Keep last LIVE reading while GPS/position settles — avoid eternal --° + SYNC flicker.
+        if (!root.sameLocationAnchor(Number(root.safeLat), Number(root.safeLng))) {
+            if (!isFinite(Number(root.airTempC)))
+                root.weatherStatus = "SYNC"
+            root.clearLocationData()
+        }
         coordinateDebounce.restart()
     }
 
@@ -1131,20 +1177,27 @@ Item {
         corner: "topLeft"
         effectLevel: root.effectLevel
         bleedFraction: root.podBleedFraction
-        live: root.weatherStatus === "LIVE"
+        live: root.weatherCornerLive()
         tempText: root.formatTemp(root.displayTempC)
-        locationText: root.weatherCompactLabel()
+        locationText: root.weatherCornerStatusText()
         conditionKind: root.weatherKind(root.currentConditionLabel())
-        conditionText: root.weatherStatus
+        conditionText: root.weatherCornerStatusText()
         onClicked: root.expandedMode = root.expandedMode === "temp" ? "" : "temp"
+        onPressAndHold: {
+            if (root.radarEnabled)
+                root.expandedMode = root.expandedMode === "radar" ? "" : "radar"
+            else
+                root.expandedMode = root.expandedMode === "temp" ? "" : "temp"
+        }
     }
 
+    // Slice 3 option A: radar is secondary under weather (TL), never steals TR from media.
     WidgetLocal.RadarCornerWidget {
         id: radarCorner
         width: root.podSize
         height: root.podSize
-        visible: root.radarEnabled
-        enabled: root.radarEnabled
+        visible: false
+        enabled: false
         anchors.right: parent.right
         anchors.top: parent.top
         anchors.rightMargin: root.cornerInset
@@ -1155,20 +1208,16 @@ Item {
         bleedFraction: root.podBleedFraction
         frameUrl: root.radarFrameUrl
         mapUrl: root.radarDisplayUrl
-        status: root.radarStatus
+        status: root.radarStatus.length > 0 ? root.radarStatus : "NO RADAR"
         frameLabel: root.radarFrameDisplayLabel()
-        onClicked: {
-            if (root.radarEnabled)
-                root.expandedMode = root.expandedMode === "radar" ? "" : "radar"
-        }
     }
 
     WidgetLocal.MediaCornerWidget {
         id: mediaCorner
         width: root.podSize
         height: root.podSize
-        visible: !root.radarEnabled
-        enabled: !root.radarEnabled
+        visible: true
+        enabled: true
         anchors.right: parent.right
         anchors.top: parent.top
         anchors.rightMargin: root.cornerInset
@@ -1395,7 +1444,7 @@ Item {
         theme: root.theme
         corner: "bottomLeft"
         effectLevel: "low"
-        opacity: root.theme && root.theme.chromeIdle !== undefined ? root.theme.chromeIdle : 0.72
+        opacity: Math.max(0.90, root.theme && root.theme.chromeIdle !== undefined ? root.theme.chromeIdle : 0.90)
         bleedFraction: root.podBleedFraction
         icon: "menu"
         label: "SETUP"
@@ -1417,7 +1466,7 @@ Item {
         theme: root.theme
         corner: "bottomRight"
         effectLevel: "low"
-        opacity: root.theme && root.theme.chromeIdle !== undefined ? root.theme.chromeIdle : 0.72
+        opacity: Math.max(0.90, root.theme && root.theme.chromeIdle !== undefined ? root.theme.chromeIdle : 0.90)
         bleedFraction: root.podBleedFraction
         icon: "route"
         label: "MAP"
@@ -1437,11 +1486,11 @@ Item {
 
         Rectangle {
             anchors.fill: parent
-            color: root.expandedMode === "radar"
-                ? "#02050A"
-                : root.expandedMode === "temp"
+            color: root.expandedMode === "temp"
                 ? Qt.rgba(0.0, 0.0, 0.0, 0.0)
-                : Qt.rgba(0.0, 0.0, 0.0, root.tallDetailMode ? 0.66 : 0.54)
+                : root.expandedMode === "radar"
+                ? Qt.rgba(0.0, 0.0, 0.0, 0.34)
+                : Qt.rgba(0.0, 0.0, 0.0, 0.54)
         }
 
         MouseArea {
@@ -1453,15 +1502,15 @@ Item {
             id: detailCard
             width: root.expandedMode === "temp"
                 ? Math.floor(Math.min(560, Math.max(500, parent.width * 0.30)))
-                : root.tallDetailMode
-                ? Math.floor(Math.min(620, Math.max(500, parent.width * 0.38)))
+                : root.expandedMode === "radar"
+                ? Math.floor(Math.min(560, Math.max(480, parent.width * 0.34)))
                 : root.expandedMode === "music"
                 ? Math.floor(Math.min(500, Math.max(430, parent.width * 0.30)))
                 : Math.floor(Math.min(452, Math.max(332, parent.width * 0.35)))
             height: root.expandedMode === "temp"
-                ? 430
-                : root.tallDetailMode
-                ? Math.floor(Math.min(parent.height - 44, Math.max(560, parent.height * 0.92)))
+                ? (root.radarEnabled ? 500 : 430)
+                : root.expandedMode === "radar"
+                ? Math.floor(Math.min(520, Math.max(420, parent.height * 0.62)))
                 : root.expandedMode === "music"
                 ? 410
                 : Math.floor(Math.min(360, Math.max(272, parent.height * 0.46)))
@@ -1478,7 +1527,7 @@ Item {
                     : "#050812"
                 borderColor: root.expandedMode === "temp"
                     ? "#FF7AD9"
-                    : root.tallDetailMode
+                    : root.expandedMode === "radar"
                     ? "#58FFE1"
                     : (root.expandedMode === "music" ? "#58FFE1" : "#5C4B90")
                 borderWidth: 1
@@ -1921,9 +1970,9 @@ Item {
                                 width: parent.width
                                 height: 76
                                 spacing: 12
+                                // Hide play/pause/next when SpotifyWeb/controls unsupported.
                                 visible: !root.spotifyPairingVisible()
-                                    && nowPlayingService
-                                    && nowPlayingService.controlsSupported
+                                    && root.mediaControlEnabled()
 
                                 Repeater {
                                     model: [
@@ -2339,6 +2388,68 @@ Item {
                             horizontalAlignment: Text.AlignHCenter
                         }
                     }
+
+                    Rectangle {
+                        width: parent.width
+                        height: 54
+                        visible: root.radarEnabled
+                        radius: 10
+                        color: radarOpenMouse.pressed ? "#123C44" : "#050812"
+                        border.width: 1
+                        border.color: root.radarStatus === "LIVE" ? "#58FFE1" : "#305E72"
+
+                        Row {
+                            anchors.fill: parent
+                            anchors.leftMargin: 14
+                            anchors.rightMargin: 14
+                            spacing: 12
+
+                            WidgetLocal.RadarGlyph {
+                                width: 34
+                                height: 34
+                                anchors.verticalCenter: parent.verticalCenter
+                                active: root.radarStatus === "LIVE"
+                                primaryColor: "#F7FBFF"
+                                accentColor: root.radarStatus === "LIVE" ? "#58FFE1" : "#FFD36B"
+                            }
+
+                            Column {
+                                width: parent.width - 46
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 2
+
+                                Text {
+                                    width: parent.width
+                                    text: "RADAR"
+                                    color: "#F7FBFF"
+                                    font.family: root.monoFont
+                                    font.pixelSize: 13
+                                    font.weight: Font.Bold
+                                    font.letterSpacing: 0
+                                    elide: Text.ElideRight
+                                }
+
+                                Text {
+                                    width: parent.width
+                                    text: root.radarStatus === "LIVE"
+                                        ? root.radarSourceLabel()
+                                        : (root.radarStatus.length > 0 ? root.radarStatus : "NO RADAR")
+                                    color: root.radarStatus === "LIVE" ? "#58FFE1" : "#FFD36B"
+                                    font.family: root.monoFont
+                                    font.pixelSize: 11
+                                    font.weight: Font.Bold
+                                    font.letterSpacing: 0
+                                    elide: Text.ElideRight
+                                }
+                            }
+                        }
+
+                        MouseArea {
+                            id: radarOpenMouse
+                            anchors.fill: parent
+                            onClicked: root.expandedMode = "radar"
+                        }
+                    }
                 }
             }
 
@@ -2371,7 +2482,9 @@ Item {
                         Text {
                             width: parent.width * 0.42 - 10
                             anchors.verticalCenter: parent.verticalCenter
-                            text: root.radarStatus === "LIVE" ? root.radarFrameDisplayLabel() : root.radarStatus
+                            text: root.radarStatus === "LIVE"
+                                ? root.radarFrameDisplayLabel()
+                                : (root.radarStatus.length > 0 ? root.radarStatus : "NO RADAR")
                             color: root.radarStatus === "LIVE" ? "#9DB4FF" : "#FFD36B"
                             font.family: root.monoFont
                             font.pixelSize: 11
@@ -2384,7 +2497,7 @@ Item {
 
                     Item {
                         width: parent.width
-                        height: Math.max(360, parent.height - 122)
+                        height: Math.max(240, parent.height - 122)
                         clip: true
 
                         NativePanel {
@@ -2452,7 +2565,9 @@ Item {
                                 Text {
                                     width: Math.min(320, detailRadarDisplay.width * 0.70)
                                     anchors.horizontalCenter: parent.horizontalCenter
-                                    text: root.radarStatus === "LIVE" ? "RADAR LOADING" : root.radarStatus
+                                    text: root.radarStatus === "LIVE"
+                                        ? "RADAR LOADING"
+                                        : (root.radarStatus.length > 0 ? root.radarStatus : "NO RADAR")
                                     color: root.radarStatus === "LIVE" ? "#58FFE1" : "#FFD36B"
                                     font.family: root.monoFont
                                     font.pixelSize: 13
