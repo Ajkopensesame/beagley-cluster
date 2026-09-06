@@ -77,9 +77,12 @@ Window {
     readonly property string gaugeEffectLevel: effectLevel
     readonly property bool gaugeLowEffectMode: gaugeEffectLevel === "low" || gaugeEffectLevel === "off"
     readonly property bool gaugeEffectsOff: gaugeEffectLevel === "off"
-    readonly property bool gaugeMatrixRainEnabled: gaugeEffectLevel === "high" && !clusterSimulation
-    // Slice 6: lava primary night accent; matrix only as subtle in-face rain at high
-    readonly property bool gaugeLavaAccentEnabled: gaugeMatrixRainEnabled
+    // FPS-first: matrix never on appliance/embedded; desktop/high may still show rain
+    readonly property bool gaugeMatrixRainEnabled: gaugeEffectLevel === "high"
+        && !clusterSimulation
+        && renderProfile !== "embedded"
+    // Lava is independent of matrix — embedded high uses lava-lite, never rain
+    readonly property bool gaugeLavaAccentEnabled: gaugeEffectLevel === "high" && !clusterSimulation
     readonly property string gaugeAccentDetailMode: gaugeLavaAccentEnabled ? "rich" : gaugeDetail
     readonly property int gaugeIndicatorCascadeCycleMs: gaugeLowEffectMode ? 2300 : 2100
     readonly property string mapRenderer: (typeof BEAGLEY_MAP_RENDERER !== "undefined" && BEAGLEY_MAP_RENDERER)
@@ -142,8 +145,8 @@ Window {
     readonly property bool embeddedEffectBudgetMode: renderProfile === "embedded" && lowEffectMode
     readonly property bool embeddedHighEffectBudgetMode: renderProfile === "embedded" && effectLevel === "high"
     readonly property bool embeddedDirectMapCamera: renderProfile === "embedded"
-    readonly property bool embeddedGaugeMatrixRainMode: renderProfile === "embedded"
-    // Slice 6: always share phase across dual faces (cheaper + coherent); NaN only when rain off
+    readonly property bool embeddedGaugeMatrixRainMode: false  // hard-off: never matrix on embedded
+    // Shared phase for demo/motion; matrix consumers get NaN when rain gated off
     readonly property real gaugeMatrixRainSharedPhase: gaugeMatrixRainEnabled ? sharedEffectPhase : NaN
     readonly property bool sharedEffectClockEnabled: !effectsOff && !embeddedEffectBudgetMode
     readonly property bool stressMapMotionEnabled: stressScene && !lowEffectMode && renderProfile !== "embedded"
@@ -1534,7 +1537,7 @@ Window {
 
     Timer {
         id: gaugeMotionClock
-        // Slice 6: drop 16ms clock on embedded when lava/rain also run
+        // Prefer needle snappiness: 33ms on embedded; lava ticks slower and never steals this clock
         interval: (root.renderProfile === "embedded" || root.embeddedHighEffectBudgetMode) ? 33 : 16
         running: true
         repeat: true
@@ -2146,8 +2149,7 @@ Window {
                 backgroundOpacity: root.gaugeFaceBackgroundOpacity
             }
 
-            // Slice 6: matrix ABOVE opaque native face (was z118 under z120 — invisible),
-            // still BELOW lava (125) and numerals (130). In-face only, circular mask.
+            // Desktop/high showy only — gated off entirely when renderProfile=embedded
             W.MatrixRain {
                 anchors.fill: speedGauge
                 z: root.mapLibreSafeCompositor ? 122 : 22
@@ -2479,7 +2481,7 @@ Window {
                 backgroundOpacity: root.gaugeFaceBackgroundOpacity
             }
 
-            // Same stack as speed: over opaque native face, under lava + numerals
+            // Desktop/high showy only — gated off entirely when renderProfile=embedded
             W.MatrixRain {
                 anchors.fill: tachGauge
                 z: root.mapLibreSafeCompositor ? 122 : 22

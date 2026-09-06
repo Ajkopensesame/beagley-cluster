@@ -78,7 +78,7 @@ the deployed binary.
 
 ## Product-night lava / matrix
 
-Product-night dial lava and subtle in-face matrix rain only run when the process has:
+Product-night dial **lava-lite** on the appliance requires:
 
 ```text
 BEAGLEY_EFFECT_LEVEL=high
@@ -89,8 +89,11 @@ Confirm on device with `tools/ui/beagley_display_status.sh`. Lab appliance
 `/etc/default/beagley-cluster.local` should keep `high` for night review (backup
 `.local.bak-slice6-20260906` captured the pre-change profile).
 
-Matrix rain is drawn **above** the opaque `NativeGaugeInstrument` face and
-**below** lava + numerals (z 122 vs face 120 / lava 125). Earlier z 118 under an
-opaque face made rain invisible on-glass. For review without hub values, set
-`BEAGLEY_GAUGE_DEMO=1` (turn off with `=0` + restart).
+**FPS-first appliance rule:** `renderProfile=embedded` never enables in-face
+matrix rain (`gaugeMatrixRainEnabled` is hard-off). Matrix code remains for
+desktop/high showy only. Embedded high runs one lava band/gauge at ~10Hz with
+a simpler/brighter gradient — pearl breathe stays off while lava is on.
+
+For review without hub values, set `BEAGLEY_GAUGE_DEMO=1` (turn off with `=0`
+in `/etc/default/beagley-cluster.local` then `systemctl restart beagley_cluster`).
 

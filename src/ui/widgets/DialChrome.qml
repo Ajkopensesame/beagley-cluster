@@ -44,8 +44,10 @@ Item {
     readonly property bool staticArcMode: !lavaAnimationEnabled
     readonly property real lowEffectArcScale: 0.36
     readonly property real lowEffectArcTune: lowEffectArcScale / 0.42
+    // Embedded lava-lite: near-full canvas so arcs stay readable at arm's length;
+    // cost cut comes from slower paint + one band, not half-res blur.
     readonly property real dynamicArcCanvasScale: embeddedHighEffectBudgetMode
-        ? 0.50
+        ? 0.88
         : ((root.lowEffectMode && !root.embeddedSafeMode) ? root.lowEffectArcScale : 1.0)
     readonly property real dynamicArcTune: dynamicArcCanvasScale < 1.0 ? dynamicArcCanvasScale : 1.0
     readonly property real progressRepaintThreshold: embeddedSafeMode
@@ -157,7 +159,8 @@ Item {
     }
 
     Timer {
-        interval: root.lowEffectMode ? 120 : (root.embeddedHighEffectBudgetMode ? 260 : 33)
+        // Embedded lava-lite ~10Hz; desktop high ~30Hz. Needle lag stays on MainV3 33ms clock.
+        interval: root.lowEffectMode ? 120 : (root.embeddedHighEffectBudgetMode ? 100 : 33)
         running: root.effectLevel !== "off" && root.lavaAnimationEnabled
         repeat: true
         onTriggered: {
@@ -487,6 +490,7 @@ Item {
             function drawLavaBand(fromRad, toRad, tailWidth, headWidth, color, brightColor, segments, capScale, blobCount) {
                 const sweep = toRad - fromRad;
                 if (sweep <= 0.0001) return;
+                const lite = root.embeddedHighEffectBudgetMode;
 
                 ctx.save();
                 if (!buildTaperedPath(fromRad, toRad, tailWidth, headWidth, segments, capScale)) {
@@ -496,30 +500,40 @@ Item {
                 ctx.clip();
 
                 const fill = ctx.createLinearGradient(cx - r, cy + r, cx + r, cy - r);
-                fill.addColorStop(0.00, rgba(neonCyan, root.lowEffectMode ? 0.54 : 0.46));
-                fill.addColorStop(0.24, rgba(neonPink, root.lowEffectMode ? 0.72 : 0.62));
-                fill.addColorStop(0.54, rgba(neonLime, root.lowEffectMode ? 0.88 : 0.76));
-                fill.addColorStop(0.78, rgba(brightColor, root.lowEffectMode ? 0.76 : 0.64));
-                fill.addColorStop(1.00, rgba(neonOrange, root.lowEffectMode ? 0.62 : 0.52));
+                if (lite) {
+                    // One simple family: cyan → pink → hot white. Fewer stops, higher alpha.
+                    fill.addColorStop(0.00, rgba(neonCyan, 0.78));
+                    fill.addColorStop(0.55, rgba(neonPink, 0.92));
+                    fill.addColorStop(1.00, rgba(brightColor, 0.88));
+                } else {
+                    fill.addColorStop(0.00, rgba(neonCyan, root.lowEffectMode ? 0.54 : 0.46));
+                    fill.addColorStop(0.24, rgba(neonPink, root.lowEffectMode ? 0.72 : 0.62));
+                    fill.addColorStop(0.54, rgba(neonLime, root.lowEffectMode ? 0.88 : 0.76));
+                    fill.addColorStop(0.78, rgba(brightColor, root.lowEffectMode ? 0.76 : 0.64));
+                    fill.addColorStop(1.00, rgba(neonOrange, root.lowEffectMode ? 0.62 : 0.52));
+                }
                 ctx.fillStyle = fill;
                 ctx.fillRect(0, 0, width, height);
 
-                for (let i = 0; i < blobCount; i++) {
-                    const blobColor = [neonCyan, neonPink, neonLime, neonOrange, neonYellow][i % 5];
+                const blobs = lite ? Math.min(1, blobCount) : blobCount;
+                for (let i = 0; i < blobs; i++) {
+                    const blobColor = lite
+                        ? neonPink
+                        : [neonCyan, neonPink, neonLime, neonOrange, neonYellow][i % 5];
                     const u = (phase * (0.11 + i * 0.015) + i * 0.23) % 1.0;
                     const angle = fromRad + sweep * u;
                     const wobble = Math.sin(phase * (1.1 + i * 0.2) + i * 1.7);
                     const blobRadius = root.lowEffectMode
                         ? (5.0 + i * 1.0)
-                        : ((root.embeddedHighEffectBudgetMode ? 7.0 : 9.0)
-                            + i * (root.embeddedHighEffectBudgetMode ? 1.0 : 1.35)) * root.dynamicArcTune;
+                        : ((lite ? 11.0 : 9.0)
+                            + i * (lite ? 0.0 : 1.35)) * root.dynamicArcTune;
                     drawBlob(
                         angle,
-                        wobble * (root.lowEffectMode ? 1.1 : 2.1),
+                        wobble * (root.lowEffectMode ? 1.1 : (lite ? 1.4 : 2.1)),
                         blobRadius,
                         blobColor,
-                        root.lowEffectMode ? 0.64 : 0.54,
-                        1.55,
+                        root.lowEffectMode ? 0.64 : (lite ? 0.82 : 0.54),
+                        lite ? 1.35 : 1.55,
                         phase + i
                     );
                 }
@@ -527,15 +541,17 @@ Item {
 
                 ctx.save();
                 buildTaperedPath(fromRad, toRad, tailWidth, headWidth, segments, capScale);
-                ctx.fillStyle = rgba(neonYellow, root.lowEffectMode ? 0.28 : 0.18);
+                ctx.fillStyle = rgba(neonYellow, root.lowEffectMode ? 0.28 : (lite ? 0.34 : 0.18));
                 ctx.fill();
                 ctx.restore();
             }
 
             ctx.beginPath();
-            ctx.strokeStyle = rgba(base, 0.06);
+            ctx.strokeStyle = rgba(base, root.embeddedHighEffectBudgetMode ? 0.14 : 0.06);
             ctx.lineCap = "round";
-            ctx.lineWidth = root.lowEffectMode ? (16 * root.lowEffectArcTune) : (30 * root.dynamicArcTune);
+            ctx.lineWidth = root.lowEffectMode
+                ? (16 * root.lowEffectArcTune)
+                : ((root.embeddedHighEffectBudgetMode ? 22 : 30) * root.dynamicArcTune);
             ctx.arc(cx, cy, r, startRad, fullEndRad);
             ctx.stroke();
 
@@ -550,34 +566,35 @@ Item {
                                     4.6 * root.lowEffectArcTune,
                                     bright, 0.26, 16, 0.22);
                 } else {
+                    // One animated family per gauge. Embedded: thicker + brighter for glance.
                     drawLavaBand(startRad, endRad,
-                                 5.5 * root.dynamicArcTune,
-                                 22 * root.dynamicArcTune,
+                                 (root.embeddedHighEffectBudgetMode ? 9.0 : 5.5) * root.dynamicArcTune,
+                                 (root.embeddedHighEffectBudgetMode ? 28.0 : 22.0) * root.dynamicArcTune,
                                  base, bright,
-                                 root.embeddedHighEffectBudgetMode ? 36 : 128,
+                                 root.embeddedHighEffectBudgetMode ? 28 : 128,
                                  0.50,
-                                 root.embeddedHighEffectBudgetMode ? 2 : 4);
+                                 root.embeddedHighEffectBudgetMode ? 1 : 4);
                 }
             } else if (!root.lowEffectMode) {
-                // Slice 6 follow-up: slow ambient lava crawl at idle (0 speed/rpm)
-                // so night skin stays alive without needle motion / breathe stack.
-                const ambSweep = sweepRad * (root.embeddedHighEffectBudgetMode ? 0.14 : 0.16);
+                // Idle ambient crawl on same cheap path (visible at 0 progress).
+                const ambSweep = sweepRad * (root.embeddedHighEffectBudgetMode ? 0.22 : 0.16);
                 const ambTravel = Math.max(0.0, sweepRad - ambSweep);
                 const ambU = (phase * 0.065) % 1.0;
                 const ambFrom = startRad + ambTravel * ambU;
                 const ambTo = ambFrom + ambSweep;
                 drawLavaBand(ambFrom, ambTo,
-                             3.2 * root.dynamicArcTune,
-                             11.0 * root.dynamicArcTune,
+                             (root.embeddedHighEffectBudgetMode ? 6.5 : 3.2) * root.dynamicArcTune,
+                             (root.embeddedHighEffectBudgetMode ? 18.0 : 11.0) * root.dynamicArcTune,
                              base, bright,
-                             root.embeddedHighEffectBudgetMode ? 24 : 64,
+                             root.embeddedHighEffectBudgetMode ? 20 : 64,
                              0.42,
-                             root.embeddedHighEffectBudgetMode ? 1 : 2);
+                             1);
                 // Soft track shimmer so the ring never looks fully dead
                 ctx.beginPath();
-                ctx.strokeStyle = rgba(bright, 0.10 + 0.06 * (0.5 + 0.5 * Math.sin(phase * 0.9)));
+                ctx.strokeStyle = rgba(bright, (root.embeddedHighEffectBudgetMode ? 0.18 : 0.10)
+                    + 0.08 * (0.5 + 0.5 * Math.sin(phase * 0.9)));
                 ctx.lineCap = "round";
-                ctx.lineWidth = (root.embeddedHighEffectBudgetMode ? 3.2 : 4.0) * root.dynamicArcTune;
+                ctx.lineWidth = (root.embeddedHighEffectBudgetMode ? 5.5 : 4.0) * root.dynamicArcTune;
                 ctx.arc(cx, cy, r, startRad, fullEndRad);
                 ctx.stroke();
             }
