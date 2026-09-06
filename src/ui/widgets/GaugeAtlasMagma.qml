@@ -97,7 +97,7 @@ Item {
         property real sweepAngleDeg: root.sweepAngleDeg
         property real radiusFactor: root.radiusFactor
         // Half-band in UV units (radius is diameter*factor / side = factor when square)
-        property real bandHalf: (root.strokePx * 0.58) / Math.max(1.0, root.side)
+        property real bandHalf: (root.strokePx * 0.62) / Math.max(1.0, root.side)
         property real soft: root.richMode ? 0.0045 : 0.0035
 
         fragmentShader: "
@@ -125,9 +125,12 @@ Item {
                 highp float inSweep = step(0.0, u) * step(u, max(progress, 0.0));
                 highp float band = 1.0 - smoothstep(bandHalf, bandHalf + soft, abs(r - radiusFactor));
                 lowp vec4 tex = texture2D(source, qt_TexCoord0);
-                // Lift concept magma midtones (baked atlas tends dark under eglfs)
+                // Push toward concept molten family: hot orange-red, low blue
                 highp vec3 rgb = tex.rgb;
-                rgb = mix(rgb, rgb * vec3(1.35, 1.18, 0.85) + vec3(0.08, 0.03, 0.0), 0.55);
+                rgb = rgb * vec3(1.28, 0.92, 0.55) + vec3(0.10, 0.02, 0.0);
+                // Hot tip bias where atlas already bright
+                highp float hot = smoothstep(0.45, 0.85, rgb.r);
+                rgb = mix(rgb, vec3(1.0, 0.78, 0.28), hot * 0.35);
                 rgb = clamp(rgb, 0.0, 1.0);
                 lowp float a = tex.a * band * inSweep;
                 gl_FragColor = vec4(rgb * a, a) * qt_Opacity;
