@@ -507,17 +507,18 @@ Item {
 
                 const fill = ctx.createLinearGradient(cx - r, cy + r, cx + r, cy - r);
                 if (lite) {
-                    // Drive lava-lite: amber → orange → magenta → hot tip (concept molten)
-                    fill.addColorStop(0.00, rgba(lavaMagenta, 0.82));
-                    fill.addColorStop(0.42, rgba(lavaOrange, 0.94));
-                    fill.addColorStop(0.78, rgba(lavaAmber, 0.96));
-                    fill.addColorStop(1.00, rgba(lavaHot, 0.92));
+                    // Drive lava-lite: orange-dominant molten, magenta only at tail (concept)
+                    fill.addColorStop(0.00, rgba(lavaMagenta, 0.55));
+                    fill.addColorStop(0.22, rgba(lavaOrange, 0.92));
+                    fill.addColorStop(0.55, rgba(lavaAmber, 0.98));
+                    fill.addColorStop(0.82, rgba(lavaHot, 0.96));
+                    fill.addColorStop(1.00, rgba(lavaHot, 0.88));
                 } else {
-                    fill.addColorStop(0.00, rgba(lavaMagenta, root.lowEffectMode ? 0.70 : 0.78));
-                    fill.addColorStop(0.28, rgba(lavaOrange, root.lowEffectMode ? 0.84 : 0.90));
-                    fill.addColorStop(0.58, rgba(lavaAmber, root.lowEffectMode ? 0.90 : 0.94));
-                    fill.addColorStop(0.82, rgba(lavaHot, root.lowEffectMode ? 0.86 : 0.92));
-                    fill.addColorStop(1.00, rgba(brightColor, root.lowEffectMode ? 0.72 : 0.80));
+                    fill.addColorStop(0.00, rgba(lavaMagenta, root.lowEffectMode ? 0.55 : 0.62));
+                    fill.addColorStop(0.20, rgba(lavaOrange, root.lowEffectMode ? 0.88 : 0.92));
+                    fill.addColorStop(0.48, rgba(lavaAmber, root.lowEffectMode ? 0.94 : 0.97));
+                    fill.addColorStop(0.78, rgba(lavaHot, root.lowEffectMode ? 0.90 : 0.95));
+                    fill.addColorStop(1.00, rgba(brightColor, root.lowEffectMode ? 0.78 : 0.85));
                 }
                 ctx.fillStyle = fill;
                 ctx.fillRect(0, 0, width, height);
@@ -525,8 +526,8 @@ Item {
                 const blobs = lite ? Math.min(1, blobCount) : blobCount;
                 for (let i = 0; i < blobs; i++) {
                     const blobColor = lite
-                        ? lavaAmber
-                        : [lavaMagenta, lavaOrange, lavaAmber, lavaHot, lavaOrange][i % 5];
+                        ? lavaHot
+                        : [lavaOrange, lavaAmber, lavaHot, lavaOrange, lavaMagenta][i % 5];
                     const u = (phase * (0.11 + i * 0.015) + i * 0.23) % 1.0;
                     const angle = fromRad + sweep * u;
                     const wobble = Math.sin(phase * (1.1 + i * 0.2) + i * 1.7);
@@ -555,7 +556,7 @@ Item {
 
             // Faint pink remainder ring (concept) under molten progress
             ctx.beginPath();
-            ctx.strokeStyle = rgba(lavaRemainder, root.embeddedHighEffectBudgetMode ? 0.22 : 0.16);
+            ctx.strokeStyle = rgba(lavaRemainder, root.embeddedHighEffectBudgetMode ? 0.12 : 0.10);
             ctx.lineCap = "round";
             ctx.lineWidth = root.lowEffectMode
                 ? (16 * root.lowEffectArcTune)
@@ -563,7 +564,7 @@ Item {
             ctx.arc(cx, cy, r, startRad, fullEndRad);
             ctx.stroke();
             ctx.beginPath();
-            ctx.strokeStyle = rgba(lavaMagenta, root.embeddedHighEffectBudgetMode ? 0.10 : 0.08);
+            ctx.strokeStyle = rgba(lavaMagenta, root.embeddedHighEffectBudgetMode ? 0.06 : 0.05);
             ctx.lineWidth = root.lowEffectMode
                 ? (6 * root.lowEffectArcTune)
                 : ((root.embeddedHighEffectBudgetMode ? 8 : 10) * root.dynamicArcTune);

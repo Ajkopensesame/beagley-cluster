@@ -64,8 +64,8 @@ QtObject {
         }
 
         // Skin v2: luminous purple-white speed reading; danger only at overspeed
-        const luminous = mix(pearlLow, Qt.rgba(1, 1, 1, 1), 0.42);
-        const base = mix(luminous, pearlHigh, t1 * 0.55);
+        const luminous = mix(pearlLow, Qt.rgba(1, 1, 1, 1), 0.62);
+        const base = mix(luminous, pearlHigh, t1 * 0.28);
         return mix(base, danger, t2);
     }
 
