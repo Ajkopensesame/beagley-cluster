@@ -106,16 +106,16 @@ Item {
 
             // Specular highlight arc (top-left glass catch) — concept white rim punch
             ctx.beginPath()
-            ctx.strokeStyle = "rgba(255,255,255,0.86)"
-            ctx.lineWidth = Math.max(3.0, side * 0.0065)
+            ctx.strokeStyle = "rgba(255,255,255,0.96)"
+            ctx.lineWidth = Math.max(3.6, side * 0.0080)
             ctx.lineCap = "round"
             ctx.arc(cx, cy, rimRadius - side * 0.008, Math.PI * 0.84, Math.PI * 1.54)
             ctx.stroke()
 
             // Soft white secondary specular (shorter)
             ctx.beginPath()
-            ctx.strokeStyle = "rgba(255,255,255,0.35)"
-            ctx.lineWidth = Math.max(1.8, side * 0.0035)
+            ctx.strokeStyle = "rgba(255,255,255,0.55)"
+            ctx.lineWidth = Math.max(2.2, side * 0.0045)
             ctx.lineCap = "round"
             ctx.arc(cx, cy, rimRadius - side * 0.016, Math.PI * 0.92, Math.PI * 1.22)
             ctx.stroke()

@@ -12,7 +12,7 @@ Item {
     property real progress: 0.0
     property real lavaPhase: 0.0
     property bool scaredHead: false
-    property bool showArcHead: true
+    property bool showArcHead: false
     // Slice 6: lava/matrix accent over NativeGaugeInstrument — no ticks/labels/track
     property bool accentOverlayMode: false
     property real maxValue: 100
@@ -352,7 +352,7 @@ Item {
         startAngleDeg: root.startAngleDeg
         sweepAngleDeg: root.sweepAngleDeg
         radiusFactor: root.arcRadiusFactor
-        strokeWidthFactor: 0.053
+        strokeWidthFactor: 0.078
         richMode: root.richAtlasMode
         lavaPhase: root.lavaPhase
     }
@@ -974,7 +974,7 @@ Item {
     GaugeArcHead {
         id: arcHead
         z: 24
-        visible: (root.lavaAnimationEnabled || root.accentOverlayMode) && root.showArcHead && root.headVisible
+        visible: !root.atlasMagmaMode && (root.lavaAnimationEnabled || root.accentOverlayMode) && root.showArcHead && root.headVisible
         lowEffectMode: root.lowEffectMode
         scared: root.scaredHead
         headRadius: root.sgMagmaMode ? (root.headScreenRadius * 1.15) : root.headScreenRadius

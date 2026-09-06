@@ -2336,7 +2336,7 @@ Window {
                 gaugeColor: appTheme.lavaOrange
                 chromeColor: appTheme.lavaTrack
                 progress: Math.max(0, Math.min(1, root.liveGaugeSpeed / 140))
-                showArcHead: true
+                showArcHead: false
                 maxValue: 140
                 startAngleDeg: 225
                 sweepAngleDeg: 210
@@ -2345,6 +2345,13 @@ Window {
                 labelStep: 20
                 labelStart: 20
                 labelDivisor: 1
+            }
+
+            W.MagmaAtlasOverlay {
+                anchors.fill: speedGauge
+                z: root.mapLibreSafeCompositor ? 126 : 26
+                visible: root.gaugeLavaAccentEnabled
+                progress: Math.max(0, Math.min(1, root.liveGaugeSpeed / 140))
             }
 
             Item {
@@ -2492,7 +2499,7 @@ Window {
                         anchors.left: parent.left
                         anchors.right: parent.right
                         anchors.bottom: parent.bottom
-                        height: parent.height * 0.42
+                        height: parent.height * 0.48
                         clip: true
                         Text {
                             anchors.horizontalCenter: parent.horizontalCenter
@@ -2501,7 +2508,7 @@ Window {
                             height: speedValueText.height
                             text: speedValueText.text
                             color: appTheme.pearlHigh
-                            opacity: 0.55
+                            opacity: 0.82
                             font: speedValueText.font
                             renderType: speedValueText.renderType
                             horizontalAlignment: Text.AlignHCenter
@@ -2511,7 +2518,7 @@ Window {
                         anchors.left: parent.left
                         anchors.right: parent.right
                         anchors.top: parent.top
-                        height: parent.height * 0.58
+                        height: parent.height * 0.62
                         clip: true
                         Text {
                             anchors.horizontalCenter: parent.horizontalCenter
@@ -2520,7 +2527,7 @@ Window {
                             height: speedValueText.height
                             text: speedValueText.text
                             color: "#FFFFFFFF"
-                            opacity: 0.78
+                            opacity: 0.94
                             font: speedValueText.font
                             renderType: speedValueText.renderType
                             horizontalAlignment: Text.AlignHCenter
@@ -2764,7 +2771,7 @@ Window {
                 gaugeColor: appTheme.lavaOrange
                 chromeColor: appTheme.lavaTrack
                 progress: Math.max(0, Math.min(1, root.liveGaugeRpm / 8000))
-                showArcHead: true
+                showArcHead: false
                 maxValue: 8000
                 startAngleDeg: 225
                 sweepAngleDeg: 210
@@ -2773,6 +2780,13 @@ Window {
                 labelStep: 1000
                 labelStart: 1000
                 labelDivisor: 1000
+            }
+
+            W.MagmaAtlasOverlay {
+                anchors.fill: speedGauge
+                z: root.mapLibreSafeCompositor ? 126 : 26
+                visible: root.gaugeLavaAccentEnabled
+                progress: Math.max(0, Math.min(1, root.liveGaugeSpeed / 140))
             }
 
             Item {
@@ -2864,7 +2878,7 @@ Window {
                         anchors.left: parent.left
                         anchors.right: parent.right
                         anchors.bottom: parent.bottom
-                        height: parent.height * 0.42
+                        height: parent.height * 0.48
                         clip: true
                         Text {
                             anchors.horizontalCenter: parent.horizontalCenter
@@ -2873,7 +2887,7 @@ Window {
                             height: rpmValueText.height
                             text: rpmValueText.text
                             color: appTheme.pearlHigh
-                            opacity: 0.52
+                            opacity: 0.80
                             font: rpmValueText.font
                             renderType: rpmValueText.renderType
                             horizontalAlignment: Text.AlignHCenter
@@ -2883,7 +2897,7 @@ Window {
                         anchors.left: parent.left
                         anchors.right: parent.right
                         anchors.top: parent.top
-                        height: parent.height * 0.58
+                        height: parent.height * 0.62
                         clip: true
                         Text {
                             anchors.horizontalCenter: parent.horizontalCenter
@@ -2892,7 +2906,7 @@ Window {
                             height: rpmValueText.height
                             text: rpmValueText.text
                             color: "#FFFFFFFF"
-                            opacity: 0.74
+                            opacity: 0.92
                             font: rpmValueText.font
                             renderType: rpmValueText.renderType
                             horizontalAlignment: Text.AlignHCenter
