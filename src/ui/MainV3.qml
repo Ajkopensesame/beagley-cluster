@@ -1749,9 +1749,10 @@ Window {
                 anchors.bottom: parent.bottom
                 height: 132
                 gradient: Gradient {
+                    // Slice 4: lighter foot fade — keep dial hierarchy without voiding the map
                     GradientStop { position: 0.0; color: "#00000000" }
-                    GradientStop { position: 0.45; color: "#02060B55" }
-                    GradientStop { position: 1.0; color: "#01050AF0" }
+                    GradientStop { position: 0.55; color: root.mapNavProductActive ? "#02060B22" : "#02060B33" }
+                    GradientStop { position: 1.0; color: root.mapNavProductActive ? "#01050A88" : "#01050AB8" }
                 }
             }
         }
