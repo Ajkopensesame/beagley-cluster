@@ -25,6 +25,8 @@ Pixel-close visual match to this still beats incremental Pearl polish.
 
 Score captures against the concept PNG with the profile named in the filename.
 
+Latest appliance stills live in [`captures/`](./captures/) (`skin-v2-drive-*.png` / `skin-v2-show-*.png`). `beagley_sync_qml.sh` uses rsync delete — re-create `SkinShowOverride.qml` after sync.
+
 ## Related env
 
 ```text
