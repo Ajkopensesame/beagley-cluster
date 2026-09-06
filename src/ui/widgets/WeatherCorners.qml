@@ -19,6 +19,7 @@ Item {
     property real phase: 0.0
     property var nowPlayingService: null
     property bool radarEnabled: false
+    property bool mapLibreNativeActive: false
     property string radarMapStyleUrl: ""
     property string radarTileUrlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
 
@@ -86,7 +87,8 @@ Item {
     readonly property int forecastRefreshIntervalMs: expandedMode === "temp"
         ? 30 * 60 * 1000
         : 2 * 60 * 60 * 1000
-    readonly property int radarRefreshIntervalMs: 60 * 1000
+    // Slice 6: throttle radar refresh when MapLibre native is the center stage
+    readonly property int radarRefreshIntervalMs: mapLibreNativeActive ? 180 * 1000 : 60 * 1000
 
     property real airTempC: NaN
     property real feelsLikeC: NaN
@@ -1197,13 +1199,13 @@ Item {
         }
     }
 
-    // Slice 3 option A: radar is secondary under weather (TL), never steals TR from media.
+    // Slice 6: upper corners are TEMP + RADAR; Spotify stays in ticker/media strip.
     WidgetLocal.RadarCornerWidget {
         id: radarCorner
         width: root.podSize
         height: root.podSize
-        visible: false
-        enabled: false
+        visible: true
+        enabled: true
         anchors.right: parent.right
         anchors.top: parent.top
         anchors.rightMargin: root.cornerInset
@@ -1216,14 +1218,19 @@ Item {
         mapUrl: root.radarDisplayUrl
         status: root.radarStatus.length > 0 ? root.radarStatus : "NO RADAR"
         frameLabel: root.radarFrameDisplayLabel()
+        onClicked: {
+            if (root.radarEnabled)
+                root.expandedMode = root.expandedMode === "radar" ? "" : "radar"
+        }
     }
 
+    // Media corner kept in tree for sheet content helpers, but not TR-primary.
     WidgetLocal.MediaCornerWidget {
         id: mediaCorner
         width: root.podSize
         height: root.podSize
-        visible: true
-        enabled: true
+        visible: false
+        enabled: false
         anchors.right: parent.right
         anchors.top: parent.top
         anchors.rightMargin: root.cornerInset
@@ -1256,6 +1263,13 @@ Item {
         border.color: root.musicPlaying ? "#16464A" : "#253145"
 
         Behavior on opacity { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+
+        MouseArea {
+            id: tickerOpenMouse
+            anchors.fill: parent
+            z: 1
+            onClicked: root.expandedMode = root.expandedMode === "music" ? "" : "music"
+        }
 
         OemIcon {
             id: tickerIcon
@@ -1352,6 +1366,7 @@ Item {
 
         Rectangle {
             id: tickerSaveButton
+            z: 2
             width: 30
             height: 30
             radius: 15
@@ -1439,10 +1454,13 @@ Item {
         }
     }
 
+    // Slice 6: remove lower SETUP/MAP twin chrome — swipe-up opens settings; MAP chip in MainV3.
     WidgetLocal.MapMenuCornerWidget {
         id: menuCorner
         width: root.podSize
         height: root.podSize
+        visible: false
+        enabled: false
         anchors.left: parent.left
         anchors.bottom: parent.bottom
         anchors.leftMargin: root.cornerInset
@@ -1465,6 +1483,8 @@ Item {
         id: mapMenuCorner
         width: root.podSize
         height: root.podSize
+        visible: false
+        enabled: false
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         anchors.rightMargin: root.cornerInset

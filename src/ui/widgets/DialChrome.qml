@@ -13,6 +13,8 @@ Item {
     property real lavaPhase: 0.0
     property bool scaredHead: false
     property bool showArcHead: true
+    // Slice 6: lava/matrix accent over NativeGaugeInstrument — no ticks/labels/track
+    property bool accentOverlayMode: false
     property real maxValue: 100
     property real startAngleDeg: 225
     property real sweepAngleDeg: 210
@@ -34,8 +36,12 @@ Item {
     readonly property bool embeddedSafeMode: Qt.platform.os === "linux"
     readonly property bool embeddedHighEffectBudgetMode: embeddedSafeMode && effectLevel === "high"
     readonly property bool richDetailMode: detailMode === "rich"
-    readonly property bool staticArcMode: !richDetailMode
-    readonly property bool lavaAnimationEnabled: !staticArcMode && !embeddedSafeMode && !lowEffectMode
+    // Slice 6: lava is primary night accent. On Linux/BeagleY use embedded high-budget path
+    // instead of permanently disabling lava via embeddedSafeMode.
+    readonly property bool lavaAnimationEnabled: effectLevel === "high" && !lowEffectMode
+        && (richDetailMode || accentOverlayMode || embeddedHighEffectBudgetMode)
+        && (!embeddedSafeMode || embeddedHighEffectBudgetMode)
+    readonly property bool staticArcMode: !lavaAnimationEnabled
     readonly property real lowEffectArcScale: 0.36
     readonly property real lowEffectArcTune: lowEffectArcScale / 0.42
     readonly property real dynamicArcCanvasScale: embeddedHighEffectBudgetMode
@@ -103,6 +109,8 @@ Item {
         }
         root.paintedProgress = root.clampedProgress;
         root.lastPaintedProgress = root.clampedProgress;
+        if (root.lavaAnimationEnabled)
+            arcCanvas.requestPaint();
         if (typeof performanceMetrics !== "undefined" && performanceMetrics)
             performanceMetrics.recordCounter("gauge.nativeDialArc")
     }
@@ -162,6 +170,7 @@ Item {
         id: ticksCanvas
         anchors.fill: parent
         z: 10
+        visible: !root.accentOverlayMode
         renderTarget: root.embeddedSafeMode ? Canvas.Image : Canvas.FramebufferObject
 
         onPaint: {
@@ -204,6 +213,7 @@ Item {
         id: labelCanvas
         anchors.fill: parent
         z: 30
+        visible: !root.accentOverlayMode
         renderTarget: root.embeddedSafeMode ? Canvas.Image : Canvas.FramebufferObject
 
         onPaint: {
@@ -240,6 +250,7 @@ Item {
     GaugeArcItem {
         anchors.fill: parent
         z: 20
+        visible: !root.accentOverlayMode
         startAngleDeg: root.startAngleDeg
         sweepAngleDeg: root.sweepAngleDeg
         startProgress: 0.0
@@ -254,6 +265,7 @@ Item {
     GaugeArcItem {
         anchors.fill: parent
         z: 21
+        visible: !root.accentOverlayMode
         startAngleDeg: root.startAngleDeg
         sweepAngleDeg: root.sweepAngleDeg
         startProgress: 0.0
@@ -268,6 +280,7 @@ Item {
     GaugeArcItem {
         anchors.fill: parent
         z: 22
+        visible: !root.accentOverlayMode
         startAngleDeg: root.startAngleDeg
         sweepAngleDeg: root.sweepAngleDeg
         startProgress: 0.0
@@ -282,7 +295,7 @@ Item {
     GaugeArcItem {
         anchors.fill: parent
         z: 23
-        visible: root.paintedProgress > 0.002
+        visible: !root.accentOverlayMode && !root.lavaAnimationEnabled && root.paintedProgress > 0.002
         startAngleDeg: root.startAngleDeg
         sweepAngleDeg: root.sweepAngleDeg
         startProgress: 0.0
@@ -315,7 +328,7 @@ Item {
         width: parent.width * root.dynamicArcCanvasScale
         height: parent.height * root.dynamicArcCanvasScale
         z: 20
-        visible: false
+        visible: root.lavaAnimationEnabled
         scale: root.dynamicArcCanvasScale < 1.0 ? (1.0 / root.dynamicArcCanvasScale) : 1.0
         renderTarget: root.embeddedSafeMode ? Canvas.Image : Canvas.FramebufferObject
         antialiasing: !root.lowEffectMode && !root.embeddedSafeMode
@@ -557,7 +570,7 @@ Item {
     GaugeArcHead {
         id: arcHead
         z: 24
-        visible: false
+        visible: root.lavaAnimationEnabled && root.showArcHead && root.headVisible
         lowEffectMode: root.lowEffectMode
         scared: root.scaredHead
         headRadius: root.headScreenRadius

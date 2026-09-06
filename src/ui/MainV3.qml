@@ -78,6 +78,9 @@ Window {
     readonly property bool gaugeLowEffectMode: gaugeEffectLevel === "low" || gaugeEffectLevel === "off"
     readonly property bool gaugeEffectsOff: gaugeEffectLevel === "off"
     readonly property bool gaugeMatrixRainEnabled: gaugeEffectLevel === "high" && !clusterSimulation
+    // Slice 6: lava primary night accent; matrix only as subtle in-face rain at high
+    readonly property bool gaugeLavaAccentEnabled: gaugeMatrixRainEnabled
+    readonly property string gaugeAccentDetailMode: gaugeLavaAccentEnabled ? "rich" : gaugeDetail
     readonly property int gaugeIndicatorCascadeCycleMs: gaugeLowEffectMode ? 2300 : 2100
     readonly property string mapRenderer: (typeof BEAGLEY_MAP_RENDERER !== "undefined" && BEAGLEY_MAP_RENDERER)
         ? String(BEAGLEY_MAP_RENDERER)
@@ -140,9 +143,8 @@ Window {
     readonly property bool embeddedHighEffectBudgetMode: renderProfile === "embedded" && effectLevel === "high"
     readonly property bool embeddedDirectMapCamera: renderProfile === "embedded"
     readonly property bool embeddedGaugeMatrixRainMode: renderProfile === "embedded"
-    readonly property real gaugeMatrixRainSharedPhase: (gaugeMatrixRainEnabled && !embeddedGaugeMatrixRainMode)
-        ? sharedEffectPhase
-        : NaN
+    // Slice 6: always share phase across dual faces (cheaper + coherent); NaN only when rain off
+    readonly property real gaugeMatrixRainSharedPhase: gaugeMatrixRainEnabled ? sharedEffectPhase : NaN
     readonly property bool sharedEffectClockEnabled: !effectsOff && !embeddedEffectBudgetMode
     readonly property bool stressMapMotionEnabled: stressScene && !lowEffectMode && renderProfile !== "embedded"
     // Slice 5: tighten dual-gauge vs map band — slight edge bleed, open center window
@@ -256,7 +258,7 @@ Window {
     readonly property real liveGaugeRpm: smoothedRpmValue
     readonly property real liveGaugeCoolant: smoothedCoolantValue
     readonly property real liveGaugeFuel: smoothedFuelValue
-    readonly property bool gaugePearlBreatheActive: !gaugeEffectsOff
+    readonly property bool gaugePearlBreatheActive: !gaugeEffectsOff && !gaugeLavaAccentEnabled
         && !clusterSimulation
         && Math.abs(liveGaugeSpeed) < 1.5
         && Math.abs(liveGaugeRpm) < 80
@@ -1524,7 +1526,8 @@ Window {
 
     Timer {
         id: gaugeMotionClock
-        interval: 16
+        // Slice 6: drop 16ms clock on embedded when lava/rain also run
+        interval: (root.renderProfile === "embedded" || root.embeddedHighEffectBudgetMode) ? 33 : 16
         running: true
         repeat: true
         onTriggered: {
@@ -1862,6 +1865,7 @@ Window {
             phase: root.sharedEffectPhase
             nowPlayingService: root.nowPlayingService
             radarEnabled: root.radarFeatureEnabled
+            mapLibreNativeActive: root.mapLibreNativeActive
             radarMapStyleUrl: root.activeMapStyleUrl
             radarTileUrlTemplate: root.activeMapTileUrlTemplate
             expandedMode: root.weatherExpandedMode
@@ -1877,6 +1881,86 @@ Window {
                 root.openMapMenu(stage)
             }
         }
+
+        // Slice 6: bottom-edge swipe-up opens SETUP/settings (no lower twin chrome)
+        MouseArea {
+            id: setupSwipeEdge
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            height: 56
+            z: 270
+            enabled: !root.mapMenuOpen && !root.navControlsOpen
+            propagateComposedEvents: true
+            property real pressX: 0
+            property real pressY: 0
+            property real pressMs: 0
+            property bool tracking: false
+
+            onPressed: function(mouse) {
+                pressX = mouse.x
+                pressY = mouse.y
+                pressMs = Date.now()
+                tracking = true
+                mouse.accepted = true
+            }
+            onReleased: function(mouse) {
+                if (!tracking) {
+                    mouse.accepted = false
+                    return
+                }
+                tracking = false
+                const dx = mouse.x - pressX
+                const dy = mouse.y - pressY
+                const dt = Math.max(16, Date.now() - pressMs)
+                const vy = (-dy) / (dt / 1000.0) // upward positive px/s
+                // Vertical dominance vs map pan; require meaningful upward travel
+                const upward = dy < -36
+                const verticalDominant = Math.abs(dy) > Math.abs(dx) * 1.35
+                const fastEnough = vy > 420 || dy < -64
+                if (upward && verticalDominant && fastEnough) {
+                    root.openMapMenu("settings")
+                    mouse.accepted = true
+                    return
+                }
+                mouse.accepted = false
+            }
+            onCanceled: tracking = false
+        }
+
+        // Slice 6: light single MAP affordance (not twin settings chrome)
+        Rectangle {
+            id: mapDiscoverChip
+            z: 271
+            visible: !root.mapMenuOpen && !root.navControlsOpen
+            width: 74
+            height: 28
+            radius: 14
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 10
+            color: Qt.rgba(0.02, 0.03, 0.06, 0.55)
+            border.width: 1
+            border.color: Qt.rgba(0.35, 0.95, 0.88, 0.28)
+            opacity: 0.72
+
+            Text {
+                anchors.centerIn: parent
+                text: "MAP"
+                color: "#9EF6E8"
+                font.family: "Oxanium"
+                font.pixelSize: 11
+                font.weight: Font.DemiBold
+                font.letterSpacing: 1.2
+                renderType: root.menuTextRenderType
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                onClicked: root.openMapMenu("search")
+            }
+        }
+
 
         Item {
             id: leftSideMass
@@ -2035,6 +2119,56 @@ Window {
                 chromeColor: appTheme.pearlLow
                 lowEffectMode: root.gaugeLowEffectMode
                 backgroundOpacity: root.gaugeFaceBackgroundOpacity
+            }
+
+            // Slice 6: lava primary + subtle in-face matrix (high only, circular mask)
+            W.MatrixRain {
+                anchors.fill: speedGauge
+                z: root.mapLibreSafeCompositor ? 118 : 18
+                visible: root.gaugeMatrixRainEnabled
+                circularMask: true
+                maskRadius: Math.min(width, height) * 0.46
+                effectEnabled: visible && !root.mapMenuOpen
+                effectLevel: root.gaugeEffectLevel
+                sharedPhase: root.gaugeMatrixRainSharedPhase
+                rainColor: Qt.rgba(appTheme.pearlLow.r, appTheme.pearlLow.g, appTheme.pearlLow.b, 0.72)
+                glowColor: Qt.rgba(1, 1, 1, 0.55)
+                fps: root.embeddedHighEffectBudgetMode ? 2.0 : 8.0
+                speedMultiplier: root.embeddedHighEffectBudgetMode ? 0.14 : 0.16
+                density: root.embeddedHighEffectBudgetMode ? 0.16 : 0.20
+                glowSpeed: 0.55
+                glowFloor: 0.12
+                glowBlur: root.embeddedHighEffectBudgetMode ? 4.0 : 5.5
+                driftScale: 0.70
+                charChangeChance: root.embeddedHighEffectBudgetMode ? 0.008 : 0.014
+                fontPx: root.embeddedHighEffectBudgetMode ? 12 : 11
+                fadeAlpha: 0.04
+                tailLength: root.embeddedHighEffectBudgetMode ? 16 : 22
+                headAlpha: 0.55
+                tailMinAlpha: 0.04
+                opacity: 0.42
+            }
+
+            W.DialChrome {
+                anchors.fill: speedGauge
+                z: root.mapLibreSafeCompositor ? 125 : 25
+                visible: root.gaugeLavaAccentEnabled
+                theme: appTheme
+                effectLevel: root.gaugeEffectLevel
+                detailMode: root.gaugeAccentDetailMode
+                accentOverlayMode: true
+                gaugeColor: appTheme.speedColor(root.liveGaugeSpeed)
+                chromeColor: appTheme.pearlLow
+                progress: Math.max(0, Math.min(1, root.liveGaugeSpeed / 140))
+                showArcHead: true
+                maxValue: 140
+                startAngleDeg: 225
+                sweepAngleDeg: 210
+                minorStep: 10
+                majorStep: 20
+                labelStep: 20
+                labelStart: 20
+                labelDivisor: 1
             }
 
             Item {
@@ -2317,6 +2451,55 @@ Window {
                 chromeColor: appTheme.pearlLow
                 lowEffectMode: root.gaugeLowEffectMode
                 backgroundOpacity: root.gaugeFaceBackgroundOpacity
+            }
+
+            W.MatrixRain {
+                anchors.fill: tachGauge
+                z: root.mapLibreSafeCompositor ? 118 : 18
+                visible: root.gaugeMatrixRainEnabled
+                circularMask: true
+                maskRadius: Math.min(width, height) * 0.46
+                effectEnabled: visible && !root.mapMenuOpen
+                effectLevel: root.gaugeEffectLevel
+                sharedPhase: root.gaugeMatrixRainSharedPhase
+                rainColor: Qt.rgba(appTheme.pearlLow.r, appTheme.pearlLow.g, appTheme.pearlLow.b, 0.68)
+                glowColor: Qt.rgba(1, 1, 1, 0.50)
+                fps: root.embeddedHighEffectBudgetMode ? 2.0 : 8.0
+                speedMultiplier: root.embeddedHighEffectBudgetMode ? 0.14 : 0.16
+                density: root.embeddedHighEffectBudgetMode ? 0.14 : 0.18
+                glowSpeed: 0.55
+                glowFloor: 0.12
+                glowBlur: root.embeddedHighEffectBudgetMode ? 4.0 : 5.5
+                driftScale: 0.70
+                charChangeChance: root.embeddedHighEffectBudgetMode ? 0.008 : 0.014
+                fontPx: root.embeddedHighEffectBudgetMode ? 12 : 11
+                fadeAlpha: 0.04
+                tailLength: root.embeddedHighEffectBudgetMode ? 16 : 22
+                headAlpha: 0.52
+                tailMinAlpha: 0.04
+                opacity: 0.36
+            }
+
+            W.DialChrome {
+                anchors.fill: tachGauge
+                z: root.mapLibreSafeCompositor ? 125 : 25
+                visible: root.gaugeLavaAccentEnabled
+                theme: appTheme
+                effectLevel: root.gaugeEffectLevel
+                detailMode: root.gaugeAccentDetailMode
+                accentOverlayMode: true
+                gaugeColor: appTheme.rpmColor(root.liveGaugeRpm)
+                chromeColor: appTheme.pearlLow
+                progress: Math.max(0, Math.min(1, root.liveGaugeRpm / 8000))
+                showArcHead: true
+                maxValue: 8000
+                startAngleDeg: 225
+                sweepAngleDeg: 210
+                minorStep: 500
+                majorStep: 1000
+                labelStep: 1000
+                labelStart: 1000
+                labelDivisor: 1000
             }
 
             Item {
