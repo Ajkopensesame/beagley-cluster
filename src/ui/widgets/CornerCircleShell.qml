@@ -79,8 +79,9 @@ Item {
             anchors.margins: embeddedShell.rimMargin
             radius: width / 2
             color: "transparent"
-            border.width: Math.max(3, embeddedShell.side * 0.030)
-            border.color: Qt.rgba(0.80, 0.84, 0.94, root.active ? 0.18 : 0.12)
+            border.width: Math.max(root.lowEffectMode ? 2 : 3, embeddedShell.side * (root.lowEffectMode ? 0.020 : 0.030))
+            border.color: Qt.rgba(0.80, 0.84, 0.94, root.active ? (root.lowEffectMode ? 0.10 : 0.18) : (root.lowEffectMode ? 0.07 : 0.12))
+            opacity: root.lowEffectMode ? 0.78 : 1.0
         }
 
         Rectangle {
@@ -98,7 +99,8 @@ Item {
             radius: width / 2
             color: "transparent"
             border.width: 1
-            border.color: Qt.rgba(0.86, 0.90, 0.98, root.active ? 0.24 : 0.16)
+            border.color: Qt.rgba(0.86, 0.90, 0.98, root.active ? (root.lowEffectMode ? 0.14 : 0.24) : (root.lowEffectMode ? 0.10 : 0.16))
+            opacity: root.lowEffectMode ? 0.78 : 1.0
         }
     }
 

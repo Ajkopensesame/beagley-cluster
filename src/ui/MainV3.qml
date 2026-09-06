@@ -24,7 +24,7 @@ Window {
     Settings {
         id: clusterUiSettings
         category: "beagley_cluster_ui"
-        property string mapTheme: "light"
+        property string mapTheme: "dark"
         property bool mapThemeUserSelected: false
         property string themeMode: "auto"
         property string cachedSunriseIso: ""
@@ -1350,8 +1350,8 @@ Window {
     }
 
     Component.onCompleted: {
-        if (!clusterUiSettings.mapThemeUserSelected && String(clusterUiSettings.mapTheme || "") !== "light")
-            clusterUiSettings.mapTheme = "light"
+        if (!clusterUiSettings.mapThemeUserSelected && String(clusterUiSettings.mapTheme || "") !== "dark")
+            clusterUiSettings.mapTheme = "dark"
         clusterUiSettings.themeMode = root.normalizedChromeThemeMode(clusterUiSettings.themeMode)
         root.restoreCachedSunTimes()
         root.requestAutoThemeSunTimes(true)
@@ -1546,7 +1546,8 @@ Window {
 
     Canvas {
         anchors.fill: parent
-        visible: !root.lowEffectMode
+        // Product idle: hide decorative hatch; keep for stress/demo only
+        visible: (root.stressScene || root.gaugeDemo) && !root.lowEffectMode
         opacity: 0.36
         onPaint: {
             const ctx = getContext("2d")
@@ -1584,7 +1585,9 @@ Window {
 
         Canvas {
             anchors.fill: parent
-            visible: !root.lowEffectMode
+            // Product idle: hide canopy cyan glow; keep for stress/demo only
+            visible: (root.stressScene || root.gaugeDemo) && !root.lowEffectMode
+            opacity: (root.stressScene || root.gaugeDemo) ? 1.0 : 0.0
             onPaint: {
                 const ctx = getContext("2d")
                 ctx.clearRect(0, 0, width, height)
@@ -1671,17 +1674,18 @@ Window {
             Rectangle {
                 anchors.fill: parent
                 color: "#07111A"
-                opacity: root.mapLibreSafeCompositor ? 0.18 : 0.12
+                opacity: root.mapLibreSafeCompositor ? appTheme.mapVeil : appTheme.mapVeilSoft
             }
 
             Rectangle {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
-                height: 120
+                height: 132
                 gradient: Gradient {
                     GradientStop { position: 0.0; color: "#00000000" }
-                    GradientStop { position: 1.0; color: "#02060BCC" }
+                    GradientStop { position: 0.45; color: "#02060B55" }
+                    GradientStop { position: 1.0; color: "#01050AF0" }
                 }
             }
         }

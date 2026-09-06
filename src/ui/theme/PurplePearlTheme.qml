@@ -78,4 +78,12 @@ QtObject {
         if (isNight) return isMajor ? 0.55 : 0.32;
         return isMajor ? 0.70 : 0.45;
     }
+
+    // Slice 1 hierarchy tokens — night cockpit scrim + quiet chrome
+    readonly property real mapVeil: 0.34
+    readonly property real mapVeilSoft: 0.28
+    readonly property real chromeIdle: 0.72
+    readonly property real chromeActive: 1.0
+    readonly property color statusBannerBg: isNight ? "#B205070B" : "#B2F5F3FF"
+    readonly property color statusBannerFg: isNight ? "#9DB4FF" : "#5E35B1"
 }

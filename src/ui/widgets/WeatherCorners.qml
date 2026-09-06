@@ -231,13 +231,13 @@ Item {
 
     function musicCornerSecondaryLine() {
         if (musicAuthRequired())
-            return "REPAIR"
+            return "LINK"
         if (musicPlaying)
             return "PLAYING"
         if (musicAvailable)
-            return musicStatus
+            return "IDLE"
         if (musicConfigured())
-            return musicStatus.length > 0 ? musicStatus : "SETUP"
+            return "SETUP"
         return musicSecondaryLine()
     }
 
@@ -253,23 +253,16 @@ Item {
     }
 
     function musicTickerDisplayLine() {
+        // Only show real track lines in the top ticker — never AUTH/permission/setup copy
         var line = musicTickerLine()
         if (line.length > 0)
             return line
-        if ((musicSpotifyConfigured || musicSourceLine() === "SPOTIFY") && musicDetail.length > 0)
-            return musicDetail
-        if ((musicSpotifyConfigured || musicSourceLine() === "SPOTIFY") && musicStatus.length > 0)
-            return musicStatus
-        if (musicConfigured())
-            return "Open Spotify setup"
         return ""
     }
 
     function musicTickerVisible() {
-        if (musicAvailable && musicTickerDisplayLine().length > 0)
-            return true
-        return musicConfigured()
-            && musicTickerDisplayLine().length > 0
+        // Top-center ticker only for a real track or active playback — not AUTH/setup chrome
+        return (musicTitle.length > 0) || musicPlaying
     }
 
     function musicAuthRequired() {
@@ -1196,7 +1189,7 @@ Item {
         anchors.top: parent.top
         anchors.topMargin: Math.max(10, Math.round(root.podSize * 0.10))
         visible: root.musicTickerVisible()
-        opacity: visible ? 1 : 0
+        opacity: visible ? (root.musicPlaying ? 1.0 : (root.theme && root.theme.chromeIdle !== undefined ? root.theme.chromeIdle : 0.72)) : 0
         radius: height * 0.5
         clip: false
         color: "#05070B"
@@ -1397,7 +1390,8 @@ Item {
         anchors.bottomMargin: root.cornerInset
         theme: root.theme
         corner: "bottomLeft"
-        effectLevel: root.effectLevel
+        effectLevel: "low"
+        opacity: root.theme && root.theme.chromeIdle !== undefined ? root.theme.chromeIdle : 0.72
         bleedFraction: root.podBleedFraction
         icon: "menu"
         label: "SETUP"
@@ -1418,7 +1412,8 @@ Item {
         anchors.bottomMargin: root.cornerInset
         theme: root.theme
         corner: "bottomRight"
-        effectLevel: root.effectLevel
+        effectLevel: "low"
+        opacity: root.theme && root.theme.chromeIdle !== undefined ? root.theme.chromeIdle : 0.72
         bleedFraction: root.podBleedFraction
         icon: "route"
         label: "MAP"
