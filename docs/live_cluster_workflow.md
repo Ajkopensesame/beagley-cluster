@@ -38,6 +38,20 @@ VEHICLE_HUB_WS_URL=ws://10.24.0.7:8765
 - `rich`: gauges show the full ticks, lens, arcs, chevrons, and gauge detail
   while the map can stay on a conservative profile.
 
+### Product-night lava / matrix
+
+Slice 6 product-night dial accents (lava bands + subtle in-face matrix rain) require
+**both**:
+
+```text
+BEAGLEY_EFFECT_LEVEL=high
+BEAGLEY_RENDER_PROFILE=embedded
+```
+
+With `effectLevel=low|off` lava/matrix stay off (pearl breathe only — do not stack
+breathe+lava+full matrix). On the appliance, set these in
+`/etc/default/beagley-cluster.local` (lab currently keeps `high` + `embedded`).
+
 `BEAGLEY_GAUGE_DEMO=1` is only for visual review of telltales and gauge
 readouts. It does not enable app replay or change the BBB vehicle-state source.
 

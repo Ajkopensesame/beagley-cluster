@@ -1200,12 +1200,14 @@ Item {
     }
 
     // Slice 6: upper corners are TEMP + RADAR; Spotify stays in ticker/media strip.
+    // When radar feature is off, show a calm OFF glyph — never an empty/NO RADAR dead pod.
     WidgetLocal.RadarCornerWidget {
         id: radarCorner
         width: root.podSize
         height: root.podSize
         visible: true
-        enabled: true
+        enabled: root.radarEnabled
+        featureEnabled: root.radarEnabled
         anchors.right: parent.right
         anchors.top: parent.top
         anchors.rightMargin: root.cornerInset
@@ -1214,10 +1216,12 @@ Item {
         corner: "topRight"
         effectLevel: root.effectLevel
         bleedFraction: root.podBleedFraction
-        frameUrl: root.radarFrameUrl
-        mapUrl: root.radarDisplayUrl
-        status: root.radarStatus.length > 0 ? root.radarStatus : "NO RADAR"
-        frameLabel: root.radarFrameDisplayLabel()
+        frameUrl: root.radarEnabled ? root.radarFrameUrl : ""
+        mapUrl: root.radarEnabled ? root.radarDisplayUrl : ""
+        status: root.radarEnabled
+            ? (root.radarStatus.length > 0 ? root.radarStatus : "NO RADAR")
+            : "OFF"
+        frameLabel: root.radarEnabled ? root.radarFrameDisplayLabel() : ""
         onClicked: {
             if (root.radarEnabled)
                 root.expandedMode = root.expandedMode === "radar" ? "" : "radar"

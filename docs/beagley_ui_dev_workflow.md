@@ -75,3 +75,17 @@ cd /Users/joshkomant/projects/beagley-cluster
 
 This removes the systemd drop-in and returns the BeagleY to compiled QML from
 the deployed binary.
+
+## Product-night lava / matrix
+
+Product-night dial lava and subtle in-face matrix rain only run when the process has:
+
+```text
+BEAGLEY_EFFECT_LEVEL=high
+BEAGLEY_RENDER_PROFILE=embedded
+```
+
+Confirm on device with `tools/ui/beagley_display_status.sh`. Lab appliance
+`/etc/default/beagley-cluster.local` should keep `high` for night review (backup
+`.local.bak-slice6-20260906` captured the pre-change profile).
+

@@ -1882,50 +1882,67 @@ Window {
             }
         }
 
-        // Slice 6: bottom-edge swipe-up opens SETUP/settings (no lower twin chrome)
-        MouseArea {
+        // Slice 6: bottom-edge swipe-up opens SETUP/settings (no lower twin chrome).
+        // Do NOT accept/capture on press — only claim after upward / vertical dominance
+        // so map pan near the bottom edge is not stolen on failed gestures. Strip ≤64px.
+        Item {
             id: setupSwipeEdge
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.bottom: parent.bottom
             height: 56
             z: 270
-            enabled: !root.mapMenuOpen && !root.navControlsOpen
-            propagateComposedEvents: true
-            property real pressX: 0
-            property real pressY: 0
-            property real pressMs: 0
-            property bool tracking: false
+            visible: !root.mapMenuOpen && !root.navControlsOpen
 
-            onPressed: function(mouse) {
-                pressX = mouse.x
-                pressY = mouse.y
-                pressMs = Date.now()
-                tracking = true
-                mouse.accepted = true
-            }
-            onReleased: function(mouse) {
-                if (!tracking) {
-                    mouse.accepted = false
-                    return
+            // Slice 6 dy thresholds: upward < -36, |dy| > |dx|*1.35, vy>420 or dy<-64
+            readonly property real upwardDy: -36
+            readonly property real strongDy: -64
+            readonly property real verticalRatio: 1.35
+            readonly property real minUpwardVy: 420
+
+            DragHandler {
+                id: setupSwipeHandler
+                target: null
+                enabled: setupSwipeEdge.visible
+                acceptedButtons: Qt.LeftButton
+                // Passive until drag threshold + allowed axis; avoids onPressed steal.
+                // Axis lock keeps horizontal map pan from activating this handler.
+                xAxis.enabled: false
+                yAxis.enabled: true
+                yAxis.maximum: 0 // upward only (y grows downward)
+                grabPermissions: PointerHandler.CanTakeOverFromItems
+                    | PointerHandler.ApprovesTakeOverByAnything
+
+                property real gestureStartMs: 0
+                property real peakDx: 0
+                property real peakDy: 0
+
+                onActiveChanged: {
+                    if (active) {
+                        gestureStartMs = Date.now()
+                        peakDx = 0
+                        peakDy = 0
+                        return
+                    }
+                    // Snapshot peaks before DragHandler clears translation on deactivate.
+                    const dx = peakDx
+                    const dy = peakDy
+                    const dt = Math.max(16, Date.now() - gestureStartMs)
+                    const vy = (-dy) / (dt / 1000.0) // upward positive px/s
+                    const upward = dy < setupSwipeEdge.upwardDy
+                    const verticalDominant = Math.abs(dy) > Math.abs(dx) * setupSwipeEdge.verticalRatio
+                    const fastEnough = vy > setupSwipeEdge.minUpwardVy || dy < setupSwipeEdge.strongDy
+                    if (upward && verticalDominant && fastEnough)
+                        root.openMapMenu("settings")
                 }
-                tracking = false
-                const dx = mouse.x - pressX
-                const dy = mouse.y - pressY
-                const dt = Math.max(16, Date.now() - pressMs)
-                const vy = (-dy) / (dt / 1000.0) // upward positive px/s
-                // Vertical dominance vs map pan; require meaningful upward travel
-                const upward = dy < -36
-                const verticalDominant = Math.abs(dy) > Math.abs(dx) * 1.35
-                const fastEnough = vy > 420 || dy < -64
-                if (upward && verticalDominant && fastEnough) {
-                    root.openMapMenu("settings")
-                    mouse.accepted = true
-                    return
+
+                onTranslationChanged: {
+                    if (!active)
+                        return
+                    peakDx = translation.x
+                    peakDy = translation.y
                 }
-                mouse.accepted = false
             }
-            onCanceled: tracking = false
         }
 
         // Slice 6: light single MAP affordance (not twin settings chrome)
