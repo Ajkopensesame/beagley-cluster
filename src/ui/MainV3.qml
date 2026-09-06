@@ -458,6 +458,7 @@ Window {
         autoThemeSunriseMs,
         autoThemeSunsetMs)
     readonly property bool menuDarkChrome: resolvedChromeTheme === "dark"
+    property bool mapThemeChosenThisSession: false
     readonly property color menuAccentColor: "#1A73E8"
     readonly property color menuPanelColor: menuDarkChrome ? "#101821" : "#F8FAFF"
     readonly property color menuSurfaceColor: menuDarkChrome ? "#111D2B" : "#FFFFFF"
@@ -672,10 +673,30 @@ Window {
         return root.mapThemeOptions[0]
     }
 
+    function isBrightMapTheme(themeId) {
+        const id = String(themeId || "").trim().toLowerCase()
+        return id === "light" || id === "street" || id === "terrain"
+            || id === "roads" || id === "drive"
+    }
+
+    function applyNightMapHierarchyPreference() {
+        // Night/product chrome beats a sticky bright map from prior sessions.
+        // A map chosen this session (selectMapTheme) still wins until reboot.
+        if (!root.menuDarkChrome)
+            return
+        if (root.mapThemeChosenThisSession)
+            return
+        if (!root.isBrightMapTheme(clusterUiSettings.mapTheme))
+            return
+        clusterUiSettings.mapTheme = "dark"
+        clusterUiSettings.mapThemeUserSelected = false
+    }
+
     function selectMapTheme(themeId) {
         const option = root.mapThemeOption(themeId)
         clusterUiSettings.mapTheme = option.id
         clusterUiSettings.mapThemeUserSelected = true
+        root.mapThemeChosenThisSession = true
     }
 
     function normalizedChromeThemeMode(value) {
@@ -1349,10 +1370,11 @@ Window {
         return displayMode + " display / " + String(root.activeMapThemeOption.label || "Minimal") + " map"
     }
 
+    onMenuDarkChromeChanged: root.applyNightMapHierarchyPreference()
+
     Component.onCompleted: {
-        if (!clusterUiSettings.mapThemeUserSelected && String(clusterUiSettings.mapTheme || "") !== "dark")
-            clusterUiSettings.mapTheme = "dark"
         clusterUiSettings.themeMode = root.normalizedChromeThemeMode(clusterUiSettings.themeMode)
+        root.applyNightMapHierarchyPreference()
         root.restoreCachedSunTimes()
         root.requestAutoThemeSunTimes(true)
         root.showNormal()
