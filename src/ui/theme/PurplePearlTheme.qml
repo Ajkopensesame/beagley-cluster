@@ -22,14 +22,14 @@ QtObject {
     readonly property string fontAccent:  "Helvetica";
     readonly property string fontMono: "DejaVu Sans Mono";
 
-    // Core semantic colors
+    // Core semantic colors (product PurplePearl — keep restrained)
     readonly property color bg:    isNight ? "#000000" : "#F5F3FF"
     readonly property color panel: isNight ? "#0B0714" : "#FFFFFF"
-    readonly property color text:  isNight ? "#E6FFFFFF" : "#1A0F2E"
+    readonly property color text:  isNight ? "#F0FFFFFF" : "#1A0F2E"
 
     readonly property color pearlLow:  isNight ? "#C7B7FF" : "#7E57C2"
     readonly property color pearlHigh: isNight ? "#5E35B1" : "#311B92"
-    readonly property color danger:    isNight ? "#FF3B3B" : "#C62828"
+    readonly property color danger:    isNight ? "#FF5252" : "#C62828"
 
     function speedColor(speedKph) {
         const s = Math.max(0, Number(speedKph) || 0);

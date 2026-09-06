@@ -47,13 +47,14 @@ Item {
     // Stable key (what halo colors should follow)
     readonly property string currentWarningKey: {
         // Build the same warning queue locally (no shared scope)
+        // Priority: BRAKE > OIL > CHARGE > CHECK > A/T > FUEL > DOOR
         var q = []
         if (warnBrake)       q.push("BRAKE")
+        if (warnOil)         q.push("OIL")
         if (warnCharge)      q.push("CHARGE")
         if (warnCheckEngine) q.push("CHECK")
         if (warnAT)          q.push("A/T")
         if (warnFuelLow)     q.push("FUEL")
-        if (warnOil)         q.push("OIL")
         if (warnDoor)        q.push("DOOR")
 
         if (q.length === 0) return ""
@@ -74,13 +75,13 @@ Item {
 
     function rebuildWarningQueue() {
         var q = []
-        // Order = priority (edit anytime)
+        // Order = priority: BRAKE > OIL > CHARGE > CHECK > A/T > FUEL > DOOR
         if (warnBrake)       q.push("BRAKE")
+        if (warnOil)         q.push("OIL")
         if (warnCharge)      q.push("CHARGE")
         if (warnCheckEngine) q.push("CHECK")
         if (warnAT)          q.push("A/T")
         if (warnFuelLow)     q.push("FUEL")
-        if (warnOil)         q.push("OIL")
         if (warnDoor)        q.push("DOOR")
 
         warningQueue = q
@@ -336,11 +337,11 @@ Column {
         text: "CHECK"
         color: warningColors.haloColor(root.currentWarningKey, root.tDanger)
         font.family: root.fontAccent
-        font.pixelSize: 17
+        font.pixelSize: 18
         font.bold: true
         font.letterSpacing: 4
         horizontalAlignment: Text.AlignHCenter
-        opacity: 0.96
+        opacity: 1.0
     }
 
     // ---- AUTO (top) ----
@@ -350,11 +351,11 @@ Column {
         text: "AUTO"
         color: warningColors.haloColor(root.currentWarningKey, root.tDanger)
         font.family: root.fontAccent
-        font.pixelSize: 16
+        font.pixelSize: 18
         font.bold: true
         font.letterSpacing: 3
         horizontalAlignment: Text.AlignHCenter
-        opacity: 0.96
+        opacity: 1.0
     }
 
     // ---- ICON ----
@@ -362,8 +363,8 @@ Column {
         id: warnIcon
         warningKey: root.currentWarningKey
         color: warningColors.haloColor(root.currentWarningKey, root.tDanger)
-        width: 76
-        height: 76
+        width: 80
+        height: 80
     }
 
     // ---- ENGINE (bottom) ----
@@ -373,11 +374,11 @@ Column {
         text: "ENGINE"
         color: warningColors.haloColor(root.currentWarningKey, root.tDanger)
         font.family: root.fontAccent
-        font.pixelSize: 17
+        font.pixelSize: 18
         font.bold: true
         font.letterSpacing: 4
         horizontalAlignment: Text.AlignHCenter
-        opacity: 0.96
+        opacity: 1.0
     }
 
     // ---- TRANS (bottom) ----
@@ -387,11 +388,11 @@ Column {
         text: "TRANS"
         color: warningColors.haloColor(root.currentWarningKey, root.tDanger)
         font.family: root.fontAccent
-        font.pixelSize: 16
+        font.pixelSize: 18
         font.bold: true
         font.letterSpacing: 3
         horizontalAlignment: Text.AlignHCenter
-        opacity: 0.96
+        opacity: 1.0
     }
 
     // ---- Generic label (everything else) ----
@@ -402,11 +403,11 @@ Column {
         text: root.currentWarningText
         color: warningColors.haloColor(root.currentWarningKey, root.tDanger)
         font.family: root.fontAccent
-        font.pixelSize: 16
+        font.pixelSize: 18
         font.bold: true
         font.letterSpacing: 3
         horizontalAlignment: Text.AlignHCenter
-        opacity: 0.96
+        opacity: 1.0
     }
 }
 
@@ -414,7 +415,7 @@ Column {
                 // ---- Warning cycling (only when 2+ warnings are active) ----
             Timer {
                 id: warnCycle
-                interval: 1300
+                interval: 1600
                 running: root.hasWarning && root.warningCount > 1
                 repeat: true
                 onTriggered: warnSwap.restart()

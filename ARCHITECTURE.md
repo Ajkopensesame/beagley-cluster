@@ -58,6 +58,7 @@ VehicleStateSource          (abstract API)
 | Mock | `BEAGLEY_VEHICLE_BACKEND=mock` |
 | Live | `BEAGLEY_VEHICLE_BACKEND=live` (default) + hub reachable at `VEHICLE_HUB_WS_URL` |
 | Map off | `BEAGLEY_NO_MAP=1` (also forced when built with `WITH_WEBENGINE=OFF`) |
+| Demo skin | `BEAGLEY_DEMO_SKIN=1` → Matrix rain + debug HUD (default off = product) |
 | macOS geometry | `./run_1920x720.sh` → cocoa `1920x720+0+0` |
 
 ## Optional map path

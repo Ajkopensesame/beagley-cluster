@@ -83,10 +83,11 @@ Window {
     }
 
     // ===============================
-    // Background
+    // Background (demo flair — gated by BEAGLEY_DEMO_SKIN)
     // ===============================
     MatrixRain {
         anchors.fill: parent
+        visible: BEAGLEY_DEMO_SKIN
         rainColor: Qt.rgba(gauge.gaugeColor.r,
                            gauge.gaugeColor.g,
                            gauge.gaugeColor.b,
@@ -150,15 +151,43 @@ Window {
     }
 
     // ===============================
-    // Debug (truth-only)
+    // Debug HUD (demo flair — gated by BEAGLEY_DEMO_SKIN)
     // ===============================
     Text {
         anchors.left: parent.left
         anchors.bottom: parent.bottom
         anchors.margins: 12
+        visible: BEAGLEY_DEMO_SKIN
         color: "#80FFFFFF"
         font.pixelSize: 16
         text: linkOk ? ("speed: " + Math.round(hub.speedKph || 0)) : "speed: (STALE)"
+    }
+
+    // ===============================
+    // Link fail-safe affordance (product skin; never invent values)
+    // Gauges already zero + VIC/turns gated when !linkOk.
+    // ===============================
+    Text {
+        id: linkStatusBanner
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: parent.top
+        anchors.topMargin: 14
+        visible: !linkOk
+        z: 200
+        color: appTheme.danger
+        font.pixelSize: 18
+        font.bold: true
+        font.letterSpacing: 3
+        opacity: 0.95
+        text: {
+            if (!hub)
+                return "NO LINK"
+            if (!hub.connected)
+                return "DISCONNECTED"
+            if (hub.linkStale)
+                return "STALE"
+            return "NO LINK"
+        }
     }
 
     // ===============================

@@ -76,6 +76,14 @@ BEAGLEY_VEHICLE_BACKEND=live \
 BEAGLEY_NO_MAP=1 ./build/beagley_cluster
 ```
 
+### Demo skin (opt-in flair)
+
+Default run is the **product** cluster skin (solid PurplePearl background, no Matrix rain, no bottom-left debug speed text). Opt in to DIY/demo flair:
+
+```bash
+BEAGLEY_DEMO_SKIN=1 ./build/beagley_cluster
+```
+
 | Build / run | Center panel |
 | --- | --- |
 | `WITH_WEBENGINE=ON` and `BEAGLEY_NO_MAP` unset/0 | `MapCenterWeb.qml` (Qt WebEngine map) |
@@ -98,6 +106,7 @@ Companion hub and wire protocol:
 | `BEAGLEY_VEHICLE_BACKEND` | env | `mock` or `live` (default **`live`**) |
 | `VEHICLE_HUB_WS_URL` | env | WebSocket URL for live hub (e.g. `ws://HOST:8765`) |
 | `BEAGLEY_NO_MAP` | env | Non-zero → skip WebEngine init and load `MapCenter.qml` placeholder |
+| `BEAGLEY_DEMO_SKIN` | env | Non-zero → Matrix rain + bottom-left debug HUD (default **off** = product skin) |
 | `WITH_WEBENGINE` | CMake | `ON`/`OFF` — link WebEngine, ship map QML/resources |
 
 ## Known debt
