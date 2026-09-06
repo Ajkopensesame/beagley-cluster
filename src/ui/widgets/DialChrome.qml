@@ -524,49 +524,68 @@ Item {
                 ctx.fillStyle = fill;
                 ctx.fillRect(0, 0, width, height);
 
-                // Magenta only as a hairline at the cold tail (not a pink band)
-                if (sweep > 0.04) {
-                    const tailEnd = fromRad + Math.min(sweep * 0.07, 0.12);
+                // Magenta hairline only on show/rich path — drive-lite stays pure amber
+                if (!lite && sweep > 0.04) {
+                    const tailEnd = fromRad + Math.min(sweep * 0.05, 0.08);
                     ctx.beginPath();
-                    ctx.strokeStyle = rgba(lavaMagenta, lite ? 0.28 : 0.34);
-                    ctx.lineWidth = Math.max(1.5, (lite ? 2.2 : 2.8) * root.dynamicArcTune);
+                    ctx.strokeStyle = rgba(lavaMagenta, 0.22);
+                    ctx.lineWidth = Math.max(1.2, 2.0 * root.dynamicArcTune);
                     ctx.lineCap = "round";
                     ctx.arc(cx, cy, r, fromRad, tailEnd);
                     ctx.stroke();
                 }
 
-                // Organic molten texture: keep a few blobs even on drive-lite
-                const blobs = lite ? Math.max(3, Math.min(4, blobCount + 2)) : blobCount;
+                // Organic molten texture: hot blobs + dark cracks even on drive-lite
+                const blobs = lite ? Math.max(4, Math.min(5, blobCount + 2)) : blobCount;
                 for (let i = 0; i < blobs; i++) {
                     const blobColor = [lavaHot, lavaAmber, lavaOrange, lavaHot, lavaAmber][i % 5];
-                    const u = (phase * (0.11 + i * 0.015) + i * 0.23) % 1.0;
+                    const u = (phase * (0.11 + i * 0.015) + i * 0.19) % 1.0;
                     const angle = fromRad + sweep * u;
                     const wobble = Math.sin(phase * (1.1 + i * 0.2) + i * 1.7);
                     const blobRadius = root.lowEffectMode
                         ? (5.0 + i * 1.0)
-                        : ((lite ? 9.5 : 9.0)
-                            + i * (lite ? 1.1 : 1.35)) * root.dynamicArcTune;
+                        : ((lite ? 10.5 : 9.0)
+                            + i * (lite ? 1.25 : 1.35)) * root.dynamicArcTune;
                     drawBlob(
                         angle,
-                        wobble * (root.lowEffectMode ? 1.1 : (lite ? 1.6 : 2.1)),
+                        wobble * (root.lowEffectMode ? 1.1 : (lite ? 1.8 : 2.1)),
                         blobRadius,
                         blobColor,
-                        root.lowEffectMode ? 0.64 : (lite ? 0.70 : 0.54),
-                        lite ? 1.40 : 1.55,
+                        root.lowEffectMode ? 0.64 : (lite ? 0.78 : 0.54),
+                        lite ? 1.45 : 1.55,
                         phase + i
                     );
                 }
 
-                // Cheap noise speckles for cracked-magma read without heavy atlas
-                const speckles = lite ? 10 : 18;
+                // Dark crack veins for molten crust read (cheap, clipped to band)
+                const cracks = lite ? 7 : 12;
+                for (let c = 0; c < cracks; c++) {
+                    const u0 = (c * 0.131 + phase * 0.03) % 1.0;
+                    const u1 = Math.min(1.0, u0 + 0.045 + (c % 3) * 0.01);
+                    const a0 = fromRad + sweep * u0;
+                    const a1 = fromRad + sweep * u1;
+                    const off = ((c % 2) === 0 ? 1.0 : -1.0) * (1.2 + (c % 3) * 0.7) * root.dynamicArcTune;
+                    ctx.beginPath();
+                    ctx.strokeStyle = rgba(Qt.color("#2A0E00"), lite ? 0.38 : 0.30);
+                    ctx.lineWidth = Math.max(1.0, (lite ? 1.6 : 1.3) * root.dynamicArcTune);
+                    ctx.lineCap = "round";
+                    const p0 = point(a0, r + off);
+                    const p1 = point(a1, r + off * 0.6);
+                    ctx.moveTo(p0.x, p0.y);
+                    ctx.lineTo(p1.x, p1.y);
+                    ctx.stroke();
+                }
+
+                // Bright speckles for ember read
+                const speckles = lite ? 14 : 20;
                 for (let s = 0; s < speckles; s++) {
                     const u = (s * 0.137 + phase * 0.04) % 1.0;
                     const angle = fromRad + sweep * u;
-                    const p = point(angle, r + Math.sin(phase + s) * 1.2);
+                    const p = point(angle, r + Math.sin(phase + s) * 1.4);
                     const hot = (s % 3) === 0;
                     ctx.beginPath();
-                    ctx.fillStyle = rgba(hot ? lavaHot : lavaAmber, lite ? 0.34 : 0.28);
-                    ctx.arc(p.x, p.y, (hot ? 1.8 : 1.2) * root.dynamicArcTune, 0, Math.PI * 2);
+                    ctx.fillStyle = rgba(hot ? lavaHot : lavaAmber, lite ? 0.48 : 0.32);
+                    ctx.arc(p.x, p.y, (hot ? 2.2 : 1.4) * root.dynamicArcTune, 0, Math.PI * 2);
                     ctx.fill();
                 }
                 ctx.restore();

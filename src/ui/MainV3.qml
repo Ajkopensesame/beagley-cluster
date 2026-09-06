@@ -301,30 +301,30 @@ Window {
         : (gaugeReviewMode ? false : truthOk && !!(hub && hub.overdrive))
     readonly property bool displayHighBeamValue: clusterSimulation
         ? (Math.floor(clusterSimulationDiscretePhase / 1.4) % 2) === 0
-        : (gaugeReviewMode ? true : !!(hub && hub.highBeam))
+        : (gaugeReviewMode ? false : !!(hub && hub.highBeam))
     readonly property int simulationDriveStep: Math.floor(clusterSimulationDiscretePhase / 2.2) % 3
     readonly property int simulationWarningStep: Math.floor(clusterSimulationDiscretePhase / 1.15) % 10
     readonly property bool displayWarnDoorValue: clusterSimulation
         ? (simulationWarningStep === 4 || simulationWarningStep === 8)
-        : (gaugeReviewMode ? true : truthOk && !!(hub && hub.warnDoor))
+        : (gaugeReviewMode ? false : truthOk && !!(hub && hub.warnDoor))
     readonly property bool displayWarnChargeValue: clusterSimulation
         ? (simulationWarningStep === 3 || simulationWarningStep === 8)
-        : (gaugeReviewMode ? true : truthOk && !!(hub && hub.warnCharge))
+        : (gaugeReviewMode ? false : truthOk && !!(hub && hub.warnCharge))
     readonly property bool displayWarnBrakeValue: clusterSimulation
         ? (simulationWarningStep === 1 || simulationWarningStep === 8)
-        : (gaugeReviewMode ? true : truthOk && !!(hub && hub.warnBrake))
+        : (gaugeReviewMode ? false : truthOk && !!(hub && hub.warnBrake))
     readonly property bool displayWarnOilValue: clusterSimulation
         ? (simulationWarningStep === 2 || simulationWarningStep === 8)
-        : (gaugeReviewMode ? true : truthOk && !!(hub && hub.warnOil))
+        : (gaugeReviewMode ? false : truthOk && !!(hub && hub.warnOil))
     readonly property bool displayWarnCheckEngineValue: clusterSimulation
         ? (simulationWarningStep === 5 || simulationWarningStep === 8)
-        : (gaugeReviewMode ? true : truthOk && !!(hub && hub.warnCheckEngine))
+        : (gaugeReviewMode ? false : truthOk && !!(hub && hub.warnCheckEngine))
     readonly property bool displayWarnATValue: clusterSimulation
         ? (simulationWarningStep === 6 || simulationWarningStep === 8)
         : (gaugeReviewMode ? false : truthOk && !!(hub && hub.warnAT))
     readonly property bool displayWarnFuelLowValue: clusterSimulation
         ? (simulationWarningStep === 7 || simulationWarningStep === 8)
-        : (gaugeReviewMode ? true : truthOk && !!(hub && hub.warnFuelLow))
+        : (gaugeReviewMode ? false : truthOk && !!(hub && hub.warnFuelLow))
     readonly property string displayDrivetrainModeValue: clusterSimulation
         ? (simulationDriveStep === 0 ? "2wd" : "4wd")
         : (gaugeReviewMode ? "4wd" : ((hub && hub.drivetrainMode) ? String(hub.drivetrainMode).toLowerCase() : "2wd"))
@@ -2050,31 +2050,22 @@ Window {
                 id: swipeCaretTab
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.top: parent.top
-                width: 42
+                width: 44
                 height: 18
                 radius: 9
-                color: Qt.rgba(0.03, 0.04, 0.08, 0.72)
+                color: Qt.rgba(0.03, 0.04, 0.08, 0.78)
                 border.width: 1
-                border.color: Qt.rgba(appTheme.mapFramePurple.r, appTheme.mapFramePurple.g, appTheme.mapFramePurple.b, 0.45)
+                border.color: Qt.rgba(appTheme.mapFramePurple.r, appTheme.mapFramePurple.g, appTheme.mapFramePurple.b, 0.55)
 
-                Canvas {
+                Text {
                     anchors.centerIn: parent
-                    width: 16
-                    height: 10
-                    onWidthChanged: requestPaint()
-                    onHeightChanged: requestPaint()
-                    Component.onCompleted: requestPaint()
-                    onPaint: {
-                        const ctx = getContext("2d")
-                        ctx.clearRect(0, 0, width, height)
-                        ctx.beginPath()
-                        ctx.moveTo(width * 0.5, 1)
-                        ctx.lineTo(width - 1, height - 1)
-                        ctx.lineTo(1, height - 1)
-                        ctx.closePath()
-                        ctx.fillStyle = "#F4F1FF"
-                        ctx.fill()
-                    }
+                    anchors.verticalCenterOffset: -1
+                    text: "▲"
+                    color: "#F4F1FF"
+                    font.pixelSize: 11
+                    font.bold: true
+                    opacity: 0.95
+                    renderType: root.menuTextRenderType
                 }
             }
 

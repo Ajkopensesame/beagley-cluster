@@ -1068,7 +1068,7 @@ Item {
     }
 
     Timer {
-        interval: root.weatherRefreshIntervalMs
+        interval: Math.max(1000, root.weatherRefreshIntervalMs)
         repeat: true
         running: root.active
         triggeredOnStart: false
@@ -1078,7 +1078,7 @@ Item {
     }
 
     Timer {
-        interval: root.forecastRefreshIntervalMs
+        interval: Math.max(1000, root.forecastRefreshIntervalMs)
         repeat: true
         running: root.active
         triggeredOnStart: false
@@ -1086,7 +1086,7 @@ Item {
     }
 
     Timer {
-        interval: root.radarRefreshIntervalMs
+        interval: Math.max(1000, root.radarRefreshIntervalMs)
         repeat: true
         running: root.active && root.radarEnabled
         triggeredOnStart: false
