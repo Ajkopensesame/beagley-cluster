@@ -1,0 +1,17 @@
+source=skin-v2-concept-1920x720.png
+cx=413.0
+cy=354.0
+r_in=284.0
+r_out=316.0
+r_rim_in=327.5
+r_rim_out=343.5
+out_size=640
+arc_radius_factor=0.405
+start_deg=225
+sweep_deg=210
+atlas_r_arc=259.20000000000005
+atlas_r0=243.37600000000003
+atlas_r1=277.02400000000006
+atlas_rim0=282.96000000000004
+atlas_rim1=296.78400000000005
+stroke_width_frac=0.05257500000000004

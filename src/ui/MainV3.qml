@@ -78,8 +78,8 @@ Window {
     readonly property bool gaugeLowEffectMode: gaugeEffectLevel === "low" || gaugeEffectLevel === "off"
     readonly property bool gaugeEffectsOff: gaugeEffectLevel === "off"
     // Skin v2 visual profiles:
-    //   drive = appliance default (glass + SG magma + map; matrix hard-off)
-    //   show  = concept still match (matrix depth + richer lava)
+    //   drive = appliance default (glass + atlas magma + map; matrix hard-off)
+    //   show  = concept still match (matrix depth + richer atlas + face plate)
     // Toggle without binary rebuild (qml-dev): place/remove
     //   /opt/beagley-cluster/qml-dev/src/ui/skin-show.on
     // Binary/env: BEAGLEY_SKIN_PROFILE=drive|show (context property from main.cpp)
@@ -1899,7 +1899,7 @@ Window {
                 height: 2
                 radius: 1
                 color: appTheme.mapFramePurple
-                opacity: 0.88
+                opacity: 0.96
             }
             Rectangle {
                 anchors.left: parent.left
@@ -1909,7 +1909,7 @@ Window {
                 y: root.mapLibreSafeVerticalInset + 2
                 height: 1
                 color: appTheme.mapFramePurple
-                opacity: 0.35
+                opacity: 0.48
             }
             Rectangle {
                 anchors.left: parent.left
@@ -1921,7 +1921,7 @@ Window {
                 height: 2
                 radius: 1
                 color: appTheme.mapFramePurple
-                opacity: 0.82
+                opacity: 0.92
             }
             Rectangle {
                 anchors.left: parent.left
@@ -1932,7 +1932,7 @@ Window {
                 anchors.bottomMargin: root.mapLibreSafeVerticalInset + 2
                 height: 1
                 color: appTheme.mapFramePurple
-                opacity: 0.32
+                opacity: 0.42
             }
         }
 
@@ -2272,6 +2272,8 @@ Window {
                 chromeColor: appTheme.rimGlow
                 faceSize: root.gaugeFaceSize
                 podSize: root.gaugeFaceSize
+                atlasRimEnabled: true
+                atlasFaceEnabled: root.skinShowProfile
             }
 
             NativeGaugeInstrument {
@@ -2700,6 +2702,8 @@ Window {
                 chromeColor: appTheme.rimGlow
                 faceSize: root.gaugeFaceSize
                 podSize: root.gaugeFaceSize
+                atlasRimEnabled: true
+                atlasFaceEnabled: root.skinShowProfile
             }
 
             NativeGaugeInstrument {

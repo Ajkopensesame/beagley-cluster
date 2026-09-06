@@ -25,3 +25,5 @@ GaugeMatrixDepth 1.0 GaugeMatrixDepth.qml
 TwinMicroArcs 1.0 TwinMicroArcs.qml
 DialChrome 1.0 DialChrome.qml
 
+GaugeAtlasMagma 1.0 GaugeAtlasMagma.qml
+GaugeAtlasRim 1.0 GaugeAtlasRim.qml

@@ -9,6 +9,8 @@ Item {
     property string effectLevel: "high"
     property real podSize: Math.min(width, height) * 0.84
     property real faceSize: podSize
+    property bool atlasRimEnabled: true
+    property bool atlasFaceEnabled: false
 
     readonly property bool lowEffectMode: effectLevel === "low" || effectLevel === "off"
     readonly property bool embeddedSafeMode: Qt.platform.os === "linux"
@@ -133,5 +135,17 @@ Item {
             ctx.arc(cx, cy, rimRadius - side * 0.010, Math.PI * 0.05, Math.PI * 0.55)
             ctx.stroke()
         }
+    }
+
+    // Concept glass rim atlas (specular ring) — cheap Image overlay
+    GaugeAtlasRim {
+        anchors.centerIn: parent
+        width: Math.min(root.width, root.height)
+        height: width
+        z: 20
+        visible: root.atlasRimEnabled && !root.lowEffectMode
+        showFacePlate: root.atlasFaceEnabled
+        faceOpacity: 0.38
+        rimOpacity: root.embeddedSafeMode ? 0.88 : 0.95
     }
 }

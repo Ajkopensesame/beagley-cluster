@@ -46,6 +46,10 @@ Item {
     // Desktop show keeps Canvas organic path when not embedded.
     readonly property bool sgMagmaMode: (lavaAnimationEnabled || accentOverlayMode) && embeddedSafeMode
     readonly property bool canvasMagmaMode: (lavaAnimationEnabled || accentOverlayMode) && !embeddedSafeMode
+    // Skin v2 atlas composite (concept PNG bake) — preferred over flat SG stacks on embedded.
+    readonly property bool atlasMagmaMode: root.sgMagmaMode
+    readonly property bool richAtlasMode: root.richDetailMode || root.accentOverlayMode
+    readonly property bool legacySgMagmaStack: root.sgMagmaMode && !root.atlasMagmaMode
     readonly property real lowEffectArcScale: 0.36
     readonly property real lowEffectArcTune: lowEffectArcScale / 0.42
     // Embedded lava-lite: near-full canvas so arcs stay readable at arm's length;
@@ -112,7 +116,7 @@ Item {
         if (root.sgMagmaMode) {
             root.lastPaintedProgress = root.clampedProgress;
             if (typeof performanceMetrics !== "undefined" && performanceMetrics)
-                performanceMetrics.recordCounter("gauge.sgMagma")
+                performanceMetrics.recordCounter(root.atlasMagmaMode ? "gauge.atlasMagma" : "gauge.sgMagma")
             return;
         }
         if (!force
@@ -339,6 +343,20 @@ Item {
         roundedCaps: false
     }
 
+    // ---- Concept atlas magma (embedded): Image + OpacityMask ----
+    GaugeAtlasMagma {
+        anchors.fill: parent
+        z: 19
+        visible: root.atlasMagmaMode
+        progress: root.clampedProgress
+        startAngleDeg: root.startAngleDeg
+        sweepAngleDeg: root.sweepAngleDeg
+        radiusFactor: root.arcRadiusFactor
+        strokeWidthFactor: 0.053
+        richMode: root.richAtlasMode
+        lavaPhase: root.lavaPhase
+    }
+
     // ---- Scene-graph magma (embedded/drive): no Canvas crust ----
     // Stacked GaugeArcItem = orange body + amber mid + hot yellow core/tip.
     readonly property color _lavaOrange: (theme && theme.lavaOrange) ? theme.lavaOrange : Qt.color("#FF7A14")
@@ -366,28 +384,28 @@ Item {
     GaugeArcItem {
         anchors.fill: parent
         z: 18
-        visible: root.sgMagmaMode
+        visible: root.atlasMagmaMode || root.legacySgMagmaStack
         startAngleDeg: root.startAngleDeg
         sweepAngleDeg: root.sweepAngleDeg
         startProgress: 0.0
         endProgress: 1.0
         radiusFactor: root.arcRadiusFactor
         strokeWidth: root.embeddedHighEffectBudgetMode ? 24 : 18
-        color: root.colorWithAlpha(root._lavaTrack, 0.36)
+        color: root.colorWithAlpha(root._lavaTrack, root.atlasMagmaMode ? 0.28 : 0.36)
         segments: 40
         roundedCaps: true
     }
     GaugeArcItem {
         anchors.fill: parent
         z: 18
-        visible: root.sgMagmaMode
+        visible: root.atlasMagmaMode || root.legacySgMagmaStack
         startAngleDeg: root.startAngleDeg
         sweepAngleDeg: root.sweepAngleDeg
         startProgress: 0.0
         endProgress: 1.0
         radiusFactor: root.arcRadiusFactor
         strokeWidth: root.embeddedHighEffectBudgetMode ? 8 : 6
-        color: root.colorWithAlpha(root._lavaRemainder, 0.22)
+        color: root.colorWithAlpha(root._lavaRemainder, root.atlasMagmaMode ? 0.16 : 0.22)
         segments: 40
         roundedCaps: true
     }
@@ -395,7 +413,7 @@ Item {
     GaugeArcItem {
         anchors.fill: parent
         z: 18
-        visible: root.sgMagmaMode && root.clampedProgress > 0.002
+        visible: root.legacySgMagmaStack && root.clampedProgress > 0.002
         startAngleDeg: root.startAngleDeg
         sweepAngleDeg: root.sweepAngleDeg
         startProgress: 0.0
@@ -410,7 +428,7 @@ Item {
     GaugeArcItem {
         anchors.fill: parent
         z: 18
-        visible: root.sgMagmaMode && root.clampedProgress > 0.002
+        visible: root.legacySgMagmaStack && root.clampedProgress > 0.002
         startAngleDeg: root.startAngleDeg
         sweepAngleDeg: root.sweepAngleDeg
         startProgress: 0.0
@@ -425,7 +443,7 @@ Item {
     GaugeArcItem {
         anchors.fill: parent
         z: 19
-        visible: root.sgMagmaMode && root.clampedProgress > 0.002
+        visible: root.legacySgMagmaStack && root.clampedProgress > 0.002
         startAngleDeg: root.startAngleDeg
         sweepAngleDeg: root.sweepAngleDeg
         startProgress: 0.0
@@ -440,7 +458,7 @@ Item {
     GaugeArcItem {
         anchors.fill: parent
         z: 19
-        visible: root.sgMagmaMode && root.clampedProgress > 0.002
+        visible: root.legacySgMagmaStack && root.clampedProgress > 0.002
         startAngleDeg: root.startAngleDeg
         sweepAngleDeg: root.sweepAngleDeg
         startProgress: 0.0
@@ -455,7 +473,7 @@ Item {
     GaugeArcItem {
         anchors.fill: parent
         z: 19
-        visible: root.sgMagmaMode && root.clampedProgress > 0.002
+        visible: root.legacySgMagmaStack && root.clampedProgress > 0.002
         startAngleDeg: root.startAngleDeg
         sweepAngleDeg: root.sweepAngleDeg
         startProgress: 0.0
@@ -470,7 +488,7 @@ Item {
     GaugeArcItem {
         anchors.fill: parent
         z: 20
-        visible: root.sgMagmaMode && root.clampedProgress > 0.002
+        visible: root.legacySgMagmaStack && root.clampedProgress > 0.002
         startAngleDeg: root.startAngleDeg
         sweepAngleDeg: root.sweepAngleDeg
         startProgress: root._sgCoreStart
@@ -485,7 +503,7 @@ Item {
     GaugeArcItem {
         anchors.fill: parent
         z: 21
-        visible: root.sgMagmaMode && root.clampedProgress > 0.002
+        visible: root.legacySgMagmaStack && root.clampedProgress > 0.002
         startAngleDeg: root.startAngleDeg
         sweepAngleDeg: root.sweepAngleDeg
         startProgress: root._sgTipStart
@@ -500,7 +518,7 @@ Item {
     GaugeArcItem {
         anchors.fill: parent
         z: 20
-        visible: root.sgMagmaMode && root.clampedProgress > 0.10
+        visible: root.legacySgMagmaStack && root.clampedProgress > 0.10
         startAngleDeg: root.startAngleDeg
         sweepAngleDeg: root.sweepAngleDeg
         startProgress: Math.min(root.clampedProgress, root._sgFilamentU * root.clampedProgress)
@@ -515,7 +533,7 @@ Item {
     GaugeArcItem {
         anchors.fill: parent
         z: 20
-        visible: root.sgMagmaMode && root.clampedProgress > 0.08
+        visible: root.legacySgMagmaStack && root.clampedProgress > 0.08
         startAngleDeg: root.startAngleDeg
         sweepAngleDeg: root.sweepAngleDeg
         startProgress: Math.min(root.clampedProgress, root._sgCrackU0 * root.clampedProgress)
@@ -529,7 +547,7 @@ Item {
     GaugeArcItem {
         anchors.fill: parent
         z: 20
-        visible: root.sgMagmaMode && root.clampedProgress > 0.08
+        visible: root.legacySgMagmaStack && root.clampedProgress > 0.08
         startAngleDeg: root.startAngleDeg
         sweepAngleDeg: root.sweepAngleDeg
         startProgress: Math.min(root.clampedProgress, root._sgCrackU1 * root.clampedProgress)
@@ -543,7 +561,7 @@ Item {
     GaugeArcItem {
         anchors.fill: parent
         z: 20
-        visible: root.sgMagmaMode && root.clampedProgress > 0.12
+        visible: root.legacySgMagmaStack && root.clampedProgress > 0.12
         startAngleDeg: root.startAngleDeg
         sweepAngleDeg: root.sweepAngleDeg
         startProgress: Math.min(root.clampedProgress, root._sgCrackU2 * root.clampedProgress)
@@ -558,7 +576,7 @@ Item {
     GaugeArcItem {
         anchors.fill: parent
         z: 20
-        visible: root.sgMagmaMode && root.clampedProgress > 0.08
+        visible: root.legacySgMagmaStack && root.clampedProgress > 0.08
         startAngleDeg: root.startAngleDeg
         sweepAngleDeg: root.sweepAngleDeg
         startProgress: Math.min(root.clampedProgress, root._sgCrackU0 * root.clampedProgress + 0.012)
@@ -572,7 +590,7 @@ Item {
     GaugeArcItem {
         anchors.fill: parent
         z: 20
-        visible: root.sgMagmaMode && root.clampedProgress > 0.10
+        visible: root.legacySgMagmaStack && root.clampedProgress > 0.10
         startAngleDeg: root.startAngleDeg
         sweepAngleDeg: root.sweepAngleDeg
         startProgress: Math.min(root.clampedProgress, root._sgEmberU0 * root.clampedProgress)
@@ -587,7 +605,7 @@ Item {
     GaugeArcItem {
         anchors.fill: parent
         z: 20
-        visible: root.sgMagmaMode && root.clampedProgress > 0.14
+        visible: root.legacySgMagmaStack && root.clampedProgress > 0.14
         startAngleDeg: root.startAngleDeg
         sweepAngleDeg: root.sweepAngleDeg
         startProgress: Math.min(root.clampedProgress, root._sgCrackU1 * root.clampedProgress + 0.008)

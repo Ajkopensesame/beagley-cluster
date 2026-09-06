@@ -6,6 +6,17 @@ Locked concept still (success criteria for live 1920×720):
 
 Pixel-close visual match to this still beats incremental Pearl polish.
 
+## Atlas assets (from concept PNG)
+
+Baked under [`atlas/`](./atlas/) and shipped as `src/ui/assets/skin-v2/`:
+
+- `lava-annulus.png` — annular magma (OpacityMask progress on DialChrome)
+- `lava-strip.png` — polar unwrap (reference / future shader map)
+- `glass-rim.png` — specular glass ring overlay
+- `gauge-face-matrix.png` — show-profile face plate
+
+Drive composites the annulus via `GaugeAtlasMagma` (GPU OpacityMask). Show can enable the face plate + richer tip.
+
 ## What “done” looks like
 
 - Deep glass gauge lenses on a near-black face

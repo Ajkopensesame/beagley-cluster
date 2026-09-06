@@ -14,8 +14,8 @@ Item {
         width: parent.width
         height: width
         radius: width / 2
-        color: "#FFE45C"
-        opacity: 0.20
+        color: "#FFD24A"
+        opacity: 0.34
     }
 
     Shape {
@@ -25,7 +25,7 @@ Item {
         preferredRendererType: Shape.CurveRenderer
 
         ShapePath {
-            fillColor: "#FFE45C"
+            fillColor: "#FFD24A"
             strokeColor: "#061D29"
             strokeWidth: 2.4
             joinStyle: ShapePath.RoundJoin
