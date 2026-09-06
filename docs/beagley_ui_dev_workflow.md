@@ -89,3 +89,8 @@ Confirm on device with `tools/ui/beagley_display_status.sh`. Lab appliance
 `/etc/default/beagley-cluster.local` should keep `high` for night review (backup
 `.local.bak-slice6-20260906` captured the pre-change profile).
 
+Matrix rain is drawn **above** the opaque `NativeGaugeInstrument` face and
+**below** lava + numerals (z 122 vs face 120 / lava 125). Earlier z 118 under an
+opaque face made rain invisible on-glass. For review without hub values, set
+`BEAGLEY_GAUGE_DEMO=1` (turn off with `=0` + restart).
+

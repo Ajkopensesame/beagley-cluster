@@ -49,9 +49,10 @@ Item {
     readonly property int effectiveTailLength: embeddedHighEffectBudgetMode ? Math.min(tailLength, 36) : tailLength
     readonly property real effectiveCharChangeChance: embeddedHighEffectBudgetMode ? Math.min(charChangeChance, 0.016) : charChangeChance
     readonly property real effectiveGlowBlur: embeddedHighEffectBudgetMode ? Math.min(glowBlur, 7.0) : glowBlur
+    // Embedded high: allow up to 4fps so in-face rain stays readable at a glance
     readonly property real effectiveFps: lowEffectMode
-        ? Math.min(fps, embeddedHighEffectBudgetMode ? 2.0 : 8.0)
-        : (embeddedHighEffectBudgetMode ? Math.min(fps, 2.0) : fps)
+        ? Math.min(fps, embeddedHighEffectBudgetMode ? 3.0 : 8.0)
+        : (embeddedHighEffectBudgetMode ? Math.min(fps, 4.0) : fps)
     property var greekGlyphs: [
         "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
         "ｱ", "ｲ", "ｳ", "ｴ", "ｵ", "ｶ", "ｷ", "ｸ", "ｹ", "ｺ",

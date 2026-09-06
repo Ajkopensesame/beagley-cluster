@@ -558,6 +558,28 @@ Item {
                                  0.50,
                                  root.embeddedHighEffectBudgetMode ? 2 : 4);
                 }
+            } else if (!root.lowEffectMode) {
+                // Slice 6 follow-up: slow ambient lava crawl at idle (0 speed/rpm)
+                // so night skin stays alive without needle motion / breathe stack.
+                const ambSweep = sweepRad * (root.embeddedHighEffectBudgetMode ? 0.14 : 0.16);
+                const ambTravel = Math.max(0.0, sweepRad - ambSweep);
+                const ambU = (phase * 0.065) % 1.0;
+                const ambFrom = startRad + ambTravel * ambU;
+                const ambTo = ambFrom + ambSweep;
+                drawLavaBand(ambFrom, ambTo,
+                             3.2 * root.dynamicArcTune,
+                             11.0 * root.dynamicArcTune,
+                             base, bright,
+                             root.embeddedHighEffectBudgetMode ? 24 : 64,
+                             0.42,
+                             root.embeddedHighEffectBudgetMode ? 1 : 2);
+                // Soft track shimmer so the ring never looks fully dead
+                ctx.beginPath();
+                ctx.strokeStyle = rgba(bright, 0.10 + 0.06 * (0.5 + 0.5 * Math.sin(phase * 0.9)));
+                ctx.lineCap = "round";
+                ctx.lineWidth = (root.embeddedHighEffectBudgetMode ? 3.2 : 4.0) * root.dynamicArcTune;
+                ctx.arc(cx, cy, r, startRad, fullEndRad);
+                ctx.stroke();
             }
 
             root.lastPaintedProgress = progress;

@@ -227,22 +227,30 @@ Window {
         ? simulationTriangle(clusterSimulationPhase, 8.0) * 140
         : (stressScene
         ? (78 + 50 * Math.sin(stressPhase * 0.9))
-        : (gaugeReviewMode ? 118 : speedValue))
+        : (gaugeReviewMode
+            ? (48 + 72 * (0.5 + 0.5 * Math.sin(sharedEffectPhase * 0.38)))
+            : speedValue))
     readonly property real displayRpmValue: clusterSimulation
         ? simulationTriangle(clusterSimulationPhase + 1.0, 7.2) * 8000
         : (stressScene
         ? (2400 + 1800 * (0.5 + 0.5 * Math.sin(stressPhase * 1.15 + 0.4)))
-        : (gaugeReviewMode ? 4200 : rpmValue))
+        : (gaugeReviewMode
+            ? (1600 + 4200 * (0.5 + 0.5 * Math.sin(sharedEffectPhase * 0.46 + 0.7)))
+            : rpmValue))
     readonly property real displayFuelValue: clusterSimulation
         ? (100 - simulationTriangle(clusterSimulationPhase + 2.0, 9.5) * 100)
         : (stressScene
         ? (18 + 11 * Math.sin(stressPhase * 0.30 - 1.2))
-        : (gaugeReviewMode ? 14 : fuelValue))
+        : (gaugeReviewMode
+            ? (22 + 38 * (0.5 + 0.5 * Math.sin(sharedEffectPhase * 0.21 + 1.4)))
+            : fuelValue))
     readonly property real displayCoolantValue: clusterSimulation
         ? (40 + simulationTriangle(clusterSimulationPhase + 3.0, 10.5) * 70)
         : (stressScene
         ? (70 + 42 * Math.sin(stressPhase * 0.42 + 1.3))
-        : (gaugeReviewMode ? 104 : coolantValue))
+        : (gaugeReviewMode
+            ? (78 + 28 * (0.5 + 0.5 * Math.sin(sharedEffectPhase * 0.27 + 0.3)))
+            : coolantValue))
 
     // Slice 5: Tesla-class gauge motion — exponential lag into native needles/numerals
     property real smoothedSpeedValue: 0
@@ -2138,32 +2146,33 @@ Window {
                 backgroundOpacity: root.gaugeFaceBackgroundOpacity
             }
 
-            // Slice 6: lava primary + subtle in-face matrix (high only, circular mask)
+            // Slice 6: matrix ABOVE opaque native face (was z118 under z120 — invisible),
+            // still BELOW lava (125) and numerals (130). In-face only, circular mask.
             W.MatrixRain {
                 anchors.fill: speedGauge
-                z: root.mapLibreSafeCompositor ? 118 : 18
+                z: root.mapLibreSafeCompositor ? 122 : 22
                 visible: root.gaugeMatrixRainEnabled
                 circularMask: true
                 maskRadius: Math.min(width, height) * 0.46
                 effectEnabled: visible && !root.mapMenuOpen
                 effectLevel: root.gaugeEffectLevel
                 sharedPhase: root.gaugeMatrixRainSharedPhase
-                rainColor: Qt.rgba(appTheme.pearlLow.r, appTheme.pearlLow.g, appTheme.pearlLow.b, 0.72)
-                glowColor: Qt.rgba(1, 1, 1, 0.55)
-                fps: root.embeddedHighEffectBudgetMode ? 2.0 : 8.0
-                speedMultiplier: root.embeddedHighEffectBudgetMode ? 0.14 : 0.16
-                density: root.embeddedHighEffectBudgetMode ? 0.16 : 0.20
+                rainColor: Qt.rgba(appTheme.pearlLow.r, appTheme.pearlLow.g, appTheme.pearlLow.b, 0.82)
+                glowColor: Qt.rgba(1, 1, 1, 0.62)
+                fps: root.embeddedHighEffectBudgetMode ? 3.0 : 8.0
+                speedMultiplier: root.embeddedHighEffectBudgetMode ? 0.18 : 0.16
+                density: root.embeddedHighEffectBudgetMode ? 0.28 : 0.22
                 glowSpeed: 0.55
-                glowFloor: 0.12
-                glowBlur: root.embeddedHighEffectBudgetMode ? 4.0 : 5.5
-                driftScale: 0.70
-                charChangeChance: root.embeddedHighEffectBudgetMode ? 0.008 : 0.014
-                fontPx: root.embeddedHighEffectBudgetMode ? 12 : 11
-                fadeAlpha: 0.04
-                tailLength: root.embeddedHighEffectBudgetMode ? 16 : 22
-                headAlpha: 0.55
-                tailMinAlpha: 0.04
-                opacity: 0.42
+                glowFloor: 0.18
+                glowBlur: root.embeddedHighEffectBudgetMode ? 4.5 : 5.5
+                driftScale: 0.75
+                charChangeChance: root.embeddedHighEffectBudgetMode ? 0.012 : 0.014
+                fontPx: root.embeddedHighEffectBudgetMode ? 13 : 11
+                fadeAlpha: 0.03
+                tailLength: root.embeddedHighEffectBudgetMode ? 18 : 22
+                headAlpha: 0.70
+                tailMinAlpha: 0.06
+                opacity: 0.58
             }
 
             W.DialChrome {
@@ -2470,31 +2479,32 @@ Window {
                 backgroundOpacity: root.gaugeFaceBackgroundOpacity
             }
 
+            // Same stack as speed: over opaque native face, under lava + numerals
             W.MatrixRain {
                 anchors.fill: tachGauge
-                z: root.mapLibreSafeCompositor ? 118 : 18
+                z: root.mapLibreSafeCompositor ? 122 : 22
                 visible: root.gaugeMatrixRainEnabled
                 circularMask: true
                 maskRadius: Math.min(width, height) * 0.46
                 effectEnabled: visible && !root.mapMenuOpen
                 effectLevel: root.gaugeEffectLevel
                 sharedPhase: root.gaugeMatrixRainSharedPhase
-                rainColor: Qt.rgba(appTheme.pearlLow.r, appTheme.pearlLow.g, appTheme.pearlLow.b, 0.68)
-                glowColor: Qt.rgba(1, 1, 1, 0.50)
-                fps: root.embeddedHighEffectBudgetMode ? 2.0 : 8.0
-                speedMultiplier: root.embeddedHighEffectBudgetMode ? 0.14 : 0.16
-                density: root.embeddedHighEffectBudgetMode ? 0.14 : 0.18
+                rainColor: Qt.rgba(appTheme.pearlLow.r, appTheme.pearlLow.g, appTheme.pearlLow.b, 0.78)
+                glowColor: Qt.rgba(1, 1, 1, 0.58)
+                fps: root.embeddedHighEffectBudgetMode ? 3.0 : 8.0
+                speedMultiplier: root.embeddedHighEffectBudgetMode ? 0.17 : 0.16
+                density: root.embeddedHighEffectBudgetMode ? 0.24 : 0.20
                 glowSpeed: 0.55
-                glowFloor: 0.12
-                glowBlur: root.embeddedHighEffectBudgetMode ? 4.0 : 5.5
-                driftScale: 0.70
-                charChangeChance: root.embeddedHighEffectBudgetMode ? 0.008 : 0.014
-                fontPx: root.embeddedHighEffectBudgetMode ? 12 : 11
-                fadeAlpha: 0.04
-                tailLength: root.embeddedHighEffectBudgetMode ? 16 : 22
-                headAlpha: 0.52
-                tailMinAlpha: 0.04
-                opacity: 0.36
+                glowFloor: 0.17
+                glowBlur: root.embeddedHighEffectBudgetMode ? 4.5 : 5.5
+                driftScale: 0.75
+                charChangeChance: root.embeddedHighEffectBudgetMode ? 0.011 : 0.014
+                fontPx: root.embeddedHighEffectBudgetMode ? 13 : 11
+                fadeAlpha: 0.03
+                tailLength: root.embeddedHighEffectBudgetMode ? 18 : 22
+                headAlpha: 0.66
+                tailMinAlpha: 0.055
+                opacity: 0.52
             }
 
             W.DialChrome {

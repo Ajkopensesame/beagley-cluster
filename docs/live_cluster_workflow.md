@@ -52,12 +52,16 @@ With `effectLevel=low|off` lava/matrix stay off (pearl breathe only — do not s
 breathe+lava+full matrix). On the appliance, set these in
 `/etc/default/beagley-cluster.local` (lab currently keeps `high` + `embedded`).
 
-`BEAGLEY_GAUGE_DEMO=1` is only for visual review of telltales and gauge
-readouts. It does not enable app replay or change the BBB vehicle-state source.
+`BEAGLEY_GAUGE_DEMO=1` is for on-glass visual review without a live hub: speedo/tach
+needles and arcs gently animate, telltales light, and product-night lava/matrix stay
+on (unlike `BEAGLEY_CLUSTER_SIMULATION`). It does not enable app replay or change the
+BBB vehicle-state source. Toggle off with `BEAGLEY_GAUGE_DEMO=0` in
+`/etc/default/beagley-cluster.local` then `systemctl restart beagley_cluster`.
 
 `BEAGLEY_CLUSTER_SIMULATION=1` runs an app-local gauge/VIC sweep for visual QA:
 speed, RPM, fuel, coolant, indicators, gear, O/D, high-beam, drivetrain, and
-warning states cycle without changing the BBB vehicle-state source.
+warning states cycle without changing the BBB vehicle-state source. Note: simulation
+disables in-face matrix rain (`gaugeMatrixRainEnabled` requires `!clusterSimulation`).
 
 Do not set `BEAGLEY_REPLAY_FILE` for live-cluster UI work. App-side replay and
 `BEAGLEY_STRESS_SCENE=1` are useful for demos, but they do not exercise the
