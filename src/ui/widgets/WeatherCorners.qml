@@ -230,7 +230,10 @@ Item {
     }
 
     function musicCornerSecondaryLine() {
-        if (musicAuthRequired())
+        var status = String(musicStatus).toUpperCase()
+        if (status === "PERMISSION")
+            return "REPAIR"
+        if (status === "AUTH" || musicAuthRequired())
             return "LINK"
         if (musicPlaying)
             return "PLAYING"
@@ -261,12 +264,13 @@ Item {
     }
 
     function musicTickerVisible() {
-        // Top-center ticker only for a real track or active playback — not AUTH/setup chrome
-        return (musicTitle.length > 0) || musicPlaying
+        // Top-center ticker only when there is a real title — never AUTH/PERMISSION/setup copy
+        return musicTitle.length > 0
     }
 
     function musicAuthRequired() {
-        return String(musicStatus).toUpperCase() === "AUTH"
+        var status = String(musicStatus).toUpperCase()
+        return status === "AUTH" || status === "PERMISSION"
     }
 
     function spotifyPairingVisible() {
@@ -1596,7 +1600,9 @@ Item {
 
                                     Text {
                                         width: parent.width
-                                        text: root.musicTitle.length > 0 ? root.musicTitle : root.musicStatus
+                                        text: root.musicTitle.length > 0
+                                            ? root.musicTitle
+                                            : (root.musicAuthRequired() ? "SPOTIFY" : root.musicStatus)
                                         color: "#F7FBFF"
                                         font.family: root.displayFont
                                         font.pixelSize: 25
@@ -1608,7 +1614,13 @@ Item {
 
                                     Text {
                                         width: parent.width
-                                        text: root.musicArtist.length > 0 ? root.musicArtist : root.musicStatusLine()
+                                        text: root.musicArtist.length > 0
+                                            ? root.musicArtist
+                                            : (root.musicAuthRequired()
+                                                ? (String(root.musicStatus).toUpperCase() === "PERMISSION"
+                                                    ? "Permission repair needed"
+                                                    : "Login required")
+                                                : root.musicStatusLine())
                                         color: root.musicPlaying ? "#58FFE1" : "#9DB4FF"
                                         font.family: root.monoFont
                                         font.pixelSize: 14

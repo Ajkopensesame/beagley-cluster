@@ -1047,7 +1047,8 @@ Window {
     }
 
     function musicAuthRequired() {
-        return String(root.musicStatus).toUpperCase() === "AUTH"
+        var status = String(root.musicStatus).toUpperCase()
+        return status === "AUTH" || status === "PERMISSION"
     }
 
     function musicNowPlayingLine() {
@@ -1069,6 +1070,8 @@ Window {
             return root.spotifySaveDetail.length > 0 ? root.spotifySaveDetail : "Reconnect Spotify for liked songs"
         if (root.spotifySavePending)
             return "Updating liked songs"
+        if (String(root.musicStatus).toUpperCase() === "PERMISSION")
+            return "Spotify permission required — scan QR to re-pair"
         if (root.musicAuthRequired())
             return "Connect Spotify to show what is playing"
         if (root.musicAvailable)
@@ -1081,6 +1084,8 @@ Window {
             return "SETUP"
         if (root.spotifyPairingActive)
             return "CANCEL"
+        if (String(root.musicStatus).toUpperCase() === "PERMISSION")
+            return "REPAIR"
         if (root.musicAuthRequired())
             return "CONNECT"
         if (root.spotifyRepairRequired)
