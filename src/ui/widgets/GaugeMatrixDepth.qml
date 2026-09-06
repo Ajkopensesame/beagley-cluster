@@ -53,7 +53,7 @@ Item {
                     Repeater {
                         model: 18
                         delegate: Text {
-                            text: root.glyphs[(index * 3 + col.x) % root.glyphs.length]
+                            text: root.glyphs[Math.floor(Math.abs(index * 3 + Math.floor(col.x))) % root.glyphs.length]
                             color: root.rainColor
                             font.pixelSize: root.fontPx
                             font.family: "monospace"

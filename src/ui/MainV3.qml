@@ -1,4 +1,5 @@
 import QtQuick 2.15
+import Qt.labs.folderlistmodel 2.15
 import QtQuick.Window 2.15
 import Qt.labs.settings
 import BeagleY 1.0
@@ -81,9 +82,9 @@ Window {
     //   drive = appliance default (glass + SG magma + map; matrix hard-off)
     //   show  = concept still match (matrix depth + richer lava)
     // Toggle without binary rebuild (qml-dev): place/remove
-    //   /opt/beagley-cluster/qml-dev/.skin-show.png
+    //   /opt/beagley-cluster/qml-dev/.skin-show
     // Binary/env: BEAGLEY_SKIN_PROFILE=drive|show (context property from main.cpp)
-    readonly property bool skinShowMarkerPresent: skinShowMarker.status === Image.Ready
+    readonly property bool skinShowMarkerPresent: skinShowDir.count > 0
     readonly property string skinVisualProfile: {
         const raw = (typeof BEAGLEY_SKIN_PROFILE !== "undefined" && BEAGLEY_SKIN_PROFILE)
             ? String(BEAGLEY_SKIN_PROFILE).trim().toLowerCase()
@@ -2108,20 +2109,14 @@ Window {
 
 
         // Probe show-profile marker without needing BEAGLEY_SKIN_PROFILE in binary.
-        // Place /opt/beagley-cluster/qml-dev/.skin-show.png to force show on qml-dev.
-        Image {
-            id: skinShowMarker
-            width: 1
-            height: 1
-            visible: false
-            asynchronous: false
-            cache: false
-            // Prefer absolute path; also try relative to qml-dev root parent of MainV3
-            source: "file:///opt/beagley-cluster/qml-dev/.skin-show.png"
-            onStatusChanged: {
-                if (status === Image.Error)
-                    source = Qt.resolvedUrl("../../.skin-show.png")
-            }
+        // Place /opt/beagley-cluster/qml-dev/.skin-show (any file) to force show on qml-dev.
+        FolderListModel {
+            id: skinShowDir
+            folder: "file:///opt/beagley-cluster/qml-dev"
+            nameFilters: [".skin-show", ".skin-show.png", ".skin-show.txt"]
+            showDirs: false
+            showDotAndDotDot: false
+            showHidden: true
         }
 
         Item {
