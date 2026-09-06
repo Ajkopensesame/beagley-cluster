@@ -327,13 +327,13 @@ Window {
         : (gaugeReviewMode ? false : truthOk && !!(hub && hub.warnFuelLow))
     readonly property string displayDrivetrainModeValue: clusterSimulation
         ? (simulationDriveStep === 0 ? "2wd" : "4wd")
-        : (gaugeReviewMode ? "4wd" : ((hub && hub.drivetrainMode) ? String(hub.drivetrainMode).toLowerCase() : "2wd"))
+        : (gaugeReviewMode ? "2wd" : ((hub && hub.drivetrainMode) ? String(hub.drivetrainMode).toLowerCase() : "2wd"))
     readonly property bool displayTransferLockValue: clusterSimulation
         ? simulationDriveStep === 2
         : (gaugeReviewMode ? false : truthOk && !!(hub && hub.transferLock))
     readonly property string displayDriveModeText: clusterSimulation
         ? (simulationDriveStep === 0 ? "2WD" : (simulationDriveStep === 1 ? "4WD" : "LOCK"))
-        : (gaugeReviewMode ? "4WD" : ((hub && hub.drivetrainMode) ? String(hub.drivetrainMode).toUpperCase() : "2WD"))
+        : (gaugeReviewMode ? "2WD" : ((hub && hub.drivetrainMode) ? String(hub.drivetrainMode).toUpperCase() : "2WD"))
     readonly property string displayOdometerText: clusterSimulation
         ? formatOdometerKm(284613 + Math.floor(clusterSimulationDiscretePhase * 12))
         : (gaugeReviewMode
@@ -2060,7 +2060,7 @@ Window {
                 Text {
                     anchors.centerIn: parent
                     anchors.verticalCenterOffset: -1
-                    text: "▲"
+                    text: "^"
                     color: "#F4F1FF"
                     font.pixelSize: 11
                     font.bold: true

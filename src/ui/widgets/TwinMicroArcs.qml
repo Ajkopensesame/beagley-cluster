@@ -27,16 +27,20 @@ Item {
     function colorWithAlpha(c, a) {
         return Qt.rgba(c.r, c.g, c.b, a)
     }
+    function css(c, a) {
+        return "rgba(" + Math.round(c.r * 255) + "," + Math.round(c.g * 255) + ","
+            + Math.round(c.b * 255) + "," + a + ")"
+    }
 
     // Left micro-arc: fuel (E → F)
     Item {
         id: fuelPod
-        width: parent.width * 0.30
-        height: parent.height * 0.26
+        width: parent.width * 0.28
+        height: parent.height * 0.24
         anchors.left: parent.left
-        anchors.leftMargin: parent.width * 0.16
+        anchors.leftMargin: parent.width * 0.17
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: parent.height * 0.12
+        anchors.bottomMargin: parent.height * 0.11
 
         GaugeArcItem {
             anchors.fill: parent
@@ -63,26 +67,52 @@ Item {
             roundedCaps: true
         }
 
-        OemIcon {
-            width: Math.max(16, parent.width * 0.22)
+        Canvas {
+            id: fuelIcon
+            width: Math.max(18, parent.width * 0.28)
             height: width
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.verticalCenter: parent.verticalCenter
-            anchors.verticalCenterOffset: parent.height * 0.02
-            icon: "fuel"
-            color: root.pearl
-            accentColor: root.fuelColor
-            strokeWidth: Math.max(2.0, width * 0.10)
+            anchors.verticalCenterOffset: -parent.height * 0.02
+            onWidthChanged: requestPaint()
+            onHeightChanged: requestPaint()
+            Component.onCompleted: requestPaint()
+            onPaint: {
+                const ctx = getContext("2d")
+                ctx.clearRect(0, 0, width, height)
+                const sw = Math.max(1.8, width * 0.10)
+                ctx.strokeStyle = root.css(root.pearl, 0.95)
+                ctx.lineWidth = sw
+                ctx.lineCap = "round"
+                ctx.lineJoin = "round"
+                // pump body
+                const x = width * 0.22, y = height * 0.18, w = width * 0.38, h = height * 0.64, r = width * 0.06
+                ctx.beginPath()
+                ctx.moveTo(x + r, y)
+                ctx.arcTo(x + w, y, x + w, y + h, r)
+                ctx.arcTo(x + w, y + h, x, y + h, r)
+                ctx.arcTo(x, y + h, x, y, r)
+                ctx.arcTo(x, y, x + w, y, r)
+                ctx.closePath()
+                ctx.stroke()
+                // window
+                ctx.strokeRect(x + w * 0.18, y + h * 0.16, w * 0.64, h * 0.18)
+                // hose
+                ctx.beginPath()
+                ctx.moveTo(x + w, y + h * 0.38)
+                ctx.bezierCurveTo(width * 0.72, height * 0.40, width * 0.80, height * 0.52, width * 0.72, height * 0.72)
+                ctx.stroke()
+            }
         }
 
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.bottom: parent.bottom
-            anchors.bottomMargin: parent.height * 0.02
+            anchors.bottomMargin: parent.height * 0.00
             text: Math.round(root.fuelPct) + "%"
             color: root.fuelColor
             font.family: "Oxanium"
-            font.pixelSize: Math.max(11, parent.width * 0.145)
+            font.pixelSize: Math.max(11, parent.width * 0.15)
             font.bold: true
             style: Text.Outline
             styleColor: "#E0000000"
@@ -94,7 +124,7 @@ Item {
             color: root.pearl
             opacity: 0.72
             font.family: "Oxanium"
-            font.pixelSize: Math.max(9, parent.width * 0.09)
+            font.pixelSize: Math.max(9, parent.width * 0.095)
             font.bold: true
         }
         Text {
@@ -104,7 +134,7 @@ Item {
             color: root.pearl
             opacity: 0.72
             font.family: "Oxanium"
-            font.pixelSize: Math.max(9, parent.width * 0.09)
+            font.pixelSize: Math.max(9, parent.width * 0.095)
             font.bold: true
         }
     }
@@ -112,12 +142,12 @@ Item {
     // Right micro-arc: coolant (C → H)
     Item {
         id: tempPod
-        width: parent.width * 0.30
-        height: parent.height * 0.26
+        width: parent.width * 0.28
+        height: parent.height * 0.24
         anchors.right: parent.right
-        anchors.rightMargin: parent.width * 0.16
+        anchors.rightMargin: parent.width * 0.17
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: parent.height * 0.12
+        anchors.bottomMargin: parent.height * 0.11
 
         GaugeArcItem {
             anchors.fill: parent
@@ -144,34 +174,28 @@ Item {
             roundedCaps: true
         }
 
-        // Thermometer icon (concept pod)
         Canvas {
             id: thermoIcon
-            width: Math.max(14, parent.width * 0.18)
+            width: Math.max(16, parent.width * 0.22)
             height: width * 1.35
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.verticalCenter: parent.verticalCenter
-            anchors.verticalCenterOffset: parent.height * 0.00
+            anchors.verticalCenterOffset: -parent.height * 0.02
             onWidthChanged: requestPaint()
             onHeightChanged: requestPaint()
             Component.onCompleted: requestPaint()
             onPaint: {
                 const ctx = getContext("2d")
                 ctx.clearRect(0, 0, width, height)
-                function css(c, a) {
-                    return "rgba(" + Math.round(c.r * 255) + "," + Math.round(c.g * 255) + ","
-                        + Math.round(c.b * 255) + "," + a + ")"
-                }
                 const cx = width * 0.5
                 const stemTop = height * 0.08
                 const stemBot = height * 0.62
                 const stemW = Math.max(2.5, width * 0.18)
                 const bulbR = Math.max(3.5, width * 0.28)
-                ctx.strokeStyle = css(root.pearl, 0.95)
-                ctx.fillStyle = css(root.tempColor, 0.90)
+                ctx.strokeStyle = root.css(root.pearl, 0.95)
+                ctx.fillStyle = root.css(root.tempColor, 0.90)
                 ctx.lineWidth = Math.max(1.5, width * 0.10)
                 ctx.lineCap = "round"
-                // stem
                 ctx.beginPath()
                 ctx.moveTo(cx - stemW * 0.5, stemTop)
                 ctx.lineTo(cx + stemW * 0.5, stemTop)
@@ -179,10 +203,8 @@ Item {
                 ctx.lineTo(cx - stemW * 0.5, stemBot)
                 ctx.closePath()
                 ctx.stroke()
-                // fill level
                 const fillTop = stemTop + (stemBot - stemTop) * (1.0 - Math.max(0.15, Math.min(1, root.coolantNorm)))
                 ctx.fillRect(cx - stemW * 0.35, fillTop, stemW * 0.7, stemBot - fillTop)
-                // bulb
                 ctx.beginPath()
                 ctx.arc(cx, stemBot + bulbR * 0.55, bulbR, 0, Math.PI * 2)
                 ctx.fill()
@@ -193,11 +215,11 @@ Item {
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.bottom: parent.bottom
-            anchors.bottomMargin: parent.height * 0.02
+            anchors.bottomMargin: parent.height * 0.00
             text: Math.round(root.coolantC) + "°C"
             color: root.tempColor
             font.family: "Oxanium"
-            font.pixelSize: Math.max(11, parent.width * 0.145)
+            font.pixelSize: Math.max(11, parent.width * 0.15)
             font.bold: true
             style: Text.Outline
             styleColor: "#E0000000"
@@ -209,7 +231,7 @@ Item {
             color: root.pearl
             opacity: 0.72
             font.family: "Oxanium"
-            font.pixelSize: Math.max(9, parent.width * 0.09)
+            font.pixelSize: Math.max(9, parent.width * 0.095)
             font.bold: true
         }
         Text {
@@ -219,7 +241,7 @@ Item {
             color: root.pearl
             opacity: 0.72
             font.family: "Oxanium"
-            font.pixelSize: Math.max(9, parent.width * 0.09)
+            font.pixelSize: Math.max(9, parent.width * 0.095)
             font.bold: true
         }
     }

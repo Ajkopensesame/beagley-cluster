@@ -506,20 +506,24 @@ Item {
                 }
                 ctx.clip();
 
+                // Dark crust underpaint so cracks/blobs read (not a flat neon stroke)
+                ctx.fillStyle = rgba(Qt.color("#3A1408"), lite ? 0.92 : 0.85);
+                ctx.fillRect(0, 0, width, height);
+
                 const fill = ctx.createLinearGradient(cx - r, cy + r, cx + r, cy - r);
                 if (lite) {
                     // Drive lava-lite: amber/orange molten readable at arm's length
-                    fill.addColorStop(0.00, rgba(lavaOrange, 0.78));
-                    fill.addColorStop(0.10, rgba(lavaOrange, 0.96));
-                    fill.addColorStop(0.42, rgba(lavaAmber, 1.00));
-                    fill.addColorStop(0.72, rgba(lavaHot, 0.98));
-                    fill.addColorStop(1.00, rgba(lavaHot, 0.90));
+                    fill.addColorStop(0.00, rgba(lavaOrange, 0.55));
+                    fill.addColorStop(0.18, rgba(lavaOrange, 0.88));
+                    fill.addColorStop(0.48, rgba(lavaAmber, 0.96));
+                    fill.addColorStop(0.78, rgba(lavaHot, 0.94));
+                    fill.addColorStop(1.00, rgba(lavaHot, 0.82));
                 } else {
-                    fill.addColorStop(0.00, rgba(lavaOrange, root.lowEffectMode ? 0.72 : 0.80));
-                    fill.addColorStop(0.12, rgba(lavaOrange, root.lowEffectMode ? 0.90 : 0.96));
-                    fill.addColorStop(0.40, rgba(lavaAmber, root.lowEffectMode ? 0.96 : 1.00));
-                    fill.addColorStop(0.72, rgba(lavaHot, root.lowEffectMode ? 0.92 : 0.98));
-                    fill.addColorStop(1.00, rgba(brightColor, root.lowEffectMode ? 0.80 : 0.88));
+                    fill.addColorStop(0.00, rgba(lavaOrange, root.lowEffectMode ? 0.55 : 0.62));
+                    fill.addColorStop(0.16, rgba(lavaOrange, root.lowEffectMode ? 0.82 : 0.90));
+                    fill.addColorStop(0.44, rgba(lavaAmber, root.lowEffectMode ? 0.92 : 0.98));
+                    fill.addColorStop(0.74, rgba(lavaHot, root.lowEffectMode ? 0.88 : 0.96));
+                    fill.addColorStop(1.00, rgba(brightColor, root.lowEffectMode ? 0.72 : 0.82));
                 }
                 ctx.fillStyle = fill;
                 ctx.fillRect(0, 0, width, height);
@@ -566,8 +570,8 @@ Item {
                     const a1 = fromRad + sweep * u1;
                     const off = ((c % 2) === 0 ? 1.0 : -1.0) * (1.2 + (c % 3) * 0.7) * root.dynamicArcTune;
                     ctx.beginPath();
-                    ctx.strokeStyle = rgba(Qt.color("#2A0E00"), lite ? 0.38 : 0.30);
-                    ctx.lineWidth = Math.max(1.0, (lite ? 1.6 : 1.3) * root.dynamicArcTune);
+                    ctx.strokeStyle = rgba(Qt.color("#1A0800"), lite ? 0.62 : 0.48);
+                    ctx.lineWidth = Math.max(1.2, (lite ? 2.2 : 1.6) * root.dynamicArcTune);
                     ctx.lineCap = "round";
                     const p0 = point(a0, r + off);
                     const p1 = point(a1, r + off * 0.6);
