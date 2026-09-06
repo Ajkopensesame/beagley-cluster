@@ -21,3 +21,10 @@ WiFiSetupOverlay 1.0 WiFiSetupOverlay.qml
 
 OemIcon 1.0 OemIcon.qml
 FuelPumpIcon 1.0 FuelPumpIcon.qml
+GaugeMatrixDepth 1.0 GaugeMatrixDepth.qml
+TwinMicroArcs 1.0 TwinMicroArcs.qml
+DialChrome 1.0 DialChrome.qml
+
+GaugeAtlasMagma 1.0 GaugeAtlasMagma.qml
+GaugeAtlasRim 1.0 GaugeAtlasRim.qml
+MagmaAtlasOverlay 1.0 MagmaAtlasOverlay.qml

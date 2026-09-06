@@ -75,3 +75,36 @@ cd /Users/joshkomant/projects/beagley-cluster
 
 This removes the systemd drop-in and returns the BeagleY to compiled QML from
 the deployed binary.
+
+## Skin v2 profiles (drive / show)
+
+| Profile | Default when | Matrix | Lava |
+| --- | --- | --- | --- |
+| `drive` | `RENDER_PROFILE=embedded` | off | lava-lite molten |
+| `show` | desktop, or `BEAGLEY_SKIN_PROFILE=show` | cyan depth (cheap on embedded; MatrixRain on desktop) | richer molten |
+
+Override with `BEAGLEY_SKIN_PROFILE=drive|show`. Score screenshots against `docs/vision/skin-v2-concept-1920x720.png`.
+
+## Product-night lava / matrix
+
+Product-night dial **lava-lite** on the appliance requires:
+
+```text
+BEAGLEY_EFFECT_LEVEL=high
+BEAGLEY_RENDER_PROFILE=embedded
+```
+
+Confirm on device with `tools/ui/beagley_display_status.sh`. Lab appliance
+`/etc/default/beagley-cluster.local` should keep `high` for night review (backup
+`.local.bak-slice6-20260906` captured the pre-change profile).
+
+**FPS-first appliance rule:** `renderProfile=embedded` never enables in-face
+matrix rain (`gaugeMatrixRainEnabled` is hard-off). Matrix code remains for
+desktop/high showy only. Embedded magma is **scene-graph GaugeArcItem only**
+(no Canvas crust / no ~10Hz blobs). A ~4Hz property crawl moves crust gaps;
+pearl breathe stays off while lava is on. Desktop show may still use Canvas
+organic lava.
+
+For review without hub values, set `BEAGLEY_GAUGE_DEMO=1` (turn off with `=0`
+in `/etc/default/beagley-cluster.local` then `systemctl restart beagley_cluster`).
+

@@ -12,7 +12,9 @@ Item {
     property real progress: 0.0
     property real lavaPhase: 0.0
     property bool scaredHead: false
-    property bool showArcHead: true
+    property bool showArcHead: false
+    // Slice 6: lava/matrix accent over NativeGaugeInstrument — no ticks/labels/track
+    property bool accentOverlayMode: false
     property real maxValue: 100
     property real startAngleDeg: 225
     property real sweepAngleDeg: 210
@@ -34,12 +36,26 @@ Item {
     readonly property bool embeddedSafeMode: Qt.platform.os === "linux"
     readonly property bool embeddedHighEffectBudgetMode: embeddedSafeMode && effectLevel === "high"
     readonly property bool richDetailMode: detailMode === "rich"
-    readonly property bool staticArcMode: !richDetailMode
-    readonly property bool lavaAnimationEnabled: !staticArcMode && !embeddedSafeMode && !lowEffectMode
+    // Slice 6: lava is primary night accent. On Linux/BeagleY use embedded high-budget path
+    // instead of permanently disabling lava via embeddedSafeMode.
+    readonly property bool lavaAnimationEnabled: effectLevel === "high" && !lowEffectMode
+        && (richDetailMode || accentOverlayMode || embeddedHighEffectBudgetMode)
+        && (!embeddedSafeMode || embeddedHighEffectBudgetMode || accentOverlayMode)
+    readonly property bool staticArcMode: !lavaAnimationEnabled
+    // Embedded/drive: scene-graph magma only — never ~10Hz Canvas crust.
+    // Desktop show keeps Canvas organic path when not embedded.
+    readonly property bool sgMagmaMode: (lavaAnimationEnabled || accentOverlayMode) && embeddedSafeMode
+    readonly property bool canvasMagmaMode: (lavaAnimationEnabled || accentOverlayMode) && !embeddedSafeMode
+    // Skin v2 atlas composite (concept PNG bake) — preferred over flat SG stacks on embedded.
+    readonly property bool atlasMagmaMode: root.sgMagmaMode
+    readonly property bool richAtlasMode: root.richDetailMode || root.accentOverlayMode
+    readonly property bool legacySgMagmaStack: root.sgMagmaMode && !root.atlasMagmaMode
     readonly property real lowEffectArcScale: 0.36
     readonly property real lowEffectArcTune: lowEffectArcScale / 0.42
+    // Embedded lava-lite: near-full canvas so arcs stay readable at arm's length;
+    // cost cut comes from slower paint + one band, not half-res blur.
     readonly property real dynamicArcCanvasScale: embeddedHighEffectBudgetMode
-        ? 0.50
+        ? 1.0
         : ((root.lowEffectMode && !root.embeddedSafeMode) ? root.lowEffectArcScale : 1.0)
     readonly property real dynamicArcTune: dynamicArcCanvasScale < 1.0 ? dynamicArcCanvasScale : 1.0
     readonly property real progressRepaintThreshold: embeddedSafeMode
@@ -95,14 +111,23 @@ Item {
 
     function requestDynamicPaint() {
         const force = arguments.length > 0 && arguments[0] === true;
+        root.paintedProgress = root.clampedProgress;
+        // SG magma: progress binds GaugeArcItem directly — no Canvas paints.
+        if (root.sgMagmaMode) {
+            root.lastPaintedProgress = root.clampedProgress;
+            if (typeof performanceMetrics !== "undefined" && performanceMetrics)
+                performanceMetrics.recordCounter(root.atlasMagmaMode ? "gauge.atlasMagma" : "gauge.sgMagma")
+            return;
+        }
         if (!force
                 && root.progressRepaintThreshold > 0
                 && root.lastPaintedProgress >= 0
                 && Math.abs(root.clampedProgress - root.lastPaintedProgress) < root.progressRepaintThreshold) {
             return;
         }
-        root.paintedProgress = root.clampedProgress;
         root.lastPaintedProgress = root.clampedProgress;
+        if (root.canvasMagmaMode)
+            arcCanvas.requestPaint();
         if (typeof performanceMetrics !== "undefined" && performanceMetrics)
             performanceMetrics.recordCounter("gauge.nativeDialArc")
     }
@@ -149,12 +174,16 @@ Item {
     }
 
     Timer {
-        interval: root.lowEffectMode ? 120 : (root.embeddedHighEffectBudgetMode ? 260 : 33)
+        // SG magma: ~4Hz property crawl only (no Canvas). Desktop Canvas: ~30Hz.
+        // Needle lag stays on MainV3 33ms clock — never hijack it for particles.
+        interval: root.sgMagmaMode ? 250 : (root.lowEffectMode ? 120 : 33)
         running: root.effectLevel !== "off" && root.lavaAnimationEnabled
+            && (root.sgMagmaMode || root.canvasMagmaMode)
         repeat: true
         onTriggered: {
             root.lavaPhase += interval / 1000.0
-            root.requestDynamicPaint(true)
+            if (root.canvasMagmaMode)
+                root.requestDynamicPaint(true)
         }
     }
 
@@ -162,6 +191,7 @@ Item {
         id: ticksCanvas
         anchors.fill: parent
         z: 10
+        visible: !root.accentOverlayMode
         renderTarget: root.embeddedSafeMode ? Canvas.Image : Canvas.FramebufferObject
 
         onPaint: {
@@ -204,6 +234,7 @@ Item {
         id: labelCanvas
         anchors.fill: parent
         z: 30
+        visible: !root.accentOverlayMode
         renderTarget: root.embeddedSafeMode ? Canvas.Image : Canvas.FramebufferObject
 
         onPaint: {
@@ -240,6 +271,7 @@ Item {
     GaugeArcItem {
         anchors.fill: parent
         z: 20
+        visible: !root.accentOverlayMode
         startAngleDeg: root.startAngleDeg
         sweepAngleDeg: root.sweepAngleDeg
         startProgress: 0.0
@@ -254,6 +286,7 @@ Item {
     GaugeArcItem {
         anchors.fill: parent
         z: 21
+        visible: !root.accentOverlayMode
         startAngleDeg: root.startAngleDeg
         sweepAngleDeg: root.sweepAngleDeg
         startProgress: 0.0
@@ -268,6 +301,7 @@ Item {
     GaugeArcItem {
         anchors.fill: parent
         z: 22
+        visible: !root.accentOverlayMode
         startAngleDeg: root.startAngleDeg
         sweepAngleDeg: root.sweepAngleDeg
         startProgress: 0.0
@@ -282,7 +316,7 @@ Item {
     GaugeArcItem {
         anchors.fill: parent
         z: 23
-        visible: root.paintedProgress > 0.002
+        visible: !root.accentOverlayMode && !root.lavaAnimationEnabled && root.paintedProgress > 0.002
         startAngleDeg: root.startAngleDeg
         sweepAngleDeg: root.sweepAngleDeg
         startProgress: 0.0
@@ -309,13 +343,287 @@ Item {
         roundedCaps: false
     }
 
+    // ---- Concept atlas magma (embedded): Image + ShaderEffect ----
+    GaugeAtlasMagma {
+        anchors.fill: parent
+        z: 19
+        visible: root.atlasMagmaMode
+        progress: root.clampedProgress
+        startAngleDeg: root.startAngleDeg
+        sweepAngleDeg: root.sweepAngleDeg
+        radiusFactor: root.arcRadiusFactor
+        strokeWidthFactor: 0.078
+        richMode: root.richAtlasMode
+        lavaPhase: root.lavaPhase
+    }
+
+    // ---- Scene-graph magma (embedded/drive): no Canvas crust ----
+    // Stacked GaugeArcItem = orange body + amber mid + hot yellow core/tip.
+    readonly property color _lavaOrange: (theme && theme.lavaOrange) ? theme.lavaOrange : Qt.color("#FF7A14")
+    readonly property color _lavaAmber: (theme && theme.lavaAmber) ? theme.lavaAmber : Qt.color("#FFC028")
+    readonly property color _lavaHot: (theme && theme.lavaHot) ? theme.lavaHot : Qt.color("#FFF2A8")
+    readonly property color _lavaTrack: (theme && theme.lavaTrack) ? theme.lavaTrack : Qt.color("#2A2240")
+    readonly property color _lavaRemainder: (theme && theme.lavaRemainder) ? theme.lavaRemainder : Qt.color("#1C1528")
+    readonly property real _sgTipStart: root.clampedProgress > 0.002
+        ? Math.max(0.0, root.clampedProgress - 0.14)
+        : 0.0
+    readonly property real _sgCoreStart: root.clampedProgress > 0.002
+        ? Math.max(0.0, root.clampedProgress - 0.36)
+        : 0.0
+    // Slow crust gaps + ember windows (property-only; no Canvas)
+    readonly property real _sgCrackU0: (lavaPhase * 0.07) % 1.0
+    readonly property real _sgCrackU1: (_sgCrackU0 + 0.37) % 1.0
+    readonly property real _sgCrackU2: (_sgCrackU0 + 0.61) % 1.0
+    readonly property real _sgEmberU0: (_sgCrackU0 + 0.19) % 1.0
+    readonly property real _sgFilamentU: (_sgCrackU0 + 0.48) % 1.0
+    readonly property color _lavaMagenta: Qt.color("#C4183A")
+    readonly property real _sgROuter: root.arcRadiusFactor + 0.010
+    readonly property real _sgRInner: root.arcRadiusFactor - 0.014
+    readonly property real _sgRCore: root.arcRadiusFactor - 0.006
+
+    GaugeArcItem {
+        anchors.fill: parent
+        z: 18
+        visible: root.atlasMagmaMode || root.legacySgMagmaStack
+        startAngleDeg: root.startAngleDeg
+        sweepAngleDeg: root.sweepAngleDeg
+        startProgress: 0.0
+        endProgress: 1.0
+        radiusFactor: root.arcRadiusFactor
+        strokeWidth: root.embeddedHighEffectBudgetMode ? 24 : 18
+        color: root.colorWithAlpha(root._lavaTrack, root.atlasMagmaMode ? 0.28 : 0.36)
+        segments: 40
+        roundedCaps: true
+    }
+    GaugeArcItem {
+        anchors.fill: parent
+        z: 18
+        visible: root.atlasMagmaMode || root.legacySgMagmaStack
+        startAngleDeg: root.startAngleDeg
+        sweepAngleDeg: root.sweepAngleDeg
+        startProgress: 0.0
+        endProgress: 1.0
+        radiusFactor: root.arcRadiusFactor
+        strokeWidth: root.embeddedHighEffectBudgetMode ? 8 : 6
+        color: root.colorWithAlpha(root._lavaRemainder, root.atlasMagmaMode ? 0.16 : 0.22)
+        segments: 40
+        roundedCaps: true
+    }
+    // Soft outer bloom (organic thickness beyond body)
+    GaugeArcItem {
+        anchors.fill: parent
+        z: 18
+        visible: root.legacySgMagmaStack && root.clampedProgress > 0.002
+        startAngleDeg: root.startAngleDeg
+        sweepAngleDeg: root.sweepAngleDeg
+        startProgress: 0.0
+        endProgress: root.clampedProgress
+        radiusFactor: root._sgROuter
+        strokeWidth: root.embeddedHighEffectBudgetMode ? 10 : 7
+        color: root.colorWithAlpha(root._lavaOrange, 0.28)
+        segments: 40
+        roundedCaps: true
+    }
+    // Magenta depth underbelly (concept red→orange lip)
+    GaugeArcItem {
+        anchors.fill: parent
+        z: 18
+        visible: root.legacySgMagmaStack && root.clampedProgress > 0.002
+        startAngleDeg: root.startAngleDeg
+        sweepAngleDeg: root.sweepAngleDeg
+        startProgress: 0.0
+        endProgress: Math.min(root.clampedProgress, Math.max(0.08, root.clampedProgress * 0.55))
+        radiusFactor: root._sgROuter
+        strokeWidth: root.embeddedHighEffectBudgetMode ? 14 : 10
+        color: root.colorWithAlpha(root._lavaMagenta, 0.22)
+        segments: 36
+        roundedCaps: true
+    }
+    // Orange magma body
+    GaugeArcItem {
+        anchors.fill: parent
+        z: 19
+        visible: root.legacySgMagmaStack && root.clampedProgress > 0.002
+        startAngleDeg: root.startAngleDeg
+        sweepAngleDeg: root.sweepAngleDeg
+        startProgress: 0.0
+        endProgress: root.clampedProgress
+        radiusFactor: root.arcRadiusFactor
+        strokeWidth: root.embeddedHighEffectBudgetMode ? 22 : 16
+        color: root.colorWithAlpha(root._lavaOrange, 0.94)
+        segments: 48
+        roundedCaps: true
+    }
+    // Amber mid ribbon
+    GaugeArcItem {
+        anchors.fill: parent
+        z: 19
+        visible: root.legacySgMagmaStack && root.clampedProgress > 0.002
+        startAngleDeg: root.startAngleDeg
+        sweepAngleDeg: root.sweepAngleDeg
+        startProgress: 0.0
+        endProgress: root.clampedProgress
+        radiusFactor: root.arcRadiusFactor
+        strokeWidth: root.embeddedHighEffectBudgetMode ? 12 : 9
+        color: root.colorWithAlpha(root._lavaAmber, 0.78)
+        segments: 48
+        roundedCaps: true
+    }
+    // Inner ember ribbon (radius offset = granular thickness)
+    GaugeArcItem {
+        anchors.fill: parent
+        z: 19
+        visible: root.legacySgMagmaStack && root.clampedProgress > 0.002
+        startAngleDeg: root.startAngleDeg
+        sweepAngleDeg: root.sweepAngleDeg
+        startProgress: 0.0
+        endProgress: root.clampedProgress
+        radiusFactor: root._sgRInner
+        strokeWidth: root.embeddedHighEffectBudgetMode ? 6 : 4.5
+        color: root.colorWithAlpha(root._lavaAmber, 0.55)
+        segments: 40
+        roundedCaps: true
+    }
+    // Hot yellow core (forward half)
+    GaugeArcItem {
+        anchors.fill: parent
+        z: 20
+        visible: root.legacySgMagmaStack && root.clampedProgress > 0.002
+        startAngleDeg: root.startAngleDeg
+        sweepAngleDeg: root.sweepAngleDeg
+        startProgress: root._sgCoreStart
+        endProgress: root.clampedProgress
+        radiusFactor: root._sgRCore
+        strokeWidth: root.embeddedHighEffectBudgetMode ? 8 : 6
+        color: root.colorWithAlpha(root._lavaHot, 0.88)
+        segments: 36
+        roundedCaps: true
+    }
+    // Hotter yellow tip / head punch
+    GaugeArcItem {
+        anchors.fill: parent
+        z: 21
+        visible: root.legacySgMagmaStack && root.clampedProgress > 0.002
+        startAngleDeg: root.startAngleDeg
+        sweepAngleDeg: root.sweepAngleDeg
+        startProgress: root._sgTipStart
+        endProgress: root.clampedProgress
+        radiusFactor: root.arcRadiusFactor
+        strokeWidth: root.embeddedHighEffectBudgetMode ? 18 : 14
+        color: root.colorWithAlpha(Qt.color("#FFFFE6"), 0.98)
+        segments: 24
+        roundedCaps: true
+    }
+    // Crawling hot filament (thin organic streak)
+    GaugeArcItem {
+        anchors.fill: parent
+        z: 20
+        visible: root.legacySgMagmaStack && root.clampedProgress > 0.10
+        startAngleDeg: root.startAngleDeg
+        sweepAngleDeg: root.sweepAngleDeg
+        startProgress: Math.min(root.clampedProgress, root._sgFilamentU * root.clampedProgress)
+        endProgress: Math.min(root.clampedProgress, root._sgFilamentU * root.clampedProgress + 0.11)
+        radiusFactor: root._sgRInner
+        strokeWidth: root.embeddedHighEffectBudgetMode ? 3.5 : 2.8
+        color: root.colorWithAlpha(Qt.color("#FFF8D0"), 0.82)
+        segments: 20
+        roundedCaps: true
+    }
+    // Dark crust cracks (3 windows crawl with phase — SG only)
+    GaugeArcItem {
+        anchors.fill: parent
+        z: 20
+        visible: root.legacySgMagmaStack && root.clampedProgress > 0.08
+        startAngleDeg: root.startAngleDeg
+        sweepAngleDeg: root.sweepAngleDeg
+        startProgress: Math.min(root.clampedProgress, root._sgCrackU0 * root.clampedProgress)
+        endProgress: Math.min(root.clampedProgress, root._sgCrackU0 * root.clampedProgress + 0.055)
+        radiusFactor: root.arcRadiusFactor
+        strokeWidth: root.embeddedHighEffectBudgetMode ? 18 : 13
+        color: root.colorWithAlpha(Qt.color("#0C0400"), 0.72)
+        segments: 16
+        roundedCaps: true
+    }
+    GaugeArcItem {
+        anchors.fill: parent
+        z: 20
+        visible: root.legacySgMagmaStack && root.clampedProgress > 0.08
+        startAngleDeg: root.startAngleDeg
+        sweepAngleDeg: root.sweepAngleDeg
+        startProgress: Math.min(root.clampedProgress, root._sgCrackU1 * root.clampedProgress)
+        endProgress: Math.min(root.clampedProgress, root._sgCrackU1 * root.clampedProgress + 0.04)
+        radiusFactor: root.arcRadiusFactor
+        strokeWidth: root.embeddedHighEffectBudgetMode ? 10 : 7
+        color: root.colorWithAlpha(Qt.color("#1A0800"), 0.55)
+        segments: 16
+        roundedCaps: true
+    }
+    GaugeArcItem {
+        anchors.fill: parent
+        z: 20
+        visible: root.legacySgMagmaStack && root.clampedProgress > 0.12
+        startAngleDeg: root.startAngleDeg
+        sweepAngleDeg: root.sweepAngleDeg
+        startProgress: Math.min(root.clampedProgress, root._sgCrackU2 * root.clampedProgress)
+        endProgress: Math.min(root.clampedProgress, root._sgCrackU2 * root.clampedProgress + 0.032)
+        radiusFactor: root._sgROuter
+        strokeWidth: root.embeddedHighEffectBudgetMode ? 8 : 6
+        color: root.colorWithAlpha(Qt.color("#140600"), 0.48)
+        segments: 14
+        roundedCaps: true
+    }
+    // Ember flecks in cracks (amber punch through dark)
+    GaugeArcItem {
+        anchors.fill: parent
+        z: 20
+        visible: root.legacySgMagmaStack && root.clampedProgress > 0.08
+        startAngleDeg: root.startAngleDeg
+        sweepAngleDeg: root.sweepAngleDeg
+        startProgress: Math.min(root.clampedProgress, root._sgCrackU0 * root.clampedProgress + 0.012)
+        endProgress: Math.min(root.clampedProgress, root._sgCrackU0 * root.clampedProgress + 0.035)
+        radiusFactor: root.arcRadiusFactor
+        strokeWidth: root.embeddedHighEffectBudgetMode ? 5 : 4
+        color: root.colorWithAlpha(root._lavaHot, 0.90)
+        segments: 12
+        roundedCaps: true
+    }
+    GaugeArcItem {
+        anchors.fill: parent
+        z: 20
+        visible: root.legacySgMagmaStack && root.clampedProgress > 0.10
+        startAngleDeg: root.startAngleDeg
+        sweepAngleDeg: root.sweepAngleDeg
+        startProgress: Math.min(root.clampedProgress, root._sgEmberU0 * root.clampedProgress)
+        endProgress: Math.min(root.clampedProgress, root._sgEmberU0 * root.clampedProgress + 0.022)
+        radiusFactor: root._sgRInner
+        strokeWidth: root.embeddedHighEffectBudgetMode ? 4 : 3
+        color: root.colorWithAlpha(root._lavaAmber, 0.95)
+        segments: 10
+        roundedCaps: true
+    }
+    // Outer crumbly rim flecks (phase-crawled)
+    GaugeArcItem {
+        anchors.fill: parent
+        z: 20
+        visible: root.legacySgMagmaStack && root.clampedProgress > 0.14
+        startAngleDeg: root.startAngleDeg
+        sweepAngleDeg: root.sweepAngleDeg
+        startProgress: Math.min(root.clampedProgress, root._sgCrackU1 * root.clampedProgress + 0.008)
+        endProgress: Math.min(root.clampedProgress, root._sgCrackU1 * root.clampedProgress + 0.018)
+        radiusFactor: root._sgROuter
+        strokeWidth: root.embeddedHighEffectBudgetMode ? 3.2 : 2.5
+        color: root.colorWithAlpha(Qt.color("#FFE08A"), 0.70)
+        segments: 8
+        roundedCaps: true
+    }
+
     Canvas {
         id: arcCanvas
         anchors.centerIn: parent
         width: parent.width * root.dynamicArcCanvasScale
         height: parent.height * root.dynamicArcCanvasScale
         z: 20
-        visible: false
+        visible: root.canvasMagmaMode
         scale: root.dynamicArcCanvasScale < 1.0 ? (1.0 / root.dynamicArcCanvasScale) : 1.0
         renderTarget: root.embeddedSafeMode ? Canvas.Image : Canvas.FramebufferObject
         antialiasing: !root.lowEffectMode && !root.embeddedSafeMode
@@ -392,11 +700,18 @@ Item {
                 return;
             }
 
-            const neonCyan = Qt.color("#73F6FF");
-            const neonLime = Qt.color("#9B5CFF");
-            const neonPink = Qt.color("#FF4DFF");
-            const neonOrange = Qt.color("#6E35FF");
-            const neonYellow = Qt.color("#EAD7FF");
+            // Skin v2 molten lava: hot yellow→orange core; magenta hairline tail only
+            const lavaAmber = (root.theme && root.theme.lavaAmber) ? root.theme.lavaAmber : Qt.color("#FFC028");
+            const lavaOrange = (root.theme && root.theme.lavaOrange) ? root.theme.lavaOrange : Qt.color("#FF7A14");
+            const lavaMagenta = (root.theme && root.theme.lavaMagenta) ? root.theme.lavaMagenta : Qt.color("#C41848");
+            const lavaHot = (root.theme && root.theme.lavaHot) ? root.theme.lavaHot : Qt.color("#FFF2A8");
+            const lavaRemainder = (root.theme && root.theme.lavaRemainder) ? root.theme.lavaRemainder : Qt.color("#1C1528");
+            const lavaTrack = (root.theme && root.theme.lavaTrack) ? root.theme.lavaTrack : Qt.color("#2A2240");
+            const neonCyan = lavaAmber;
+            const neonLime = lavaOrange;
+            const neonPink = lavaMagenta;
+            const neonOrange = lavaOrange;
+            const neonYellow = lavaHot;
 
             function point(angle, radius) {
                 return {
@@ -474,6 +789,63 @@ Item {
             function drawLavaBand(fromRad, toRad, tailWidth, headWidth, color, brightColor, segments, capScale, blobCount) {
                 const sweep = toRad - fromRad;
                 if (sweep <= 0.0001) return;
+                const embeddedLite = root.embeddedHighEffectBudgetMode || root.accentOverlayMode;
+                const showExtras = root.richDetailMode && !root.lowEffectMode && !root.embeddedHighEffectBudgetMode;
+
+                // Embedded / accent: Image-canvas safe path — NO clip/tapered fill
+                if (embeddedLite) {
+                    // Base molten = GaugeArcItem. Texture = filled quads/circles only
+                    // (Canvas.Image strokeArc has been unreliable on BeagleY).
+                    const halfW = Math.max(12, Math.max(tailWidth, headWidth * 0.62) * 0.58);
+                    function fillArcQuad(a0, a1, half, color, alpha) {
+                        const steps = 5;
+                        ctx.beginPath();
+                        for (let s = 0; s <= steps; s++) {
+                            const a = a0 + (a1 - a0) * (s / steps);
+                            const p = point(a, r + half);
+                            if (s === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+                        }
+                        for (let s = steps; s >= 0; s--) {
+                            const a = a0 + (a1 - a0) * (s / steps);
+                            const p = point(a, r - half);
+                            ctx.lineTo(p.x, p.y);
+                        }
+                        ctx.closePath();
+                        ctx.fillStyle = rgba(color, alpha);
+                        ctx.fill();
+                    }
+                    const gaps = 8;
+                    for (let i = 0; i < gaps; i++) {
+                        const u0 = (i / gaps + phase * 0.02) % 1.0;
+                        const a0 = fromRad + sweep * u0;
+                        const a1 = fromRad + sweep * Math.min(1.0, u0 + 0.075);
+                        fillArcQuad(a0, a1, halfW, Qt.color("#0C0400"), 0.94);
+                    }
+                    for (let i = 0; i < gaps; i++) {
+                        const u0 = ((i + 0.42) / gaps + phase * 0.02) % 1.0;
+                        const a0 = fromRad + sweep * u0;
+                        const a1 = fromRad + sweep * Math.min(1.0, u0 + 0.04);
+                        fillArcQuad(a0, a1, halfW * 0.45, (i % 2) ? lavaHot : lavaAmber, 0.90);
+                    }
+                    for (let b = 0; b < 8; b++) {
+                        const u = ((b + 0.3) / 8 + phase * 0.045) % 1.0;
+                        const pt = point(fromRad + sweep * u, r);
+                        const rad = (7.5 + (b % 3) * 2.5) * root.dynamicArcTune;
+                        ctx.beginPath();
+                        ctx.fillStyle = rgba(Qt.color("#1A0800"), 0.75);
+                        ctx.arc(pt.x, pt.y, rad * 1.45, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.beginPath();
+                        ctx.fillStyle = rgba(lavaOrange, 0.96);
+                        ctx.arc(pt.x, pt.y, rad * 1.05, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.beginPath();
+                        ctx.fillStyle = rgba(lavaHot, 0.98);
+                        ctx.arc(pt.x, pt.y, rad * 0.55, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                    return;
+                }
 
                 ctx.save();
                 if (!buildTaperedPath(fromRad, toRad, tailWidth, headWidth, segments, capScale)) {
@@ -481,48 +853,69 @@ Item {
                     return;
                 }
                 ctx.clip();
-
+                ctx.fillStyle = rgba(Qt.color("#241006"), 0.85);
+                ctx.fillRect(0, 0, width, height);
                 const fill = ctx.createLinearGradient(cx - r, cy + r, cx + r, cy - r);
-                fill.addColorStop(0.00, rgba(neonCyan, root.lowEffectMode ? 0.54 : 0.46));
-                fill.addColorStop(0.24, rgba(neonPink, root.lowEffectMode ? 0.72 : 0.62));
-                fill.addColorStop(0.54, rgba(neonLime, root.lowEffectMode ? 0.88 : 0.76));
-                fill.addColorStop(0.78, rgba(brightColor, root.lowEffectMode ? 0.76 : 0.64));
-                fill.addColorStop(1.00, rgba(neonOrange, root.lowEffectMode ? 0.62 : 0.52));
+                fill.addColorStop(0.00, rgba(lavaOrange, 0.62));
+                fill.addColorStop(0.16, rgba(lavaOrange, 0.90));
+                fill.addColorStop(0.44, rgba(lavaAmber, 0.98));
+                fill.addColorStop(0.74, rgba(lavaHot, 0.96));
+                fill.addColorStop(1.00, rgba(brightColor, 0.82));
                 ctx.fillStyle = fill;
                 ctx.fillRect(0, 0, width, height);
-
+                if (showExtras && sweep > 0.04) {
+                    const tailEnd = fromRad + Math.min(sweep * 0.05, 0.08);
+                    ctx.beginPath();
+                    ctx.strokeStyle = rgba(lavaMagenta, 0.22);
+                    ctx.lineWidth = Math.max(1.2, 2.0 * root.dynamicArcTune);
+                    ctx.lineCap = "round";
+                    ctx.arc(cx, cy, r, fromRad, tailEnd);
+                    ctx.stroke();
+                }
                 for (let i = 0; i < blobCount; i++) {
-                    const blobColor = [neonCyan, neonPink, neonLime, neonOrange, neonYellow][i % 5];
-                    const u = (phase * (0.11 + i * 0.015) + i * 0.23) % 1.0;
+                    const blobColor = [lavaHot, lavaAmber, lavaOrange, lavaHot, lavaAmber][i % 5];
+                    const u = (phase * (0.11 + i * 0.015) + i * 0.19) % 1.0;
                     const angle = fromRad + sweep * u;
                     const wobble = Math.sin(phase * (1.1 + i * 0.2) + i * 1.7);
-                    const blobRadius = root.lowEffectMode
-                        ? (5.0 + i * 1.0)
-                        : ((root.embeddedHighEffectBudgetMode ? 7.0 : 9.0)
-                            + i * (root.embeddedHighEffectBudgetMode ? 1.0 : 1.35)) * root.dynamicArcTune;
-                    drawBlob(
-                        angle,
-                        wobble * (root.lowEffectMode ? 1.1 : 2.1),
-                        blobRadius,
-                        blobColor,
-                        root.lowEffectMode ? 0.64 : 0.54,
-                        1.55,
-                        phase + i
-                    );
+                    drawBlob(angle, wobble * 2.1, (9.0 + i * 1.35) * root.dynamicArcTune, blobColor, 0.54, 1.55, phase + i);
+                }
+                for (let c = 0; c < 12; c++) {
+                    const u0 = (c * 0.109 + phase * 0.028) % 1.0;
+                    const a0 = fromRad + sweep * u0;
+                    const a1 = fromRad + sweep * Math.min(1.0, u0 + 0.05);
+                    const off = ((c % 2) === 0 ? 1.0 : -1.0) * (1.4 + (c % 4) * 0.85) * root.dynamicArcTune;
+                    const p0 = point(a0, r + off);
+                    const p1 = point(a1, r + off * 0.55);
+                    ctx.beginPath();
+                    ctx.strokeStyle = rgba(Qt.color("#140600"), 0.48);
+                    ctx.lineWidth = Math.max(1.4, 1.6 * root.dynamicArcTune);
+                    ctx.lineCap = "round";
+                    ctx.moveTo(p0.x, p0.y);
+                    ctx.lineTo(p1.x, p1.y);
+                    ctx.stroke();
                 }
                 ctx.restore();
-
                 ctx.save();
                 buildTaperedPath(fromRad, toRad, tailWidth, headWidth, segments, capScale);
-                ctx.fillStyle = rgba(neonYellow, root.lowEffectMode ? 0.28 : 0.18);
+                ctx.fillStyle = rgba(lavaHot, 0.18);
                 ctx.fill();
                 ctx.restore();
             }
 
+            // Quiet dark track under molten progress — no pink remainder glow
             ctx.beginPath();
-            ctx.strokeStyle = rgba(base, 0.06);
+            ctx.strokeStyle = rgba(lavaTrack, root.embeddedHighEffectBudgetMode ? 0.34 : 0.28);
             ctx.lineCap = "round";
-            ctx.lineWidth = root.lowEffectMode ? (16 * root.lowEffectArcTune) : (30 * root.dynamicArcTune);
+            ctx.lineWidth = root.lowEffectMode
+                ? (16 * root.lowEffectArcTune)
+                : ((root.embeddedHighEffectBudgetMode ? 24 : 32) * root.dynamicArcTune);
+            ctx.arc(cx, cy, r, startRad, fullEndRad);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.strokeStyle = rgba(lavaRemainder, root.embeddedHighEffectBudgetMode ? 0.22 : 0.18);
+            ctx.lineWidth = root.lowEffectMode
+                ? (6 * root.lowEffectArcTune)
+                : ((root.embeddedHighEffectBudgetMode ? 8 : 10) * root.dynamicArcTune);
             ctx.arc(cx, cy, r, startRad, fullEndRad);
             ctx.stroke();
 
@@ -537,14 +930,38 @@ Item {
                                     4.6 * root.lowEffectArcTune,
                                     bright, 0.26, 16, 0.22);
                 } else {
+                    // One animated family per gauge. Embedded: thicker + brighter for glance.
+                    // Thick molten ribbon (concept): drive uses fewer blobs, show uses organic blobs
                     drawLavaBand(startRad, endRad,
-                                 5.5 * root.dynamicArcTune,
-                                 22 * root.dynamicArcTune,
+                                 (root.embeddedHighEffectBudgetMode ? 13.0 : 8.0) * root.dynamicArcTune,
+                                 (root.embeddedHighEffectBudgetMode ? 36.0 : 28.0) * root.dynamicArcTune,
                                  base, bright,
-                                 root.embeddedHighEffectBudgetMode ? 36 : 128,
+                                 root.embeddedHighEffectBudgetMode ? 32 : 128,
                                  0.50,
-                                 root.embeddedHighEffectBudgetMode ? 2 : 4);
+                                 root.embeddedHighEffectBudgetMode ? 3 : 6);
                 }
+            } else if (!root.lowEffectMode) {
+                // Idle ambient crawl on same cheap path (visible at 0 progress).
+                const ambSweep = sweepRad * (root.embeddedHighEffectBudgetMode ? 0.22 : 0.16);
+                const ambTravel = Math.max(0.0, sweepRad - ambSweep);
+                const ambU = (phase * 0.065) % 1.0;
+                const ambFrom = startRad + ambTravel * ambU;
+                const ambTo = ambFrom + ambSweep;
+                drawLavaBand(ambFrom, ambTo,
+                             (root.embeddedHighEffectBudgetMode ? 6.5 : 3.2) * root.dynamicArcTune,
+                             (root.embeddedHighEffectBudgetMode ? 18.0 : 11.0) * root.dynamicArcTune,
+                             base, bright,
+                             root.embeddedHighEffectBudgetMode ? 20 : 64,
+                             0.42,
+                             1);
+                // Soft track shimmer so the ring never looks fully dead
+                ctx.beginPath();
+                ctx.strokeStyle = rgba(lavaAmber, (root.embeddedHighEffectBudgetMode ? 0.20 : 0.12)
+                    + 0.08 * (0.5 + 0.5 * Math.sin(phase * 0.9)));
+                ctx.lineCap = "round";
+                ctx.lineWidth = (root.embeddedHighEffectBudgetMode ? 5.5 : 4.0) * root.dynamicArcTune;
+                ctx.arc(cx, cy, r, startRad, fullEndRad);
+                ctx.stroke();
             }
 
             root.lastPaintedProgress = progress;
@@ -557,10 +974,10 @@ Item {
     GaugeArcHead {
         id: arcHead
         z: 24
-        visible: false
+        visible: !root.atlasMagmaMode && (root.lavaAnimationEnabled || root.accentOverlayMode) && root.showArcHead && root.headVisible
         lowEffectMode: root.lowEffectMode
         scared: root.scaredHead
-        headRadius: root.headScreenRadius
+        headRadius: root.sgMagmaMode ? (root.headScreenRadius * 1.15) : root.headScreenRadius
         x: (root.width / 2) + Math.cos(root.headAngleRad) * root.arcRadiusOnScreen - (width / 2)
         y: (root.height / 2) + Math.sin(root.headAngleRad) * root.arcRadiusOnScreen - (height / 2)
     }

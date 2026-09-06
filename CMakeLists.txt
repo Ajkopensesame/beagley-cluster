@@ -202,6 +202,8 @@ set(BEAGLEY_QML_FILES
     src/ui/widgets/SpeedoPearl.qml
     src/ui/widgets/TachGauge.qml
     src/ui/widgets/MatrixRain.qml
+    src/ui/widgets/GaugeMatrixDepth.qml
+    src/ui/widgets/TwinMicroArcs.qml
     src/ui/widgets/MapCenter.qml
     src/ui/widgets/MapCenterBootShell.qml
     src/ui/widgets/MapCenterMapLibreNative.qml

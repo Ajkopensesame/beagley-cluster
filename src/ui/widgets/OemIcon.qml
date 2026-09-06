@@ -233,19 +233,31 @@ Item {
             }
 
             if (name === "fuel") {
-                ctx.strokeStyle = css(primary)
                 ctx.lineWidth = sw
                 ctx.lineCap = "round"
                 ctx.lineJoin = "round"
-                roundedRectPath(ctx, x(0.23), y(0.18), s * 0.38, s * 0.66, s * 0.055)
+                roundedRectPath(ctx, x(0.20), y(0.16), s * 0.42, s * 0.68, s * 0.06)
+                ctx.fillStyle = css(Qt.rgba(primary.r, primary.g, primary.b, 0.28))
+                ctx.fill()
+                ctx.strokeStyle = css(primary)
                 ctx.stroke()
-                roundedRectPath(ctx, x(0.31), y(0.28), s * 0.22, s * 0.14, s * 0.026)
+                roundedRectPath(ctx, x(0.28), y(0.26), s * 0.26, s * 0.16, s * 0.03)
+                ctx.fillStyle = css(accent)
+                ctx.fill()
                 ctx.stroke()
                 ctx.strokeStyle = css(accent)
+                ctx.lineWidth = sw * 1.05
                 ctx.beginPath()
-                ctx.moveTo(x(0.61), y(0.35))
-                ctx.bezierCurveTo(x(0.77), y(0.39), x(0.80), y(0.50), x(0.72), y(0.60))
-                ctx.lineTo(x(0.72), y(0.76))
+                ctx.moveTo(x(0.62), y(0.34))
+                ctx.bezierCurveTo(x(0.80), y(0.38), x(0.86), y(0.52), x(0.76), y(0.64))
+                ctx.lineTo(x(0.76), y(0.80))
+                ctx.lineTo(x(0.68), y(0.80))
+                ctx.stroke()
+                // foot
+                ctx.strokeStyle = css(primary)
+                ctx.beginPath()
+                ctx.moveTo(x(0.16), y(0.84))
+                ctx.lineTo(x(0.66), y(0.84))
                 ctx.stroke()
                 return
             }
@@ -263,6 +275,48 @@ Item {
                     ctx.arc(x(px + 0.05), y(py + 0.08), s * 0.075, 0, Math.PI * 2)
                     ctx.stroke()
                 }
+                return
+            }
+
+            if (name === "thermo" || name === "thermometer" || name === "temp") {
+                const cx = x(0.50)
+                const stemTop = y(0.12)
+                const stemBot = y(0.58)
+                const stemW = s * 0.16
+                const bulbR = s * 0.18
+                ctx.lineWidth = sw
+                ctx.lineCap = "round"
+                ctx.lineJoin = "round"
+                ctx.beginPath()
+                ctx.moveTo(cx - stemW * 0.5, stemTop)
+                ctx.lineTo(cx + stemW * 0.5, stemTop)
+                ctx.lineTo(cx + stemW * 0.5, stemBot)
+                ctx.lineTo(cx - stemW * 0.5, stemBot)
+                ctx.closePath()
+                ctx.fillStyle = css(Qt.rgba(primary.r, primary.g, primary.b, 0.22))
+                ctx.fill()
+                ctx.strokeStyle = css(primary)
+                ctx.stroke()
+                // mercury
+                ctx.fillStyle = css(accent)
+                ctx.fillRect(cx - stemW * 0.28, stemTop + (stemBot - stemTop) * 0.35, stemW * 0.56, (stemBot - stemTop) * 0.65)
+                // ticks
+                ctx.strokeStyle = css(primary)
+                ctx.lineWidth = sw * 0.55
+                for (let ti = 0; ti < 3; ti++) {
+                    const ty = stemTop + (stemBot - stemTop) * (0.22 + ti * 0.2)
+                    ctx.beginPath()
+                    ctx.moveTo(cx + stemW * 0.55, ty)
+                    ctx.lineTo(cx + stemW * 1.05, ty)
+                    ctx.stroke()
+                }
+                ctx.beginPath()
+                ctx.arc(cx, stemBot + bulbR * 0.55, bulbR, 0, Math.PI * 2)
+                ctx.fillStyle = css(accent)
+                ctx.fill()
+                ctx.strokeStyle = css(primary)
+                ctx.lineWidth = sw
+                ctx.stroke()
                 return
             }
 

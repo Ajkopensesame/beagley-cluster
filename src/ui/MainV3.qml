@@ -20,11 +20,14 @@ Window {
     flags: Qt.Window | Qt.CustomizeWindowHint | Qt.WindowTitleHint | Qt.WindowCloseButtonHint
     visible: true
 
-    Theme.PurplePearlTheme { id: appTheme }
+    Theme.PurplePearlTheme {
+        id: appTheme
+        isNight: root.menuDarkChrome
+    }
     Settings {
         id: clusterUiSettings
         category: "beagley_cluster_ui"
-        property string mapTheme: "light"
+        property string mapTheme: "dark"
         property bool mapThemeUserSelected: false
         property string themeMode: "auto"
         property string cachedSunriseIso: ""
@@ -33,7 +36,7 @@ Window {
         property string cachedSunDate: ""
     }
 
-    color: "#02060B"
+    color: appTheme.deepBlack
     readonly property var cluster: clusterRenderModel
     readonly property real defaultMapLat: -27.4698
     readonly property real defaultMapLng: 153.0251
@@ -74,7 +77,39 @@ Window {
     readonly property string gaugeEffectLevel: effectLevel
     readonly property bool gaugeLowEffectMode: gaugeEffectLevel === "low" || gaugeEffectLevel === "off"
     readonly property bool gaugeEffectsOff: gaugeEffectLevel === "off"
-    readonly property bool gaugeMatrixRainEnabled: gaugeEffectLevel === "high" && !clusterSimulation
+    // Skin v2 visual profiles:
+    //   drive = appliance default (glass + atlas magma + map; matrix hard-off)
+    //   show  = concept still match (matrix depth + richer atlas + face plate)
+    // Toggle without binary rebuild (qml-dev): place/remove
+    //   /opt/beagley-cluster/qml-dev/src/ui/skin-show.on
+    // Binary/env: BEAGLEY_SKIN_PROFILE=drive|show (context property from main.cpp)
+    readonly property bool skinShowMarkerPresent: skinShowLoader.status === Loader.Ready
+    readonly property string skinVisualProfile: {
+        const raw = (typeof BEAGLEY_SKIN_PROFILE !== "undefined" && BEAGLEY_SKIN_PROFILE)
+            ? String(BEAGLEY_SKIN_PROFILE).trim().toLowerCase()
+            : ""
+        if (raw === "show" || raw === "drive")
+            return raw
+        if (skinShowMarkerPresent)
+            return "show"
+        return renderProfile === "embedded" ? "drive" : "show"
+    }
+    readonly property bool skinShowProfile: skinVisualProfile === "show"
+
+    // Drive: matrix hard-off on embedded. Show: full MatrixRain on desktop; cheap depth on embedded.
+    readonly property bool gaugeMatrixRainEnabled: gaugeEffectLevel === "high"
+        && !clusterSimulation
+        && skinShowProfile
+        && renderProfile !== "embedded"
+    readonly property bool gaugeMatrixDepthEnabled: gaugeEffectLevel === "high"
+        && !clusterSimulation
+        && skinShowProfile
+        && renderProfile === "embedded"
+    // Lava is independent of matrix — embedded high uses lava-lite, never rain
+    readonly property bool gaugeLavaAccentEnabled: gaugeEffectLevel === "high" && !clusterSimulation
+    readonly property string gaugeAccentDetailMode: gaugeLavaAccentEnabled
+        ? (skinShowProfile ? "rich" : "safe")
+        : gaugeDetail
     readonly property int gaugeIndicatorCascadeCycleMs: gaugeLowEffectMode ? 2300 : 2100
     readonly property string mapRenderer: (typeof BEAGLEY_MAP_RENDERER !== "undefined" && BEAGLEY_MAP_RENDERER)
         ? String(BEAGLEY_MAP_RENDERER)
@@ -100,20 +135,26 @@ Window {
         && BEAGLEY_MAPLIBRE_NATIVE_ALLOW_UNTESTED_STYLES
     readonly property bool mapLibreNativeStyleOverrideActive: mapLibreNativeStyleOverride.length > 0
         && !clusterUiSettings.mapThemeUserSelected
+        // Slice 4: night product chrome prefers dark MapLibre theme style over bright env override
+        && !(menuDarkChrome && !mapThemeChosenThisSession)
     readonly property bool mapLibreNativeStyleTrusted: mapLibreStyleTrusted(activeMapStyleUrl)
-    readonly property string effectiveMapRenderer: mapLibreNativeRequested
-        && (!activeMapThemeUsesMapLibre || !mapLibreNativeStyleTrusted)
-        ? "native-online"
-        : mapRenderer
+    readonly property string effectiveMapRenderer: {
+        if (!mapLibreNativeRequested)
+            return mapRenderer
+        // Slice 4: keep MapLibre when a trusted style URL is active (theme or night preference)
+        if (String(activeMapStyleUrl || "").length > 0 && mapLibreNativeStyleTrusted)
+            return "maplibre-native"
+        return "native-online"
+    }
     readonly property bool mapLibreNativeActive: effectiveMapRenderer === "maplibre-native"
     readonly property bool mapLibreNativeFullUnderlay: (typeof BEAGLEY_MAPLIBRE_NATIVE_FULL_UNDERLAY !== "undefined")
         && BEAGLEY_MAPLIBRE_NATIVE_FULL_UNDERLAY
     readonly property bool mapLibreSafeCompositor: mapLibreNativeActive && !mapLibreNativeFullUnderlay
     readonly property real gaugeFaceBackgroundOpacity: 1.0
     readonly property int mapLibreSafeSideInset: mapLibreSafeCompositor
-        ? Math.round(gaugeFaceSize * 0.54)
+        ? Math.round(gaugeFaceSize * 0.50)
         : 0
-    readonly property int mapLibreSafeVerticalInset: mapLibreSafeCompositor ? 18 : 0
+    readonly property int mapLibreSafeVerticalInset: mapLibreSafeCompositor ? 14 : 0
     readonly property bool radarFeatureEnabled: (typeof BEAGLEY_RADAR_ENABLED !== "undefined")
         && BEAGLEY_RADAR_ENABLED
     property string weatherExpandedMode: (typeof BEAGLEY_INITIAL_WEATHER_EXPANDED_MODE !== "undefined"
@@ -130,16 +171,16 @@ Window {
     readonly property bool embeddedEffectBudgetMode: renderProfile === "embedded" && lowEffectMode
     readonly property bool embeddedHighEffectBudgetMode: renderProfile === "embedded" && effectLevel === "high"
     readonly property bool embeddedDirectMapCamera: renderProfile === "embedded"
-    readonly property bool embeddedGaugeMatrixRainMode: renderProfile === "embedded"
-    readonly property real gaugeMatrixRainSharedPhase: (gaugeMatrixRainEnabled && !embeddedGaugeMatrixRainMode)
-        ? sharedEffectPhase
-        : NaN
+    readonly property bool embeddedGaugeMatrixRainMode: false  // hard-off: never matrix on embedded
+    // Shared phase for demo/motion; matrix consumers get NaN when rain gated off
+    readonly property real gaugeMatrixRainSharedPhase: gaugeMatrixRainEnabled ? sharedEffectPhase : NaN
     readonly property bool sharedEffectClockEnabled: !effectsOff && !embeddedEffectBudgetMode
     readonly property bool stressMapMotionEnabled: stressScene && !lowEffectMode && renderProfile !== "embedded"
-    readonly property int gaugeShellSize: 780
-    readonly property int gaugePodSize: 642
-    readonly property int gaugeFaceSize: 656
-    readonly property int gaugeEdgeBleed: -18
+    // Slice 5: tighten dual-gauge vs map band — slight edge bleed, open center window
+    readonly property int gaugeShellSize: 768
+    readonly property int gaugePodSize: 632
+    readonly property int gaugeFaceSize: 644
+    readonly property int gaugeEdgeBleed: -26
     property real sharedEffectPhase: 0.0
     property real stressPhase: 0.0
     property real clusterSimulationPhase: 0.0
@@ -198,6 +239,9 @@ Window {
         ? (navigation.mapGuidanceBanner.banner || ({}))
         : ({})
     readonly property bool hasActiveRoute: navigation && navigation.activeRoute && Object.keys(navigation.activeRoute).length > 0
+    // Slice 4: guidance / active route lifts map contrast vs idle underlay
+    readonly property bool mapNavProductActive: hasActiveRoute
+        || (navigation && navigation.guidanceStarted)
     readonly property bool followUnlocked: navigation && navigation.followMode === "free_pan"
     readonly property bool gpsHoldingPose: !!navConnectivity.gpsUsingLastKnown
     readonly property string gearText: truthOk && hub && hub.gear ? hub.gear : "-"
@@ -212,67 +256,100 @@ Window {
         ? simulationTriangle(clusterSimulationPhase, 8.0) * 140
         : (stressScene
         ? (78 + 50 * Math.sin(stressPhase * 0.9))
-        : (gaugeReviewMode ? 118 : speedValue))
+        : (gaugeReviewMode
+            ? (48 + 72 * (0.5 + 0.5 * Math.sin(sharedEffectPhase * 0.38)))
+            : speedValue))
     readonly property real displayRpmValue: clusterSimulation
         ? simulationTriangle(clusterSimulationPhase + 1.0, 7.2) * 8000
         : (stressScene
         ? (2400 + 1800 * (0.5 + 0.5 * Math.sin(stressPhase * 1.15 + 0.4)))
-        : (gaugeReviewMode ? 4200 : rpmValue))
+        : (gaugeReviewMode
+            ? (1600 + 4200 * (0.5 + 0.5 * Math.sin(sharedEffectPhase * 0.46 + 0.7)))
+            : rpmValue))
     readonly property real displayFuelValue: clusterSimulation
         ? (100 - simulationTriangle(clusterSimulationPhase + 2.0, 9.5) * 100)
         : (stressScene
         ? (18 + 11 * Math.sin(stressPhase * 0.30 - 1.2))
-        : (gaugeReviewMode ? 14 : fuelValue))
+        : (gaugeReviewMode
+            ? (22 + 38 * (0.5 + 0.5 * Math.sin(sharedEffectPhase * 0.21 + 1.4)))
+            : fuelValue))
     readonly property real displayCoolantValue: clusterSimulation
         ? (40 + simulationTriangle(clusterSimulationPhase + 3.0, 10.5) * 70)
         : (stressScene
         ? (70 + 42 * Math.sin(stressPhase * 0.42 + 1.3))
-        : (gaugeReviewMode ? 104 : coolantValue))
+        : (gaugeReviewMode
+            ? (78 + 28 * (0.5 + 0.5 * Math.sin(sharedEffectPhase * 0.27 + 0.3)))
+            : coolantValue))
+
+    // Slice 5: Tesla-class gauge motion — exponential lag into native needles/numerals
+    property real smoothedSpeedValue: 0
+    property real smoothedRpmValue: 0
+    property real smoothedCoolantValue: 70
+    property real smoothedFuelValue: 100
+    readonly property real gaugeSpeedResponse: gaugeLowEffectMode ? 9.0 : 13.5
+    readonly property real gaugeRpmResponse: gaugeLowEffectMode ? 10.0 : 15.5
+    readonly property real gaugeAuxResponse: gaugeLowEffectMode ? 7.0 : 10.0
+    readonly property real gaugeSpeedMaxStep: gaugeLowEffectMode ? 7.5 : 11.0
+    readonly property real gaugeRpmMaxStep: gaugeLowEffectMode ? 280.0 : 420.0
+    readonly property real liveGaugeSpeed: smoothedSpeedValue
+    readonly property real liveGaugeRpm: smoothedRpmValue
+    readonly property real liveGaugeCoolant: smoothedCoolantValue
+    readonly property real liveGaugeFuel: smoothedFuelValue
+    readonly property bool gaugePearlBreatheActive: !gaugeEffectsOff && !gaugeLavaAccentEnabled
+        && !clusterSimulation
+        && Math.abs(liveGaugeSpeed) < 1.5
+        && Math.abs(liveGaugeRpm) < 80
     readonly property var simulationGearSequence: ["P", "R", "N", "D", "2", "1", "L"]
     readonly property string displayGearValue: clusterSimulation
         ? simulationGearSequence[Math.floor(clusterSimulationDiscretePhase / 1.25) % simulationGearSequence.length]
-        : (gaugeReviewMode ? "D" : gearText)
+        : (gaugeReviewMode ? "D" : root.gearText)
     readonly property bool displayOverdriveValue: clusterSimulation
         ? (Math.floor(clusterSimulationDiscretePhase / 4.0) % 3) === 1
         : (gaugeReviewMode ? false : truthOk && !!(hub && hub.overdrive))
     readonly property bool displayHighBeamValue: clusterSimulation
         ? (Math.floor(clusterSimulationDiscretePhase / 1.4) % 2) === 0
-        : (gaugeReviewMode ? true : !!(hub && hub.highBeam))
+        : (gaugeReviewMode ? false : !!(hub && hub.highBeam))
     readonly property int simulationDriveStep: Math.floor(clusterSimulationDiscretePhase / 2.2) % 3
     readonly property int simulationWarningStep: Math.floor(clusterSimulationDiscretePhase / 1.15) % 10
     readonly property bool displayWarnDoorValue: clusterSimulation
         ? (simulationWarningStep === 4 || simulationWarningStep === 8)
-        : (gaugeReviewMode ? true : truthOk && !!(hub && hub.warnDoor))
+        : (gaugeReviewMode ? false : truthOk && !!(hub && hub.warnDoor))
     readonly property bool displayWarnChargeValue: clusterSimulation
         ? (simulationWarningStep === 3 || simulationWarningStep === 8)
-        : (gaugeReviewMode ? true : truthOk && !!(hub && hub.warnCharge))
+        : (gaugeReviewMode ? false : truthOk && !!(hub && hub.warnCharge))
     readonly property bool displayWarnBrakeValue: clusterSimulation
         ? (simulationWarningStep === 1 || simulationWarningStep === 8)
-        : (gaugeReviewMode ? true : truthOk && !!(hub && hub.warnBrake))
+        : (gaugeReviewMode ? false : truthOk && !!(hub && hub.warnBrake))
     readonly property bool displayWarnOilValue: clusterSimulation
         ? (simulationWarningStep === 2 || simulationWarningStep === 8)
-        : (gaugeReviewMode ? true : truthOk && !!(hub && hub.warnOil))
+        : (gaugeReviewMode ? false : truthOk && !!(hub && hub.warnOil))
     readonly property bool displayWarnCheckEngineValue: clusterSimulation
         ? (simulationWarningStep === 5 || simulationWarningStep === 8)
-        : (gaugeReviewMode ? true : truthOk && !!(hub && hub.warnCheckEngine))
+        : (gaugeReviewMode ? false : truthOk && !!(hub && hub.warnCheckEngine))
     readonly property bool displayWarnATValue: clusterSimulation
         ? (simulationWarningStep === 6 || simulationWarningStep === 8)
-        : (gaugeReviewMode ? true : truthOk && !!(hub && hub.warnAT))
+        : (gaugeReviewMode ? false : truthOk && !!(hub && hub.warnAT))
     readonly property bool displayWarnFuelLowValue: clusterSimulation
         ? (simulationWarningStep === 7 || simulationWarningStep === 8)
-        : (gaugeReviewMode ? true : truthOk && !!(hub && hub.warnFuelLow))
+        : (gaugeReviewMode ? false : truthOk && !!(hub && hub.warnFuelLow))
     readonly property string displayDrivetrainModeValue: clusterSimulation
         ? (simulationDriveStep === 0 ? "2wd" : "4wd")
-        : (gaugeReviewMode ? "4wd" : ((hub && hub.drivetrainMode) ? String(hub.drivetrainMode).toLowerCase() : "2wd"))
+        : (gaugeReviewMode ? "2wd" : ((hub && hub.drivetrainMode) ? String(hub.drivetrainMode).toLowerCase() : "2wd"))
     readonly property bool displayTransferLockValue: clusterSimulation
         ? simulationDriveStep === 2
         : (gaugeReviewMode ? false : truthOk && !!(hub && hub.transferLock))
     readonly property string displayDriveModeText: clusterSimulation
         ? (simulationDriveStep === 0 ? "2WD" : (simulationDriveStep === 1 ? "4WD" : "LOCK"))
-        : (gaugeReviewMode ? "4WD" : ((hub && hub.drivetrainMode) ? String(hub.drivetrainMode).toUpperCase() : "2WD"))
+        : (gaugeReviewMode ? "2WD" : ((hub && hub.drivetrainMode) ? String(hub.drivetrainMode).toUpperCase() : "2WD"))
     readonly property string displayOdometerText: clusterSimulation
         ? formatOdometerKm(284613 + Math.floor(clusterSimulationDiscretePhase * 12))
-        : "------"
+        : (gaugeReviewMode
+            ? formatOdometerKm(12580)
+            : (truthOk && hub && isFinite(Number(hub.odometerKm))
+                ? formatOdometerKm(hub.odometerKm)
+                : (truthOk && hub && isFinite(Number(hub.odoKm))
+                    ? formatOdometerKm(hub.odoKm)
+                    : "------")))
     function formatOdometerKm(value) {
         const text = String(Math.max(0, Math.round(Number(value) || 0)))
         let out = ""
@@ -458,6 +535,7 @@ Window {
         autoThemeSunriseMs,
         autoThemeSunsetMs)
     readonly property bool menuDarkChrome: resolvedChromeTheme === "dark"
+    property bool mapThemeChosenThisSession: false
     readonly property color menuAccentColor: "#1A73E8"
     readonly property color menuPanelColor: menuDarkChrome ? "#101821" : "#F8FAFF"
     readonly property color menuSurfaceColor: menuDarkChrome ? "#111D2B" : "#FFFFFF"
@@ -498,8 +576,8 @@ Window {
             label: "Minimal",
             detail: "Clean",
             tileUrlTemplate: "https://a.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}.png",
-            styleUrl: "",
-            mapLibre: false,
+            styleUrl: "https://tiles.openfreemap.org/styles/positron",
+            mapLibre: true,
             maxZoom: 19,
             swatchA: "#F7F8F3",
             swatchB: "#ADBFD1"
@@ -520,8 +598,8 @@ Window {
             label: "Dark",
             detail: "Night",
             tileUrlTemplate: "https://a.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png",
-            styleUrl: "",
-            mapLibre: false,
+            styleUrl: "https://tiles.openfreemap.org/styles/dark",
+            mapLibre: true,
             maxZoom: 19,
             swatchA: "#172132",
             swatchB: "#406179"
@@ -542,9 +620,27 @@ Window {
     readonly property string activeMapTileUrlTemplate: String(activeMapThemeOption.tileUrlTemplate || "")
     readonly property bool activeMapThemeUsesMapLibre: activeMapThemeOption.mapLibre !== false
         && String(activeMapThemeOption.styleUrl || "").length > 0
-    readonly property string activeMapStyleUrl: mapLibreNativeStyleOverrideActive
-        ? mapLibreNativeStyleOverride
-        : (activeMapThemeUsesMapLibre ? String(activeMapThemeOption.styleUrl || "") : "")
+    readonly property string openFreeMapDarkStyleUrl: "https://tiles.openfreemap.org/styles/dark"
+    readonly property string activeMapStyleUrl: {
+        // Slice 4: night + maplibre-native → trusted dark MapLibre (readable product underlay)
+        if (mapLibreNativeRequested && menuDarkChrome && !mapThemeChosenThisSession
+                && !isBrightMapTheme(clusterUiSettings.mapTheme)) {
+            const darkOpt = mapThemeOption("dark")
+            const darkUrl = String((darkOpt && darkOpt.styleUrl) || openFreeMapDarkStyleUrl).trim()
+            if (darkUrl.length > 0)
+                return darkUrl
+        }
+        if (mapLibreNativeStyleOverrideActive)
+            return mapLibreNativeStyleOverride
+        if (activeMapThemeUsesMapLibre)
+            return String(activeMapThemeOption.styleUrl || "")
+        if (mapLibreNativeRequested && menuDarkChrome) {
+            const fallbackDark = String(openFreeMapDarkStyleUrl).trim()
+            if (fallbackDark.length > 0)
+                return fallbackDark
+        }
+        return ""
+    }
     readonly property real activeMapMaxZoom: mapLibreNativeRequested && activeMapThemeUsesMapLibre
         ? Math.min(Number(activeMapThemeOption.maxZoom || 19), mapLibreNativeMaxZoom)
         : Number(activeMapThemeOption.maxZoom || 19)
@@ -672,10 +768,32 @@ Window {
         return root.mapThemeOptions[0]
     }
 
+    function isBrightMapTheme(themeId) {
+        const id = String(themeId || "").trim().toLowerCase()
+        return id === "light" || id === "street" || id === "terrain"
+            || id === "roads" || id === "drive"
+    }
+
+    function applyNightMapHierarchyPreference() {
+        // Night/product chrome beats a sticky bright map from prior sessions.
+        // A map chosen this session (selectMapTheme) still wins until reboot.
+        // Slice 4: prefer MapLibre-backed dark theme so the center map stays a readable product.
+        if (!root.menuDarkChrome)
+            return
+        if (root.mapThemeChosenThisSession)
+            return
+        if (!root.isBrightMapTheme(clusterUiSettings.mapTheme)
+                && String(clusterUiSettings.mapTheme || "").trim().toLowerCase() === "dark")
+            return
+        clusterUiSettings.mapTheme = "dark"
+        clusterUiSettings.mapThemeUserSelected = false
+    }
+
     function selectMapTheme(themeId) {
         const option = root.mapThemeOption(themeId)
         clusterUiSettings.mapTheme = option.id
         clusterUiSettings.mapThemeUserSelected = true
+        root.mapThemeChosenThisSession = true
     }
 
     function normalizedChromeThemeMode(value) {
@@ -1026,7 +1144,8 @@ Window {
     }
 
     function musicAuthRequired() {
-        return String(root.musicStatus).toUpperCase() === "AUTH"
+        var status = String(root.musicStatus).toUpperCase()
+        return status === "AUTH" || status === "PERMISSION"
     }
 
     function musicNowPlayingLine() {
@@ -1048,6 +1167,8 @@ Window {
             return root.spotifySaveDetail.length > 0 ? root.spotifySaveDetail : "Reconnect Spotify for liked songs"
         if (root.spotifySavePending)
             return "Updating liked songs"
+        if (String(root.musicStatus).toUpperCase() === "PERMISSION")
+            return "Spotify permission required — scan QR to re-pair"
         if (root.musicAuthRequired())
             return "Connect Spotify to show what is playing"
         if (root.musicAvailable)
@@ -1060,6 +1181,8 @@ Window {
             return "SETUP"
         if (root.spotifyPairingActive)
             return "CANCEL"
+        if (String(root.musicStatus).toUpperCase() === "PERMISSION")
+            return "REPAIR"
         if (root.musicAuthRequired())
             return "CONNECT"
         if (root.spotifyRepairRequired)
@@ -1349,10 +1472,11 @@ Window {
         return displayMode + " display / " + String(root.activeMapThemeOption.label || "Minimal") + " map"
     }
 
+    onMenuDarkChromeChanged: root.applyNightMapHierarchyPreference()
+
     Component.onCompleted: {
-        if (!clusterUiSettings.mapThemeUserSelected && String(clusterUiSettings.mapTheme || "") !== "light")
-            clusterUiSettings.mapTheme = "light"
         clusterUiSettings.themeMode = root.normalizedChromeThemeMode(clusterUiSettings.themeMode)
+        root.applyNightMapHierarchyPreference()
         root.restoreCachedSunTimes()
         root.requestAutoThemeSunTimes(true)
         root.showNormal()
@@ -1441,6 +1565,28 @@ Window {
         interval: 2200
         repeat: false
         onTriggered: root.departureCameraCloseInActive = false
+    }
+
+    Timer {
+        id: gaugeMotionClock
+        // Prefer needle snappiness: 33ms on embedded; lava ticks slower and never steals this clock
+        interval: (root.renderProfile === "embedded" || root.embeddedHighEffectBudgetMode) ? 33 : 16
+        running: true
+        repeat: true
+        onTriggered: {
+            const dt = interval / 1000.0
+            function approach(current, target, response, maxStep) {
+                const diff = target - current
+                let step = diff * (1.0 - Math.exp(-response * dt))
+                if (step > maxStep) step = maxStep
+                if (step < -maxStep) step = -maxStep
+                return current + step
+            }
+            root.smoothedSpeedValue = approach(root.smoothedSpeedValue, root.displaySpeedValue, root.gaugeSpeedResponse, root.gaugeSpeedMaxStep)
+            root.smoothedRpmValue = approach(root.smoothedRpmValue, root.displayRpmValue, root.gaugeRpmResponse, root.gaugeRpmMaxStep)
+            root.smoothedCoolantValue = approach(root.smoothedCoolantValue, root.displayCoolantValue, root.gaugeAuxResponse, 3.5)
+            root.smoothedFuelValue = approach(root.smoothedFuelValue, root.displayFuelValue, root.gaugeAuxResponse, 6.0)
+        }
     }
 
     Timer {
@@ -1546,7 +1692,8 @@ Window {
 
     Canvas {
         anchors.fill: parent
-        visible: !root.lowEffectMode
+        // Product idle: hide decorative hatch; keep for stress/demo only
+        visible: (root.stressScene || root.gaugeDemo) && !root.lowEffectMode
         opacity: 0.36
         onPaint: {
             const ctx = getContext("2d")
@@ -1584,7 +1731,9 @@ Window {
 
         Canvas {
             anchors.fill: parent
-            visible: !root.lowEffectMode
+            // Product idle: hide canopy cyan glow; keep for stress/demo only
+            visible: (root.stressScene || root.gaugeDemo) && !root.lowEffectMode
+            opacity: (root.stressScene || root.gaugeDemo) ? 1.0 : 0.0
             onPaint: {
                 const ctx = getContext("2d")
                 ctx.clearRect(0, 0, width, height)
@@ -1671,17 +1820,26 @@ Window {
             Rectangle {
                 anchors.fill: parent
                 color: "#07111A"
-                opacity: root.mapLibreSafeCompositor ? 0.18 : 0.12
+                opacity: {
+                    // Slice 4: dial veil keeps gauges primary; lift map when navigating
+                    if (root.mapNavProductActive)
+                        return appTheme.mapVeilGuidance
+                    if (root.mapLibreSafeCompositor)
+                        return appTheme.mapVeilIdle
+                    return appTheme.mapVeilSoft
+                }
             }
 
             Rectangle {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
-                height: 120
+                height: 118
                 gradient: Gradient {
+                    // Slice 5: slightly shorter foot fade — more readable map band under gauges
                     GradientStop { position: 0.0; color: "#00000000" }
-                    GradientStop { position: 1.0; color: "#02060BCC" }
+                    GradientStop { position: 0.52; color: root.mapNavProductActive ? "#02060B1A" : "#02060B2A" }
+                    GradientStop { position: 1.0; color: root.mapNavProductActive ? "#01050A78" : "#01050AA8" }
                 }
             }
         }
@@ -1725,6 +1883,59 @@ Window {
             }
         }
 
+        // Skin v2: concept purple top/bottom map frame accents
+        Item {
+            id: mapFrameAccents
+            anchors.fill: parent
+            z: 9
+            visible: !root.mapMenuOpen && !root.navControlsOpen
+
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.leftMargin: root.mapLibreSafeSideInset + 8
+                anchors.rightMargin: root.mapLibreSafeSideInset + 8
+                y: root.mapLibreSafeVerticalInset
+                height: 2
+                radius: 1
+                color: appTheme.mapFramePurple
+                opacity: 0.96
+            }
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.leftMargin: root.mapLibreSafeSideInset + 28
+                anchors.rightMargin: root.mapLibreSafeSideInset + 28
+                y: root.mapLibreSafeVerticalInset + 2
+                height: 1
+                color: appTheme.mapFramePurple
+                opacity: 0.48
+            }
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.leftMargin: root.mapLibreSafeSideInset + 8
+                anchors.rightMargin: root.mapLibreSafeSideInset + 8
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: root.mapLibreSafeVerticalInset
+                height: 2
+                radius: 1
+                color: appTheme.mapFramePurple
+                opacity: 0.92
+            }
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.leftMargin: root.mapLibreSafeSideInset + 28
+                anchors.rightMargin: root.mapLibreSafeSideInset + 28
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: root.mapLibreSafeVerticalInset + 2
+                height: 1
+                color: appTheme.mapFramePurple
+                opacity: 0.42
+            }
+        }
+
         W.MapVehicleMarker {
             id: mapVehicleMarker
             width: 54
@@ -1750,6 +1961,7 @@ Window {
             phase: root.sharedEffectPhase
             nowPlayingService: root.nowPlayingService
             radarEnabled: root.radarFeatureEnabled
+            mapLibreNativeActive: root.mapLibreNativeActive
             radarMapStyleUrl: root.activeMapStyleUrl
             radarTileUrlTemplate: root.activeMapTileUrlTemplate
             expandedMode: root.weatherExpandedMode
@@ -1764,6 +1976,147 @@ Window {
             onMapMenuRequested: function(stage) {
                 root.openMapMenu(stage)
             }
+        }
+
+        // Slice 6: bottom-edge swipe-up opens SETUP/settings (no lower twin chrome).
+        // Do NOT accept/capture on press — only claim after upward / vertical dominance
+        // so map pan near the bottom edge is not stolen on failed gestures. Strip ≤64px.
+        Item {
+            id: setupSwipeEdge
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            height: 56
+            z: 270
+            visible: !root.mapMenuOpen && !root.navControlsOpen
+
+            // Slice 6 dy thresholds: upward < -36, |dy| > |dx|*1.35, vy>420 or dy<-64
+            readonly property real upwardDy: -36
+            readonly property real strongDy: -64
+            readonly property real verticalRatio: 1.35
+            readonly property real minUpwardVy: 420
+
+            DragHandler {
+                id: setupSwipeHandler
+                target: null
+                enabled: setupSwipeEdge.visible
+                acceptedButtons: Qt.LeftButton
+                // Passive until drag threshold + allowed axis; avoids onPressed steal.
+                // Axis lock keeps horizontal map pan from activating this handler.
+                xAxis.enabled: false
+                yAxis.enabled: true
+                yAxis.maximum: 0 // upward only (y grows downward)
+                grabPermissions: PointerHandler.CanTakeOverFromItems
+                    | PointerHandler.ApprovesTakeOverByAnything
+
+                property real gestureStartMs: 0
+                property real peakDx: 0
+                property real peakDy: 0
+
+                onActiveChanged: {
+                    if (active) {
+                        gestureStartMs = Date.now()
+                        peakDx = 0
+                        peakDy = 0
+                        return
+                    }
+                    // Snapshot peaks before DragHandler clears translation on deactivate.
+                    const dx = peakDx
+                    const dy = peakDy
+                    const dt = Math.max(16, Date.now() - gestureStartMs)
+                    const vy = (-dy) / (dt / 1000.0) // upward positive px/s
+                    const upward = dy < setupSwipeEdge.upwardDy
+                    const verticalDominant = Math.abs(dy) > Math.abs(dx) * setupSwipeEdge.verticalRatio
+                    const fastEnough = vy > setupSwipeEdge.minUpwardVy || dy < setupSwipeEdge.strongDy
+                    if (upward && verticalDominant && fastEnough)
+                        root.openMapMenu("settings")
+                }
+
+                onTranslationChanged: {
+                    if (!active)
+                        return
+                    peakDx = translation.x
+                    peakDy = translation.y
+                }
+            }
+        }
+
+        // Skin v2: concept bottom swipe caret + light MAP affordance
+        Item {
+            id: mapDiscoverCluster
+            z: 271
+            visible: !root.mapMenuOpen && !root.navControlsOpen
+            width: 86
+            height: 46
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 6
+
+            // Concept still: rounded tab with upward caret
+            Rectangle {
+                id: swipeCaretTab
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.top: parent.top
+                width: 44
+                height: 18
+                radius: 9
+                color: Qt.rgba(0.03, 0.04, 0.08, 0.78)
+                border.width: 1
+                border.color: Qt.rgba(appTheme.mapFramePurple.r, appTheme.mapFramePurple.g, appTheme.mapFramePurple.b, 0.55)
+
+                Text {
+                    anchors.centerIn: parent
+                    anchors.verticalCenterOffset: -1
+                    text: "^"
+                    color: "#F4F1FF"
+                    font.pixelSize: 11
+                    font.bold: true
+                    opacity: 0.95
+                    renderType: root.menuTextRenderType
+                }
+            }
+
+            Rectangle {
+                id: mapDiscoverChip
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.bottom: parent.bottom
+                width: 74
+                height: 26
+                radius: 13
+                color: Qt.rgba(0.02, 0.03, 0.06, 0.55)
+                border.width: 1
+                border.color: Qt.rgba(appTheme.mapFramePurple.r, appTheme.mapFramePurple.g, appTheme.mapFramePurple.b, 0.38)
+                opacity: 0.78
+
+                Text {
+                    anchors.centerIn: parent
+                    text: "MAP"
+                    color: "#E8DEFF"
+                    font.family: "Oxanium"
+                    font.pixelSize: 11
+                    font.weight: Font.DemiBold
+                    font.letterSpacing: 1.2
+                    renderType: root.menuTextRenderType
+                }
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                onClicked: root.openMapMenu("search")
+            }
+        }
+
+
+        // Probe show-profile without BEAGLEY_SKIN_PROFILE in the running binary.
+        // Loader.Ready only when SkinShowOverride.qml exists beside MainV3 (qml-dev).
+        // SHOW:  printf '%s\n' 'import QtQuick 2.15; QtObject { objectName: "skinShow" }' \
+        //          > /opt/beagley-cluster/qml-dev/src/ui/SkinShowOverride.qml && systemctl restart beagley_cluster
+        // DRIVE: rm -f /opt/beagley-cluster/qml-dev/src/ui/SkinShowOverride.qml && systemctl restart beagley_cluster
+        Loader {
+            id: skinShowLoader
+            active: true
+            asynchronous: false
+            source: Qt.resolvedUrl("SkinShowOverride.qml")
         }
 
         Item {
@@ -1888,6 +2241,41 @@ Window {
                 color: "#010309FE"
             }
 
+            // Slice 5: soft idle pearl breathe — only when meaningfully parked/idle
+            Rectangle {
+                anchors.centerIn: parent
+                width: root.gaugeFaceSize + 28
+                height: width
+                radius: width / 2
+                z: root.mapLibreSafeCompositor ? 115 : 15
+                visible: root.gaugePearlBreatheActive
+                color: "transparent"
+                border.width: 2
+                border.color: Qt.rgba(appTheme.pearlLow.r, appTheme.pearlLow.g, appTheme.pearlLow.b, 0.16)
+                opacity: 0.0
+                SequentialAnimation on opacity {
+                    running: root.gaugePearlBreatheActive
+                    loops: Animation.Infinite
+                    NumberAnimation { from: 0.10; to: 0.28; duration: 1600; easing.type: Easing.InOutSine }
+                    NumberAnimation { from: 0.28; to: 0.10; duration: 1600; easing.type: Easing.InOutSine }
+                }
+            }
+
+            W.GaugeLensShell {
+                anchors.centerIn: parent
+                width: root.gaugeFaceSize + 36
+                height: width
+                z: root.mapLibreSafeCompositor ? 118 : 18
+                theme: appTheme
+                effectLevel: root.gaugeEffectLevel
+                gaugeColor: appTheme.speedGlow
+                chromeColor: appTheme.rimGlow
+                faceSize: root.gaugeFaceSize
+                podSize: root.gaugeFaceSize
+                atlasRimEnabled: true
+                atlasFaceEnabled: root.skinShowProfile
+            }
+
             NativeGaugeInstrument {
                 id: speedGauge
                 anchors.centerIn: parent
@@ -1895,19 +2283,94 @@ Window {
                 height: root.gaugeFaceSize
                 z: root.mapLibreSafeCompositor ? 120 : 20
                 kind: "speed"
-                value: root.displaySpeedValue
+                value: root.liveGaugeSpeed
                 maxValue: 140
-                auxProgress: Math.max(0.14, Math.min(1, (root.displayCoolantValue - 40) / 70))
-                primaryColor: appTheme.speedColor(root.displaySpeedValue)
-                auxColor: root.displayCoolantValue >= 100 ? appTheme.danger : (root.displayCoolantValue < 40 ? "#63C9FF" : appTheme.pearlLow)
-                chromeColor: appTheme.pearlLow
+                // Coolant moves to tach twin micro-arcs (Skin v2); keep a quiet residual track
+                auxProgress: 0.0
+                // NativeGaugeInstrumentItem.cpp forces primary alpha to 242 — never pass lavaOrange
+                // or a solid orange band paints under DialChrome and kills magma texture read.
+                primaryColor: root.gaugeLavaAccentEnabled
+                    ? appTheme.deepBlack
+                    : appTheme.speedColor(root.liveGaugeSpeed)
+                auxColor: "transparent"
+                chromeColor: root.gaugeLavaAccentEnabled ? appTheme.lavaTrack : appTheme.pearlLow
                 lowEffectMode: root.gaugeLowEffectMode
                 backgroundOpacity: root.gaugeFaceBackgroundOpacity
+            }
+
+            W.MatrixRain {
+                anchors.fill: speedGauge
+                z: root.mapLibreSafeCompositor ? 122 : 22
+                visible: root.gaugeMatrixRainEnabled
+                circularMask: true
+                maskRadius: Math.min(width, height) * 0.46
+                effectEnabled: visible && !root.mapMenuOpen
+                effectLevel: root.gaugeEffectLevel
+                sharedPhase: root.gaugeMatrixRainSharedPhase
+                rainColor: Qt.rgba(appTheme.matrixCyan.r, appTheme.matrixCyan.g, appTheme.matrixCyan.b, 0.72)
+                glowColor: Qt.rgba(appTheme.matrixCyan.r, appTheme.matrixCyan.g, appTheme.matrixCyan.b, 0.45)
+                fps: root.embeddedHighEffectBudgetMode ? 3.0 : 8.0
+                speedMultiplier: root.embeddedHighEffectBudgetMode ? 0.18 : 0.16
+                density: root.embeddedHighEffectBudgetMode ? 0.28 : 0.22
+                glowSpeed: 0.55
+                glowFloor: 0.18
+                glowBlur: root.embeddedHighEffectBudgetMode ? 4.5 : 5.5
+                driftScale: 0.75
+                charChangeChance: root.embeddedHighEffectBudgetMode ? 0.012 : 0.014
+                fontPx: root.embeddedHighEffectBudgetMode ? 13 : 11
+                fadeAlpha: 0.03
+                tailLength: root.embeddedHighEffectBudgetMode ? 18 : 22
+                headAlpha: 0.70
+                tailMinAlpha: 0.06
+                opacity: 0.58
+            }
+
+            W.DialChrome {
+                anchors.fill: speedGauge
+                z: root.mapLibreSafeCompositor ? 125 : 25
+                visible: root.gaugeLavaAccentEnabled
+                theme: appTheme
+                effectLevel: root.gaugeEffectLevel
+                detailMode: root.gaugeAccentDetailMode
+                accentOverlayMode: true
+                gaugeColor: appTheme.lavaOrange
+                chromeColor: appTheme.lavaTrack
+                progress: Math.max(0, Math.min(1, root.liveGaugeSpeed / 140))
+                showArcHead: false
+                maxValue: 140
+                startAngleDeg: 225
+                sweepAngleDeg: 210
+                minorStep: 10
+                majorStep: 20
+                labelStep: 20
+                labelStart: 20
+                labelDivisor: 1
+            }
+
+            W.MagmaAtlasOverlay {
+                anchors.fill: speedGauge
+                z: root.mapLibreSafeCompositor ? 126 : 26
+                visible: root.gaugeLavaAccentEnabled
+                progress: Math.max(0, Math.min(1, root.liveGaugeSpeed / 140))
             }
 
             Item {
                 anchors.fill: speedGauge
                 z: root.mapLibreSafeCompositor ? 130 : 30
+
+                // Show matrix in numeral stack (above NativeGauge/DialChrome face, under digits)
+                W.GaugeMatrixDepth {
+                    anchors.fill: parent
+                    z: 1
+                    visible: root.gaugeMatrixDepthEnabled && !root.mapMenuOpen
+                    effectEnabled: visible
+                    rainColor: "#B8FFFF"
+                    density: 0.72
+                    columns: 14
+                    fontPx: 14
+                    opacityScale: 0.95
+                    faceFactor: 0.68
+                }
 
                 Repeater {
                     model: [
@@ -1939,8 +2402,8 @@ Window {
                     id: odBadge
                     z: 62
                     visible: root.displayOverdriveValue
-                    anchors.horizontalCenter: speedValueText.horizontalCenter
-                    anchors.bottom: speedValueText.top
+                    anchors.horizontalCenter: speedValueBox.horizontalCenter
+                    anchors.bottom: speedValueBox.top
                     anchors.bottomMargin: parent.height * 0.046
                     width: parent.width * 0.222
                     height: parent.height * 0.078
@@ -1994,32 +2457,95 @@ Window {
                 }
 
                 Text {
-                    id: speedValueText
+                    id: speedUnitText
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.verticalCenter: parent.verticalCenter
-                    anchors.verticalCenterOffset: -parent.height * 0.030
-                    text: root.formatSpeedValue(root.displaySpeedValue)
-                    color: appTheme.speedColor(root.displaySpeedValue)
+                    anchors.verticalCenterOffset: -parent.height * 0.168
+                    text: "KM/H"
+                    color: Qt.rgba(appTheme.speedGlow.r, appTheme.speedGlow.g, appTheme.speedGlow.b, 0.78)
                     font.family: "Oxanium"
-                    font.pixelSize: parent.width * 0.158
+                    font.pixelSize: parent.width * 0.028
                     font.bold: true
+                    font.letterSpacing: 2
                     renderType: root.menuTextRenderType
                     horizontalAlignment: Text.AlignHCenter
                     style: Text.Outline
-                    styleColor: "#F0000000"
+                    styleColor: "#C0000000"
+                }
+
+                Item {
+                    id: speedValueBox
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.verticalCenterOffset: -parent.height * 0.030
+                    width: speedValueText.implicitWidth
+                    height: speedValueText.implicitHeight
+
+                    Text {
+                        id: speedValueText
+                        anchors.centerIn: parent
+                        text: root.formatSpeedValue(root.liveGaugeSpeed)
+                        color: appTheme.speedColor(root.liveGaugeSpeed)
+                        font.family: "Oxanium"
+                        font.pixelSize: parent.parent.width * 0.168
+                        font.bold: true
+                        renderType: root.menuTextRenderType
+                        horizontalAlignment: Text.AlignHCenter
+                        style: Text.Outline
+                        styleColor: "#F0000000"
+                    }
+                    // Purple→white vertical gradient (concept numeral punch)
+                    Item {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        height: parent.height * 0.48
+                        clip: true
+                        Text {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            anchors.bottom: parent.bottom
+                            width: speedValueText.width
+                            height: speedValueText.height
+                            text: speedValueText.text
+                            color: appTheme.pearlHigh
+                            opacity: 0.82
+                            font: speedValueText.font
+                            renderType: speedValueText.renderType
+                            horizontalAlignment: Text.AlignHCenter
+                        }
+                    }
+                    Item {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        height: parent.height * 0.62
+                        clip: true
+                        Text {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            y: 0
+                            width: speedValueText.width
+                            height: speedValueText.height
+                            text: speedValueText.text
+                            color: "#FFFFFFFF"
+                            opacity: 0.94
+                            font: speedValueText.font
+                            renderType: speedValueText.renderType
+                            horizontalAlignment: Text.AlignHCenter
+                        }
+                    }
                 }
 
                 Item {
                     id: gearReadout
                     z: 61
-                    anchors.top: speedValueText.bottom
+                    anchors.top: speedValueBox.bottom
                     anchors.topMargin: parent.height * 0.024
-                    anchors.horizontalCenter: speedValueText.horizontalCenter
+                    anchors.horizontalCenter: speedValueBox.horizontalCenter
                     width: parent.width * 0.144
                     height: parent.height * 0.088
 
                     Text {
-                        id: gearText
+                        id: gearValueText
                         anchors.centerIn: parent
                         text: root.displayGearValue
                         color: root.gearColorFor(text)
@@ -2033,7 +2559,7 @@ Window {
                         styleColor: "#F0000000"
 
                         SequentialAnimation on opacity {
-                            running: root.normGear(gearText.text) === "R"
+                            running: root.normGear(gearValueText.text) === "R"
                             loops: Animation.Infinite
                             NumberAnimation { from: 1.0; to: 0.20; duration: 220 }
                             NumberAnimation { from: 0.20; to: 1.0; duration: 220 }
@@ -2079,6 +2605,7 @@ Window {
                     height: parent.height * 0.034
                     x: root.gaugePointX(parent.width, root.gaugeAuxStartDeg + root.gaugeAuxSweepDeg, parent.width * 0.36 + 24) - width / 2
                     y: root.gaugePointY(parent.height, root.gaugeAuxStartDeg + root.gaugeAuxSweepDeg, parent.width * 0.36 + 24) - height / 2
+                    visible: false
                     text: "C"
                     color: appTheme.pearlLow
                     opacity: 0.86
@@ -2095,6 +2622,7 @@ Window {
                     height: parent.height * 0.034
                     x: root.gaugePointX(parent.width, root.gaugeAuxStartDeg, parent.width * 0.36 + 24) - width / 2
                     y: root.gaugePointY(parent.height, root.gaugeAuxStartDeg, parent.width * 0.36 + 24) - height / 2
+                    visible: false
                     text: "H"
                     color: appTheme.pearlLow
                     opacity: 0.86
@@ -2151,6 +2679,40 @@ Window {
                 color: "#010309FE"
             }
 
+            Rectangle {
+                anchors.centerIn: parent
+                width: root.gaugeFaceSize + 28
+                height: width
+                radius: width / 2
+                z: root.mapLibreSafeCompositor ? 115 : 15
+                visible: root.gaugePearlBreatheActive
+                color: "transparent"
+                border.width: 2
+                border.color: Qt.rgba(appTheme.pearlLow.r, appTheme.pearlLow.g, appTheme.pearlLow.b, 0.14)
+                opacity: 0.0
+                SequentialAnimation on opacity {
+                    running: root.gaugePearlBreatheActive
+                    loops: Animation.Infinite
+                    NumberAnimation { from: 0.08; to: 0.24; duration: 1700; easing.type: Easing.InOutSine }
+                    NumberAnimation { from: 0.24; to: 0.08; duration: 1700; easing.type: Easing.InOutSine }
+                }
+            }
+
+            W.GaugeLensShell {
+                anchors.centerIn: parent
+                width: root.gaugeFaceSize + 36
+                height: width
+                z: root.mapLibreSafeCompositor ? 118 : 18
+                theme: appTheme
+                effectLevel: root.gaugeEffectLevel
+                gaugeColor: appTheme.pearlLow
+                chromeColor: appTheme.rimGlow
+                faceSize: root.gaugeFaceSize
+                podSize: root.gaugeFaceSize
+                atlasRimEnabled: true
+                atlasFaceEnabled: root.skinShowProfile
+            }
+
             NativeGaugeInstrument {
                 id: tachGauge
                 anchors.centerIn: parent
@@ -2158,19 +2720,91 @@ Window {
                 height: root.gaugeFaceSize
                 z: root.mapLibreSafeCompositor ? 120 : 20
                 kind: "tach"
-                value: root.displayRpmValue
+                value: root.liveGaugeRpm
                 maxValue: 8000
-                auxProgress: Math.max(0, Math.min(1, root.displayFuelValue / 100))
-                primaryColor: appTheme.rpmColor(root.displayRpmValue)
-                auxColor: root.displayFuelValue <= 12 ? appTheme.danger : appTheme.pearlLow
-                chromeColor: appTheme.pearlLow
+                // Twin micro-arcs own fuel/temp; mute native aux to avoid double rings
+                auxProgress: 0.0
+                primaryColor: root.gaugeLavaAccentEnabled
+                    ? appTheme.deepBlack
+                    : appTheme.rpmColor(root.liveGaugeRpm)
+                auxColor: "transparent"
+                chromeColor: root.gaugeLavaAccentEnabled ? appTheme.lavaTrack : appTheme.pearlLow
                 lowEffectMode: root.gaugeLowEffectMode
                 backgroundOpacity: root.gaugeFaceBackgroundOpacity
+            }
+
+            W.MatrixRain {
+                anchors.fill: tachGauge
+                z: root.mapLibreSafeCompositor ? 122 : 22
+                visible: root.gaugeMatrixRainEnabled
+                circularMask: true
+                maskRadius: Math.min(width, height) * 0.46
+                effectEnabled: visible && !root.mapMenuOpen
+                effectLevel: root.gaugeEffectLevel
+                sharedPhase: root.gaugeMatrixRainSharedPhase
+                rainColor: Qt.rgba(appTheme.matrixCyan.r, appTheme.matrixCyan.g, appTheme.matrixCyan.b, 0.68)
+                glowColor: Qt.rgba(appTheme.matrixCyan.r, appTheme.matrixCyan.g, appTheme.matrixCyan.b, 0.40)
+                fps: root.embeddedHighEffectBudgetMode ? 3.0 : 8.0
+                speedMultiplier: root.embeddedHighEffectBudgetMode ? 0.17 : 0.16
+                density: root.embeddedHighEffectBudgetMode ? 0.24 : 0.20
+                glowSpeed: 0.55
+                glowFloor: 0.17
+                glowBlur: root.embeddedHighEffectBudgetMode ? 4.5 : 5.5
+                driftScale: 0.75
+                charChangeChance: root.embeddedHighEffectBudgetMode ? 0.011 : 0.014
+                fontPx: root.embeddedHighEffectBudgetMode ? 13 : 11
+                fadeAlpha: 0.03
+                tailLength: root.embeddedHighEffectBudgetMode ? 18 : 22
+                headAlpha: 0.66
+                tailMinAlpha: 0.055
+                opacity: 0.52
+            }
+
+            W.DialChrome {
+                anchors.fill: tachGauge
+                z: root.mapLibreSafeCompositor ? 125 : 25
+                visible: root.gaugeLavaAccentEnabled
+                theme: appTheme
+                effectLevel: root.gaugeEffectLevel
+                detailMode: root.gaugeAccentDetailMode
+                accentOverlayMode: true
+                gaugeColor: appTheme.lavaOrange
+                chromeColor: appTheme.lavaTrack
+                progress: Math.max(0, Math.min(1, root.liveGaugeRpm / 8000))
+                showArcHead: false
+                maxValue: 8000
+                startAngleDeg: 225
+                sweepAngleDeg: 210
+                minorStep: 500
+                majorStep: 1000
+                labelStep: 1000
+                labelStart: 1000
+                labelDivisor: 1000
+            }
+
+            W.MagmaAtlasOverlay {
+                anchors.fill: speedGauge
+                z: root.mapLibreSafeCompositor ? 126 : 26
+                visible: root.gaugeLavaAccentEnabled
+                progress: Math.max(0, Math.min(1, root.liveGaugeSpeed / 140))
             }
 
             Item {
                 anchors.fill: tachGauge
                 z: root.mapLibreSafeCompositor ? 130 : 30
+
+                W.GaugeMatrixDepth {
+                    anchors.fill: parent
+                    z: 1
+                    visible: root.gaugeMatrixDepthEnabled && !root.mapMenuOpen
+                    effectEnabled: visible
+                    rainColor: "#66F0FF"
+                    density: 0.40
+                    columns: 11
+                    fontPx: 11
+                    opacityScale: 0.42
+                    faceFactor: 0.62
+                }
 
                 Repeater {
                     model: [
@@ -2199,14 +2833,103 @@ Window {
                     }
                 }
 
+                // Skin v2: calm RPM×1000 center (concept); VIC faults stay secondary
+                Text {
+                    id: rpmUnitText
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.verticalCenterOffset: -parent.height * 0.168
+                    z: 155
+                    text: "RPM x1000"
+                    color: Qt.rgba(appTheme.pearlLow.r, appTheme.pearlLow.g, appTheme.pearlLow.b, 0.72)
+                    font.family: "Oxanium"
+                    font.pixelSize: parent.width * 0.026
+                    font.bold: true
+                    font.letterSpacing: 1
+                    renderType: root.menuTextRenderType
+                    horizontalAlignment: Text.AlignHCenter
+                    style: Text.Outline
+                    styleColor: "#C0000000"
+                }
+
+                Item {
+                    id: rpmValueBox
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.verticalCenterOffset: -parent.height * 0.028
+                    z: 156
+                    width: rpmValueText.implicitWidth
+                    height: rpmValueText.implicitHeight
+
+                    Text {
+                        id: rpmValueText
+                        anchors.centerIn: parent
+                        text: (root.liveGaugeRpm / 1000.0).toFixed(1)
+                        color: appTheme.rpmColor(root.liveGaugeRpm)
+                        font.family: "Oxanium"
+                        font.pixelSize: parent.parent.width * 0.150
+                        font.bold: true
+                        renderType: root.menuTextRenderType
+                        horizontalAlignment: Text.AlignHCenter
+                        style: Text.Outline
+                        styleColor: "#F0000000"
+                    }
+                    Item {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        height: parent.height * 0.48
+                        clip: true
+                        Text {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            anchors.bottom: parent.bottom
+                            width: rpmValueText.width
+                            height: rpmValueText.height
+                            text: rpmValueText.text
+                            color: appTheme.pearlHigh
+                            opacity: 0.80
+                            font: rpmValueText.font
+                            renderType: rpmValueText.renderType
+                            horizontalAlignment: Text.AlignHCenter
+                        }
+                    }
+                    Item {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        height: parent.height * 0.62
+                        clip: true
+                        Text {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            y: 0
+                            width: rpmValueText.width
+                            height: rpmValueText.height
+                            text: rpmValueText.text
+                            color: "#FFFFFFFF"
+                            opacity: 0.92
+                            font: rpmValueText.font
+                            renderType: rpmValueText.renderType
+                            horizontalAlignment: Text.AlignHCenter
+                        }
+                    }
+                }
+
                 W.VehicleInfoCenter {
                     id: vicCenter
-                    anchors.centerIn: parent
-                    width: Math.min(parent.width, parent.height) * 0.50
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.top: rpmValueBox.bottom
+                    anchors.topMargin: parent.height * 0.012
+                    width: Math.min(parent.width, parent.height) * 0.28
                     height: width
                     z: 150
+                    visible: root.displayWarnDoorValue || root.displayWarnChargeValue
+                        || root.displayWarnBrakeValue || root.displayWarnOilValue
+                        || root.displayWarnCheckEngineValue || root.displayWarnATValue
+                        || root.displayWarnFuelLowValue || root.displayHighBeamValue
+                        || String(root.displayDrivetrainModeValue || "").toLowerCase().indexOf("4") !== -1
+                        || root.displayTransferLockValue
                     theme: appTheme
-                    simplified: root.gaugeLowEffectMode
+                    simplified: true
                     pulseEnabled: !root.gaugeLowEffectMode
                     warnDoor: root.displayWarnDoorValue
                     warnCharge: root.displayWarnChargeValue
@@ -2222,11 +2945,24 @@ Window {
                 W.HighBeamHalo {
                     anchors.centerIn: vicCenter
                     z: 140
+                    visible: vicCenter.visible
                     vicDiameter: vicCenter.width
-                    ringThickness: 16
-                    gapPx: 3
+                    ringThickness: 10
+                    gapPx: 2
                     heartbeat: true
                     active: root.displayHighBeamValue
+                }
+
+                W.TwinMicroArcs {
+                    anchors.fill: parent
+                    z: 148
+                    theme: appTheme
+                    effectLevel: root.gaugeEffectLevel
+                    lowEffectMode: root.gaugeLowEffectMode
+                    fuelNorm: Math.max(0, Math.min(1, root.liveGaugeFuel / 100))
+                    fuelPct: root.liveGaugeFuel
+                    coolantNorm: Math.max(0.14, Math.min(1, (root.liveGaugeCoolant - 40) / 70))
+                    coolantC: root.liveGaugeCoolant
                 }
 
                 Text {
@@ -2234,6 +2970,7 @@ Window {
                     height: parent.height * 0.034
                     x: root.gaugePointX(parent.width, root.gaugeAuxStartDeg + root.gaugeAuxSweepDeg, parent.width * 0.36 + 24) - width / 2
                     y: root.gaugePointY(parent.height, root.gaugeAuxStartDeg + root.gaugeAuxSweepDeg, parent.width * 0.36 + 24) - height / 2
+                    visible: false
                     text: "E"
                     color: appTheme.pearlLow
                     opacity: 0.86
@@ -2250,6 +2987,7 @@ Window {
                     height: parent.height * 0.034
                     x: root.gaugePointX(parent.width, root.gaugeAuxStartDeg, parent.width * 0.36 + 24) - width / 2
                     y: root.gaugePointY(parent.height, root.gaugeAuxStartDeg, parent.width * 0.36 + 24) - height / 2
+                    visible: false
                     text: "F"
                     color: appTheme.pearlLow
                     opacity: 0.86

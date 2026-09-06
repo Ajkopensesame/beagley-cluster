@@ -479,8 +479,13 @@ int main(int argc, char *argv[])
                                              mapLibreNativeTrustedStyles);
     engine.rootContext()->setContextProperty("BEAGLEY_MAPLIBRE_NATIVE_MAX_ZOOM",
                                              mapLibreNativeMaxZoom);
+
+    QString skinProfile = QString::fromUtf8(qgetenv("BEAGLEY_SKIN_PROFILE")).trimmed().toLowerCase();
+    if (skinProfile != QLatin1String("show") && skinProfile != QLatin1String("drive"))
+        skinProfile.clear();
     engine.rootContext()->setContextProperty("BEAGLEY_RENDER_PROFILE", renderProfile);
     engine.rootContext()->setContextProperty("BEAGLEY_EFFECT_LEVEL", effectLevel);
+    engine.rootContext()->setContextProperty("BEAGLEY_SKIN_PROFILE", skinProfile);
     engine.rootContext()->setContextProperty("BEAGLEY_MAP_RENDERER", mapRenderer);
     engine.rootContext()->setContextProperty("BEAGLEY_GAUGE_DETAIL", gaugeDetail);
     engine.rootContext()->setContextProperty("BEAGLEY_GAUGE_DEMO", gaugeDemo);

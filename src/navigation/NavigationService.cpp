@@ -136,9 +136,14 @@ NavigationService::NavigationService(VehicleStateClient *vehicleState, WiFiSetup
             ? QString::fromUtf8(qgetenv("BEAGLEY_NAV_CACHE_DIR")).trimmed()
             : defaultNavCacheDir())
 {
-    m_routeRefreshTimer.setInterval((qEnvironmentVariableIsSet("BEAGLEY_NAV_ROUTE_REFRESH_SEC")
+    {
+        int refreshSec = qEnvironmentVariableIsSet("BEAGLEY_NAV_ROUTE_REFRESH_SEC")
             ? qEnvironmentVariableIntValue("BEAGLEY_NAV_ROUTE_REFRESH_SEC")
-            : kDefaultRouteRefreshSec) * 1000);
+            : kDefaultRouteRefreshSec;
+        if (refreshSec < 1)
+            refreshSec = kDefaultRouteRefreshSec;
+        m_routeRefreshTimer.setInterval(refreshSec * 1000);
+    }
     connect(&m_routeRefreshTimer, &QTimer::timeout, this, &NavigationService::maybeRefreshRoute);
     m_routeRefreshTimer.start();
 

@@ -1035,14 +1035,14 @@ Item {
 
     Timer {
         id: cameraRefreshTimer
-        interval: root.cameraRefreshIntervalMs
+        interval: Math.max(250, Number(root.cameraRefreshIntervalMs) || 1000)
         repeat: false
         onTriggered: root.refreshCamera()
     }
 
     Timer {
         id: rerouteTimer
-        interval: root.rerouteIntervalMs
+        interval: Math.max(250, Number(root.rerouteIntervalMs) || 5000)
         repeat: false
         onTriggered: root.computeRoute(false)
     }
