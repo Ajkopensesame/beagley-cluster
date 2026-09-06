@@ -40,10 +40,10 @@ On a **qml-dev** appliance, a marker file forces **show** (matrix depth):
 
 ```bash
 # SHOW
-ssh beagley-ai "touch /opt/beagley-cluster/qml-dev/skin-show.on && systemctl restart beagley_cluster"
+ssh beagley-ai "touch /opt/beagley-cluster/qml-dev/src/ui/skin-show.on && systemctl restart beagley_cluster"
 
 # DRIVE (embedded default)
-ssh beagley-ai "rm -f /opt/beagley-cluster/qml-dev/skin-show.on /opt/beagley-cluster/qml-dev/.skin-show /opt/beagley-cluster/qml-dev/.skin-show.png && systemctl restart beagley_cluster"
+ssh beagley-ai "rm -f /opt/beagley-cluster/qml-dev/src/ui/skin-show.on /opt/beagley-cluster/qml-dev/.skin-show /opt/beagley-cluster/qml-dev/.skin-show.png && systemctl restart beagley_cluster"
 ```
 
 With a binary that exposes `BEAGLEY_SKIN_PROFILE` (already in `main.cpp`), set it in

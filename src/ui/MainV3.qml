@@ -82,7 +82,7 @@ Window {
     //   drive = appliance default (glass + SG magma + map; matrix hard-off)
     //   show  = concept still match (matrix depth + richer lava)
     // Toggle without binary rebuild (qml-dev): place/remove
-    //   /opt/beagley-cluster/qml-dev/skin-show.on
+    //   /opt/beagley-cluster/qml-dev/src/ui/skin-show.on
     // Binary/env: BEAGLEY_SKIN_PROFILE=drive|show (context property from main.cpp)
     readonly property bool skinShowMarkerPresent: skinShowDir.count > 0
     readonly property string skinVisualProfile: {
@@ -2109,12 +2109,12 @@ Window {
 
 
         // Probe show-profile marker without needing BEAGLEY_SKIN_PROFILE in binary.
-        // Place /opt/beagley-cluster/qml-dev/skin-show.on (any file) to force show on qml-dev.
-        // Non-hidden marker — FolderListModel often skips dotfiles on embedded Qt.
-        // touch /opt/beagley-cluster/qml-dev/skin-show.on
+        // Place /opt/beagley-cluster/qml-dev/src/ui/skin-show.on (any file) to force show on qml-dev.
+        // Marker lives beside MainV3 so FolderListModel shares the QML dir.
+        // touch /opt/beagley-cluster/qml-dev/src/ui/skin-show.on
         FolderListModel {
             id: skinShowDir
-            folder: "file:///opt/beagley-cluster/qml-dev"
+            folder: Qt.resolvedUrl("./")
             nameFilters: ["skin-show.on"]
             showDirs: false
             showDotAndDotDot: false
