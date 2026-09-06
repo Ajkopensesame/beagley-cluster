@@ -65,10 +65,10 @@ QtObject {
             );
         }
 
-        // Skin v2: luminous purple-white speed reading; danger only at overspeed
+        // Skin v2: purple→white vertical-feel (solid approx); danger only at overspeed
         // Concept still: purple-white luminous (not pink)
-        const luminous = mix(pearlLow, Qt.rgba(1, 1, 1, 1), 0.82);
-        const base = mix(luminous, pearlHigh, t1 * 0.14);
+        const luminous = mix(pearlLow, Qt.rgba(1, 1, 1, 1), 0.68);
+        const base = mix(luminous, pearlHigh, 0.18 + t1 * 0.12);
         return mix(base, danger, t2);
     }
 
@@ -90,8 +90,8 @@ QtObject {
             );
         }
 
-        const luminous = mix(pearlLow, Qt.rgba(1, 1, 1, 1), 0.62);
-        const base = mix(luminous, pearlHigh, t1 * 0.22);
+        const luminous = mix(pearlLow, Qt.rgba(1, 1, 1, 1), 0.52);
+        const base = mix(luminous, pearlHigh, 0.22 + t1 * 0.16);
         return mix(base, danger, t2);
     }
 

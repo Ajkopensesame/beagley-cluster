@@ -2282,8 +2282,10 @@ Window {
                 maxValue: 140
                 // Coolant moves to tach twin micro-arcs (Skin v2); keep a quiet residual track
                 auxProgress: 0.0
+                // NativeGaugeInstrumentItem.cpp forces primary alpha to 242 — never pass lavaOrange
+                // or a solid orange band paints under DialChrome and kills magma texture read.
                 primaryColor: root.gaugeLavaAccentEnabled
-                    ? Qt.rgba(appTheme.lavaOrange.r, appTheme.lavaOrange.g, appTheme.lavaOrange.b, 0.03)
+                    ? appTheme.deepBlack
                     : appTheme.speedColor(root.liveGaugeSpeed)
                 auxColor: "transparent"
                 chromeColor: root.gaugeLavaAccentEnabled ? appTheme.lavaTrack : appTheme.pearlLow
@@ -2387,8 +2389,8 @@ Window {
                     id: odBadge
                     z: 62
                     visible: root.displayOverdriveValue
-                    anchors.horizontalCenter: speedValueText.horizontalCenter
-                    anchors.bottom: speedValueText.top
+                    anchors.horizontalCenter: speedValueBox.horizontalCenter
+                    anchors.bottom: speedValueBox.top
                     anchors.bottomMargin: parent.height * 0.046
                     width: parent.width * 0.222
                     height: parent.height * 0.078
@@ -2458,28 +2460,55 @@ Window {
                     styleColor: "#C0000000"
                 }
 
-                Text {
-                    id: speedValueText
+                Item {
+                    id: speedValueBox
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.verticalCenter: parent.verticalCenter
                     anchors.verticalCenterOffset: -parent.height * 0.030
-                    text: root.formatSpeedValue(root.liveGaugeSpeed)
-                    color: appTheme.speedColor(root.liveGaugeSpeed)
-                    font.family: "Oxanium"
-                    font.pixelSize: parent.width * 0.168
-                    font.bold: true
-                    renderType: root.menuTextRenderType
-                    horizontalAlignment: Text.AlignHCenter
-                    style: Text.Outline
-                    styleColor: "#F0000000"
+                    width: speedValueText.implicitWidth
+                    height: speedValueText.implicitHeight
+
+                    Text {
+                        id: speedValueText
+                        anchors.centerIn: parent
+                        text: root.formatSpeedValue(root.liveGaugeSpeed)
+                        color: appTheme.speedColor(root.liveGaugeSpeed)
+                        font.family: "Oxanium"
+                        font.pixelSize: parent.parent.width * 0.168
+                        font.bold: true
+                        renderType: root.menuTextRenderType
+                        horizontalAlignment: Text.AlignHCenter
+                        style: Text.Outline
+                        styleColor: "#F0000000"
+                    }
+                    // Soft white top wash ≈ purple→white vertical gradient (keeps outline)
+                    Item {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        height: parent.height * 0.52
+                        clip: true
+                        Text {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            y: 0
+                            width: speedValueText.width
+                            height: speedValueText.height
+                            text: speedValueText.text
+                            color: "#FFFFFFFF"
+                            opacity: 0.42
+                            font: speedValueText.font
+                            renderType: speedValueText.renderType
+                            horizontalAlignment: Text.AlignHCenter
+                        }
+                    }
                 }
 
                 Item {
                     id: gearReadout
                     z: 61
-                    anchors.top: speedValueText.bottom
+                    anchors.top: speedValueBox.bottom
                     anchors.topMargin: parent.height * 0.024
-                    anchors.horizontalCenter: speedValueText.horizontalCenter
+                    anchors.horizontalCenter: speedValueBox.horizontalCenter
                     width: parent.width * 0.144
                     height: parent.height * 0.088
 
@@ -2662,7 +2691,7 @@ Window {
                 // Twin micro-arcs own fuel/temp; mute native aux to avoid double rings
                 auxProgress: 0.0
                 primaryColor: root.gaugeLavaAccentEnabled
-                    ? Qt.rgba(appTheme.lavaOrange.r, appTheme.lavaOrange.g, appTheme.lavaOrange.b, 0.03)
+                    ? appTheme.deepBlack
                     : appTheme.rpmColor(root.liveGaugeRpm)
                 auxColor: "transparent"
                 chromeColor: root.gaugeLavaAccentEnabled ? appTheme.lavaTrack : appTheme.pearlLow
@@ -2781,27 +2810,53 @@ Window {
                     styleColor: "#C0000000"
                 }
 
-                Text {
-                    id: rpmValueText
+                Item {
+                    id: rpmValueBox
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.verticalCenter: parent.verticalCenter
                     anchors.verticalCenterOffset: -parent.height * 0.028
                     z: 156
-                    text: (root.liveGaugeRpm / 1000.0).toFixed(1)
-                    color: appTheme.rpmColor(root.liveGaugeRpm)
-                    font.family: "Oxanium"
-                    font.pixelSize: parent.width * 0.150
-                    font.bold: true
-                    renderType: root.menuTextRenderType
-                    horizontalAlignment: Text.AlignHCenter
-                    style: Text.Outline
-                    styleColor: "#F0000000"
+                    width: rpmValueText.implicitWidth
+                    height: rpmValueText.implicitHeight
+
+                    Text {
+                        id: rpmValueText
+                        anchors.centerIn: parent
+                        text: (root.liveGaugeRpm / 1000.0).toFixed(1)
+                        color: appTheme.rpmColor(root.liveGaugeRpm)
+                        font.family: "Oxanium"
+                        font.pixelSize: parent.parent.width * 0.150
+                        font.bold: true
+                        renderType: root.menuTextRenderType
+                        horizontalAlignment: Text.AlignHCenter
+                        style: Text.Outline
+                        styleColor: "#F0000000"
+                    }
+                    Item {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        height: parent.height * 0.52
+                        clip: true
+                        Text {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            y: 0
+                            width: rpmValueText.width
+                            height: rpmValueText.height
+                            text: rpmValueText.text
+                            color: "#FFFFFFFF"
+                            opacity: 0.40
+                            font: rpmValueText.font
+                            renderType: rpmValueText.renderType
+                            horizontalAlignment: Text.AlignHCenter
+                        }
+                    }
                 }
 
                 W.VehicleInfoCenter {
                     id: vicCenter
                     anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.top: rpmValueText.bottom
+                    anchors.top: rpmValueBox.bottom
                     anchors.topMargin: parent.height * 0.012
                     width: Math.min(parent.width, parent.height) * 0.28
                     height: width
