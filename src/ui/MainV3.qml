@@ -20,7 +20,10 @@ Window {
     flags: Qt.Window | Qt.CustomizeWindowHint | Qt.WindowTitleHint | Qt.WindowCloseButtonHint
     visible: true
 
-    Theme.PurplePearlTheme { id: appTheme }
+    Theme.PurplePearlTheme {
+        id: appTheme
+        isNight: root.menuDarkChrome
+    }
     Settings {
         id: clusterUiSettings
         category: "beagley_cluster_ui"
@@ -100,11 +103,17 @@ Window {
         && BEAGLEY_MAPLIBRE_NATIVE_ALLOW_UNTESTED_STYLES
     readonly property bool mapLibreNativeStyleOverrideActive: mapLibreNativeStyleOverride.length > 0
         && !clusterUiSettings.mapThemeUserSelected
+        // Slice 4: night product chrome prefers dark MapLibre theme style over bright env override
+        && !(menuDarkChrome && !mapThemeChosenThisSession)
     readonly property bool mapLibreNativeStyleTrusted: mapLibreStyleTrusted(activeMapStyleUrl)
-    readonly property string effectiveMapRenderer: mapLibreNativeRequested
-        && (!activeMapThemeUsesMapLibre || !mapLibreNativeStyleTrusted)
-        ? "native-online"
-        : mapRenderer
+    readonly property string effectiveMapRenderer: {
+        if (!mapLibreNativeRequested)
+            return mapRenderer
+        // Slice 4: keep MapLibre when a trusted style URL is active (theme or night preference)
+        if (String(activeMapStyleUrl || "").length > 0 && mapLibreNativeStyleTrusted)
+            return "maplibre-native"
+        return "native-online"
+    }
     readonly property bool mapLibreNativeActive: effectiveMapRenderer === "maplibre-native"
     readonly property bool mapLibreNativeFullUnderlay: (typeof BEAGLEY_MAPLIBRE_NATIVE_FULL_UNDERLAY !== "undefined")
         && BEAGLEY_MAPLIBRE_NATIVE_FULL_UNDERLAY
@@ -198,6 +207,9 @@ Window {
         ? (navigation.mapGuidanceBanner.banner || ({}))
         : ({})
     readonly property bool hasActiveRoute: navigation && navigation.activeRoute && Object.keys(navigation.activeRoute).length > 0
+    // Slice 4: guidance / active route lifts map contrast vs idle underlay
+    readonly property bool mapNavProductActive: hasActiveRoute
+        || (navigation && navigation.guidanceStarted)
     readonly property bool followUnlocked: navigation && navigation.followMode === "free_pan"
     readonly property bool gpsHoldingPose: !!navConnectivity.gpsUsingLastKnown
     readonly property string gearText: truthOk && hub && hub.gear ? hub.gear : "-"
@@ -499,8 +511,8 @@ Window {
             label: "Minimal",
             detail: "Clean",
             tileUrlTemplate: "https://a.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}.png",
-            styleUrl: "",
-            mapLibre: false,
+            styleUrl: "https://tiles.openfreemap.org/styles/positron",
+            mapLibre: true,
             maxZoom: 19,
             swatchA: "#F7F8F3",
             swatchB: "#ADBFD1"
@@ -521,8 +533,8 @@ Window {
             label: "Dark",
             detail: "Night",
             tileUrlTemplate: "https://a.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png",
-            styleUrl: "",
-            mapLibre: false,
+            styleUrl: "https://tiles.openfreemap.org/styles/dark",
+            mapLibre: true,
             maxZoom: 19,
             swatchA: "#172132",
             swatchB: "#406179"
@@ -543,9 +555,27 @@ Window {
     readonly property string activeMapTileUrlTemplate: String(activeMapThemeOption.tileUrlTemplate || "")
     readonly property bool activeMapThemeUsesMapLibre: activeMapThemeOption.mapLibre !== false
         && String(activeMapThemeOption.styleUrl || "").length > 0
-    readonly property string activeMapStyleUrl: mapLibreNativeStyleOverrideActive
-        ? mapLibreNativeStyleOverride
-        : (activeMapThemeUsesMapLibre ? String(activeMapThemeOption.styleUrl || "") : "")
+    readonly property string openFreeMapDarkStyleUrl: "https://tiles.openfreemap.org/styles/dark"
+    readonly property string activeMapStyleUrl: {
+        // Slice 4: night + maplibre-native → trusted dark MapLibre (readable product underlay)
+        if (mapLibreNativeRequested && menuDarkChrome && !mapThemeChosenThisSession
+                && !isBrightMapTheme(clusterUiSettings.mapTheme)) {
+            const darkOpt = mapThemeOption("dark")
+            const darkUrl = String((darkOpt && darkOpt.styleUrl) || openFreeMapDarkStyleUrl).trim()
+            if (darkUrl.length > 0)
+                return darkUrl
+        }
+        if (mapLibreNativeStyleOverrideActive)
+            return mapLibreNativeStyleOverride
+        if (activeMapThemeUsesMapLibre)
+            return String(activeMapThemeOption.styleUrl || "")
+        if (mapLibreNativeRequested && menuDarkChrome) {
+            const fallbackDark = String(openFreeMapDarkStyleUrl).trim()
+            if (fallbackDark.length > 0)
+                return fallbackDark
+        }
+        return ""
+    }
     readonly property real activeMapMaxZoom: mapLibreNativeRequested && activeMapThemeUsesMapLibre
         ? Math.min(Number(activeMapThemeOption.maxZoom || 19), mapLibreNativeMaxZoom)
         : Number(activeMapThemeOption.maxZoom || 19)
@@ -682,11 +712,13 @@ Window {
     function applyNightMapHierarchyPreference() {
         // Night/product chrome beats a sticky bright map from prior sessions.
         // A map chosen this session (selectMapTheme) still wins until reboot.
+        // Slice 4: prefer MapLibre-backed dark theme so the center map stays a readable product.
         if (!root.menuDarkChrome)
             return
         if (root.mapThemeChosenThisSession)
             return
-        if (!root.isBrightMapTheme(clusterUiSettings.mapTheme))
+        if (!root.isBrightMapTheme(clusterUiSettings.mapTheme)
+                && String(clusterUiSettings.mapTheme || "").trim().toLowerCase() === "dark")
             return
         clusterUiSettings.mapTheme = "dark"
         clusterUiSettings.mapThemeUserSelected = false
@@ -1701,7 +1733,14 @@ Window {
             Rectangle {
                 anchors.fill: parent
                 color: "#07111A"
-                opacity: root.mapLibreSafeCompositor ? appTheme.mapVeil : appTheme.mapVeilSoft
+                opacity: {
+                    // Slice 4: dial veil keeps gauges primary; lift map when navigating
+                    if (root.mapNavProductActive)
+                        return appTheme.mapVeilGuidance
+                    if (root.mapLibreSafeCompositor)
+                        return appTheme.mapVeilIdle
+                    return appTheme.mapVeilSoft
+                }
             }
 
             Rectangle {

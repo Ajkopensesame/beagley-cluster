@@ -79,9 +79,12 @@ QtObject {
         return isMajor ? 0.70 : 0.45;
     }
 
-    // Slice 1 hierarchy tokens — night cockpit scrim + quiet chrome
-    readonly property real mapVeil: 0.34
-    readonly property real mapVeilSoft: 0.28
+    // Slice 1/4 hierarchy tokens — readable dark map underlay + quiet chrome
+    // Prefer a legible MapLibre dark style over a crushing veil (Slice 4).
+    readonly property real mapVeilIdle: isNight ? 0.14 : 0.20
+    readonly property real mapVeilGuidance: isNight ? 0.05 : 0.08
+    readonly property real mapVeil: mapVeilIdle
+    readonly property real mapVeilSoft: isNight ? 0.10 : 0.16
     readonly property real chromeIdle: 0.72
     readonly property real chromeActive: 1.0
     readonly property color statusBannerBg: isNight ? "#B205070B" : "#B2F5F3FF"

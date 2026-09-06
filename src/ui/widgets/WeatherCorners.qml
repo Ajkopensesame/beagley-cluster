@@ -196,15 +196,20 @@ Item {
     }
 
     function musicPrimaryLine() {
+        // Idle TR pod face: never raw PERMISSION/AUTH — keep long copy in expand/SETUP.
         if (musicTitle.length > 0)
             return musicTitle
         var status = String(musicStatus).toUpperCase()
         if (status === "PERMISSION")
-            return "PERMISSION"
+            return "SPOTIFY"
         if (status === "AUTH" || musicAuthRequired())
-            return "AUTH"
-        if (musicAvailable)
+            return "SPOTIFY"
+        if (musicAvailable) {
+            var available = String(musicStatus).toUpperCase()
+            if (available === "PERMISSION" || available === "AUTH")
+                return "SPOTIFY"
             return musicStatus
+        }
         return "SPOTIFY"
     }
 
