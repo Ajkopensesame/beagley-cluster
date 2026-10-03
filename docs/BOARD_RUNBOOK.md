@@ -18,7 +18,9 @@ Related docs: [live_cluster_workflow.md](live_cluster_workflow.md),
 [beagley_ui_dev_workflow.md](beagley_ui_dev_workflow.md),
 [beagley_wifi_architecture.md](beagley_wifi_architecture.md),
 [../yocto/README.md](../yocto/README.md), [ENVIRONMENT.md](ENVIRONMENT.md),
-hub protocol [../tools/schema/vehicle_state_v1.md](../tools/schema/vehicle_state_v1.md).
+hub protocol [../tools/schema/vehicle_state_v1.md](../tools/schema/vehicle_state_v1.md),
+UNO bench checklist [bench_test_checklist.md](bench_test_checklist.md),
+UNO firmware [../firmware/uno_vehicle_input/](../firmware/uno_vehicle_input/README.md).
 Added by PR #19 (not on this branch until it merges; links resolve after that):
 `docs/bbb_deploy_rollback.md`, `docs/bbb_deploy_plan_2026-10-03.md`,
 `docs/bbb_hardware_wiring.md`.
@@ -97,6 +99,24 @@ Other facts
   Do not assume repo behaviour equals deployed behaviour.
 * BBB serial: GPS on `/dev/ttyS1`; UNO input configured on `/dev/ttyS2` but the
   RX pin is damaged (0 frames). No `can0`. **VERIFIED (HW 2026-10-03)**.
+* BeagleY time: it is a Yocto image with **no `chrony` or `ntpd`**; time comes
+  from `systemd-timesyncd` only. **VERIFIED (HW 2026-10-03)**. So the BeagleY
+  cannot serve time to the BBB (the "chrony from BeagleY" option in the
+  PR #19 plan, Stage 3, option A, does not apply without adding a package).
+* BBB clock: wrong on 2026-10-03 (shows Apr 2026, RTC reads 2000-01-01, no
+  internet on the `10.24.0.x` link). **VERIFIED (HW 2026-10-03)**. The fix in
+  progress is to set the time from GPS (Hardware Integration's follow-up
+  GPS-time PR). Staged deploy scripts for it (hub update, clock fix, UART4)
+  are in **PR #29** ("staged BBB deploy scripts"), **pending, not merged and
+  not run on the board**. Until a fix is deployed, BBB log and fault-recorder
+  timestamps are unreliable; use the Mac clock for records.
+* Hub speed source (REPO, **PR #30, merged**): the hub now prefers GPS speed
+  and falls back to pulse speed. Env `VEHICLE_SPEED_SOURCE` =
+  `gps_first` | `pulse_only` | `gps_only`; the active choice is reported in
+  the additive `_health.speedSource` field. **The hub deployed on the BBB is
+  still the OLD code** and has none of this until ThatGuy approves a deploy.
+  Bench steps: [bench_test_checklist.md](bench_test_checklist.md). UNO
+  firmware (pulse/input sketch): [../firmware/uno_vehicle_input/](../firmware/uno_vehicle_input/README.md).
 * Canonical hub address is `10.24.0.7`. Any `192.168.0.x` hub value in older
   docs is a stale hotspot-era value. Canonical hub protocol doc is
   `tools/schema/vehicle_state_v1.md` (the vehicle-hub repo `PROTOCOL.md` is
@@ -207,7 +227,10 @@ sudoers rule**. The same applies to overlay and clock changes.
    `systemctl is-active bbb-hardware-gps`,
    `journalctl -u bbb-hardware-gps -n 50 --no-pager`,
    `cat /etc/default/bbb-hardware-gps`. Log timestamps are unreliable
-   (section 6).
+   (section 6). `VEHICLE_SPEED_SOURCE` and `_health.speedSource` (PR #30) only
+   exist after the hub is updated; the deployed hub is still the old code.
+   After a deploy, run the speed-source cases in
+   [bench_test_checklist.md](bench_test_checklist.md).
 2. A restart blanks the gauges for roughly 5-10 s (**estimated** in the PR #19 plan, not measured).
 3. ThatGuy runs: `sudo systemctl restart bbb-hardware-gps`.
 4. Verify within 60 s: service `active`, no traceback in the journal, and the
@@ -280,6 +303,8 @@ PR #19 docs (`bbb_deploy_rollback.md`, `bbb_deploy_plan_2026-10-03.md`,
       * BBB hub: stage beside the running code, never over it; deploy order
         code -> env -> unit -> `daemon-reload` -> restart (a `Type=notify`
         unit needs `sd_notify`-capable code first). Needs ThatGuy for `sudo`.
+        Staged deploy scripts (hub update, clock fix, UART4) are in PR #29,
+        **pending, not merged**; do not assume they exist on this branch.
       * Full image: flashing the media is a separate approval and a
         hands-on step (see 5.3).
 - [ ] **Health check**: BeagleY `check.sh` OK and
@@ -403,7 +428,9 @@ Order of least to most invasive. Wi-Fi config is **not** yours to edit.
 
 | Issue | Detail | Source |
 | --- | --- | --- |
-| BBB clock wrong | Shows Apr 2026, RTC reads 2000-01-01, not synchronized, and the BBB link has no internet. Journal and fault-recorder timestamps are unreliable. Fix options (chrony from BeagleY, GPS time, RTC) are in the PR #19 plan, Stage 3; none applied. | **VERIFIED (HW 2026-10-03)** |
+| BBB clock wrong | Shows Apr 2026, RTC reads 2000-01-01, not synchronized, and the BBB link has no internet. Journal and fault-recorder timestamps are unreliable until fixed. The BeagleY has no chrony/ntpd (systemd-timesyncd only), so it cannot serve time. Fix in progress: set time from GPS (Hardware Integration's follow-up GPS-time PR); staged scripts are in PR #29, pending, nothing applied. Other options are in the PR #19 plan, Stage 3. | **VERIFIED (HW 2026-10-03)** |
+| BeagleY has no NTP daemon | Yocto image; `systemd-timesyncd` only, no `chrony`/`ntpd`. | **VERIFIED (HW 2026-10-03)** |
+| New hub features not deployed | PR #30 (GPS-first speed, `VEHICLE_SPEED_SOURCE`, `_health.speedSource`) is merged, but the BBB still runs the OLD hub code until ThatGuy approves a deploy. Bench checklist: [bench_test_checklist.md](bench_test_checklist.md); UNO firmware: [../firmware/uno_vehicle_input/](../firmware/uno_vehicle_input/README.md). | REPO (deployed state **VERIFIED (HW 2026-10-03)**) |
 | journald unbounded on BBB | 558 MB used. A limits drop-in (`tools/bbb_hub/journald-beagley.conf`) is added by PR #19; not installed. | **VERIFIED (HW 2026-10-03)** |
 | ttyS mismatch | Live: GPS on `/dev/ttyS1`, UNO configured on `/dev/ttyS2` (RX pin damaged, 0 frames). Docs and `bbb-hardware-gps.env.example` that say `ttyS4` are stale; UART4 on P9_11 is a *proposal* (PR #19 plan, Stage 2). | **VERIFIED (HW 2026-10-03)** |
 | No CAN | No `can0`, no `can_signals.json` on the BBB. | **VERIFIED (HW 2026-10-03)** |
@@ -423,8 +450,9 @@ Order of least to most invasive. Wi-Fi config is **not** yours to edit.
    sign-off per deploy? `sudo` on the BBB needs your password (except
    `bbb-bench-sim`): will you run hub restarts yourself, or approve a narrow
    sudoers rule for `systemctl restart bbb-hardware-gps`?
-2. Should the BBB clock fix (PR #19 plan Stage 3, option A first) go ahead, and
-   when?
+2. Should the BBB clock fix go ahead, and when? Option A (chrony from the
+   BeagleY) is out because the BeagleY has no chrony; the GPS-time fix and the
+   PR #29 staged scripts are pending your approval to deploy.
 3. `bbb-bench-sim` is installed (state `disable`). Who is allowed to enable it, and how is the state checked before a real-vehicle test?
 
 **Chief of Staff (Wi-Fi)**
