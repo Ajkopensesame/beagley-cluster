@@ -219,6 +219,19 @@ VehicleStateClient::VehicleStateClient(QObject *parent)
     connectNow();
 }
 
+VehicleStateClient::~VehicleStateClient()
+{
+    // m_socket is declared before members its signal handlers use (e.g.
+    // m_connectUrl), so it would otherwise be destroyed after them and emit
+    // stateChanged/disconnected into freed state. Detach and close it first.
+    m_watchdog.stop();
+    m_reconnect.stop();
+    m_connectTimeout.stop();
+    m_replayTimer.stop();
+    QObject::disconnect(&m_socket, nullptr, this, nullptr);
+    m_socket.abort();
+}
+
 void VehicleStateClient::loadReplayFrames(const QString &path)
 {
     QFile file(path);
