@@ -1,5 +1,7 @@
 #include "VehicleStateClient.h"
 
+#include "../config/ClusterConfig.h"
+
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonValue>
@@ -153,9 +155,7 @@ QByteArray headerValue(const QByteArray &headers, const QByteArray &name)
 VehicleStateClient::VehicleStateClient(QObject *parent)
     : VehicleStateSource(parent)
 {
-    m_url = qEnvironmentVariableIsSet("VEHICLE_HUB_WS_URL")
-                ? QString::fromUtf8(qgetenv("VEHICLE_HUB_WS_URL"))
-                : QStringLiteral("ws://10.24.0.7:8765");
+    m_url = ClusterConfig::hubUrl();
     const QString replayPath = qEnvironmentVariableIsSet("BEAGLEY_REPLAY_FILE")
         ? QString::fromUtf8(qgetenv("BEAGLEY_REPLAY_FILE")).trimmed()
         : QString();
