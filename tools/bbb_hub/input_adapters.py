@@ -9,7 +9,7 @@ import termios
 import time
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Callable
 
 from tools.bbb_hub.can_diagnostics import CanDiagnosticsEngine
 from tools.bbb_hub.sensor_calibration import SensorCalibration, load_sensor_calibration
@@ -204,8 +204,12 @@ class SocketCanSignalSource:
         signal_dictionary_path: str,
         stale_ms: int = 1000,
         diagnostics_enabled: bool = True,
+        socket_factory: Callable[[], socket.socket] | None = None,
     ) -> None:
         self.interface = interface
+        # Test seam: a factory returning an already-connected socket that yields 16-byte SocketCAN
+        # ``struct can_frame`` datagrams (see tools/bbb_hub/fake_can.py). None = real SocketCAN.
+        self._socket_factory = socket_factory
         self.dictionary_path = signal_dictionary_path
         self.dictionary = CanSignalDictionary.from_path(signal_dictionary_path)
         self._latest: dict[str, float] = {}
@@ -240,10 +244,20 @@ class SocketCanSignalSource:
     def diagnostics(self) -> dict[str, Any]:
         return self._diagnostics.snapshot()
 
+    def _open_socket(self) -> socket.socket:
+        if self._socket_factory is not None:
+            return self._socket_factory()
+        sock = socket.socket(socket.AF_CAN, socket.SOCK_RAW, socket.CAN_RAW)
+        try:
+            sock.bind((self.interface,))
+        except OSError:
+            sock.close()
+            raise
+        return sock
+
     async def _run_socketcan_once(self) -> None:
         loop = asyncio.get_running_loop()
-        with socket.socket(socket.AF_CAN, socket.SOCK_RAW, socket.CAN_RAW) as sock:
-            sock.bind((self.interface,))
+        with self._open_socket() as sock:
             sock.setblocking(False)
             self._health.last_error = None
             while True:

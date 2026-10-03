@@ -95,6 +95,31 @@ def validate_signal_dictionary(payload: dict[str, Any]) -> list[str]:
         confidence = signal.get("confidence")
         if not isinstance(confidence, (float, int)) or not 0.0 <= float(confidence) <= 1.0:
             errors.append(f"{signal_name}: confidence must be in [0, 1]")
+        errors.extend(_validate_when(signal_name, signal.get("when")))
+    return errors
+
+
+def _validate_when(signal_name: str, when: Any) -> list[str]:
+    """Optional ``when`` multiplexer conditions: [{"startBit": int>=0, "length": int in [1,32], "value": int>=0}]."""
+    if when is None:
+        return []
+    if not isinstance(when, list):
+        return [f"{signal_name}: when must be a list of {{startBit, length, value}} objects"]
+    errors: list[str] = []
+    for index, cond in enumerate(when):
+        label = f"{signal_name}: when[{index}]"
+        if not isinstance(cond, dict):
+            errors.append(f"{label} must be an object")
+            continue
+        for key in ("startBit", "length", "value"):
+            if not isinstance(cond.get(key), int) or isinstance(cond.get(key), bool):
+                errors.append(f"{label}.{key} must be an integer")
+        if isinstance(cond.get("startBit"), int) and cond["startBit"] < 0:
+            errors.append(f"{label}.startBit must be non-negative")
+        if isinstance(cond.get("length"), int) and not 1 <= cond["length"] <= 32:
+            errors.append(f"{label}.length must be in [1, 32]")
+        if isinstance(cond.get("value"), int) and cond["value"] < 0:
+            errors.append(f"{label}.value must be non-negative")
     return errors
 
 

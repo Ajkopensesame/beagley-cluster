@@ -67,6 +67,10 @@ Example:
 - `offset`: offset applied after scaling.
 - `unit`: display/semantic unit such as `rpm` or `kph`.
 - `confidence`: deterministic confidence in `[0, 1]`.
+- `when` (optional, additive): list of `{"startBit", "length", "value"}` multiplexer conditions. Every condition must
+  match (unsigned, big-endian, byte-aligned or not) before the signal is decoded. Needed where one CAN ID carries
+  several messages, e.g. OBD-II responses on `0x7E8` (byte 1 = `0x41`, byte 2 = PID). Absent = decode every frame of
+  the ID (original behaviour). See `tools/bbb_hub/config/can_signals.obd2_example.json`.
 - `verified`: true for exported mappings. Unverified candidates must not appear
   under `signals`.
 - `pipeline`: bit analysis, correlation, scaling, validation, and final decision

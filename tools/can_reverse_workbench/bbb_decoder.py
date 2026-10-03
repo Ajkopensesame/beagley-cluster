@@ -26,6 +26,10 @@ class DecoderSignal:
     offset: float
     unit: str
     confidence: float
+    # Optional multiplexing: every (startBit, length, value) must match (big-endian, unsigned) before
+    # the signal is decoded. Needed for diagnostic protocols such as OBD-II where one CAN ID carries
+    # many PIDs. Empty = decode every frame with this ID (the original behaviour).
+    when: tuple[tuple[int, int, int], ...] = ()
 
     @property
     def byte_index(self) -> int:
@@ -57,6 +61,8 @@ class CanSignalDictionary:
         decoded: dict[str, float] = {}
         for signal in self._by_can_id.get(frame.arbitration_id, []):
             if signal.start_bit + signal.length > len(frame.data) * 8:
+                continue
+            if not _conditions_match(signal.when, frame.data):
                 continue
             raw = extract_signal_value(frame.data, signal.start_bit, signal.length, signal.endian, signal.signed)
             decoded[signal.name] = raw * signal.scale + signal.offset
@@ -116,8 +122,13 @@ class CanLogSignalReplay:
         return dict(self._latest)
 
     def health(self) -> dict[str, Any]:
+        # The hub only applies a source's snapshot when health["stale"] is False (fail-safe for dead
+        # sources); without this key a replay was always treated as stale and never applied. A repeating
+        # replay is always live; a one-shot replay goes stale 1 s after its log ended.
+        replay_timestamp = self._log_start + (time.monotonic() - self._started_monotonic)
         return {
             "enabled": True,
+            "stale": (not self.repeat) and replay_timestamp > self._log_end + 1.0,
             "dictionary": self.dictionary_path,
             "log": self.raw_log_path,
             "signals": [signal.name for signal in self.dictionary.signals],
@@ -140,6 +151,15 @@ class CanLogSignalReplay:
         self._started_monotonic = now_monotonic
 
 
+def _conditions_match(when: tuple[tuple[int, int, int], ...], data: bytes) -> bool:
+    for start_bit, length, value in when:
+        if start_bit + length > len(data) * 8:
+            return False
+        if extract_signal_value(data, start_bit, length, "big", False) != value:
+            return False
+    return True
+
+
 def _decode_signal(name: str, payload: dict[str, Any]) -> DecoderSignal:
     return DecoderSignal(
         name=name,
@@ -152,6 +172,7 @@ def _decode_signal(name: str, payload: dict[str, Any]) -> DecoderSignal:
         offset=float(payload["offset"]),
         unit=str(payload.get("unit", "")),
         confidence=float(payload.get("confidence", 0.0)),
+        when=tuple((int(item["startBit"]), int(item["length"]), int(item["value"])) for item in payload.get("when", [])),
     )
 
 
