@@ -16,6 +16,11 @@ Options:
   --host HOST          SSH target. Default: root@beagley-ai.local
   --remote-root PATH   Remote QML dev root. Default: /opt/beagley-cluster/qml-dev
                        Must be a plain absolute path with >= 3 components.
+                       REFUSED: anything at/under /data/beagley-cluster, any path
+                       segment named runtime-*, and any root (or parent directory of
+                       it) on the target that holds a live-runtime marker
+                       (launch.sh, bin/beagley_cluster, .live, ...). The board's live
+                       QML root is such a tree: use /opt/beagley-cluster/qml-dev.
                        WARNING: it is deleted (rm -rf) and replaced on every sync,
                        so anything else in it (e.g. SkinShowOverride.qml) is wiped.
   --no-restart         Sync files without restarting beagley_cluster.
@@ -89,6 +94,18 @@ validate_remote_root() {
     return 1
   fi
 
+  # The live board runs from /data/beagley-cluster/runtime-*/ (launch.sh, binary and an
+  # isolated QML snapshot). This script rm -rf's its target, which would delete the live UI
+  # (docs/BOARD_RUNBOOK.md 3.1). Never allowed, no override.
+  if [[ "$root" == /data/beagley-cluster || "$root" == /data/beagley-cluster/* ]]; then
+    echo "[beagley-ui] refusing live runtime location (/data/beagley-cluster/...): $root" >&2
+    return 1
+  fi
+  if [[ "$root" == */runtime-* ]]; then
+    echo "[beagley-ui] refusing a path with a runtime-* segment (live runtime layout): $root" >&2
+    return 1
+  fi
+
   rest="${root#/}"
   first="${rest%%/*}"
   # Require at least /<top>/<x>/<y> (e.g. /opt/beagley-cluster/qml-dev).
@@ -103,6 +120,24 @@ validate_remote_root() {
       ;;
   esac
   return 0
+}
+
+# Remote half of the live-runtime guard: walks REMOTE_ROOT and each of its ancestors
+# (excluding /) on the target and reports the first live-runtime marker. Exit 3 = marker
+# found (printed), 0 = none. Runs before anything is deleted. Markers: a launch script,
+# the capture-once hook, the app binary, or an explicit .live / .beagley-live-runtime file.
+live_runtime_probe_cmd() {
+  cat <<EOF
+# BEAGLEY_LIVE_PROBE
+d='$1'
+while [ -n "\$d" ] && [ "\$d" != / ]; do
+  for m in launch.sh beagley-cluster-launch.sh capture-once.env bin/beagley_cluster beagley_cluster .live .beagley-live-runtime; do
+    if [ -e "\$d/\$m" ]; then echo "\$d/\$m"; exit 3; fi
+  done
+  d=\$(dirname "\$d")
+done
+exit 0
+EOF
 }
 
 validate_remote_root "$REMOTE_ROOT" || exit 2
@@ -124,6 +159,20 @@ trap cleanup EXIT
 
 echo "[beagley-ui] Step 1: Verify SSH..."
 ssh -o ConnectTimeout=5 "$HOST" "true"
+
+echo "[beagley-ui] Step 1b: Check target is not a live runtime..."
+set +e
+marker="$(ssh "$HOST" "$(live_runtime_probe_cmd "$REMOTE_ROOT")")"
+probe_rc=$?
+set -e
+if [[ "$probe_rc" -eq 3 ]]; then
+  echo "[beagley-ui] refusing: $REMOTE_ROOT is (inside) a live runtime on $HOST - found marker: $marker" >&2
+  echo "[beagley-ui] Nothing was deleted. Use a dedicated dev root such as /opt/beagley-cluster/qml-dev." >&2
+  exit 2
+elif [[ "$probe_rc" -ne 0 ]]; then
+  echo "[beagley-ui] live-runtime check failed (ssh/probe exit $probe_rc); refusing to continue" >&2
+  exit 1
+fi
 
 echo "[beagley-ui] Step 2: Sync QML to $HOST:$REMOTE_ROOT..."
 # NOTE: this is a replace, not a merge. The remote dir is rebuilt from a tar of

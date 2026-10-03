@@ -21,14 +21,8 @@ from pathlib import Path
 # ---------------------------------------------------------------- file selection
 # Supported = everything under src/ui that ships in the compiled module and is reachable
 # from MainV3 / MainEmbedded / the widget qmldirs, i.e. all tracked *.qml minus:
-EXCLUDED = {
-    "src/ui/Main.qml": "legacy v1 entry (BEAGLEY_UI_VARIANT=legacy)",
-    "src/ui/MainV2.qml": "legacy v2 entry",
-    "src/ui/MainPanelTest.qml": "dev-only panel test harness",
-    "src/ui/widgets/SpeedoPearl.qml": "dead code: imports the Qt5-only QtGraphicalEffects "
-                                      "module, which does not exist in Qt 6; nothing references it",
-}
-EXCLUDED_PREFIXES = ("src/ui/mock/",)  # dev mocks
+EXCLUDED = {}  # rel-path -> reason. (Legacy Main/MainV2 and dead SpeedoPearl were deleted.)
+EXCLUDED_PREFIXES = ()
 EXCLUDED_SUFFIXES = (".bak",)
 
 
