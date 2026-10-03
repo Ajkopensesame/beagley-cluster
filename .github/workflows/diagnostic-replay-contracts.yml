@@ -1,12 +1,8 @@
 name: Diagnostic Replay Contracts
 
 on:
+  # No path filter: this job is a required check and must report on every PR.
   pull_request:
-    paths:
-      - "tools/bbb_hub/**"
-      - "tests/**"
-      - "tools/schema/**"
-      - ".github/workflows/diagnostic-replay-contracts.yml"
   push:
     branches:
       - main
