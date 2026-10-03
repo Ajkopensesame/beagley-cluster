@@ -70,8 +70,8 @@ Item {
     property real coolantMaxStepPerFrame: 3.5
 
     // Tuning
-    property real response: 10.0
-    property real maxStepPerFrame: 10.0
+    property real response: 11.5
+    property real maxStepPerFrame: 9.0
 
     // Depth
     property real rimDepth: 1.0

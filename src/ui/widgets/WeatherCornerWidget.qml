@@ -14,6 +14,7 @@ Item {
     property string conditionText: "WEATHER"
 
     signal clicked()
+    signal pressAndHold()
 
     readonly property string displayFont: theme && theme.fontDisplay ? theme.fontDisplay : "Oxanium"
     readonly property string monoFont: theme && theme.fontMono ? theme.fontMono : "Oxanium"
@@ -117,5 +118,6 @@ Item {
     MouseArea {
         anchors.fill: parent
         onClicked: root.clicked()
+        onPressAndHold: root.pressAndHold()
     }
 }

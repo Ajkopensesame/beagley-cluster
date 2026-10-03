@@ -36,8 +36,8 @@ Item {
     property int redlineStart: 5000
 
     // Smoothing
-    property real response: 12.0
-    property real maxStepPerFrame: 350.0
+    property real response: 14.0
+    property real maxStepPerFrame: 320.0
 
     // Depth controls
     property real rimDepth: 1.0

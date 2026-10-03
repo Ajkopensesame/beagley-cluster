@@ -19,6 +19,7 @@ Item {
     property real phase: 0.0
     property var nowPlayingService: null
     property bool radarEnabled: false
+    property bool mapLibreNativeActive: false
     property string radarMapStyleUrl: ""
     property string radarTileUrlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
 
@@ -27,9 +28,11 @@ Item {
     readonly property string displayFont: theme && theme.fontDisplay ? theme.fontDisplay : "Oxanium"
     readonly property string monoFont: theme && theme.fontMono ? theme.fontMono : "Oxanium"
     readonly property bool embeddedSafeMode: Qt.platform.os === "linux"
-    readonly property bool tallDetailMode: radarEnabled && expandedMode === "radar"
-    readonly property int podSize: Math.floor(Math.min(164, Math.max(142, height * 0.228)))
-    readonly property int cornerBleed: Math.round(podSize * 0.17)
+    // Slice 3: radar expands as a card/sheet under weather — not a full-canopy peer corner.
+    readonly property bool tallDetailMode: false
+    // Slice 5: slightly quieter corner bleed — arm's-length jobs, no numeral crowd
+    readonly property int podSize: Math.floor(Math.min(158, Math.max(138, height * 0.218)))
+    readonly property int cornerBleed: Math.round(podSize * 0.15)
     readonly property int cornerInset: -cornerBleed
     readonly property real podBleedFraction: cornerBleed / podSize
     readonly property int podFaceInset: Math.round(podSize * 0.190)
@@ -84,7 +87,8 @@ Item {
     readonly property int forecastRefreshIntervalMs: expandedMode === "temp"
         ? 30 * 60 * 1000
         : 2 * 60 * 60 * 1000
-    readonly property int radarRefreshIntervalMs: 60 * 1000
+    // Slice 6: throttle radar refresh when MapLibre native is the center stage
+    readonly property int radarRefreshIntervalMs: mapLibreNativeActive ? 180 * 1000 : 60 * 1000
 
     property real airTempC: NaN
     property real feelsLikeC: NaN
@@ -195,10 +199,20 @@ Item {
     }
 
     function musicPrimaryLine() {
+        // Idle TR pod face: never raw PERMISSION/AUTH — keep long copy in expand/SETUP.
         if (musicTitle.length > 0)
             return musicTitle
-        if (musicAvailable)
+        var status = String(musicStatus).toUpperCase()
+        if (status === "PERMISSION")
+            return "SPOTIFY"
+        if (status === "AUTH" || musicAuthRequired())
+            return "SPOTIFY"
+        if (musicAvailable) {
+            var available = String(musicStatus).toUpperCase()
+            if (available === "PERMISSION" || available === "AUTH")
+                return "SPOTIFY"
             return musicStatus
+        }
         return "SPOTIFY"
     }
 
@@ -230,14 +244,17 @@ Item {
     }
 
     function musicCornerSecondaryLine() {
-        if (musicAuthRequired())
+        var status = String(musicStatus).toUpperCase()
+        if (status === "PERMISSION")
             return "REPAIR"
+        if (status === "AUTH" || musicAuthRequired())
+            return "LINK"
         if (musicPlaying)
             return "PLAYING"
         if (musicAvailable)
-            return musicStatus
+            return "TAP"
         if (musicConfigured())
-            return musicStatus.length > 0 ? musicStatus : "SETUP"
+            return "SETUP"
         return musicSecondaryLine()
     }
 
@@ -253,27 +270,21 @@ Item {
     }
 
     function musicTickerDisplayLine() {
+        // Only show real track lines in the top ticker — never AUTH/permission/setup copy
         var line = musicTickerLine()
         if (line.length > 0)
             return line
-        if ((musicSpotifyConfigured || musicSourceLine() === "SPOTIFY") && musicDetail.length > 0)
-            return musicDetail
-        if ((musicSpotifyConfigured || musicSourceLine() === "SPOTIFY") && musicStatus.length > 0)
-            return musicStatus
-        if (musicConfigured())
-            return "Open Spotify setup"
         return ""
     }
 
     function musicTickerVisible() {
-        if (musicAvailable && musicTickerDisplayLine().length > 0)
-            return true
-        return musicConfigured()
-            && musicTickerDisplayLine().length > 0
+        // Top-center ticker only when there is a real title — never AUTH/PERMISSION/setup copy
+        return musicTitle.length > 0
     }
 
     function musicAuthRequired() {
-        return String(musicStatus).toUpperCase() === "AUTH"
+        var status = String(musicStatus).toUpperCase()
+        return status === "AUTH" || status === "PERMISSION"
     }
 
     function spotifyPairingVisible() {
@@ -670,10 +681,28 @@ Item {
     function coordinateStatusText() {
         if (weatherPositionReady) {
             if (positionLive || stressScene)
-                return "SYNC"
+                return "GPS…"
             return positionWeak ? "GPS WEAK" : "GPS HOLD"
         }
-        return "GPS WAIT"
+        return "GPS…"
+    }
+
+    function weatherCornerStatusText() {
+        if (weatherStatus === "LIVE")
+            return weatherCompactLabel()
+        if (!weatherPositionReady)
+            return coordinateStatusText()
+        if (weatherStatus === "SYNC")
+            return "SYNC…"
+        if (weatherStatus === "OFFLINE")
+            return "OFFLINE"
+        if (weatherStatus === "NO DATA")
+            return "NO DATA"
+        return weatherStatus.length > 0 ? weatherStatus : "SYNC…"
+    }
+
+    function weatherCornerLive() {
+        return weatherStatus === "LIVE" && isFinite(Number(displayTempC))
     }
 
     function requestLocationFallback(latValue, lngValue) {
@@ -839,17 +868,28 @@ Item {
     function requestWeatherCandidate(candidates, index) {
         if (index >= candidates.length) {
             weatherStatus = "OFFLINE"
+            if (!isFinite(Number(airTempC)))
+                clearWeatherData("OFFLINE")
             return
         }
 
         const candidate = candidates[index]
         const xhr = new XMLHttpRequest()
+        var settled = false
+        function advance() {
+            if (settled)
+                return
+            settled = true
+            requestWeatherCandidate(candidates, index + 1)
+        }
         xhr.onreadystatechange = function() {
             if (xhr.readyState !== 4)
                 return
+            if (settled)
+                return
 
             if (xhr.status < 200 || xhr.status >= 300) {
-                requestWeatherCandidate(candidates, index + 1)
+                advance()
                 return
             }
 
@@ -859,23 +899,29 @@ Item {
                     ? payload.observations.data
                     : []
                 if (!data || data.length === 0) {
-                    requestWeatherCandidate(candidates, index + 1)
+                    advance()
                     return
                 }
 
                 const row = data[0]
                 if (!isFinite(Number(row.air_temp))) {
-                    requestWeatherCandidate(candidates, index + 1)
+                    advance()
                     return
                 }
 
+                settled = true
                 applyWeatherRow(candidate, payload, row)
             } catch (err) {
                 console.warn("[WeatherCorners] BOM weather parse failed:", err)
-                requestWeatherCandidate(candidates, index + 1)
+                advance()
             }
         }
+        xhr.ontimeout = function() {
+            console.warn("[WeatherCorners] BOM weather timeout:", candidate && candidate.name)
+            advance()
+        }
         xhr.open("GET", bomStationUrl(candidate), true)
+        try { xhr.timeout = 12000 } catch (err) { }
         xhr.send()
     }
 
@@ -957,7 +1003,8 @@ Item {
             return
         }
 
-        weatherStatus = "SYNC"
+        if (!isFinite(Number(airTempC)))
+            weatherStatus = "SYNC"
         requestWeatherCandidate(candidates, 0)
     }
 
@@ -1011,13 +1058,17 @@ Item {
             return
         }
 
-        if (!root.sameLocationAnchor(Number(root.safeLat), Number(root.safeLng)))
-            root.clearLiveWeatherState("SYNC")
+        // Keep last LIVE reading while GPS/position settles — avoid eternal --° + SYNC flicker.
+        if (!root.sameLocationAnchor(Number(root.safeLat), Number(root.safeLng))) {
+            if (!isFinite(Number(root.airTempC)))
+                root.weatherStatus = "SYNC"
+            root.clearLocationData()
+        }
         coordinateDebounce.restart()
     }
 
     Timer {
-        interval: root.weatherRefreshIntervalMs
+        interval: Math.max(1000, Number(root.weatherRefreshIntervalMs) || 1000)
         repeat: true
         running: root.active
         triggeredOnStart: false
@@ -1027,7 +1078,7 @@ Item {
     }
 
     Timer {
-        interval: root.forecastRefreshIntervalMs
+        interval: Math.max(1000, Number(root.forecastRefreshIntervalMs) || 1000)
         repeat: true
         running: root.active
         triggeredOnStart: false
@@ -1035,7 +1086,7 @@ Item {
     }
 
     Timer {
-        interval: root.radarRefreshIntervalMs
+        interval: Math.max(1000, Number(root.radarRefreshIntervalMs) || 60000)
         repeat: true
         running: root.active && root.radarEnabled
         triggeredOnStart: false
@@ -1134,20 +1185,29 @@ Item {
         corner: "topLeft"
         effectLevel: root.effectLevel
         bleedFraction: root.podBleedFraction
-        live: root.weatherStatus === "LIVE"
+        live: root.weatherCornerLive()
         tempText: root.formatTemp(root.displayTempC)
-        locationText: root.weatherCompactLabel()
+        locationText: root.weatherCornerStatusText()
         conditionKind: root.weatherKind(root.currentConditionLabel())
-        conditionText: root.weatherStatus
+        conditionText: root.weatherCornerStatusText()
         onClicked: root.expandedMode = root.expandedMode === "temp" ? "" : "temp"
+        onPressAndHold: {
+            if (root.radarEnabled)
+                root.expandedMode = root.expandedMode === "radar" ? "" : "radar"
+            else
+                root.expandedMode = root.expandedMode === "temp" ? "" : "temp"
+        }
     }
 
+    // Slice 6: upper corners are TEMP + RADAR; Spotify stays in ticker/media strip.
+    // When radar feature is off, show a calm OFF glyph — never an empty/NO RADAR dead pod.
     WidgetLocal.RadarCornerWidget {
         id: radarCorner
         width: root.podSize
         height: root.podSize
-        visible: root.radarEnabled
+        visible: true
         enabled: root.radarEnabled
+        featureEnabled: root.radarEnabled
         anchors.right: parent.right
         anchors.top: parent.top
         anchors.rightMargin: root.cornerInset
@@ -1156,22 +1216,25 @@ Item {
         corner: "topRight"
         effectLevel: root.effectLevel
         bleedFraction: root.podBleedFraction
-        frameUrl: root.radarFrameUrl
-        mapUrl: root.radarDisplayUrl
-        status: root.radarStatus
-        frameLabel: root.radarFrameDisplayLabel()
+        frameUrl: root.radarEnabled ? root.radarFrameUrl : ""
+        mapUrl: root.radarEnabled ? root.radarDisplayUrl : ""
+        status: root.radarEnabled
+            ? (root.radarStatus.length > 0 ? root.radarStatus : "NO RADAR")
+            : "OFF"
+        frameLabel: root.radarEnabled ? root.radarFrameDisplayLabel() : ""
         onClicked: {
             if (root.radarEnabled)
                 root.expandedMode = root.expandedMode === "radar" ? "" : "radar"
         }
     }
 
+    // Media corner kept in tree for sheet content helpers, but not TR-primary.
     WidgetLocal.MediaCornerWidget {
         id: mediaCorner
         width: root.podSize
         height: root.podSize
-        visible: !root.radarEnabled
-        enabled: !root.radarEnabled
+        visible: false
+        enabled: false
         anchors.right: parent.right
         anchors.top: parent.top
         anchors.rightMargin: root.cornerInset
@@ -1196,7 +1259,7 @@ Item {
         anchors.top: parent.top
         anchors.topMargin: Math.max(10, Math.round(root.podSize * 0.10))
         visible: root.musicTickerVisible()
-        opacity: visible ? 1 : 0
+        opacity: visible ? (root.musicPlaying ? 1.0 : (root.theme && root.theme.chromeIdle !== undefined ? root.theme.chromeIdle : 0.72)) : 0
         radius: height * 0.5
         clip: false
         color: "#05070B"
@@ -1204,6 +1267,13 @@ Item {
         border.color: root.musicPlaying ? "#16464A" : "#253145"
 
         Behavior on opacity { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+
+        MouseArea {
+            id: tickerOpenMouse
+            anchors.fill: parent
+            z: 1
+            onClicked: root.expandedMode = root.expandedMode === "music" ? "" : "music"
+        }
 
         OemIcon {
             id: tickerIcon
@@ -1300,6 +1370,7 @@ Item {
 
         Rectangle {
             id: tickerSaveButton
+            z: 2
             width: 30
             height: 30
             radius: 15
@@ -1387,17 +1458,21 @@ Item {
         }
     }
 
+    // Slice 6: remove lower SETUP/MAP twin chrome — swipe-up opens settings; MAP chip in MainV3.
     WidgetLocal.MapMenuCornerWidget {
         id: menuCorner
         width: root.podSize
         height: root.podSize
+        visible: false
+        enabled: false
         anchors.left: parent.left
         anchors.bottom: parent.bottom
         anchors.leftMargin: root.cornerInset
         anchors.bottomMargin: root.cornerInset
         theme: root.theme
         corner: "bottomLeft"
-        effectLevel: root.effectLevel
+        effectLevel: "low"
+        opacity: Math.max(0.90, root.theme && root.theme.chromeIdle !== undefined ? root.theme.chromeIdle : 0.90)
         bleedFraction: root.podBleedFraction
         icon: "menu"
         label: "SETUP"
@@ -1412,13 +1487,16 @@ Item {
         id: mapMenuCorner
         width: root.podSize
         height: root.podSize
+        visible: false
+        enabled: false
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         anchors.rightMargin: root.cornerInset
         anchors.bottomMargin: root.cornerInset
         theme: root.theme
         corner: "bottomRight"
-        effectLevel: root.effectLevel
+        effectLevel: "low"
+        opacity: Math.max(0.90, root.theme && root.theme.chromeIdle !== undefined ? root.theme.chromeIdle : 0.90)
         bleedFraction: root.podBleedFraction
         icon: "route"
         label: "MAP"
@@ -1433,20 +1511,26 @@ Item {
         id: detailLayer
         anchors.fill: parent
         z: 500
-        visible: root.expandedMode !== ""
-        opacity: visible ? 1 : 0
+        // Slice 5: card sheets animate in (opacity/y); keep dim light so gauges stay lit
+        readonly property bool open: root.expandedMode !== ""
+        visible: opacity > 0.01 || open
+        opacity: open ? 1 : 0
+        Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
 
         Rectangle {
             anchors.fill: parent
-            color: root.expandedMode === "radar"
-                ? "#02050A"
-                : root.expandedMode === "temp"
+            color: root.expandedMode === "temp"
                 ? Qt.rgba(0.0, 0.0, 0.0, 0.0)
-                : Qt.rgba(0.0, 0.0, 0.0, root.tallDetailMode ? 0.66 : 0.54)
+                : root.expandedMode === "radar"
+                ? Qt.rgba(0.0, 0.0, 0.0, 0.18)
+                : Qt.rgba(0.0, 0.0, 0.0, 0.22)
+            opacity: detailLayer.open ? 1 : 0
+            Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
         }
 
         MouseArea {
             anchors.fill: parent
+            enabled: detailLayer.open
             onClicked: root.expandedMode = ""
         }
 
@@ -1454,20 +1538,26 @@ Item {
             id: detailCard
             width: root.expandedMode === "temp"
                 ? Math.floor(Math.min(560, Math.max(500, parent.width * 0.30)))
-                : root.tallDetailMode
-                ? Math.floor(Math.min(620, Math.max(500, parent.width * 0.38)))
+                : root.expandedMode === "radar"
+                ? Math.floor(Math.min(560, Math.max(480, parent.width * 0.34)))
                 : root.expandedMode === "music"
                 ? Math.floor(Math.min(500, Math.max(430, parent.width * 0.30)))
                 : Math.floor(Math.min(452, Math.max(332, parent.width * 0.35)))
             height: root.expandedMode === "temp"
-                ? 430
-                : root.tallDetailMode
-                ? Math.floor(Math.min(parent.height - 44, Math.max(560, parent.height * 0.92)))
+                ? (root.radarEnabled ? 500 : 430)
+                : root.expandedMode === "radar"
+                ? Math.floor(Math.min(520, Math.max(420, parent.height * 0.62)))
                 : root.expandedMode === "music"
                 ? 410
                 : Math.floor(Math.min(360, Math.max(272, parent.height * 0.46)))
             anchors.horizontalCenter: parent.horizontalCenter
-            anchors.verticalCenter: parent.verticalCenter
+            // Slice 5: rise into place rather than hard-cut canopy takeover
+            y: Math.round((parent.height - height) / 2) + (detailLayer.open ? 0 : 22)
+            opacity: detailLayer.open ? 1 : 0
+            scale: detailLayer.open ? 1.0 : 0.985
+            Behavior on y { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+            Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+            Behavior on scale { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
             clip: false
 
             NativePanel {
@@ -1479,7 +1569,7 @@ Item {
                     : "#050812"
                 borderColor: root.expandedMode === "temp"
                     ? "#FF7AD9"
-                    : root.tallDetailMode
+                    : root.expandedMode === "radar"
                     ? "#58FFE1"
                     : (root.expandedMode === "music" ? "#58FFE1" : "#5C4B90")
                 borderWidth: 1
@@ -1601,7 +1691,9 @@ Item {
 
                                     Text {
                                         width: parent.width
-                                        text: root.musicTitle.length > 0 ? root.musicTitle : root.musicStatus
+                                        text: root.musicTitle.length > 0
+                                            ? root.musicTitle
+                                            : (root.musicAuthRequired() ? "SPOTIFY" : root.musicStatus)
                                         color: "#F7FBFF"
                                         font.family: root.displayFont
                                         font.pixelSize: 25
@@ -1613,7 +1705,13 @@ Item {
 
                                     Text {
                                         width: parent.width
-                                        text: root.musicArtist.length > 0 ? root.musicArtist : root.musicStatusLine()
+                                        text: root.musicArtist.length > 0
+                                            ? root.musicArtist
+                                            : (root.musicAuthRequired()
+                                                ? (String(root.musicStatus).toUpperCase() === "PERMISSION"
+                                                    ? "Permission repair needed"
+                                                    : "Login required")
+                                                : root.musicStatusLine())
                                         color: root.musicPlaying ? "#58FFE1" : "#9DB4FF"
                                         font.family: root.monoFont
                                         font.pixelSize: 14
@@ -1914,9 +2012,9 @@ Item {
                                 width: parent.width
                                 height: 76
                                 spacing: 12
+                                // Hide play/pause/next when SpotifyWeb/controls unsupported.
                                 visible: !root.spotifyPairingVisible()
-                                    && nowPlayingService
-                                    && nowPlayingService.controlsSupported
+                                    && root.mediaControlEnabled()
 
                                 Repeater {
                                     model: [
@@ -2332,6 +2430,68 @@ Item {
                             horizontalAlignment: Text.AlignHCenter
                         }
                     }
+
+                    Rectangle {
+                        width: parent.width
+                        height: 54
+                        visible: root.radarEnabled
+                        radius: 10
+                        color: radarOpenMouse.pressed ? "#123C44" : "#050812"
+                        border.width: 1
+                        border.color: root.radarStatus === "LIVE" ? "#58FFE1" : "#305E72"
+
+                        Row {
+                            anchors.fill: parent
+                            anchors.leftMargin: 14
+                            anchors.rightMargin: 14
+                            spacing: 12
+
+                            WidgetLocal.RadarGlyph {
+                                width: 34
+                                height: 34
+                                anchors.verticalCenter: parent.verticalCenter
+                                active: root.radarStatus === "LIVE"
+                                primaryColor: "#F7FBFF"
+                                accentColor: root.radarStatus === "LIVE" ? "#58FFE1" : "#FFD36B"
+                            }
+
+                            Column {
+                                width: parent.width - 46
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 2
+
+                                Text {
+                                    width: parent.width
+                                    text: "RADAR"
+                                    color: "#F7FBFF"
+                                    font.family: root.monoFont
+                                    font.pixelSize: 13
+                                    font.weight: Font.Bold
+                                    font.letterSpacing: 0
+                                    elide: Text.ElideRight
+                                }
+
+                                Text {
+                                    width: parent.width
+                                    text: root.radarStatus === "LIVE"
+                                        ? root.radarSourceLabel()
+                                        : (root.radarStatus.length > 0 ? root.radarStatus : "NO RADAR")
+                                    color: root.radarStatus === "LIVE" ? "#58FFE1" : "#FFD36B"
+                                    font.family: root.monoFont
+                                    font.pixelSize: 11
+                                    font.weight: Font.Bold
+                                    font.letterSpacing: 0
+                                    elide: Text.ElideRight
+                                }
+                            }
+                        }
+
+                        MouseArea {
+                            id: radarOpenMouse
+                            anchors.fill: parent
+                            onClicked: root.expandedMode = "radar"
+                        }
+                    }
                 }
             }
 
@@ -2364,7 +2524,9 @@ Item {
                         Text {
                             width: parent.width * 0.42 - 10
                             anchors.verticalCenter: parent.verticalCenter
-                            text: root.radarStatus === "LIVE" ? root.radarFrameDisplayLabel() : root.radarStatus
+                            text: root.radarStatus === "LIVE"
+                                ? root.radarFrameDisplayLabel()
+                                : (root.radarStatus.length > 0 ? root.radarStatus : "NO RADAR")
                             color: root.radarStatus === "LIVE" ? "#9DB4FF" : "#FFD36B"
                             font.family: root.monoFont
                             font.pixelSize: 11
@@ -2377,7 +2539,7 @@ Item {
 
                     Item {
                         width: parent.width
-                        height: Math.max(360, parent.height - 122)
+                        height: Math.max(240, parent.height - 122)
                         clip: true
 
                         NativePanel {
@@ -2445,7 +2607,9 @@ Item {
                                 Text {
                                     width: Math.min(320, detailRadarDisplay.width * 0.70)
                                     anchors.horizontalCenter: parent.horizontalCenter
-                                    text: root.radarStatus === "LIVE" ? "RADAR LOADING" : root.radarStatus
+                                    text: root.radarStatus === "LIVE"
+                                        ? "RADAR LOADING"
+                                        : (root.radarStatus.length > 0 ? root.radarStatus : "NO RADAR")
                                     color: root.radarStatus === "LIVE" ? "#58FFE1" : "#FFD36B"
                                     font.family: root.monoFont
                                     font.pixelSize: 13

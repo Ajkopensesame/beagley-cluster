@@ -38,12 +38,39 @@ VEHICLE_HUB_WS_URL=ws://10.24.0.7:8765
 - `rich`: gauges show the full ticks, lens, arcs, chevrons, and gauge detail
   while the map can stay on a conservative profile.
 
-`BEAGLEY_GAUGE_DEMO=1` is only for visual review of telltales and gauge
-readouts. It does not enable app replay or change the BBB vehicle-state source.
+### Skin v2 drive / show
+
+- `BEAGLEY_SKIN_PROFILE=drive` (embedded default): glass + molten lava-lite; matrix off
+- `BEAGLEY_SKIN_PROFILE=show`: concept match — matrix depth + richer lava
+- Vision still: `docs/vision/skin-v2-concept-1920x720.png`
+
+### Product-night lava / matrix
+
+Slice 6 product-night dial **lava** requires `BEAGLEY_EFFECT_LEVEL=high`.
+On the appliance (`BEAGLEY_RENDER_PROFILE=embedded`) that means **lava-lite only**:
+one band per gauge, ~8–12Hz paint, no matrix rain. Matrix is desktop/high-showy
+only — `gaugeMatrixRainEnabled` is false whenever `renderProfile=embedded`.
+
+```text
+BEAGLEY_EFFECT_LEVEL=high
+BEAGLEY_RENDER_PROFILE=embedded   # appliance: lava-lite, matrix hard-off
+```
+
+With `effectLevel=low|off` lava/matrix stay off (pearl breathe only — do not stack
+breathe+lava+rain). On the appliance, set these in
+`/etc/default/beagley-cluster.local` (lab currently keeps `high` + `embedded`).
+
+`BEAGLEY_GAUGE_DEMO=1` is for on-glass visual review without a live hub: speedo/tach
+needles and arcs gently animate, telltales light, and lava-lite stays on (unlike
+`BEAGLEY_CLUSTER_SIMULATION`). It does not enable app replay or change the
+BBB vehicle-state source. Toggle off with `BEAGLEY_GAUGE_DEMO=0` in
+`/etc/default/beagley-cluster.local` then `systemctl restart beagley_cluster`.
 
 `BEAGLEY_CLUSTER_SIMULATION=1` runs an app-local gauge/VIC sweep for visual QA:
 speed, RPM, fuel, coolant, indicators, gear, O/D, high-beam, drivetrain, and
-warning states cycle without changing the BBB vehicle-state source.
+warning states cycle without changing the BBB vehicle-state source. Simulation
+also disables matrix rain on desktop (`gaugeMatrixRainEnabled` requires
+`!clusterSimulation`).
 
 Do not set `BEAGLEY_REPLAY_FILE` for live-cluster UI work. App-side replay and
 `BEAGLEY_STRESS_SCENE=1` are useful for demos, but they do not exercise the
