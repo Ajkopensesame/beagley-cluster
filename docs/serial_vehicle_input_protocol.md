@@ -63,6 +63,38 @@ a signal with no table is not produced and stays at the hub default `0.0`.
 * `fuel.low_pct` drives `warnings.fuel_low` when calibrated fuel is at or below it.
 * Raw ADC is smoothed with an exponential average (`smoothing_alpha`, default 0.25) before conversion.
 
+## Speed source: GPS first, pulse fallback (`VEHICLE_SPEED_SOURCE`)
+
+Top-level `speedKph` has two possible sources: the GPS receiver and the UNO speed pulse
+(`speed_hz` x `speed.kph_per_hz`, or a pre-converted `speed` key). Implemented in
+`tools/bbb_hub/speed_source.py`, wired in `vehicle_hub_prod.py`. **RPM is not affected**: the rpm source is
+still undecided and keeps the previous behaviour (serial/CAN only).
+
+| `VEHICLE_SPEED_SOURCE` | Behaviour |
+|---|---|
+| `gps_first` (default) | GPS speed while there is a live fix; otherwise pulse speed; otherwise `0.0` |
+| `pulse_only` | previous behaviour: UNO/serial speed only, GPS never overrides it |
+| `gps_only` | GPS speed only, `0.0` without a live fix |
+
+* "Live fix" = the GPS receiver reports a valid fix **now**: GPS sentences fresh (`BBB_GPS_STALE_MS`, 2 s) and
+  the fix is not the hub's 15 s fix-hold (`gps_nmea.py` keeps `fixValid` true for up to 15 s after the receiver
+  loses its fix; that held speed is old, so it is not used for speed selection. `gps.fixValid` itself is unchanged).
+* "Pulse available" = the UNO link is not stale and its line produced a `speedKph` (needs `speed.kph_per_hz` > 0
+  in the calibration, or a pre-converted `speed`). An uncalibrated pulse is not available, so the result is `0.0`.
+* **Hysteresis** (`gps_first`): fall back to the pulse only after the fix has been lost for
+  `VEHICLE_SPEED_GPS_LOST_S` (default 2.0 s; the last GPS speed is held for at most that long, then replaced);
+  return to GPS only after the fix has been continuously valid for `VEHICLE_SPEED_GPS_REGAIN_S` (default 2.0 s).
+  If no pulse speed exists there is nothing to flap against, so GPS is used immediately.
+* **Fail-safe is unchanged**: with neither source valid the speed is `0.0` (never a frozen value), reported as
+  `active: "none"`. A stale UNO still contributes nothing.
+* CAN-supplied speed (when the serial line has no speed) and the bench simulator are left untouched
+  (`active: "other"`). If both CAN and serial supply speed, serial already overwrites CAN, so the policy applies.
+* Additive health field `_health.speedSource`: `{policy, active: "gps"|"pulse"|"none"|"other", reason, gpsFix, ageS}`.
+  `gpsFix` is the live-fix flag used above; `ageS` is the age of the active source (GPS sentence age or UNO line age),
+  `null` for `none`. Reasons: `gps_fix`, `gps_lost_holding`, `gps_lost_pulse_fallback`, `gps_lost_no_pulse`,
+  `no_gps_fix_pulse`, `gps_regain_wait`, `gps_regained`, `pulse_unavailable`, `no_valid_source`, `pulse_only`,
+  `gps_only`, `gps_only_no_fix`, `bench_sim`, `can_speed`.
+
 ## Health fields (additive, under `_health.serialVehicleInputs`)
 
 * `calibration`: `{fuel,coolant,speed,rpm}` booleans, which signals are calibrated.

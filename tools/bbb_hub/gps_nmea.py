@@ -131,6 +131,8 @@ class GpsSample:
     satellites: int
     source: str
     received_monotonic: float
+    # True when fix_valid is only the short fix-hold (no live fix); speed is then the last known value.
+    held: bool = False
 
 
 @dataclass
@@ -220,6 +222,7 @@ class NmeaGpsState:
             satellites=sample.satellites,
             source=sample.source,
             received_monotonic=received_monotonic,
+            held=True,
         )
 
     def _build_sample(self, received_monotonic: float) -> GpsSample:

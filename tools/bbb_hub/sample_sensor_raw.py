@@ -30,7 +30,9 @@ async def main(url: str, seconds: float) -> None:
                     samples[key].append(float(raw[key]))
             print(
                 f"raw={raw} stale={serial.get('stale')} faults={serial.get('sensorFaults')} "
-                f"fuelPct={state.get('fuelPct')} coolantC={state.get('coolantC')}"
+                f"fuelPct={state.get('fuelPct')} coolantC={state.get('coolantC')} "
+                f"speedKph={state.get('speedKph')} rpm={state.get('rpm')} "
+                f"speedSource={((state.get('_health') or {}).get('speedSource') or {}).get('active')}"
             )
     for key, values in samples.items():
         if values:

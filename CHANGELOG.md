@@ -8,6 +8,7 @@ follow [Semantic Versioning](https://semver.org/) (see [docs/RELEASING.md](docs/
 ## [Unreleased]
 
 ### Added
+- Hub: GPS-first speed with pulse fallback (`VEHICLE_SPEED_SOURCE`, `_health.speedSource`); UNO bench-test checklist; `firmware/uno_vehicle_input` sketch.
 - `THIRD_PARTY_NOTICES.md` inventory of bundled/third-party components and open licence questions.
 - `CHANGELOG.md`, `docs/RELEASING.md` and a CMake project version (`0.2.0`).
 
