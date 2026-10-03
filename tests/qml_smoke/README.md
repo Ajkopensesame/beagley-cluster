@@ -32,6 +32,11 @@ process start until the verdict - allow-list with justifications is `kAllowList`
 `rpmValueText` in MainV3; `gaugeReadout` x2 in MainEmbedded) is a number with mock data and
 exactly `--` when link is lost.
 
+Teardown: a `SmokeProbe::TeardownGuard` (first local in `main()`, so destroyed last) collects every
+warning logged after the verdict until the process is fully torn down; any non-allow-listed one (in
+practice `TypeError: Cannot read property ... of null`) prints `[SMOKE] TEARDOWN FAIL` and exits 1
+(`FAIL_REGULAR_EXPRESSION` makes ctest fail).
+
 Because a failed QML load makes `main()` return -1 before any verdict, the tests also require
 the `[SMOKE] RESULT PASS` line (`PASS_REGULAR_EXPRESSION`).
 

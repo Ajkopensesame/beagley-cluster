@@ -32,4 +32,13 @@ void installMessageHandler();
 // Call after the entry-point QML has been loaded and before app.exec().
 void start(QQmlApplicationEngine &engine);
 
+// Declare as the FIRST local in main() (right after installMessageHandler()): it is then
+// destroyed last, i.e. after the QGuiApplication, the QQmlApplicationEngine and every
+// context object. Any warning logged between the verdict and that point (QML bindings
+// evaluating against already-destroyed context objects: "TypeError: Cannot read property
+// ... of null") is reported as "[SMOKE] TEARDOWN FAIL" and the process exits 1.
+struct TeardownGuard {
+    ~TeardownGuard();
+};
+
 } // namespace SmokeProbe
