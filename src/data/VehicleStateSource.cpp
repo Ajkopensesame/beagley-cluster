@@ -1,6 +1,7 @@
 #include "VehicleStateSource.h"
 
 #include <QDebug>
+#include <QTimer>
 #include <cmath>
 #include <cstdlib>
 #include <algorithm>
@@ -50,11 +51,56 @@ VehicleStateSource::VehicleStateSource(QObject *parent)
 {
 }
 
+void VehicleStateSource::updateLinkLost()
+{
+    // Same predicate as MainV3 `truthOk` / ClusterRenderModel `truthOk`, inverted.
+    const bool lost = !m_connected || m_linkStale || m_bbbStale || !m_vehicleStateSeen;
+    if (m_linkLost == lost) return;
+    m_linkLost = lost;
+    emit linkLostChanged();
+    if (!lost) {
+        // Recovered: latched warnings follow the live values again.
+        scheduleLatchedSync();
+    }
+}
+
+void VehicleStateSource::scheduleLatchedSync()
+{
+    // Deferred by one event-loop turn on purpose. A hub-stale frame carries
+    // zeroed warnings AND `_health.stale=true`; the client applies the warnings
+    // before it applies the stale flag. Syncing immediately would latch those
+    // zeros. By the time this runs the whole frame has been applied, linkLost is
+    // true, and syncLatchedWarnings() leaves the previous latched set untouched.
+    if (m_latchedSyncQueued) return;
+    m_latchedSyncQueued = true;
+    QTimer::singleShot(0, this, [this]() {
+        m_latchedSyncQueued = false;
+        syncLatchedWarnings();
+    });
+}
+
+void VehicleStateSource::syncLatchedWarnings()
+{
+    if (m_linkLost) return;
+    WarnSet live;
+    live.brake = m_warnBrake;
+    live.oil = m_warnOil;
+    live.charge = m_warnCharge;
+    live.door = m_warnDoor;
+    live.checkEngine = m_warnCheckEngine;
+    live.at = m_warnAT;
+    live.fuelLow = m_warnFuelLow;
+    if (live == m_latched) return;
+    m_latched = live;
+    emit warnLatchedChanged();
+}
+
 void VehicleStateSource::setConnected(bool v)
 {
     if (m_connected == v) return;
     m_connected = v;
     emit connectedChanged();
+    updateLinkLost();
 }
 
 void VehicleStateSource::setLinkStale(bool v)
@@ -62,6 +108,7 @@ void VehicleStateSource::setLinkStale(bool v)
     if (m_linkStale == v) return;
     m_linkStale = v;
     emit linkStaleChanged();
+    updateLinkLost();
 }
 
 void VehicleStateSource::setRxAgeMs(int v)
@@ -76,6 +123,7 @@ void VehicleStateSource::setVehicleStateSeen(bool v)
     if (m_vehicleStateSeen == v) return;
     m_vehicleStateSeen = v;
     emit vehicleStateSeenChanged();
+    updateLinkLost();
 }
 
 void VehicleStateSource::setLeftIndicator(bool v)
@@ -104,6 +152,7 @@ void VehicleStateSource::setWarnBrake(bool v)
     if (m_warnBrake == v) return;
     m_warnBrake = v;
     emit warnBrakeChanged();
+    scheduleLatchedSync();
 }
 
 void VehicleStateSource::setWarnOil(bool v)
@@ -111,6 +160,7 @@ void VehicleStateSource::setWarnOil(bool v)
     if (m_warnOil == v) return;
     m_warnOil = v;
     emit warnOilChanged();
+    scheduleLatchedSync();
 }
 
 void VehicleStateSource::setWarnCharge(bool v)
@@ -118,6 +168,7 @@ void VehicleStateSource::setWarnCharge(bool v)
     if (m_warnCharge == v) return;
     m_warnCharge = v;
     emit warnChargeChanged();
+    scheduleLatchedSync();
 }
 
 void VehicleStateSource::setWarnDoor(bool v)
@@ -125,6 +176,7 @@ void VehicleStateSource::setWarnDoor(bool v)
     if (m_warnDoor == v) return;
     m_warnDoor = v;
     emit warnDoorChanged();
+    scheduleLatchedSync();
 }
 
 void VehicleStateSource::setWarnCheckEngine(bool v)
@@ -132,6 +184,7 @@ void VehicleStateSource::setWarnCheckEngine(bool v)
     if (m_warnCheckEngine == v) return;
     m_warnCheckEngine = v;
     emit warnCheckEngineChanged();
+    scheduleLatchedSync();
 }
 
 void VehicleStateSource::setWarnAT(bool v)
@@ -139,6 +192,7 @@ void VehicleStateSource::setWarnAT(bool v)
     if (m_warnAT == v) return;
     m_warnAT = v;
     emit warnATChanged();
+    scheduleLatchedSync();
 }
 
 void VehicleStateSource::setWarnFuelLow(bool v)
@@ -146,6 +200,7 @@ void VehicleStateSource::setWarnFuelLow(bool v)
     if (m_warnFuelLow == v) return;
     m_warnFuelLow = v;
     emit warnFuelLowChanged();
+    scheduleLatchedSync();
 }
 
 void VehicleStateSource::setBbbStale(bool v)
@@ -153,6 +208,7 @@ void VehicleStateSource::setBbbStale(bool v)
     if (m_bbbStale == v) return;
     m_bbbStale = v;
     emit bbbStaleChanged();
+    updateLinkLost();
 }
 
 void VehicleStateSource::setDiagnosticOk(bool v)

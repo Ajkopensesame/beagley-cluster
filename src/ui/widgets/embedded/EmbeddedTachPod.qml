@@ -8,6 +8,7 @@ Rectangle {
     property color panelFill: "#081220"
     property color panelStroke: "#14324A"
     property color needleColor: "#4CD9FF"
+    readonly property bool linkLost: !root.cluster || !!root.cluster.linkLost
     readonly property real rpmValue: root.cluster ? Number(root.cluster.rpm || 0) : 0
     readonly property bool warningActive: !!(root.cluster && root.cluster.activeWarnings > 0)
 
@@ -23,7 +24,8 @@ Rectangle {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: parent.top
         anchors.topMargin: 18
-        value: root.rpmValue
+        value: root.linkLost ? 0 : root.rpmValue
+        inactive: root.linkLost
         maxValue: 6000
         dangerStart: 5000
         minorStep: 500

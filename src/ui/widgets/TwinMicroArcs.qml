@@ -12,13 +12,17 @@ Item {
     property real fuelPct: 62
     property real coolantC: 78
     property bool lowEffectMode: false
+    // Link lost: no live fuel/coolant reading. Fill arcs hidden, readouts "--",
+    // everything greyed, so an empty/zero value is never shown as a real reading.
+    property bool inactive: false
     property string effectLevel: "high"
 
     readonly property color pearl: theme?.pearlLow ?? Qt.color("#D4C4FF")
-    readonly property color fuelColor: (fuelNorm <= 0.12)
+    readonly property color inactiveColor: "#6B7280"
+    readonly property color fuelColor: inactive ? inactiveColor : (fuelNorm <= 0.12)
         ? (theme?.danger ?? Qt.color("#FF3B3B"))
         : pearl
-    readonly property color tempColor: (coolantNorm >= 0.90)
+    readonly property color tempColor: inactive ? inactiveColor : (coolantNorm >= 0.90)
         ? (theme?.danger ?? Qt.color("#FF3B3B"))
         : ((coolantNorm <= 0.15)
             ? (theme?.matrixCyan ?? Qt.color("#5FF7FF"))
@@ -30,6 +34,7 @@ Item {
 
     Item {
         id: fuelPod
+        opacity: root.inactive ? 0.55 : 1.0
         width: parent.width * 0.275
         height: parent.height * 0.250
         anchors.left: parent.left
@@ -55,6 +60,7 @@ Item {
             startAngleDeg: 205
             sweepAngleDeg: 130
             startProgress: 0.0
+            visible: !root.inactive
             endProgress: Math.max(0.02, Math.min(1, root.fuelNorm))
             radiusFactor: 0.40
             strokeWidth: root.lowEffectMode ? 5 : 7
@@ -127,7 +133,7 @@ Item {
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.bottom: parent.bottom
             z: 6
-            text: Math.round(root.fuelPct) + "%"
+            text: root.inactive ? "--" : Math.round(root.fuelPct) + "%"
             color: root.fuelColor
             font.family: "Oxanium"
             font.pixelSize: Math.max(12, parent.width * 0.16)
@@ -159,6 +165,7 @@ Item {
 
     Item {
         id: tempPod
+        opacity: root.inactive ? 0.55 : 1.0
         width: parent.width * 0.275
         height: parent.height * 0.250
         anchors.right: parent.right
@@ -184,6 +191,7 @@ Item {
             startAngleDeg: 205
             sweepAngleDeg: 130
             startProgress: 0.0
+            visible: !root.inactive
             endProgress: Math.max(0.02, Math.min(1, root.coolantNorm))
             radiusFactor: 0.40
             strokeWidth: root.lowEffectMode ? 5 : 7
@@ -250,7 +258,7 @@ Item {
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.bottom: parent.bottom
             z: 6
-            text: Math.round(root.coolantC) + "°C"
+            text: root.inactive ? "--" : Math.round(root.coolantC) + "°C"
             color: root.tempColor
             font.family: "Oxanium"
             font.pixelSize: Math.max(12, parent.width * 0.16)

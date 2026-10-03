@@ -36,7 +36,9 @@ Rectangle {
             color: "#C7DAE8"
             font.family: root.fontFamily
             font.pixelSize: 24
-            text: "SPD " + Math.round(root.cluster.speedKph) + "  |  RPM " + Math.round(root.cluster.rpm)
+            text: root.cluster.linkLost
+                ? "SPD --  |  RPM --"
+                : "SPD " + Math.round(root.cluster.speedKph) + "  |  RPM " + Math.round(root.cluster.rpm)
         }
     }
 }

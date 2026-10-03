@@ -120,6 +120,8 @@ ClusterRenderModel::ClusterRenderModel(VehicleStateSource *vehicleState,
         connect(m_vehicleState, &VehicleStateSource::linkStaleChanged, this, refreshStatus);
         connect(m_vehicleState, &VehicleStateSource::vehicleStateSeenChanged, this, refreshStatus);
         connect(m_vehicleState, &VehicleStateSource::bbbStaleChanged, this, refreshStatus);
+        connect(m_vehicleState, &VehicleStateSource::linkLostChanged, this, refreshStatus);
+        connect(m_vehicleState, &VehicleStateSource::warnLatchedChanged, this, refreshStatus);
         connect(m_vehicleState, &VehicleStateSource::gpsFixValidChanged, this, refreshStatus);
         connect(m_vehicleState, &VehicleStateSource::gpsPoseValidChanged, this, refreshStatus);
         connect(m_vehicleState, &VehicleStateSource::speedKphChanged, this, refreshAnalogs);
@@ -169,6 +171,7 @@ void ClusterRenderModel::syncStatus()
     bool linkOk = false;
     bool truthOk = false;
     bool gpsOk = false;
+    bool linkLost = true;
     bool diagnosticActive = false;
     QString diagnosticSeverity;
     int activeWarnings = 0;
@@ -178,31 +181,43 @@ void ClusterRenderModel::syncStatus()
         linkOk = m_vehicleState->connected() && !m_vehicleState->linkStale();
         truthOk = linkOk && !m_vehicleState->bbbStale() && m_vehicleState->vehicleStateSeen();
         gpsOk = truthOk && m_vehicleState->gpsFixValid() && m_vehicleState->gpsPoseValid();
-        if (m_vehicleState->warnBrake()) {
+        linkLost = m_vehicleState->linkLost();
+        // Link-lost fail-safe: while the link is lost, warnings that were active
+        // before the loss stay active (latched); the live values are the hub's
+        // zeroed fail-safe defaults and must not clear them.
+        const VehicleStateSource *vs = m_vehicleState;
+        const bool wBrake = linkLost ? vs->warnBrakeLatched() : vs->warnBrake();
+        const bool wOil = linkLost ? vs->warnOilLatched() : vs->warnOil();
+        const bool wCharge = linkLost ? vs->warnChargeLatched() : vs->warnCharge();
+        const bool wDoor = linkLost ? vs->warnDoorLatched() : vs->warnDoor();
+        const bool wCheck = linkLost ? vs->warnCheckEngineLatched() : vs->warnCheckEngine();
+        const bool wAT = linkLost ? vs->warnATLatched() : vs->warnAT();
+        const bool wFuelLow = linkLost ? vs->warnFuelLowLatched() : vs->warnFuelLow();
+        if (wBrake) {
             ++activeWarnings;
             warnings.append(QStringLiteral("BRAKE"));
         }
-        if (m_vehicleState->warnOil()) {
+        if (wOil) {
             ++activeWarnings;
             warnings.append(QStringLiteral("OIL"));
         }
-        if (m_vehicleState->warnCharge()) {
+        if (wCharge) {
             ++activeWarnings;
             warnings.append(QStringLiteral("CHARGE"));
         }
-        if (m_vehicleState->warnDoor()) {
+        if (wDoor) {
             ++activeWarnings;
             warnings.append(QStringLiteral("DOOR"));
         }
-        if (m_vehicleState->warnCheckEngine()) {
+        if (wCheck) {
             ++activeWarnings;
             warnings.append(QStringLiteral("CHECK"));
         }
-        if (m_vehicleState->warnAT()) {
+        if (wAT) {
             ++activeWarnings;
             warnings.append(QStringLiteral("A/T"));
         }
-        if (m_vehicleState->warnFuelLow()) {
+        if (wFuelLow) {
             ++activeWarnings;
             warnings.append(QStringLiteral("LOW FUEL"));
         }
@@ -234,9 +249,15 @@ void ClusterRenderModel::syncStatus()
     const QString networkText = m_navigation
         ? m_navigation->networkStatus().replace(QLatin1Char('_'), QLatin1Char(' ')).toUpper()
         : QStringLiteral("OFFLINE");
-    const QString warningSummary = warnings.isEmpty()
+    QString warningSummary = warnings.isEmpty()
         ? QStringLiteral("SYSTEMS NOMINAL")
         : warnings.join(QStringLiteral("  |  "));
+    if (linkLost) {
+        // Never claim "SYSTEMS NOMINAL" without live data.
+        warningSummary = warnings.isEmpty()
+            ? QStringLiteral("LINK LOST  |  NO LIVE VEHICLE DATA")
+            : warningSummary + QStringLiteral("  |  LINK LOST");
+    }
 
     bool changed = false;
     if (m_linkOk != linkOk) {
@@ -245,6 +266,10 @@ void ClusterRenderModel::syncStatus()
     }
     if (m_truthOk != truthOk) {
         m_truthOk = truthOk;
+        changed = true;
+    }
+    if (m_linkLost != linkLost) {
+        m_linkLost = linkLost;
         changed = true;
     }
     if (m_internetOk != internetOk) {
