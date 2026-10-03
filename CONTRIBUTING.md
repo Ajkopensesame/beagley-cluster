@@ -32,6 +32,5 @@ Propose protocol changes there first (or in a linked issue), then update the clu
 
 - Dual assets (`assets/` vs `src/assets/`) and legacy `src/qml.qrc` not wired into the current `qt_add_*` build path
 - `src/ui/web/test/` remains gitignored local scratch (not part of the build)
-- Committed `*.bak*` files under `src/ui`
 
 These are intentional follow-ups; small, well-scoped PRs that fix one of them with a plan are welcome. Large unrelated refactors are not.

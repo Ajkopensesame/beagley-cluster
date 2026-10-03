@@ -86,6 +86,8 @@ Environment overrides:
 - `MACHINE_POLICY`
 - `IMAGE`
 - `BEAGLEY_CLUSTER_GIT_BRANCH`
+- `BEAGLEY_CLUSTER_SRCREV` (pin the app commit; default: local `HEAD`)
+- `BEAGLEY_CLUSTER_USE_AUTOREV` (`1` = track branch tip, development only)
 - `YOCTO_RESOURCE_PROFILE`
 - `YOCTO_BITBAKE_RETRIES`
 - `YOCTO_GIT_FETCH_RETRIES`
@@ -103,8 +105,17 @@ expected `BEAGLEY_CLUSTER_GIT_BRANCH`, the build repo is clean, and the branch
 tip in `BEAGLEY_SOURCE_REMOTE` matches the exact local commit.
 
 If `BEAGLEY_CLUSTER_GIT_BRANCH` is not set, the appliance helper uses the
-current checkout branch and only falls back to `main` when Git cannot report a
-branch.
+current checkout branch and only falls back to `codex/maplibre-native-yocto-build`
+when Git cannot report a branch (`main` now points at unrelated legacy history).
+
+## Pinned source revision
+
+The `beagley-cluster` recipe no longer floats on `${AUTOREV}`. The helper writes
+`BEAGLEY_CLUSTER_SRCREV = "<local HEAD sha>"` to `conf/local.conf`, so a release
+builds exactly the commit the provenance guard verified. Override with
+`BEAGLEY_CLUSTER_SRCREV=<sha>`, or set `BEAGLEY_CLUSTER_USE_AUTOREV=1` for a
+non-reproducible development build. Running `bitbake` directly with neither
+variable set fails at parse time with an explanatory message.
 
 The default `BEAGLEY_SOURCE_REMOTE` is
 `https://github.com/Ajkopensesame/beagley-cluster.git`. Set

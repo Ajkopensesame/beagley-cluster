@@ -150,6 +150,8 @@ qt_add_resources(beagley_cluster app_font_resources
     BASE "src"
     FILES
         src/assets/fonts/Oxanium-Regular.ttf
+        src/assets/fonts/Orbitron-Medium.ttf
+        src/assets/fonts/Orbitron-Bold.ttf
 )
 
 # --------------------

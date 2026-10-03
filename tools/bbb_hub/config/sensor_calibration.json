@@ -1,0 +1,7 @@
+{
+  "_comment": "Empty tables = signal not produced (hub keeps 0.0). points are [raw_adc_counts, value], need >= 2. Capture raw with tools/bbb_hub/sample_sensor_raw.py. See docs/serial_vehicle_input_protocol.md.",
+  "fuel": { "points": [], "low_pct": 10, "fault_low": 5, "fault_high": 1018, "smoothing_alpha": 0.25 },
+  "coolant": { "points": [], "fault_low": 5, "fault_high": 1018, "smoothing_alpha": 0.25 },
+  "speed": { "kph_per_hz": 0.0, "max": 300 },
+  "rpm": { "rpm_per_hz": 0.0, "max": 9000 }
+}

@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from tools.bbb_hub.can_diagnostics import CanDiagnosticsEngine
+from tools.bbb_hub.sensor_calibration import SensorCalibration, load_sensor_calibration
 from tools.can_reverse_workbench.bbb_decoder import CanSignalDictionary
 from tools.can_reverse_workbench.parser import CanFrame
 
@@ -116,7 +117,18 @@ class InputHealth:
         }
 
 
-def parse_vehicle_input_line(line: str) -> dict[str, Any]:
+def parse_vehicle_input_line(
+    line: str,
+    calibration: SensorCalibration | None = None,
+    raw_out: dict[str, float] | None = None,
+    faults_out: list[str] | None = None,
+) -> dict[str, Any]:
+    """Parse one serial line into a vehicle_state overlay.
+
+    With ``calibration``, raw sender/pulse keys (a0, a1, speed_hz, rpm_hz) are
+    converted to fuelPct/coolantC/speedKph/rpm. ``raw_out``/``faults_out`` (optional)
+    receive the raw readings and any sensor-fault codes for health reporting.
+    """
     stripped = line.strip()
     if not stripped:
         return {}
@@ -124,7 +136,7 @@ def parse_vehicle_input_line(line: str) -> dict[str, Any]:
         payload = json.loads(stripped)
         if not isinstance(payload, dict):
             raise ValueError("serial JSON line must be an object")
-        return normalize_vehicle_overlay(payload)
+        return _overlay_with_calibration(payload, calibration, raw_out, faults_out)
     raw: dict[str, Any] = {}
     for part in stripped.replace(";", ",").split(","):
         token = part.strip()
@@ -134,7 +146,24 @@ def parse_vehicle_input_line(line: str) -> dict[str, Any]:
             raise ValueError(f"serial token missing '=': {token}")
         key, value = token.split("=", 1)
         raw[key.strip()] = _parse_scalar(value.strip())
-    return normalize_vehicle_overlay(raw)
+    return _overlay_with_calibration(raw, calibration, raw_out, faults_out)
+
+
+def _overlay_with_calibration(
+    payload: dict[str, Any],
+    calibration: SensorCalibration | None,
+    raw_out: dict[str, float] | None,
+    faults_out: list[str] | None,
+) -> dict[str, Any]:
+    overlay = normalize_vehicle_overlay(payload)
+    if calibration is not None:
+        raw = calibration.extract_raw(payload)
+        if raw_out is not None:
+            raw_out.update(raw)
+        faults = calibration.apply(raw, overlay)
+        if faults_out is not None:
+            faults_out.extend(faults)
+    return overlay
 
 
 def normalize_vehicle_overlay(payload: dict[str, Any]) -> dict[str, Any]:
@@ -234,18 +263,38 @@ class SocketCanSignalSource:
 
 
 class SerialVehicleInputSource:
-    def __init__(self, device: str, baud: int = 115200, stale_ms: int = 1000) -> None:
+    def __init__(
+        self,
+        device: str,
+        baud: int = 115200,
+        stale_ms: int = 1000,
+        calibration: SensorCalibration | None = None,
+    ) -> None:
         if baud not in SERIAL_BAUDS:
             raise ValueError(f"unsupported serial baud {baud}; expected one of {sorted(SERIAL_BAUDS)}")
         self.device = device
         self.baud = baud
         self._latest: dict[str, Any] = {}
+        self._raw: dict[str, float] = {}
+        if calibration is None:
+            calibration, calibration_error = load_sensor_calibration()
+        else:
+            calibration_error = None
+        self.calibration = calibration
         self._health = InputHealth(
             enabled=True,
             source="serial",
             stale_ms=stale_ms,
-            metadata={"device": device, "baud": baud},
+            metadata={
+                "device": device,
+                "baud": baud,
+                "calibration": calibration.summary(),
+                "raw": {},
+                "sensorFaults": [],
+            },
         )
+        if calibration_error:
+            self._health.last_error = calibration_error
 
     async def run(self) -> None:
         while True:
@@ -287,8 +336,14 @@ class SerialVehicleInputSource:
                     if not line:
                         continue
                     try:
-                        overlay = parse_vehicle_input_line(line)
-                        if overlay:
+                        raw_line: dict[str, float] = {}
+                        faults: list[str] = []
+                        overlay = parse_vehicle_input_line(line, self.calibration, raw_line, faults)
+                        if raw_line:
+                            self._raw.update(raw_line)
+                            self._health.metadata["raw"] = dict(self._raw)
+                        self._health.metadata["sensorFaults"] = faults
+                        if overlay or raw_line:
                             self._latest = overlay
                             self._health.last_update_monotonic = time.monotonic()
                         self._health.frames += 1
