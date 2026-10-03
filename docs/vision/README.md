@@ -36,7 +36,7 @@ Drive composites the annulus via `GaugeAtlasMagma` (GPU OpacityMask). Show can e
 
 Score captures against the concept PNG with the profile named in the filename.
 
-Latest appliance stills live in [`captures/`](./captures/) (`skin-v2-drive-*.png` / `skin-v2-show-*.png`). `beagley_sync_qml.sh` uses rsync delete — re-create `SkinShowOverride.qml` after sync.
+Latest appliance stills live in [`captures/`](./captures/) (`skin-v2-drive-*.png` / `skin-v2-show-*.png`). `beagley_sync_qml.sh` does not use rsync: it tars the `src/ui` files over ssh into `${REMOTE_ROOT}.tmp` (default `/opt/beagley-cluster/qml-dev.tmp`), then, as the ssh user (root by default), runs `rm -rf ${REMOTE_ROOT}` and `mv`s the new tree into place. That replaces the whole remote directory and wipes anything else in it, including a hand-made `SkinShowOverride.qml` — re-create it after every sync.
 
 ## Related env
 
