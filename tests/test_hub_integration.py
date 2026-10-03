@@ -217,5 +217,130 @@ class HubWatchdogTest(_HubHarness):
         self.assertEqual(got[1:], ["WATCHDOG=1", "WATCHDOG=1"])
 
 
+def _nmea(body: str) -> bytes:
+    checksum = 0
+    for ch in body:
+        checksum ^= ord(ch)
+    return f"${body}*{checksum:02X}\r\n".encode()
+
+
+# Live fix: GGA quality 1 / 8 sats / hdop 0.9 plus RMC status A at 20.0 knots = 37.04 km/h -> 37.0.
+GPS_FIX_LINES = [
+    _nmea("GPGGA,123519,2728.188,S,15301.506,E,1,08,0.9,10.0,M,0.0,M,,"),
+    _nmea("GPRMC,123519,A,2728.188,S,15301.506,E,020.0,084.4,230394,,"),
+]
+# UNO pulse: speed_hz=60 with the bench calibration below (0.5 km/h per Hz) = 30.0 km/h.
+UNO_PULSE_LINE = b"a0=512,a1=430,speed_hz=60.0,rpm_hz=40.0\n"
+GPS_KPH = 37.0
+PULSE_KPH = 30.0
+
+
+class _SpeedSourceHarness(_HubHarness):
+    speed_source = "gps_first"
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls._cal_dir = tempfile.mkdtemp(prefix="hubcal")
+        cal = os.path.join(cls._cal_dir, "cal.json")
+        with open(cal, "w", encoding="utf-8") as fh:
+            json.dump({"speed": {"kph_per_hz": 0.5, "max": 300}}, fh)
+        cls.extra_env = {
+            "VEHICLE_SENSOR_CALIBRATION": cal,
+            "VEHICLE_SPEED_SOURCE": cls.speed_source,
+            "BBB_GPS_STALE_MS": "600",
+            "VEHICLE_SPEED_GPS_LOST_S": "1.0",
+            "VEHICLE_SPEED_GPS_REGAIN_S": "1.0",
+        }
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        shutil.rmtree(cls._cal_dir, ignore_errors=True)
+
+    async def _feed_both(self, uno: bool, gps: bool, seconds: float) -> None:
+        end = time.monotonic() + seconds
+        while time.monotonic() < end:
+            if uno:
+                os.write(self.uno_master, UNO_PULSE_LINE)
+            if gps:
+                for line in GPS_FIX_LINES:
+                    os.write(self.gps_master, line)
+            await asyncio.sleep(0.05)
+
+
+def _src(state: dict) -> dict:
+    return state["_health"]["speedSource"]
+
+
+@unittest.skipIf(websockets is None or pty is None, "needs websockets and pty")
+class HubGpsFirstSpeedTest(_SpeedSourceHarness):
+    def test_gps_first_with_pulse_fallback_and_both_stale(self) -> None:
+        async def scenario() -> None:
+            ws = await self._connect()
+            try:
+                # 1. GPS fix + UNO pulse that disagrees: GPS speed wins.
+                feeder = asyncio.create_task(self._feed_both(True, True, 2.0))
+                live = await self._wait_for(
+                    ws, lambda s: s["_health"].get("speedSource", {}).get("active") == "gps" and s["gps"]["fixValid"]
+                )
+                self.assertEqual(live["speedKph"], GPS_KPH)
+                self.assertEqual(_src(live)["policy"], "gps_first")
+                self.assertTrue(_src(live)["gpsFix"])
+                self.assertEqual(live["_health"]["serialVehicleInputs"]["raw"]["speed_hz"], 60.0)
+                await feeder
+
+                # 2. GPS goes silent, UNO keeps sending: GPS speed is held only briefly, then pulse.
+                feeder = asyncio.create_task(self._feed_both(True, False, 4.0))
+                holding = await self._wait_for(ws, lambda s: _src(s).get("reason") == "gps_lost_holding", timeout=3)
+                self.assertEqual(_src(holding)["active"], "gps")
+                fallback = await self._wait_for(ws, lambda s: _src(s).get("active") == "pulse", timeout=4)
+                self.assertEqual(fallback["speedKph"], PULSE_KPH)
+                self.assertFalse(_src(fallback)["gpsFix"])
+                self.assertEqual(_src(fallback)["reason"], "gps_lost_pulse_fallback")
+
+                # 3. GPS returns: pulse stays until the fix has been valid for the regain window.
+                await feeder
+                feeder = asyncio.create_task(self._feed_both(True, True, 3.5))
+                waiting = await self._wait_for(ws, lambda s: _src(s).get("reason") == "gps_regain_wait", timeout=3)
+                self.assertEqual(waiting["speedKph"], PULSE_KPH)
+                regained = await self._wait_for(ws, lambda s: _src(s).get("active") == "gps", timeout=4)
+                self.assertEqual(regained["speedKph"], GPS_KPH)
+                await feeder
+
+                # 4. Both sources go silent: speed is 0 / source none, nothing frozen.
+                none = await self._wait_for(ws, lambda s: _src(s).get("active") == "none", timeout=6)
+                self.assertEqual(none["speedKph"], 0.0)
+                self.assertIsNone(_src(none)["ageS"])
+                self.assertFalse(_src(none)["gpsFix"])
+                self.assertTrue(none["_health"]["serialVehicleInputs"]["stale"])
+                self.assertIsNone(self.proc.poll(), "hub must still be running")
+            finally:
+                await ws.close()
+
+        asyncio.run(scenario())
+
+
+@unittest.skipIf(websockets is None or pty is None, "needs websockets and pty")
+class HubPulseOnlySpeedTest(_SpeedSourceHarness):
+    speed_source = "pulse_only"
+
+    def test_pulse_only_ignores_gps_fix(self) -> None:
+        async def scenario() -> None:
+            ws = await self._connect()
+            try:
+                feeder = asyncio.create_task(self._feed_both(True, True, 1.5))
+                live = await self._wait_for(
+                    ws, lambda s: _src(s).get("active") == "pulse" and s["gps"]["fixValid"]
+                )
+                self.assertEqual(live["speedKph"], PULSE_KPH)
+                self.assertEqual(_src(live)["policy"], "pulse_only")
+                await feeder
+                stale = await self._wait_for(ws, lambda s: _src(s).get("active") == "none", timeout=4)
+                self.assertEqual(stale["speedKph"], 0.0)
+            finally:
+                await ws.close()
+
+        asyncio.run(scenario())
+
+
 if __name__ == "__main__":
     unittest.main()

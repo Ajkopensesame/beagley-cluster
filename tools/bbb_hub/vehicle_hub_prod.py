@@ -27,6 +27,7 @@ try:
     from tools.bbb_hub.diagnostic_status import build_diagnostic_status
     from tools.bbb_hub.fault_recorder import FaultRecorder
     from tools.bbb_hub.signal_health import SignalHealthMonitor
+    from tools.bbb_hub.speed_source import SpeedSourceSelector, parse_mode as parse_speed_source_mode
     from tools.bbb_hub.transition_monitor import VehicleTransitionMonitor, default_transition_profiles
     from tools.bbb_hub.vehicle_baseline import VehicleBaselineMonitor, default_vehicle_baseline_profiles
     from tools.can_reverse_workbench.bbb_decoder import CanLogSignalReplay
@@ -38,6 +39,8 @@ except Exception as exc:
     FaultRecorder = None
     SerialVehicleInputSource = None
     SignalHealthMonitor = None
+    SpeedSourceSelector = None
+    parse_speed_source_mode = None
     SocketCanSignalSource = None
     VehicleTransitionMonitor = None
     VehicleBaselineMonitor = None
@@ -64,6 +67,10 @@ CAN_EXPERT_DIAGNOSTICS_ENABLED = os.getenv("CAN_EXPERT_DIAGNOSTICS_ENABLED", "1"
 VEHICLE_INPUT_SERIAL_DEVICE = os.getenv("VEHICLE_INPUT_SERIAL_DEVICE", "").strip()
 VEHICLE_INPUT_SERIAL_BAUD = int(os.getenv("VEHICLE_INPUT_SERIAL_BAUD", "115200"))
 VEHICLE_INPUT_STALE_MS = int(os.getenv("VEHICLE_INPUT_STALE_MS", "1000"))
+# Speed source: gps_first (default) | pulse_only | gps_only. See tools/bbb_hub/speed_source.py.
+VEHICLE_SPEED_SOURCE = os.getenv("VEHICLE_SPEED_SOURCE", "gps_first").strip().lower()
+VEHICLE_SPEED_GPS_LOST_S = float(os.getenv("VEHICLE_SPEED_GPS_LOST_S", "2.0"))
+VEHICLE_SPEED_GPS_REGAIN_S = float(os.getenv("VEHICLE_SPEED_GPS_REGAIN_S", "2.0"))
 SIGNAL_HEALTH_ENABLED = os.getenv("SIGNAL_HEALTH_ENABLED", "1").strip().lower() not in {"0", "false", "no"}
 GPS_SPEED_DISAGREEMENT_KPH = float(os.getenv("GPS_SPEED_DISAGREEMENT_KPH", "18.0"))
 VEHICLE_BASELINE_ENABLED = os.getenv("VEHICLE_BASELINE_ENABLED", "1").strip().lower() not in {"0", "false", "no"}
@@ -154,6 +161,10 @@ class VehicleHub:
         self._can_replay = self._build_can_replay()
         self._can_live = self._build_can_live()
         self._serial_inputs = self._build_serial_inputs()
+        self._serial_speed_kph: float | None = None
+        self._serial_speed_age_s: float | None = None
+        self._can_speed_present = False
+        self._speed_selector = self._build_speed_selector()
         self._signal_health = self._build_signal_health()
         self._vehicle_baseline = self._build_vehicle_baseline()
         self._transition_monitor = self._build_transition_monitor()
@@ -469,6 +480,51 @@ class VehicleHub:
             print(f"[bbb_hub] serial vehicle inputs disabled: {exc}")
             return None
 
+    def _build_speed_selector(self):
+        if SpeedSourceSelector is None:
+            print(f"[bbb_hub] speed source selector unavailable: {_CAN_DECODER_IMPORT_ERROR}")
+            return None
+        mode, warning = parse_speed_source_mode(VEHICLE_SPEED_SOURCE)
+        if warning:
+            print(f"[bbb_hub] {warning}")
+        print(
+            f"[bbb_hub] speed source: {mode} "
+            f"(gps lost {VEHICLE_SPEED_GPS_LOST_S}s, gps regain {VEHICLE_SPEED_GPS_REGAIN_S}s)"
+        )
+        return SpeedSourceSelector(mode, VEHICLE_SPEED_GPS_LOST_S, VEHICLE_SPEED_GPS_REGAIN_S)
+
+    def _apply_speed_source(self, state: dict, sample, gps_health) -> None:
+        """GPS-first speed with pulse (serial speed_hz) fallback; additive ``_health.speedSource``.
+
+        CAN-supplied speed and the bench simulator are left untouched. RPM is not handled here.
+        """
+        if self._speed_selector is None:
+            return
+        can_speed = self._can_speed_present and self._serial_speed_kph is None  # serial overwrites CAN
+        if VEHICLE_BENCH_SIM_ENABLED or can_speed:
+            state["_health"]["speedSource"] = {
+                "policy": self._speed_selector.mode,
+                "active": "other",
+                "reason": "bench_sim" if VEHICLE_BENCH_SIM_ENABLED else "can_speed",
+                "gpsFix": bool(state["gps"].get("fixValid")),
+                "ageS": None,
+            }
+            return
+        gps_valid = bool(
+            sample is not None and sample.fix_valid and not getattr(sample, "held", False) and not gps_health.stale
+        )
+        speed, info = self._speed_selector.select(
+            time.monotonic(),
+            gps_valid=gps_valid,
+            gps_speed_kph=float(sample.speed_kph) if sample is not None else 0.0,
+            gps_age_s=gps_health.age_ms / 1000.0 if gps_health.age_ms >= 0 else None,
+            pulse_speed_kph=self._serial_speed_kph,
+            pulse_age_s=self._serial_speed_age_s,
+        )
+        if self._speed_selector.mode != "pulse_only":
+            state["speedKph"] = 0.0 if speed is None else round(float(speed), 1)
+        state["_health"]["speedSource"] = info
+
     def _build_signal_health(self):
         if SignalHealthMonitor is None:
             print(f"[bbb_hub] signal health monitor unavailable: {_CAN_DECODER_IMPORT_ERROR}")
@@ -541,6 +597,7 @@ class VehicleHub:
             if decoded and not health.get("stale", True):
                 state["_health"]["stale"] = False
                 state["_health"]["vehicleSource"] = "can_live"
+        self._can_speed_present = "speedKph" in decoded_signals
         if decoded_signals:
             state["_health"]["canDecodedSignals"] = sorted(decoded_signals)
         elif (CAN_RAW_LOG or CAN_LIVE_INTERFACE) and self._can_replay is None and self._can_live is None:
@@ -551,6 +608,8 @@ class VehicleHub:
                 }
 
     def _apply_serial_overlay(self, state: dict) -> None:
+        self._serial_speed_kph = None
+        self._serial_speed_age_s = None
         if self._serial_inputs is None:
             if VEHICLE_INPUT_SERIAL_DEVICE:
                 state["_health"]["serialVehicleInputs"] = {
@@ -562,6 +621,10 @@ class VehicleHub:
         # Fail-safe: a stale source (UNO unplugged/silent) must not keep showing its last values as live.
         overlay = {} if health.get("stale", True) else self._serial_inputs.snapshot()
         merge_vehicle_overlay(state, overlay)
+        if "speedKph" in overlay:
+            self._serial_speed_kph = float(overlay["speedKph"])
+            age_ms = health.get("ageMs")
+            self._serial_speed_age_s = None if age_ms is None else age_ms / 1000.0
         state["_health"]["serialVehicleInputs"] = health
         if overlay and not health.get("stale", True):
             state["_health"]["stale"] = False
@@ -650,6 +713,7 @@ class VehicleHub:
             state["gps"] = self._build_cruise_gps_payload(t, state["gps"])
             state["gpsSource"] = "bench_cruise"
         state["_health"]["gpsSourcePolicy"] = "hardware_only"
+        self._apply_speed_source(state, sample, health)
         if VEHICLE_BENCH_SIM_ENABLED:
             state["_health"]["benchProfile"] = BENCH_PROFILE
         state["_health"]["gpsStale"] = health.stale
@@ -745,6 +809,7 @@ async def main() -> None:
     print(f"[bbb_hub] bench vehicle sim: {'enabled' if VEHICLE_BENCH_SIM_ENABLED else 'disabled'}")
     if VEHICLE_BENCH_SIM_ENABLED:
         print(f"[bbb_hub] bench profile: {BENCH_PROFILE}")
+    print(f"[bbb_hub] speed source policy: {VEHICLE_SPEED_SOURCE}")
     print(f"[bbb_hub] GPS device: {GPS_DEVICE} @ {GPS_BAUD}")
     print(f"[bbb_hub] GPS read timeout: {GPS_READ_TIMEOUT_MS} ms | stale: {GPS_STALE_MS} ms")
 
