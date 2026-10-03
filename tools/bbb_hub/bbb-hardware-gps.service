@@ -2,9 +2,16 @@
 Description=BBB vehicle_state hub with hardware GPS
 After=network-online.target
 Wants=network-online.target
+# Appliance: never give up restarting (default limit is 5 starts per 10 s).
+StartLimitIntervalSec=0
 
 [Service]
-Type=simple
+# Type=notify + WatchdogSec need a hub that includes tools/bbb_hub/sd_notify.py (sends READY=1 / WATCHDOG=1).
+# DEPLOY ORDER: ship the new hub code first, then this unit. See docs/bbb_deploy_rollback.md.
+Type=notify
+NotifyAccess=main
+TimeoutStartSec=60
+WatchdogSec=15
 User=debian
 Group=debian
 WorkingDirectory=/home/debian/projects/beagley-cluster/tools/bbb_hub
@@ -16,6 +23,9 @@ EnvironmentFile=-/etc/default/bbb-hardware-gps
 ExecStart=/bin/bash /home/debian/projects/beagley-cluster/tools/bbb_hub/run_prod.sh
 Restart=always
 RestartSec=2
+# Cap runaway logging so a fault loop cannot fill the flash.
+LogRateLimitIntervalSec=30s
+LogRateLimitBurst=2000
 StandardOutput=journal
 StandardError=journal
 
