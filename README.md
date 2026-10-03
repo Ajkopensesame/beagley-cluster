@@ -26,7 +26,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for seams and data flow, and [CONTRIBUTIN
 | `src/ui/` | QML: `MainV3` (default), `MainV2`, `Main` (legacy), `MainEmbedded`, theme, widgets, `web/map` |
 | `tools/bbb_hub/` | Python BBB hub (prod/sim), diagnostics, replay |
 | `yocto/` | Appliance image build (`meta-beagley-cluster`) |
-| `docs/` | Design notes and workflows |
+| `docs/` | Design notes and workflows; board access, deploy and recovery: [docs/BOARD_RUNBOOK.md](docs/BOARD_RUNBOOK.md) |
 | `assets/`, `src/assets/` | VIC SVGs / fonts (dual tree — see Known debt) |
 
 ## Build
