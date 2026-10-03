@@ -9,6 +9,20 @@
 Related: `.github/workflows/build-aarch64.yml` (the build), `docs/BOARD_RUNBOOK.md`
 (access, rules), `docs/ENVIRONMENT.md` (env vars), `ARCHITECTURE.md` ("Link-lost behaviour").
 
+
+## Reference build (first run of this workflow)
+
+| | |
+| --- | --- |
+| Built commit | `f2ac1b3c69d42b5da6ef275dc581283b33ba568b` (default-branch tip at 2026-10-03 16:31 +1000: merge of #38; includes #35 hub CAN prep, #37 changelog, #23 link-lost fail-safe, #16 fonts, #15 hub config) |
+| Run | https://github.com/Ajkopensesame/beagley-cluster/actions/runs/37103355734 (success, ~7 min on `ubuntu-24.04-arm`) |
+| `beagley_cluster` sha256 | `914368eb6eecf283d2cb1ed0cbf78f6c984e78e442aa2b5046b71da13c481bb3` (21,795,688 bytes, aarch64, not stripped) |
+| `nowplayingctl` sha256 | `b7eb75379d80a845f2adcf0b009d18cd24d092b26912714f132de83ff6d6218e` |
+| Max symbol versions | GLIBC_2.38, GLIBCXX 3.4.x <= 3.4.32 (board glibc must be >= 2.38; Scarthgap ships 2.39) |
+| Not included | PR #36 (QML smoke tests + qmllint + OFF-build MainV3 load fix + unversioned `QtQuick.Shapes` + dead Carto tile URLs) was still open when this was built. The binary therefore still has the Carto tile URLs and `QtQuick.Shapes 1.15` imports. The MapLibre-ON build (this one) is not affected by the OFF-build MainV3 load failure. |
+
+Always re-check the commit in `BUILD_INFO.txt` against what you intend to deploy.
+
 ---
 
 ## 1. How the binary is built and why

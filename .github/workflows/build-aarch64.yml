@@ -19,14 +19,6 @@ on:
         description: "Git ref (branch/tag/sha) of beagley-cluster to build"
         required: false
         default: "codex/maplibre-native-yocto-build"
-  # TEMPORARY: lets the PR branch exercise this workflow before it exists on the
-  # default branch (workflow_dispatch needs the file on the default branch).
-  # Removed before merge. Still builds the default-branch tip (see checkout ref).
-  push:
-    branches:
-      - build/aarch64-workflow
-    paths:
-      - ".github/workflows/build-aarch64.yml"
 
 permissions:
   contents: read
