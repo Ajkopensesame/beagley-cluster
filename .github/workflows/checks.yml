@@ -1,0 +1,112 @@
+name: Checks
+
+# Additional, NON-REQUIRED checks. The required gate remains the "Configure + build
+# (WITH_WEBENGINE=OFF)" job in ci.yml. Kept in a separate workflow so ci.yml is untouched.
+# Job names (for a later ruleset): "Python tests (pytest, 3.12)", "Lint: shellcheck (severity=error)",
+# "Lint: ruff (hard errors)", "Lint: qmllint (informational)".
+
+on:
+  push:
+    branches:
+      - main
+      - ui/slice1-map-hierarchy-quiet-chrome
+      - codex/maplibre-native-yocto-build
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  python-tests:
+    name: Python tests (pytest, 3.12)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        run: python -m pip install --upgrade pip pytest
+
+      - name: Run pytest (tests/ and tools/bbb_hub tests, if any)
+        # All tests/test_*.py currently pass without hardware. If one starts needing hardware or extra
+        # dependencies, exclude exactly that file with --deselect/--ignore here and list it in the PR,
+        # rather than hiding the failure.
+        # tests/bbb_nmea_gps_test.py is not collected by pytest (name does not match test_*.py); it runs
+        # via ctest in the C++ test suite.
+        run: |
+          paths="tests"
+          if find tools/bbb_hub -name 'test_*.py' -o -name '*_test.py' | grep -q .; then
+            paths="$paths tools/bbb_hub"
+          fi
+          python -m pytest $paths -q
+
+  shellcheck:
+    name: "Lint: shellcheck (severity=error)"
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "shellcheck (hard gate - errors only)"
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+          files=$(git ls-files 'tools/*.sh')
+          echo "Checking $(echo "$files" | wc -l) shell scripts"
+          # shellcheck disable=SC2086
+          shellcheck --severity=error $files
+
+      - name: "shellcheck (informational - warning and below)"
+        continue-on-error: true
+        run: |
+          files=$(git ls-files 'tools/*.sh')
+          for sev in warning info style; do
+            n=$(shellcheck --severity=$sev --format=gcc $files | grep -cE ': (error|warning|note):' || true)
+            echo "shellcheck findings at severity>=$sev: $n"
+          done
+          shellcheck --severity=warning --format=gcc $files || true
+
+  ruff:
+    name: "Lint: ruff (hard errors)"
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: ruff check (config in ruff.toml: E9, F63, F7, F82)
+        run: |
+          python -m pip install --upgrade pip ruff
+          ruff check .
+
+  qmllint:
+    name: "Lint: qmllint (informational)"
+    runs-on: ubuntu-22.04
+    # Informational only: never fails the workflow.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Qt 6.6.3 (no WebEngine)
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.6.3'
+          modules: 'qtwebsockets'
+          cache: true
+
+      - name: qmllint
+        continue-on-error: true
+        run: |
+          files=$(git ls-files 'src/ui/*.qml')
+          echo "Linting $(echo "$files" | wc -l) QML files"
+          set +e
+          qmllint $files > qmllint.log 2>&1
+          echo "qmllint exit code: $?"
+          echo "qmllint warnings: $(grep -c '^Warning:' qmllint.log)"
+          echo "qmllint errors:   $(grep -c '^Error:' qmllint.log)"
+          head -100 qmllint.log
+          exit 0
