@@ -25,6 +25,7 @@
 
 #include <memory>
 
+#include "config/ClusterConfig.h"
 #include "data/MockVehicleStateClient.h"
 #include "data/VehicleStateClient.h"
 #include "data/VehicleStateSource.h"
@@ -523,7 +524,7 @@ int main(int argc, char *argv[])
                                   QString::fromLatin1(BEAGLEY_BUILD_GIT_DIRTY),
                                   QString::fromLatin1(BEAGLEY_BUILD_TIMESTAMP_UTC));
     qInfo() << "[BOOT] uiVariant env =" << qgetenv("BEAGLEY_UI_VARIANT")
-            << "hubUrl =" << qgetenv("VEHICLE_HUB_WS_URL")
+            << "hubUrl =" << ClusterConfig::hubUrl()
             << "mapStyle =" << mapStyleUrl
             << "platform =" << actualPlatformName
             << "embedded =" << embeddedDisplay
@@ -548,21 +549,24 @@ int main(int argc, char *argv[])
 
     // vehicle_state backend: BEAGLEY_VEHICLE_BACKEND=mock|live (default live).
     // Either way it is exposed to QML as `vehicleState` with the same properties.
-    const QString vehicleBackend =
-        QString::fromUtf8(qgetenv("BEAGLEY_VEHICLE_BACKEND")).trimmed().toLower();
+#ifdef BEAGLEY_APPLIANCE_PRODUCTION
+    constexpr bool applianceProduction = true;
+#else
+    constexpr bool applianceProduction = false;
+#endif
+    QString backendWarning;
+    const ClusterConfig::VehicleBackend vehicleBackend = ClusterConfig::resolveVehicleBackend(
+        QString::fromUtf8(qgetenv("BEAGLEY_VEHICLE_BACKEND")), applianceProduction, &backendWarning);
+    if (!backendWarning.isEmpty())
+        qWarning().noquote() << "[main]" << backendWarning;
     std::unique_ptr<VehicleStateSource> vehicleStateOwner;
-    if (vehicleBackend == QLatin1String("mock")) {
+    if (vehicleBackend == ClusterConfig::VehicleBackend::Mock)
         vehicleStateOwner = std::make_unique<MockVehicleStateClient>();
-    } else {
-        if (!vehicleBackend.isEmpty() && vehicleBackend != QLatin1String("live")) {
-            qWarning() << "[main] unknown BEAGLEY_VEHICLE_BACKEND" << vehicleBackend
-                       << "- using live";
-        }
+    else
         vehicleStateOwner = std::make_unique<VehicleStateClient>();
-    }
     VehicleStateSource &vehicleState = *vehicleStateOwner;
     qInfo() << "[main] BEAGLEY_VEHICLE_BACKEND ="
-            << (vehicleBackend == QLatin1String("mock") ? "mock" : "live");
+            << (vehicleBackend == ClusterConfig::VehicleBackend::Mock ? "mock" : "live");
     engine.rootContext()->setContextProperty("vehicleState", &vehicleState);
     WiFiSetupService wifiSetup;
     engine.rootContext()->setContextProperty("wifiSetup", &wifiSetup);

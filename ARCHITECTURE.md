@@ -53,7 +53,10 @@ VehicleStateSource          (QML-facing properties + shared setters)
 
 - Flat camelCase `speedKph`, `rpm`, `fuelPct`, `coolantC`, `gear` (P/R/N/D/2/1), `overdrive`; nested `indicators` (`left`, `right`, `high_beam`), `warnings` (`brake`, `oil`, `charge`, `door`, `check`, `at`, `fuel_low`) and `_health.stale`. Optional `ts_ms`, `seq`, `source` are ignored.
 - **Good frame**: only a frame that has the four gauge keys **and** the `indicators`, `warnings` and `_health` objects refreshes `lastGoodRx`. Other frames are still applied but do not keep the link alive. Replayed frames (`BEAGLEY_REPLAY_FILE`) are always treated as good.
+
+  > **Known behaviour:** frames fed through `BEAGLEY_REPLAY_FILE` **always count as good**, regardless of which keys they contain. The recorded diagnostic fixtures (`tests/fixtures/*.jsonl`) predate the contract and omit `indicators`/`warnings`, so the strict rule would mark them stale. Consequently a replay never goes `linkStale` and cannot be used to test the stale path; live frames use the strict rule.
 - **Stale**: the watchdog sets `linkStale` when no good frame arrived for >1000 ms (hub sends ~10 Hz). `_health.stale` is exposed separately as `bbbStale`.
+- **Hub URL**: the single C++ default is `ClusterConfig::defaultHubUrl()` in `src/config/ClusterConfig.h` (`ws://10.24.0.7:8765`), overridden by `VEHICLE_HUB_WS_URL`. Shell scripts, `run_1920x720.sh`, env examples and the Yocto defaults repeat the same value; see [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md). **Doc drift:** the vehicle-hub `PROTOCOL.md` still names `ws://192.168.0.7:8765` as the cluster's fallback (the older `main`-line value); on this line the correct default is `10.24.0.7`, and that file should be corrected in the vehicle-hub repo.
 - The hub owns fuel/coolant conversion; the client reads the top-level fields, never `analog.*`.
 - The client additionally understands extras used on this line: GPS (nested `gps` or top-level), `_diagnostic`, `drivetrain`/`transmission`, `gpsSource`. Changes to the wire format belong in [vehicle-hub](https://github.com/Ajkopensesame/vehicle-hub) first.
 
@@ -61,7 +64,7 @@ VehicleStateSource          (QML-facing properties + shared setters)
 
 | Mode | How |
 | --- | --- |
-| Mock | `BEAGLEY_VEHICLE_BACKEND=mock` |
+| Mock | `BEAGLEY_VEHICLE_BACKEND=mock` (refused with a warning, and live is used, when built with `BEAGLEY_APPLIANCE_PRODUCTION=ON`) |
 | Live | `BEAGLEY_VEHICLE_BACKEND=live` (default) + hub reachable at `VEHICLE_HUB_WS_URL` |
 | Replay | `BEAGLEY_REPLAY_FILE=<jsonl>` (live client) |
 | Map off | `BEAGLEY_NO_MAP=1` (forced when built with `WITH_WEBENGINE=OFF`) |
