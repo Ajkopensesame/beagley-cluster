@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - ui/slice1-map-hierarchy-quiet-chrome
+      - codex/maplibre-native-yocto-build
+  pull_request:
+
+jobs:
+  build:
+    name: Configure + build (WITH_WEBENGINE=OFF)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Ninja
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+
+      - name: Install Qt 6.6.3 (no WebEngine)
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.6.3'
+          # Svg ships in the Qt 6.6.3 base install; "qtsvg" is not a valid aqt module here.
+          modules: 'qtwebsockets'
+          cache: true
+
+      - name: Configure (required)
+        # WITH_WEBENGINE=OFF must configure without the WebEngine package.
+        # WITH_MAPLIBRE_NATIVE stays OFF (default); BEAGLEY_APPLIANCE_PRODUCTION default.
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DWITH_WEBENGINE=OFF \
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build (required)
+        # WITH_WEBENGINE=OFF must compile and link; MapCenterWeb.qml is omitted from the module.
+        run: cmake --build build
