@@ -149,6 +149,7 @@ def run_guards(root: Path) -> int:
                         failures.append(f"{p.relative_to(root)}:{n}: Carto keyless raster tiles are dead "
                                         "(API KEY REQUIRED watermark); use BEAGLEY_MAP_TILE_URL")
     failures += qrc_reference_failures(root)
+    failures += map_style_init_failures(root)
     for f in failures:
         print("GUARD FAIL:", f)
     print(f"qml_static_guards: {len(supported_files(root))} files checked, {len(failures)} problem(s)")
