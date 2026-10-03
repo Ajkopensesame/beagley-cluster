@@ -374,4 +374,32 @@ if(BUILD_TESTING)
         NAME bbb_nmea_gps_test
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/bbb_nmea_gps_test.py
     )
+
+    # ---- QtTest suite (vehicle-state layer) ----
+    find_package(Qt6 REQUIRED COMPONENTS Test)
+
+    # Vehicle-state sources without the QML/render stack, shared by the tests.
+    add_library(beagley_vehicle_state STATIC
+        src/data/VehicleStateSource.cpp
+        src/data/VehicleStateClient.cpp
+        src/data/MockVehicleStateClient.cpp
+        src/data/WebSocketFrameDecoder.cpp
+    )
+    target_include_directories(beagley_vehicle_state PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(beagley_vehicle_state PUBLIC Qt6::Core Qt6::Network)
+
+    foreach(_qt_test
+        tst_websocket_frame_decoder
+        tst_vehicle_state_source
+        tst_mock_vehicle_state
+        tst_vehicle_state_client
+    )
+        add_executable(${_qt_test} tests/qt/${_qt_test}.cpp)
+        target_include_directories(${_qt_test} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests/qt)
+        target_link_libraries(${_qt_test} PRIVATE beagley_vehicle_state Qt6::Test)
+        add_test(NAME ${_qt_test} COMMAND ${_qt_test})
+        set_tests_properties(${_qt_test} PROPERTIES
+            ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+            TIMEOUT 120)
+    endforeach()
 endif()

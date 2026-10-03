@@ -37,3 +37,9 @@ jobs:
       - name: Build (required)
         # WITH_WEBENGINE=OFF must compile and link; MapCenterWeb.qml is omitted from the module.
         run: cmake --build build
+
+      - name: Test (required)
+        # QtTest suite + the plain C++/Python tests registered with CTest.
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: ctest --test-dir build --output-on-failure
