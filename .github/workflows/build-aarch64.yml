@@ -143,6 +143,12 @@ jobs:
           [ -f "$out/nowplayingctl" ] && patchelf --remove-rpath "$out/nowplayingctl" || true
           # Reference copies of the MapLibre libs this binary was linked against (do NOT deploy by default).
           find "$RUNNER_TEMP/qmaplibre-prefix" -name 'libQMapLibre*.so*' -exec cp -a {} "$out/reference/" \;
+          # The app does not link QMapLibre/Qt6Location directly (linker --as-needed): they are
+          # loaded at run time through the MapLibre QML module + geoservices plugin, so ship those
+          # for reference too (same layout the Yocto recipe installs).
+          mkdir -p "$out/reference/plugins/geoservices" "$out/reference/qml/MapLibre"
+          find "$RUNNER_TEMP/qmaplibre-prefix" -name 'libqtgeoservices_maplibre.so' -exec cp -a {} "$out/reference/plugins/geoservices/" \;
+          find "$RUNNER_TEMP/qmaplibre-prefix" -path '*qml/MapLibre/*' -type f -exec cp -a {} "$out/reference/qml/MapLibre/" \;
           cp app/yocto/meta-beagley-cluster/recipes-apps/beagley-cluster/files/beagley-cluster-launch.sh "$out/reference/beagley-cluster-launch.sh.from-repo"
           cp app/yocto/meta-beagley-cluster/recipes-apps/beagley-cluster/files/beagley-cluster.default "$out/reference/beagley-cluster.default.from-repo"
 
@@ -162,8 +168,17 @@ jobs:
           fail=0; res="$ev/abi-checks.txt"; : > "$res"
           chk() { if [ "$1" = ok ]; then echo "PASS  $2" >> "$res"; else echo "FAIL  $2" >> "$res"; fail=1; fi; }
           grep -q "ELF 64-bit.*ARM aarch64" "$ev/file.txt" && chk ok "ELF 64-bit aarch64" || chk bad "ELF 64-bit aarch64"
-          grep -q "QMapLibre" "$ev/needed-libs.txt" && chk ok "links libQMapLibre (WITH_MAPLIBRE_NATIVE=ON)" || chk bad "links libQMapLibre (WITH_MAPLIBRE_NATIVE=ON)"
-          grep -q "Qt6Location" "$ev/needed-libs.txt" && chk ok "links libQt6Location" || chk bad "links libQt6Location"
+          # WITH_MAPLIBRE_NATIVE=ON proof: cache value + the Impl QML file only added to the
+          # resource set when ON + the geoservices/QML plugins depend on QMapLibre + Qt6Location.
+          grep -q '^WITH_MAPLIBRE_NATIVE:BOOL=ON' build/CMakeCache.txt && chk ok "CMakeCache WITH_MAPLIBRE_NATIVE=ON" || chk bad "CMakeCache WITH_MAPLIBRE_NATIVE=ON"
+          grep -q '^WITH_WEBENGINE:BOOL=OFF' build/CMakeCache.txt && chk ok "CMakeCache WITH_WEBENGINE=OFF" || chk bad "CMakeCache WITH_WEBENGINE=OFF"
+          grep -qs 'MapCenterMapLibreNativeImpl' build/build.ninja && chk ok "MapCenterMapLibreNativeImpl.qml compiled into resources" || chk bad "MapCenterMapLibreNativeImpl.qml compiled into resources"
+          for pl in reference/plugins/geoservices/libqtgeoservices_maplibre.so reference/qml/MapLibre/libdeclarative_locationplugin_maplibre.so; do
+            readelf -d "$out/$pl" > "$ev/$(basename "$pl").readelf-dynamic.txt" 2>&1 || true
+            f="$ev/$(basename "$pl").readelf-dynamic.txt"
+            { grep -q 'libQMapLibre' "$f" && grep -q 'libQt6Location' "$f"; } && chk ok "$(basename "$pl") needs libQMapLibre + libQt6Location" || chk bad "$(basename "$pl") needs libQMapLibre + libQt6Location"
+          done
+          grep -q 'libQMapLibre' "$ev/needed-libs.txt" && echo "NOTE  binary links libQMapLibre directly" >> "$res" || echo "NOTE  binary does not list libQMapLibre/libQt6Location as NEEDED (expected: --as-needed, loaded at run time via the MapLibre QML plugin + geoservices plugin)" >> "$res"
           grep -qi "WebEngine" "$ev/needed-libs.txt" && chk bad "no WebEngine linkage" || chk ok "no WebEngine linkage"
           maxv() { sort -V "$1" | tail -1 | sed 's/^[A-Z]*_//'; }
           g="$(maxv "$ev/glibc-versions-needed.txt")"; x="$(maxv "$ev/glibcxx-versions-needed.txt")"
