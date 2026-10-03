@@ -7,6 +7,9 @@ follow [Semantic Versioning](https://semver.org/) (see [docs/RELEASING.md](docs/
 
 ## [Unreleased]
 
+### Removed
+- Cleanup (no behaviour change; every file was unreferenced by code, CMake, tests, scripts and docs): duplicate `docs/vision/atlas/*.png` (identical copies live in `src/ui/assets/skin-v2/`; `atlas-meta.txt` kept, README pointer added), `src/resources/web.qrc`, `src/ui/widgets/VehicleStateCoreAnimated.qml`, `src/ui/mock/`, the orphan old VIC icon/warning widgets (`vic/ATIcon`, `vic/VicWarningIcon`, `vic/VicWarningHalo`, `vic/icons/*` except `DriveStateIcon`, `vic/warnings/*`) and the unused `FuelGauge`, `FuelPumpIcon`, `SpeedoPearl`, `MapLibreGaugeBackplate` widgets (CMake `BEAGLEY_QML_FILES` and `widgets/qmldir` entries removed together).
+
 ### Changed
 - Board runbook: section 3.1 now describes the live QML root (`<runtime>/source` under `/data`, launched by `launch.sh`), warns that `tools/ui` sync/enable scripts default to `/opt/beagley-cluster/qml-dev` and that pointing `--remote-root` at the live source deletes it, documents the `capture-once.env` one-shot method, answers open question 6, and adds known issues (root fs 95% full, deployed binary is the 2026-09-13 build, BeagleY IP drift). Docs only.
 

@@ -160,7 +160,6 @@ qt_add_resources(beagley_cluster app_font_resources
 set(BEAGLEY_QML_FILES
     src/ui/widgets/VehicleInfoCenter.qml
     src/ui/widgets/vic/VicWarningColors.qml
-    src/ui/widgets/vic/VicWarningHalo.qml
     src/ui/widgets/vic/OemTellTaleIcon.qml
     src/ui/widgets/vic/telltales/AtTempTelltale.qml
     src/ui/widgets/vic/telltales/BatteryTelltale.qml
@@ -205,9 +204,6 @@ set(BEAGLEY_QML_FILES
     src/ui/widgets/GaugeAtlasMagma.qml
     src/ui/widgets/GaugeAtlasRim.qml
     src/ui/widgets/MagmaAtlasOverlay.qml
-    src/ui/widgets/FuelPumpIcon.qml
-    src/ui/widgets/FuelGauge.qml
-    src/ui/widgets/SpeedoPearl.qml
     src/ui/widgets/TachGauge.qml
     src/ui/widgets/MatrixRain.qml
     src/ui/widgets/GaugeMatrixDepth.qml
@@ -216,7 +212,6 @@ set(BEAGLEY_QML_FILES
     src/ui/widgets/MapCenter.qml
     src/ui/widgets/MapCenterBootShell.qml
     src/ui/widgets/MapCenterMapLibreNative.qml
-    src/ui/widgets/MapLibreGaugeBackplate.qml
     src/ui/widgets/MapVehicleMarker.qml
     src/ui/widgets/WeatherCorners.qml
     src/ui/widgets/WeatherMoodIcon.qml

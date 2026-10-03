@@ -55,6 +55,7 @@ confirmed) attribution-free. To close them the owner can open each icon in a bro
   neither be proved nor excluded from the files.
 - The atlas PNGs (`lava-annulus`, `lava-strip`, `glass-rim`, `gauge-face-matrix`, `progress/lava-p00..20`) are derived from the
   concept still: `docs/vision/README.md` ("Atlas assets (from concept PNG)") and `docs/vision/atlas/atlas-meta.txt`
+  (the PNGs are kept only in `src/ui/assets/skin-v2/`; the former byte-identical copies under `docs/vision/atlas/` were removed)
   (`source=skin-v2-concept-1920x720.png`, `bake=extract_skin_atlas4`). The bake script `extract_skin_atlas4` is not in the
   repository. Ownership of the atlases therefore follows the ownership of the concept still.
 - `docs/vision/captures/*.png` are screenshots of the app itself (1920x720, 100 dpi); they are not third-party art.

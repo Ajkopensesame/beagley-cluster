@@ -8,7 +8,7 @@ Pixel-close visual match to this still beats incremental Pearl polish.
 
 ## Atlas assets (from concept PNG)
 
-Baked under [`atlas/`](./atlas/) and shipped as `src/ui/assets/skin-v2/`:
+Baked from the concept still (bake parameters in [`atlas/atlas-meta.txt`](./atlas/atlas-meta.txt)); the PNGs themselves live only in [`src/ui/assets/skin-v2/`](../../src/ui/assets/skin-v2/):
 
 - `lava-annulus.png` — annular magma (OpacityMask progress on DialChrome)
 - `lava-strip.png` — polar unwrap (reference / future shader map)
