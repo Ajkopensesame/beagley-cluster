@@ -234,12 +234,12 @@ In app logs:
 
 ## BBB hardware GPS production path
 
-On the BBB, use the production hub entrypoint instead of the sim runner:
+On the BBB, use the production hub entrypoint instead of the sim runner. The GPS is on UART1 (`/dev/ttyS1`); `/dev/ttyS4` (UART4) is the UNO input (see [BOARD_RUNBOOK.md](BOARD_RUNBOOK.md), section "Deployed board state"). The `/home/debian/projects/beagley-cluster` paths below are the old, no-longer-used deploy location; the live hub runs from `/home/debian/releases/current`:
 
 ```bash
 cd /home/debian/projects/beagley-cluster/tools/bbb_hub
-BBB_GPS_DEVICE=/dev/ttyS4 \
-BBB_GPS_BAUD=9600 \
+BBB_GPS_DEVICE=/dev/ttyS1 \
+BBB_GPS_BAUD=115200 \
 BBB_GPS_READ_TIMEOUT_MS=200 \
 BBB_GPS_STALE_MS=2000 \
 BBB_GPS_MIN_HEADING_SPEED_KPH=7.0 \

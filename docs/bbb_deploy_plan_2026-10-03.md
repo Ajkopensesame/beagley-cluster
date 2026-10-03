@@ -1,7 +1,15 @@
-# BBB deploy plan (DRAFT, NOT EXECUTED): hub update, UART4 overlay, GPS clock fix
+# BBB deploy plan (EXECUTED 2026-10-03): hub update, UART4 overlay, GPS clock fix
 
-Written by Hardware Integration from the read-only audit of 2026-10-03. **Nothing here has been run.** Each stage
-needs separate approval from Cluster Lead / ThatGuy. Companion docs: `docs/bbb_deploy_rollback.md` (generic procedure),
+**Status: EXECUTED 2026-10-03** (owner-authorised run of `bbb_stage.sh` stage1/2/3 from the Mac; BBB release `305b982` live
+since ~15:17 AEST; UART4 overlay added 15:23 AEST). The text below is the original plan, kept for reference; the
+"Board facts" below are the **pre-deploy** state. For the as-deployed state see `docs/BOARD_RUNBOOK.md`, section
+"Deployed board state (verified 2026-10-03 15:55 AEST)".
+
+**Stage numbering:** this plan's Stage 1 = `bbb_stage.sh stage1` (hub code update); this plan's Stage 2 (UART4) =
+`bbb_stage.sh stage3`; this plan's "Stage 3" clock fix = `bbb_stage.sh stage2`. Stage 4 (CAN0) has not been done.
+
+Written by Hardware Integration from the read-only audit of 2026-10-03. Each stage
+needed separate approval from Cluster Lead / ThatGuy. Companion docs: `docs/bbb_deploy_rollback.md` (generic procedure),
 `docs/bbb_hardware_wiring.md` (pins), `docs/serial_vehicle_input_protocol.md` (UNO line format, PR #11).
 
 ## Board facts (VERIFIED read-only, 2026-10-03)

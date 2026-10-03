@@ -22,20 +22,20 @@ can run from any machine with Python and `websockets` (`pip install websockets`)
 - [ ] A0/A1/D2/D3 only ever see 0..5 V (no negative voltages, no >5 V). Function generator: 0..5 V square wave,
       DC offset set so the low level is 0 V, unloaded amplitude checked on a scope/meter **before** connecting.
 - [ ] While uploading firmware, **disconnect the D1 wire** (D1 is shared with the USB serial used for upload).
-- [ ] Wiring per `docs/bbb_hardware_wiring.md`. That doc is "not yet bench-verified": confirm the UART4 pin-mux
-      (`config-pin -q P9_11`) and the device name (`/dev/ttyS4`) on the board. **TO CONFIRM**: the same doc notes
-      the live hub reported GPS on `/dev/ttyS1` while the env example uses `/dev/ttyS4` for GPS; resolve that
-      before using UART4 for the UNO.
+- [ ] Wiring per `docs/bbb_hardware_wiring.md`. The UART4 overlay is enabled and `/dev/ttyS4` exists on the board (2026-10-03).
+      The GPS-vs-UNO device question is **resolved**: GPS = `/dev/ttyS1` (UART1), UNO input = `/dev/ttyS4` (UART4).
+      Still **TO CONFIRM on the bench**: the UART4 pin-mux (`config-pin -q P9_11`, not yet queried) and the UNO wiring
+      (nothing is wired to UART4 yet, so the hub currently reads 0 serial frames).
 - [ ] Changing the hub env file and restarting the hub is a board change and needs approval
-      (`docs/bbb_deploy_rollback.md`). This checklist assumes the hub on the board already runs a build that
-      contains `speed_source.py` (GPS-first speed). **TO CONFIRM** which build is deployed.
+      (`docs/bbb_deploy_rollback.md`). The hub on the board runs release `305b982` (2026-10-03), which
+      contains `speed_source.py` (GPS-first speed).
 
 ## 1. Prerequisites
 
 - [ ] UNO flashed with `firmware/uno_vehicle_input` (see its README), real-input mode (no `BENCH_SIM`), or with
       `BENCH_SIM=1` for the self-stepping variant in section 6. **TO CONFIRM**: the sketch has been compiled but not yet run on hardware.
 - [ ] Hub env (`/etc/default/bbb-hardware-gps`): `VEHICLE_INPUT_SERIAL_DEVICE=/dev/ttyS4`
-      (**TO CONFIRM**, see section 0), `VEHICLE_INPUT_SERIAL_BAUD=115200`, `VEHICLE_INPUT_STALE_MS=1000` (default).
+      (set on the deployed board; see section 0), `VEHICLE_INPUT_SERIAL_BAUD=115200`, `VEHICLE_INPUT_STALE_MS=1000` (default).
       `BBB_VEHICLE_BENCH_SIM` must be **unset or 0** (otherwise the hub shows synthetic values).
 - [ ] `VEHICLE_SENSOR_CALIBRATION` unset for sections 2-4 (shipped file `tools/bbb_hub/config/sensor_calibration.json` is empty).
 
