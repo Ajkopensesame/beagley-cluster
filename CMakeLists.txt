@@ -197,6 +197,9 @@ set(BEAGLEY_QML_FILES
     src/ui/widgets/DialChrome.qml
     src/ui/widgets/GaugeLensShell.qml
     src/ui/widgets/GaugeArcHead.qml
+    src/ui/widgets/GaugeAtlasMagma.qml
+    src/ui/widgets/GaugeAtlasRim.qml
+    src/ui/widgets/MagmaAtlasOverlay.qml
     src/ui/widgets/FuelPumpIcon.qml
     src/ui/widgets/FuelGauge.qml
     src/ui/widgets/SpeedoPearl.qml

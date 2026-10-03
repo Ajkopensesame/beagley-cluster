@@ -480,7 +480,7 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("BEAGLEY_MAPLIBRE_NATIVE_MAX_ZOOM",
                                              mapLibreNativeMaxZoom);
 
-    QString skinProfile = QString::fromUtf8(qgetenv("BEAGLEY_SKIN_PROFILE")).trimmed().toLowerCase();
+    QString skinProfile = QString::fromUtf8(qgetenv("BEAGLEY_SKIN_PROFILE")).trimmed().toLower();
     if (skinProfile != QLatin1String("show") && skinProfile != QLatin1String("drive"))
         skinProfile.clear();
     engine.rootContext()->setContextProperty("BEAGLEY_RENDER_PROFILE", renderProfile);
