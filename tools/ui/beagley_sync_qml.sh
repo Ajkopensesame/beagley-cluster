@@ -15,6 +15,9 @@ Usage:
 Options:
   --host HOST          SSH target. Default: root@beagley-ai.local
   --remote-root PATH   Remote QML dev root. Default: /opt/beagley-cluster/qml-dev
+                       Must be a plain absolute path with >= 3 components.
+                       WARNING: it is deleted (rm -rf) and replaced on every sync,
+                       so anything else in it (e.g. SkinShowOverride.qml) is wiped.
   --no-restart         Sync files without restarting beagley_cluster.
   --no-health          Skip post-restart health check.
   -h, --help           Show this help.
@@ -51,10 +54,58 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ "$REMOTE_ROOT" == *"'"* ]]; then
-  echo "[beagley-ui] remote root may not contain single quotes: $REMOTE_ROOT" >&2
-  exit 2
-fi
+# The sync runs `rm -rf` on REMOTE_ROOT (and on "${REMOTE_ROOT}.tmp") on the
+# target as the ssh user (root by default), so refuse anything that is not a
+# clearly scoped, plain absolute path. Returns non-zero and prints the reason
+# to stderr when the path is unsafe.
+validate_remote_root() {
+  local root="$1"
+  local rest first
+
+  if [[ -z "$root" ]]; then
+    echo "[beagley-ui] refusing empty remote root" >&2
+    return 1
+  fi
+  if [[ "$root" == *"'"* ]]; then
+    echo "[beagley-ui] remote root may not contain single quotes: $root" >&2
+    return 1
+  fi
+  if [[ "$root" != /* ]]; then
+    echo "[beagley-ui] remote root must be an absolute path: $root" >&2
+    return 1
+  fi
+  # Whitelist: letters, digits, '.', '_', '-' and '/'. This rejects whitespace,
+  # glob characters (* ? [ ]), quotes, '$', backticks, ';', '~', etc.
+  if [[ ! "$root" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+    echo "[beagley-ui] remote root contains unsupported characters (allowed: A-Za-z0-9 . _ - /): $root" >&2
+    return 1
+  fi
+  if [[ "$root" == *//* || "$root" == */ ]]; then
+    echo "[beagley-ui] remote root may not contain '//' or a trailing '/': $root" >&2
+    return 1
+  fi
+  if [[ "$root" == */./* || "$root" == */. || "$root" == */../* || "$root" == */.. ]]; then
+    echo "[beagley-ui] remote root may not contain '.' or '..' path segments: $root" >&2
+    return 1
+  fi
+
+  rest="${root#/}"
+  first="${rest%%/*}"
+  # Require at least /<top>/<x>/<y> (e.g. /opt/beagley-cluster/qml-dev).
+  if [[ "$rest" != */*/* ]]; then
+    echo "[beagley-ui] remote root must have at least 3 path components (e.g. /opt/<x>/<y>): $root" >&2
+    return 1
+  fi
+  case "$first" in
+    bin|boot|dev|etc|lib|lib32|lib64|proc|root|run|sbin|sys|usr)
+      echo "[beagley-ui] remote root may not be under system directory /$first: $root" >&2
+      return 1
+      ;;
+  esac
+  return 0
+}
+
+validate_remote_root "$REMOTE_ROOT" || exit 2
 
 MANIFEST="$(mktemp -t beagley-qml-manifest.XXXXXX)"
 cleanup() {
@@ -75,6 +126,10 @@ echo "[beagley-ui] Step 1: Verify SSH..."
 ssh -o ConnectTimeout=5 "$HOST" "true"
 
 echo "[beagley-ui] Step 2: Sync QML to $HOST:$REMOTE_ROOT..."
+# NOTE: this is a replace, not a merge. The remote dir is rebuilt from a tar of
+# src/ui, so anything else in $REMOTE_ROOT (e.g. a hand-made SkinShowOverride.qml)
+# is deleted and must be re-created after each sync.
+echo "[beagley-ui] WARNING: will rm -rf on $HOST: '$REMOTE_ROOT' and '${REMOTE_ROOT}.tmp' (all other files there are lost, e.g. SkinShowOverride.qml)"
 (
   cd "$ROOT"
   find src/ui -type f \( -name '*.qml' -o -name '*.js' -o -name 'qmldir' -o -path 'src/ui/assets/*' \) | sort | COPYFILE_DISABLE=1 tar -czf - -T -
