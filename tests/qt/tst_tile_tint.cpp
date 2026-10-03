@@ -36,6 +36,16 @@ private slots:
         QVERIFY(TileTint::darken(QImage()).isNull());
     }
 
+    void mapLibreNativeDefaultStyleIsDarkOpenFreeMapOnline()
+    {
+        // Compiled-in start-up style of the embedded MapLibre Native map. Must stay https (online
+        // style) and must not regress to the MapLibre demo style or a board-local file:// style.
+        const QString style = ClusterConfig::defaultMapLibreNativeStyleUrl();
+        QCOMPARE(style, QStringLiteral("https://tiles.openfreemap.org/styles/dark"));
+        QVERIFY(!style.contains(QLatin1String("demotiles")));
+        QVERIFY(!style.startsWith(QLatin1String("file:")));
+    }
+
     void tileUrlConfigDefaultsAndOverride()
     {
         qunsetenv("BEAGLEY_MAP_TILE_URL");
