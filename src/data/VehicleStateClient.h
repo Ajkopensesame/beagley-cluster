@@ -19,6 +19,7 @@ class VehicleStateClient : public VehicleStateSource
 
 public:
     explicit VehicleStateClient(QObject *parent = nullptr);
+    ~VehicleStateClient() override;
 
 private slots:
     void onSocketConnected();
