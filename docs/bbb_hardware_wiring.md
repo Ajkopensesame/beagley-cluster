@@ -1,30 +1,31 @@
 # BBB hardware: UART/pin map, wiring safety, CAN bring-up
 
-Status: **design guidance, not yet bench-verified.** Pin numbers below are the standard BeagleBone
-Black header functions; confirm each against the BBB's actual pin-mux (`config-pin -q P9_11`,
-`/boot/uEnv.txt` overlays) before wiring. Nothing here has been applied to the board.
+Status: **UART4 overlay enabled and deployed on the BBB (2026-10-03, ~15:23 AEST); nothing is wired to UART4 yet.**
+Pin numbers below are the standard BeagleBone Black header functions; the pin-mux (`config-pin -q P9_11`) has **not**
+been queried on the board, so confirm it on the bench before wiring. See `docs/BOARD_RUNBOOK.md`, section
+"Deployed board state (verified 2026-10-03 15:55 AEST)".
 
 ## Serial port / pin map
 
 | UART | Linux device | RX pin | TX pin | Current/planned use |
 |---|---|---|---|---|
 | UART1 | `/dev/ttyS1` | P9_26 | P9_24 | **GPS** (live hub reported GPS on `/dev/ttyS1`) |
-| UART2 | `/dev/ttyS2` | P9_22 | P9_21 | original UNO serial input; **RX pin P9_22 is damaged, do not use** |
-| UART4 | `/dev/ttyS4` | P9_11 | P9_13 | **planned UNO serial input** (UNO TX -> P9_11) |
+| UART2 | `/dev/ttyS2` | P9_22 | P9_21 | overlay enabled, **unused**; the original UNO input, **RX pin P9_22 is damaged, do not use** |
+| UART4 | `/dev/ttyS4` | P9_11 | P9_13 | **UNO serial input**: overlay enabled and `/dev/ttyS4` present; hub reads it (`VEHICLE_INPUT_SERIAL_DEVICE=/dev/ttyS4` @115200). UNO TX -> P9_11 **not wired yet** (0 frames); pin-mux not queried |
 | UART5 | `/dev/ttyS5` | P8_38 | P8_37 | spare (may clash with HDMI pins on some images) |
 | DCAN0 | `can0` | P9_19 (RX) | P9_20 (TX) | planned CAN (shares pins with I2C2) |
 | DCAN1 | `can1` | P9_26 | P9_24 | **not usable while UART1 carries the GPS** |
 
-**Conflict to resolve first:** `docs/beagley_wifi_architecture.md` and
-`tools/bbb_hub/bbb-hardware-gps.env.example` set `BBB_GPS_DEVICE=/dev/ttyS4` (UART4), but the live hub
-reported the GPS on `/dev/ttyS1`. Read the live `/etc/default/bbb-hardware-gps`, `dmesg | grep tty` and
-`/boot/uEnv.txt` on the BBB (read-only) before enabling UART4 for the UNO.
+**Resolved (2026-10-03):** the GPS is on UART1 (`/dev/ttyS1`) and the UNO input is on UART4 (`/dev/ttyS4`). Older
+text (`docs/beagley_wifi_architecture.md`, `tools/bbb_hub/bbb-hardware-gps.env.example`) that set
+`BBB_GPS_DEVICE=/dev/ttyS4` was wrong and has been corrected. Note the hub code default in
+`tools/bbb_hub/vehicle_hub_prod.py` is still `/dev/ttyS4` if `BBB_GPS_DEVICE` is unset; the deployed env file sets it
+explicitly to `/dev/ttyS1`, so always keep `BBB_GPS_DEVICE` set.
 
-Switching the UNO input is configuration only (no code change): enable the UART overlay (typically
-`uboot_overlay_addr?=/lib/firmware/BB-UART4-00A0.dtbo` in `/boot/uEnv.txt`, then reboot), then set
-`VEHICLE_INPUT_SERIAL_DEVICE=/dev/ttyS4` in `/etc/default/bbb-hardware-gps` and restart the hub only.
-Both steps are board changes and need approval (`docs/bbb_deploy_rollback.md`). Serial line format:
-`docs/serial_vehicle_input_protocol.md`.
+Deployed UART4 change (done by `bbb_stage.sh stage3`, with `/boot/uEnv.txt` backups on the board): overlay
+`BB-UART4` (`addr6`; `addr4`=BB-UART1, `addr5`=BB-UART2) added to `/boot/uEnv.txt`, BBB rebooted, then
+`VEHICLE_INPUT_SERIAL_DEVICE=/dev/ttyS4` set in `/etc/default/bbb-hardware-gps` and the hub restarted. Rollback:
+`bbb_stage.sh rollback3` (see `docs/BOARD_RUNBOOK.md`). Serial line format: `docs/serial_vehicle_input_protocol.md`.
 
 ## GPS time (system clock)
 

@@ -62,7 +62,7 @@ Hard rules:
 
 ```text
  hardware GPS -> UART1 \
- UNO inputs  -> UART2  >-> BBB hub (10.24.0.7:8765, WebSocket, vehicle_state)
+ UNO inputs  -> UART4  >-> BBB hub (10.24.0.7:8765, WebSocket, vehicle_state)
  (no can0)            /        |  eth0 direct LAN (hub LAN only)
                                v
                        BeagleY eth0 10.24.0.46 --- BeagleY wlan0 (DHCP, Wi-Fi) --- Mac
@@ -97,8 +97,11 @@ Other facts
 * BBB deployed dir `/home/debian/projects/beagley-cluster` is **not a git
   checkout** and is **older than the repo**. **VERIFIED (HW 2026-10-03)**.
   Do not assume repo behaviour equals deployed behaviour.
-* BBB serial: GPS on `/dev/ttyS1`; UNO input configured on `/dev/ttyS2` but the
-  RX pin is damaged (0 frames). No `can0`. **VERIFIED (HW 2026-10-03)**.
+* BBB serial: GPS on `/dev/ttyS1`; UNO input was configured on `/dev/ttyS2` but the
+  RX pin is damaged (0 frames); since ~15:23 AEST it is on `/dev/ttyS4` (UART4),
+  nothing wired yet. No `can0`. **VERIFIED (HW 2026-10-03)**; see "Deployed board
+  state" below for the as-deployed facts, which supersede older "pre-deploy"
+  bullets in this section.
 * BeagleY time: it is a Yocto image with **no `chrony` or `ntpd`**; time comes
   from `systemd-timesyncd` only. **VERIFIED (HW 2026-10-03)**. So the BeagleY
   cannot serve time to the BBB (the "chrony from BeagleY" option in the
@@ -107,9 +110,9 @@ Other facts
   internet on the `10.24.0.x` link). **VERIFIED (HW 2026-10-03)**. The fix in
   progress is to set the time from GPS (Hardware Integration's follow-up
   GPS-time PR). Staged deploy scripts for it (hub update, clock fix, UART4)
-  are in **PR #29** ("staged BBB deploy scripts"), **pending, not merged and
-  not run on the board**. Until a fix is deployed, BBB log and fault-recorder
-  timestamps are unreliable; use the Mac clock for records.
+  were in PR #29 ("staged BBB deploy scripts"), since merged (included in #32) and
+  **deployed 2026-10-03**; the GPS clock service now sets the time (see "Deployed
+  board state"). Records from before the first clock step carry the wrong date.
 * Hub speed source (REPO, **PR #30, merged**): the hub now prefers GPS speed
   and falls back to pulse speed. Env `VEHICLE_SPEED_SOURCE` =
   `gps_first` | `pulse_only` | `gps_only`; the active choice is reported in
@@ -303,8 +306,9 @@ PR #19 docs (`bbb_deploy_rollback.md`, `bbb_deploy_plan_2026-10-03.md`,
       * BBB hub: stage beside the running code, never over it; deploy order
         code -> env -> unit -> `daemon-reload` -> restart (a `Type=notify`
         unit needs `sd_notify`-capable code first). Needs ThatGuy for `sudo`.
-        Staged deploy scripts (hub update, clock fix, UART4) are in PR #29,
-        **pending, not merged**; do not assume they exist on this branch.
+        Staged deploy scripts (hub update, clock fix, UART4) were PR #29, now merged
+        (included in #32) and used for the 2026-10-03 deploy:
+        `tools/bbb_hub/deploy/bbb_stage.sh` (Mac) and `bbb_apply.sh` (BBB).
       * Full image: flashing the media is a separate approval and a
         hands-on step (see 5.3).
 - [ ] **Health check**: BeagleY `check.sh` OK and
@@ -424,15 +428,90 @@ Order of least to most invasive. Wi-Fi config is **not** yours to edit.
 
 ---
 
+## Deployed board state (verified 2026-10-03 15:55 AEST)
+
+Evidence tag for everything in this section: **VERIFIED (HW 2026-10-03)** (Hardware Integration), unless marked
+REPO / UNKNOWN. It describes the boards *after* the 2026-10-03 deploy and supersedes the "pre-deploy" statements
+elsewhere in this runbook. No secrets are recorded here.
+
+### BBB (BeagleBone Black)
+
+* **Release `305b982`** (merge of #32, which includes #30 and #31) live since 2026-10-03 ~15:17 AEST. Deployed by an
+  owner-authorised run of `bbb_stage.sh` stage1/2/3 from the Mac. Hub restarted 15:17, and again 15:24 after the reboot.
+* **Layout:** `/home/debian/releases/<sha>/` (`305b982`; `5f01914` was only a dry-run copy); symlink
+  `/home/debian/releases/current -> /home/debian/releases/305b982` (root-owned); `release-<sha>.tgz` and `bbb_apply.sh`
+  in `/home/debian/releases/`. The old hub code at `/home/debian/projects/beagley-cluster` is not a git checkout and is
+  no longer used.
+* **Hub:** `bbb-hardware-gps.service` enabled, `User=debian`, `Type=notify`, runs
+  `/bin/bash /home/debian/releases/current/tools/bbb_hub/run_prod.sh` -> `vehicle_hub_prod.py`, WebSocket
+  `0.0.0.0:8765`. The hub log shows speed source `gps_first`. `/var/lib/beagley-cluster` and `/var/log/beagley-cluster`
+  were created (owner `debian`).
+* **Env `/etc/default/bbb-hardware-gps`:** `BBB_GPS_DEVICE=/dev/ttyS1`, `BBB_GPS_BAUD=115200`,
+  `VEHICLE_INPUT_SERIAL_DEVICE=/dev/ttyS4` @115200, `GPS_SOURCE_POLICY=hardware_only`, `BBB_VEHICLE_BENCH_SIM=0`.
+  (REPO note: the code default for `BBB_GPS_DEVICE` in `vehicle_hub_prod.py` is still `/dev/ttyS4`, so keep it set
+  explicitly.)
+* **Caveat, file times:** the BBB wall clock was wrong until stage 2, so mtimes of the stage1 dirs under
+  `/home/debian/releases` and of `rollback/stage1-*`, `stage2-*` show Apr 27 2026. Do not use them as deploy times.
+
+### UART
+
+* `/boot/uEnv.txt` overlays: `addr4=BB-UART1`, `addr5=BB-UART2`, `addr6=BB-UART4` (UART4 added 15:23 AEST; BBB
+  rebooted). `ttyS1`, `ttyS2`, `ttyS4` exist.
+* UART4 pins: RX P9_11, TX P9_13 (REPO). Pin-mux **UNKNOWN** (not queried with `config-pin`).
+* **Nothing is wired to UART4 yet** (UNO disconnected; 0 serial frames).
+* GPS is on `/dev/ttyS1` (UART1) with a live fix, 12 satellites. UART2/`ttyS2` is enabled but unused (RX pin P9_22 is
+  damaged).
+
+### GPS clock (`bbb-gps-clock.service`)
+
+* Enabled and active, `Type=simple`, `User=debian`, `AmbientCapabilities=CAP_SYS_TIME`, runs `gps_clock.py` from
+  `releases/current`.
+* Reads GPS UTC from the hub WebSocket (`gps.utcMs` / `gps.utcValid`). Steps the clock after 5 consecutive valid
+  frames with >= 4 satellites when off by more than 1 s; rechecks every 600 s; rejects dates before 2026-01-01 or
+  after 2040-01-01.
+* First set: stepped +13759463.572 s at 15:22:43. After the reboot: re-stepped +36.9 s at 15:24:28. There is no
+  battery-backed RTC, so the clock resets on every boot until the GPS fix (about 40-60 s after boot). Later offsets
+  were under 0.5 s; drift is about 0.1 s per 10 min.
+* `timedatectl` still says "System clock synchronized: no". This is cosmetic: it only tracks timesyncd/NTP.
+* With no fix the service stays running and waits (REPO + stub test; **not tested live** with the antenna removed).
+
+### BeagleY (unchanged by this deploy)
+
+* Arago 2025.01; `beagley_cluster.service` active; `beagley-user-bg-upload.service` (:8787); app under
+  `/opt/beagley-cluster`. Running commit/tag: **UNKNOWN**.
+* Wi-Fi DHCP currently `192.168.1.111` on `VX220-9869`. It dropped off the network twice on 2026-10-03 (13:40-14:50
+  and ~15:52 AEST); cause **UNKNOWN** (Chief of Staff owns Wi-Fi).
+
+### Rollback pointers
+
+* BBB backups in `/home/debian/rollback/`: `stage1-20260427-091655` (old unit/env), `stage2-20260427-091758`,
+  `stage3-20261003-152317` (`uEnv.txt` backup), `stage3b-20261003-152434`; plus `/boot/uEnv.txt.bak-before-uart4`.
+  (The `20260427` in two names is the wrong BBB clock at the time, not a real date.)
+* From the Mac, in `~/bbb-release`: `bash bbb_stage.sh rollback1|rollback2|rollback3`. On the BBB:
+  `sudo bash /home/debian/releases/bbb_apply.sh rollbackN`. Mac files: `~/bbb-release/{bbb_stage.sh,bbb_apply.sh,release-305b982.tgz}`.
+  Pre-deploy read-only snapshot: Mac `~/bbb-snapshots/2026-10-03-pre-deploy/`.
+* Generic procedure: section 5.2 and `docs/bbb_deploy_rollback.md`.
+
+### Known issues after the deploy
+
+* BBB journal is 545 MB and unbounded (capping it needs approval).
+* The clock helper has not been tested live with no GPS fix.
+* BeagleY Wi-Fi dropouts (above).
+* UNO TX is not wired, so serial inputs read 0 frames; fuel, coolant and rpm are uncalibrated; the UNO sketch pins are
+  unverified on hardware.
+* No `can0` and no `can_signals.json` on the BBB (the CAN prep PR is in progress).
+
+---
+
 ## 6. Known issues (as of 2026-10-03)
 
 | Issue | Detail | Source |
 | --- | --- | --- |
-| BBB clock wrong | Shows Apr 2026, RTC reads 2000-01-01, not synchronized, and the BBB link has no internet. Journal and fault-recorder timestamps are unreliable until fixed. The BeagleY has no chrony/ntpd (systemd-timesyncd only), so it cannot serve time. Fix in progress: set time from GPS (Hardware Integration's follow-up GPS-time PR); staged scripts are in PR #29, pending, nothing applied. Other options are in the PR #19 plan, Stage 3. | **VERIFIED (HW 2026-10-03)** |
+| BBB clock wrong | Shows Apr 2026, RTC reads 2000-01-01, not synchronized, and the BBB link has no internet. Journal and fault-recorder timestamps are unreliable until fixed. The BeagleY has no chrony/ntpd (systemd-timesyncd only), so it cannot serve time. **Fixed 2026-10-03 15:22 AEST** by the `bbb-gps-clock` service (GPS time; see "Deployed board state"); earlier journal and fault-recorder timestamps stay wrong. | **VERIFIED (HW 2026-10-03)** |
 | BeagleY has no NTP daemon | Yocto image; `systemd-timesyncd` only, no `chrony`/`ntpd`. | **VERIFIED (HW 2026-10-03)** |
-| New hub features not deployed | PR #30 (GPS-first speed, `VEHICLE_SPEED_SOURCE`, `_health.speedSource`) is merged, but the BBB still runs the OLD hub code until ThatGuy approves a deploy. Bench checklist: [bench_test_checklist.md](bench_test_checklist.md); UNO firmware: [../firmware/uno_vehicle_input/](../firmware/uno_vehicle_input/README.md). | REPO (deployed state **VERIFIED (HW 2026-10-03)**) |
-| journald unbounded on BBB | 558 MB used. A limits drop-in (`tools/bbb_hub/journald-beagley.conf`) is added by PR #19; not installed. | **VERIFIED (HW 2026-10-03)** |
-| ttyS mismatch | Live: GPS on `/dev/ttyS1`, UNO configured on `/dev/ttyS2` (RX pin damaged, 0 frames). Docs and `bbb-hardware-gps.env.example` that say `ttyS4` are stale; UART4 on P9_11 is a *proposal* (PR #19 plan, Stage 2). | **VERIFIED (HW 2026-10-03)** |
+| New hub features deployed (was: not deployed) | PR #30 (GPS-first speed, `VEHICLE_SPEED_SOURCE`, `_health.speedSource`) is merged and **live on the BBB since 2026-10-03 ~15:17 AEST (release 305b982)**; the hub log shows speed source `gps_first`. Bench checklist: [bench_test_checklist.md](bench_test_checklist.md); UNO firmware: [../firmware/uno_vehicle_input/](../firmware/uno_vehicle_input/README.md). | REPO (deployed state **VERIFIED (HW 2026-10-03)**) |
+| journald unbounded on BBB | 545 MB used (2026-10-03 15:55 AEST; was 558 MB). A limits drop-in (`tools/bbb_hub/journald-beagley.conf`) is in the repo; not installed (capping needs approval). | **VERIFIED (HW 2026-10-03)** |
+| ttyS mismatch (resolved) | GPS on `/dev/ttyS1` (UART1). UART4 is now **enabled** (overlay added 15:23 AEST, BBB rebooted, `/dev/ttyS4` exists) and the hub reads `/dev/ttyS4` @115200 as the UNO input. UART2/`ttyS2` is enabled but unused (RX pin P9_22 damaged). The older docs and `bbb-hardware-gps.env.example` that said GPS = `ttyS4` were wrong and are corrected. Still open: nothing is wired to UART4 (0 frames) and the pin-mux (`config-pin -q P9_11`) was not queried. | **VERIFIED (HW 2026-10-03)** (enabled/present); wiring and pin-mux **UNKNOWN** |
 | No CAN | No `can0`, no `can_signals.json` on the BBB. | **VERIFIED (HW 2026-10-03)** |
 | BBB deployed code is old | Not a git checkout, older than the repo. Repo behaviour and tests do not describe what runs. | **VERIFIED (HW 2026-10-03)** |
 | BeagleY unreachable from Elitebook | Likely Wi-Fi client isolation. Builds can still be done on the Elitebook, but pushing to the board goes via the Mac. | **VERIFIED (HW 2026-10-03)** |
@@ -451,8 +530,8 @@ Order of least to most invasive. Wi-Fi config is **not** yours to edit.
    `bbb-bench-sim`): will you run hub restarts yourself, or approve a narrow
    sudoers rule for `systemctl restart bbb-hardware-gps`?
 2. Should the BBB clock fix go ahead, and when? Option A (chrony from the
-   BeagleY) is out because the BeagleY has no chrony; the GPS-time fix and the
-   PR #29 staged scripts are pending your approval to deploy.
+   BeagleY) is out because the BeagleY has no chrony; the GPS-time fix was
+   deployed 2026-10-03 (done, see "Deployed board state").
 3. `bbb-bench-sim` is installed (state `disable`). Who is allowed to enable it, and how is the state checked before a real-vehicle test?
 
 **Chief of Staff (Wi-Fi)**
