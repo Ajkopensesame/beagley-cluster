@@ -46,6 +46,12 @@ Both are `check_qml.py`. File set: every tracked `src/ui/**/*.qml` except the le
 * `qml_static_guards`: import allow-list (unversioned `QtQuick.Shapes` only - a versioned import
   hides `Shape.preferredRendererType`/`CurveRenderer` on Qt >= 6.6 and the component fails to
   load; no Qt5-only modules such as `QtGraphicalEffects`), and no dead Carto raster tile URLs.
+  Also `qrc` references: every literal relative resource path in a QML file (`"Foo.qml"`, `"../assets/x.png"`, ...)
+  must exist and be listed in `CMakeLists.txt` (`QML_FILES`/`RESOURCES`), otherwise it is missing from the
+  compiled qrc (`qrc:/BeagleY/...: No such file or directory`). Intentionally absent files go in
+  `OPTIONAL_QRC_REFS` with a justification and a required guard expression (currently only the qml-dev-only
+  `SkinShowOverride.qml`, probed only when MainV3 was loaded from a `file:` URL). The runtime counterpart is the
+  smoke probe: a missing Loader/Image source is a `qWarning`, which fails every `qml_smoke_*` test.
 * `qmllint_errors`: qmllint from the same Qt install, `-I <build dir>` so `import BeagleY` resolves.
   Fails on syntax errors and on every category except those listed below. Levels are passed
   as flags (not a `.qmllint.ini`) because qmllint applies a repo-level `.qmllint.ini` to *every*

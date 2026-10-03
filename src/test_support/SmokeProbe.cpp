@@ -32,11 +32,6 @@ struct AllowEntry {
     const char *why;
 };
 const AllowEntry kAllowList[] = {
-    // MainV3 probes for an optional qml-dev override file via a Loader. In a compiled
-    // build the file intentionally does not exist (see the comment above that Loader in
-    // MainV3.qml); Qt reports the miss as a warning.
-    {R"(SkinShowOverride\.qml: No such file or directory)",
-     "optional qml-dev-only override, absent by design in compiled builds"},
     // Emitted by the offscreen QPA plugin when the window asks to be raised; the
     // offscreen platform has no window stacking.
     {R"(This plugin does not support (raise|propagateSizeHints|setParent)\(\))",

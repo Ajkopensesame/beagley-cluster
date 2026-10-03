@@ -2137,14 +2137,19 @@ Window {
 
         // Probe show-profile without BEAGLEY_SKIN_PROFILE in the running binary.
         // Loader.Ready only when SkinShowOverride.qml exists beside MainV3 (qml-dev).
+        // The file is a qml-dev-only marker and is intentionally NOT in the compiled module
+        // (shipping it would force the show profile permanently). The Loader therefore only
+        // probes when MainV3 itself was loaded from the filesystem (file: URL, i.e.
+        // BEAGLEY_QML_DEV_ROOT); in a compiled build (qrc:) it stays inactive and nothing is
+        // logged ("qrc:/BeagleY/src/ui/SkinShowOverride.qml: No such file or directory").
         // SHOW:  printf '%s\n' 'import QtQuick 2.15; QtObject { objectName: "skinShow" }' \
         //          > /opt/beagley-cluster/qml-dev/src/ui/SkinShowOverride.qml && systemctl restart beagley_cluster
         // DRIVE: rm -f /opt/beagley-cluster/qml-dev/src/ui/SkinShowOverride.qml && systemctl restart beagley_cluster
         Loader {
             id: skinShowLoader
-            active: true
+            active: Qt.resolvedUrl("SkinShowOverride.qml").toString().indexOf("file:") === 0
             asynchronous: false
-            source: Qt.resolvedUrl("SkinShowOverride.qml")
+            source: active ? Qt.resolvedUrl("SkinShowOverride.qml") : ""
         }
 
         Item {
