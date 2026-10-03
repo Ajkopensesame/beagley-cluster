@@ -1,0 +1,13 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    # PRs must target the default branch of this repo
+    target-branch: "codex/maplibre-native-yocto-build"
+    commit-message:
+      prefix: "ci"
+# No pip ecosystem entry yet: the repo has no requirements*.txt / pyproject.toml.
+# Add one when Python dependency manifests are introduced.
