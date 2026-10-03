@@ -440,6 +440,9 @@ if(BUILD_TESTING)
         BEAGLEY_SMOKE_TEST=1
         # Without this the Wi-Fi onboarding dialog covers the whole screen (see docs/ENVIRONMENT.md).
         BEAGLEY_WIFI_ONBOARDING=0
+        # Hermetic: never hit a real tile server from CI (OSM policy; and HTTP/2 stream errors
+        # from the live server surfaced as Qt warnings and failed the embedded cases).
+        BEAGLEY_MAP_TILE_URL=file:///nonexistent-tiles/{z}/{x}/{y}.png
         # Hermetic: no persisted settings/caches from the developer's or runner's profile.
         XDG_CONFIG_HOME=${CMAKE_CURRENT_BINARY_DIR}/smoke-home/config
         XDG_CACHE_HOME=${CMAKE_CURRENT_BINARY_DIR}/smoke-home/cache
