@@ -416,6 +416,14 @@ if(BUILD_TESTING)
     add_test(NAME tst_tile_tint COMMAND tst_tile_tint)
     set_tests_properties(tst_tile_tint PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 120)
 
+    # Live-runtime guard of tools/ui/beagley_sync_qml.sh (fake ssh, nothing real is touched).
+    find_program(BEAGLEY_BASH bash)
+    if(BEAGLEY_BASH)
+        add_test(NAME sync_qml_guard_test
+            COMMAND ${BEAGLEY_BASH} ${CMAKE_CURRENT_SOURCE_DIR}/tests/sync_qml_guard_test.sh)
+        set_tests_properties(sync_qml_guard_test PROPERTIES TIMEOUT 60)
+    endif()
+
     # ---- Static QML checks (tests/qml_smoke/check_qml.py) ----
     # Source guards (unversioned QtQuick.Shapes, no Qt5-only imports, no dead Carto tiles) and
     # qmllint from the same Qt install that built the app, failing on error-level problems only.

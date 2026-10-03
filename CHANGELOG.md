@@ -14,6 +14,7 @@ follow [Semantic Versioning](https://semver.org/) (see [docs/RELEASING.md](docs/
 - Branch inventory with tip SHAs recorded in `docs/archive-branches-2026-10-03.md` before remote branch cleanup.
 
 ### Fixed
+- `tools/ui/beagley_sync_qml.sh` (also used by `beagley_enable_qml_dev.sh` / `beagley_watch_qml.sh`) now refuses a live runtime as `--remote-root`: paths under `/data/beagley-cluster`, `runtime-*` segments, and (checked on the target before any `rm -rf`) roots at or below a directory with `launch.sh` / `bin/beagley_cluster` / `capture-once.env` / `.live` markers. Covered by `tests/sync_qml_guard_test.sh`.
 - Docs: runbook no longer lists merged PRs #19/#23 and the CAN prep work as pending; `docs/reimagined_cluster_v2.md` no longer claims `MainV2` is the default (code defaults to `MainV3`); removed `/Users/joshkomant/...` paths and example `192.168.0.x` IPs from docs and skill docs; known-debt notes updated for the removed QRC files.
 
 ### Changed
