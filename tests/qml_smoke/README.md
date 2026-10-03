@@ -20,7 +20,9 @@ drifts from it. The probe is inert unless `BEAGLEY_SMOKE_TEST=1`.
 
 Environment set by CTest: `QT_QPA_PLATFORM=offscreen`, `QT_QUICK_BACKEND=software` (no GL/EGL
 needed on the runner), `BEAGLEY_WIFI_ONBOARDING=0` (otherwise the Wi-Fi dialog covers the
-screen), hermetic `XDG_*` dirs under the build tree. Works with `WITH_WEBENGINE=OFF` and
+screen), hermetic `XDG_*` dirs under the build tree, and `BEAGLEY_MAP_TILE_URL=file:///nonexistent-tiles/...` so the
+embedded map pod / radar never contact a real tile server (a live OSM response once failed CI with
+HTTP/2 "stream N finished with error" warnings). Works with `WITH_WEBENGINE=OFF` and
 `WITH_MAPLIBRE_NATIVE=OFF` (the CI configuration).
 
 Assertions: root object created and is a `QQuickWindow`; window and content item are 1920x720;
