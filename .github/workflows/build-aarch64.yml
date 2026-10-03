@@ -13,6 +13,9 @@ name: Build aarch64 (BeagleY appliance binary)
 # the checks to run read-only on the board before swapping.
 
 on:
+  push:
+    branches: [build/combined-fixes-gles-run]
+    paths: ['.github/workflows/build-aarch64.yml']
   workflow_dispatch:
     inputs:
       ref:
@@ -44,7 +47,7 @@ jobs:
       - name: Checkout app source
         uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.ref || 'codex/maplibre-native-yocto-build' }}
+          ref: ${{ github.sha }}
           path: app
 
       - name: Source identity
