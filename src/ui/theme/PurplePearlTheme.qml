@@ -110,6 +110,13 @@ QtObject {
     readonly property real mapVeilGuidance: mapDarkTokens ? 0.0 : 0.04
     readonly property real mapVeil: mapVeilIdle
     readonly property real mapVeilSoft: mapDarkTokens ? 0.04 : 0.10
+    // Centre map panel (MainV3 mapPanel): dark backing so a missing/light (demo-style) map never
+    // shows as a bright rectangle, a flat dark tint over the map content, and the canopy colour
+    // the panel frame fades into.
+    readonly property color mapPanelBackdrop: "#06111D"
+    readonly property color mapPanelFence: "#09111A"
+    readonly property real mapPanelTint: mapDarkTokens ? 0.50 : 0.30
+    readonly property real mapPanelTintGuidance: mapDarkTokens ? 0.32 : 0.16
     readonly property real chromeIdle: 0.72
     readonly property real chromeActive: 1.0
     readonly property color statusBannerBg: isNight ? "#B205070B" : "#B2F5F3FF"

@@ -206,6 +206,7 @@ set(BEAGLEY_QML_FILES
     src/ui/widgets/TwinMicroArcs.qml
     src/ui/widgets/LinkLostTelltale.qml
     src/ui/widgets/MapCenter.qml
+    src/ui/widgets/MapPanelFrame.qml
     src/ui/widgets/MapCenterBootShell.qml
     src/ui/widgets/MapCenterMapLibreNative.qml
     src/ui/widgets/MapVehicleMarker.qml
