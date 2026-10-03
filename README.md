@@ -122,3 +122,7 @@ Other workflows cover the diagnostic replay contracts (`tools/bbb_hub`, `tests`)
 ## License
 
 [MIT](LICENSE) © 2026 Ajkopensesame.
+
+### Third-party assets
+
+- **Orbitron** (Medium, Bold) — © 2009 Matt McInerney, SIL Open Font License 1.1. Bundled unmodified in `src/assets/fonts/`; see `src/assets/fonts/OFL-Orbitron.txt` and `src/assets/fonts/README-Orbitron.md`.

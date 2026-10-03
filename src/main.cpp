@@ -432,7 +432,15 @@ int main(int argc, char *argv[])
     qmlRegisterType<NativeRasterMapItem>("BeagleY", 1, 0, "NativeRasterMapItem");
     qmlRegisterType<RadarFrameItem>("BeagleY", 1, 0, "RadarFrameItem");
     qmlRegisterType<RasterFrameItem>("BeagleY", 1, 0, "RasterFrameItem");
-    QFontDatabase::addApplicationFont(QStringLiteral(":/assets/fonts/Oxanium-Regular.ttf"));
+    for (const QString &fontPath : {
+             QStringLiteral(":/assets/fonts/Oxanium-Regular.ttf"),
+             QStringLiteral(":/assets/fonts/Orbitron-Medium.ttf"),
+             QStringLiteral(":/assets/fonts/Orbitron-Bold.ttf"),
+         }) {
+        if (QFontDatabase::addApplicationFont(fontPath) < 0) {
+            qWarning() << "[fonts] failed to load bundled font" << fontPath;
+        }
+    }
     QCoreApplication::setApplicationName(QStringLiteral("BeagleyCluster"));
     QCoreApplication::setApplicationVersion(QStringLiteral("1.0"));
     QCoreApplication::setOrganizationName(QStringLiteral("Beagley"));
