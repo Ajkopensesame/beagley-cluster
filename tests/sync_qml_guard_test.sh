@@ -30,7 +30,7 @@ fail=0
 run() { # name expected_rc expect_destructive(0/1) root
   local name="$1" want_rc="$2" want_cmd="$3" root="$4" rc
   : >"$LOG"
-  BEAGLEY_HOST=fake@host "$SCRIPT" --remote-root "$root" --no-restart --no-health >"$T/out" 2>&1
+  BEAGLEY_HOST=fake@host "$SCRIPT" --remote-root "$root" --no-restart --no-health </dev/null >"$T/out" 2>&1
   rc=$?
   local ran=0
   grep -q "rm -rf" "$LOG" && ran=1
