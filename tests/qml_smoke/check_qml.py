@@ -114,6 +114,12 @@ def map_style_init_failures(root: Path):
     if "demotiles" in impl:
         out.append("src/ui/widgets/MapCenterMapLibreNativeImpl.qml: must not default to the MapLibre demo style "
                    "(blank map); use ClusterConfig::defaultMapLibreNativeStyleUrl() / BEAGLEY_MAPLIBRE_NATIVE_DEFAULT_STYLE_URL")
+    if not re.search(r"resolvedStyleUrl:\s*styleUrl\.length\s*>\s*0\s*\?\s*styleUrl\s*:\s*defaultStyleUrl", impl):
+        out.append("src/ui/widgets/MapCenterMapLibreNativeImpl.qml: resolvedStyleUrl must fall back to defaultStyleUrl "
+                   "when styleUrl is empty (an empty style leaves the map blank until restart)")
+    if not re.search(r':\s*"https?://[^"\s]+"\s*\n\s*readonly property string resolvedStyleUrl', impl):
+        out.append("src/ui/widgets/MapCenterMapLibreNativeImpl.qml: defaultStyleUrl must end in a non-empty "
+                   "http(s) literal fallback")
     return out
 
 
@@ -145,6 +151,7 @@ def run_guards(root: Path) -> int:
                         failures.append(f"{p.relative_to(root)}:{n}: Carto keyless raster tiles are dead "
                                         "(API KEY REQUIRED watermark); use BEAGLEY_MAP_TILE_URL")
     failures += qrc_reference_failures(root)
+    failures += map_style_init_failures(root)
     for f in failures:
         print("GUARD FAIL:", f)
     print(f"qml_static_guards: {len(supported_files(root))} files checked, {len(failures)} problem(s)")
