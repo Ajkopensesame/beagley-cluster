@@ -12,6 +12,7 @@ from pathlib import Path
 import websockets
 
 from gps_nmea import NmeaSerialGpsSource, build_hardware_gps_payload
+import sd_notify
 
 
 try:
@@ -142,6 +143,7 @@ class VehicleHub:
     def __init__(self) -> None:
         self.clients: set[websockets.WebSocketServerProtocol] = set()
         self._started_at = time.time()
+        self.last_loop_monotonic = time.monotonic()
         self._gps = NmeaSerialGpsSource(
             device=GPS_DEVICE,
             baud=GPS_BAUD,
@@ -518,20 +520,22 @@ class VehicleHub:
     def _apply_can_overlay(self, state: dict) -> None:
         decoded_signals = set()
         if self._can_replay is not None:
-            decoded = self._can_replay.snapshot()
+            health = self._can_replay.health()
+            # Fail-safe: a stale source must not keep showing its last values as live.
+            decoded = {} if health.get("stale", True) else self._can_replay.snapshot()
             merge_vehicle_overlay(state, decoded)
             decoded_signals.update(decoded)
-            health = self._can_replay.health()
             state["_health"]["canReplay"] = health
             state["_health"]["canReplayDiagnostics"] = self._can_replay.diagnostics()
             if decoded and not health.get("stale", True):
                 state["_health"]["stale"] = False
                 state["_health"]["vehicleSource"] = "can_replay"
         if self._can_live is not None:
-            decoded = self._can_live.snapshot()
+            health = self._can_live.health()
+            # Fail-safe: a stale source must not keep showing its last values as live.
+            decoded = {} if health.get("stale", True) else self._can_live.snapshot()
             merge_vehicle_overlay(state, decoded)
             decoded_signals.update(decoded)
-            health = self._can_live.health()
             state["_health"]["canLive"] = health
             state["_health"]["canLiveDiagnostics"] = self._can_live.diagnostics()
             if decoded and not health.get("stale", True):
@@ -554,9 +558,10 @@ class VehicleHub:
                     "reason": "not configured or failed to initialize",
                 }
             return
-        overlay = self._serial_inputs.snapshot()
-        merge_vehicle_overlay(state, overlay)
         health = self._serial_inputs.health()
+        # Fail-safe: a stale source (UNO unplugged/silent) must not keep showing its last values as live.
+        overlay = {} if health.get("stale", True) else self._serial_inputs.snapshot()
+        merge_vehicle_overlay(state, overlay)
         state["_health"]["serialVehicleInputs"] = health
         if overlay and not health.get("stale", True):
             state["_health"]["stale"] = False
@@ -678,6 +683,7 @@ class VehicleHub:
 
     async def broadcast_loop(self) -> None:
         while True:
+            self.last_loop_monotonic = time.monotonic()
             if self.clients:
                 frame = json.dumps(await self.next_state())
                 disconnected = []
@@ -689,6 +695,27 @@ class VehicleHub:
                 for ws in disconnected:
                     await self.remove_client(ws)
             await asyncio.sleep(FRAME_PERIOD_SEC)
+
+
+WATCHDOG_MAX_LOOP_LAG_SEC = float(os.getenv("BBB_WATCHDOG_MAX_LOOP_LAG_SEC", "5"))
+
+
+async def watchdog_loop(hub: VehicleHub, tasks: list) -> None:
+    """Pet the systemd watchdog only while the hub is demonstrably making progress.
+
+    Stops petting when the broadcast loop has stalled or any background task has died,
+    so systemd restarts a hung (not just crashed) hub. No-op outside systemd.
+    """
+    interval = sd_notify.watchdog_interval_sec()
+    if interval is None:
+        return
+    while True:
+        lag = time.monotonic() - hub.last_loop_monotonic
+        if lag <= WATCHDOG_MAX_LOOP_LAG_SEC and not any(task.done() for task in tasks):
+            sd_notify.notify("WATCHDOG=1")
+        else:
+            print(f"[bbb_hub] watchdog: not petting (loop lag {lag:.1f}s, dead tasks: {[t for t in tasks if t.done()]})")
+        await asyncio.sleep(interval)
 
 
 async def ws_handler(ws: websockets.WebSocketServerProtocol, hub: VehicleHub) -> None:
@@ -729,6 +756,9 @@ async def main() -> None:
         background_tasks.append(asyncio.create_task(hub.can_live_loop()))
     if hub._serial_inputs is not None:
         background_tasks.append(asyncio.create_task(hub.serial_input_loop()))
+    sd_notify.notify("READY=1")
+    watchdog_task = asyncio.create_task(watchdog_loop(hub, background_tasks))
+    background_tasks.append(watchdog_task)
     try:
         await asyncio.gather(ws_server.wait_closed(), *background_tasks)
     finally:

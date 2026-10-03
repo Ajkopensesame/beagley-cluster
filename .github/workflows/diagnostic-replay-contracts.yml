@@ -32,7 +32,8 @@ jobs:
           python-version: "3.12"
 
       - name: Install test dependencies
-        run: python3 -m pip install --upgrade pip pytest
+        # websockets pinned to the version running on the BBB (10.4) so hub integration tests match production.
+        run: python3 -m pip install --upgrade pip pytest "websockets==10.4"
 
-      - name: Run diagnostic replay contract tests
-        run: python3 -m pytest tests/test_diagnostic_replay.py tests/test_fault_recorder.py -q
+      - name: Run all Python hub/tool tests (includes hub integration + watchdog tests)
+        run: python3 -m pytest tests -q
