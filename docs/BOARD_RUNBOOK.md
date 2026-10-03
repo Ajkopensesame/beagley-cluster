@@ -21,7 +21,7 @@ Related docs: [live_cluster_workflow.md](live_cluster_workflow.md),
 hub protocol [../tools/schema/vehicle_state_v1.md](../tools/schema/vehicle_state_v1.md),
 UNO bench checklist [bench_test_checklist.md](bench_test_checklist.md),
 UNO firmware [../firmware/uno_vehicle_input/](../firmware/uno_vehicle_input/README.md).
-Added by PR #19 (not on this branch until it merges; links resolve after that):
+Added by PR #19 (merged):
 `docs/bbb_deploy_rollback.md`, `docs/bbb_deploy_plan_2026-10-03.md`,
 `docs/bbb_hardware_wiring.md`.
 
@@ -71,7 +71,7 @@ Hard rules:
 
 | Device | Address | How to reach | Owner | Status |
 | --- | --- | --- | --- | --- |
-| BeagleY (`beagley-ai`) Wi-Fi | DHCP. Was `192.168.1.111`, earlier `192.168.1.100`. **Changes.** | From the **Mac only**: find the IP with `dns-sd -G v4 beagley-ai.local`, then `ssh -o BatchMode=yes -o ConnectTimeout=8 -i ~/.ssh/beagley_bbb root@<ip>` | Cluster Lead (app); Chief of Staff (Wi-Fi) | **VERIFIED (HW 2026-10-03)** |
+| BeagleY (`beagley-ai`) Wi-Fi | DHCP. `192.168.1.111` on 2026-10-03; was `192.168.1.100` on 2026-09-20 (that address now times out on port 22). **Changes: re-discover it every time.** | From the **Mac only**: find the IP with `dns-sd -G v4 beagley-ai.local`, then `ssh -o BatchMode=yes -o ConnectTimeout=8 -i ~/.ssh/beagley_bbb root@<ip>` | Cluster Lead (app); Chief of Staff (Wi-Fi) | **VERIFIED (HW 2026-10-03)** |
 | BeagleY from the Elitebook | none | Cannot reach it. Cause **TO CONFIRM** (Wi-Fi client isolation or a different network). Use the Mac. | n/a | Unreachable: **VERIFIED (HW 2026-10-03)**; cause **TO CONFIRM** |
 | BeagleY `eth0` | `10.24.0.46/24` | Direct hub LAN to the BBB only; not a general uplink | Cluster Lead | **VERIFIED (HW 2026-10-03)**; REPO `05-beagley-eth-debug.network` |
 | BBB hub | `10.24.0.7:8765` (WebSocket) | From the Mac, jump through the BeagleY: `ssh -o BatchMode=yes -i ~/.ssh/beagley_bbb -J root@<beagley-ip> debian@10.24.0.7`. User `debian`; root login refused. | Hardware Integration | **VERIFIED (HW 2026-10-03)** |
@@ -93,7 +93,7 @@ Other facts
   running `tools/bbb_hub/run_prod.sh` -> `vehicle_hub_prod.py`, env
   `/etc/default/bbb-hardware-gps`. Legacy `vehicle-hub.service` is disabled.
   **VERIFIED (HW 2026-10-03)**. The repo unit (`tools/bbb_hub/bbb-hardware-gps.service`)
-  matches that shape (REPO) and adds `Restart=always`, `RestartSec=2`. The repo unit after PR #19 also adds `Type=notify`, `WatchdogSec=15` and log rate limits; the unit on the board is the pre-#19 version.
+  matches that shape (REPO) and adds `Restart=always`, `RestartSec=2`. The repo unit (since PR #19, merged) also has `Type=notify`, `WatchdogSec=15` and log rate limits; the board's unit state is under "Deployed board state" (`Type=notify` since the 2026-10-03 deploy).
 * BBB deployed dir `/home/debian/projects/beagley-cluster` is **not a git
   checkout** and is **older than the repo**. **VERIFIED (HW 2026-10-03)**.
   Do not assume repo behaviour equals deployed behaviour.
@@ -143,14 +143,60 @@ Each one changes a live board: get approval first (rule 1).
 
 REPO: `docs/beagley_ui_dev_workflow.md`, `tools/ui/*`.
 
-Prerequisite: the deployed binary supports `BEAGLEY_QML_DEV_ROOT`
-(**TO CONFIRM** for the binary currently on the board).
+> **WARNING: the repo scripts target the wrong tree on the current board.**
+> `tools/ui/beagley_sync_qml.sh`, `beagley_enable_qml_dev.sh` and
+> `beagley_watch_qml.sh` default to `/opt/beagley-cluster/qml-dev` (also when
+> `BEAGLEY_QML_DEV_ROOT` is set in your shell). **That is not what the glass
+> shows** (see "What the display actually runs" below). Pointing
+> `--remote-root` (or `BEAGLEY_QML_DEV_ROOT`) at the live source directory
+> under `/data` passes the script's path validation and then **`rm -rf`s the
+> live Pearl UI** (about 24 MB: PearlControlCenter, weather, radar, skin-v2,
+> `tools/ui/audit` probes, fonts) and replaces it with the much smaller repo
+> `src/ui`. Do not do that. Use the capture-once method below to try a
+> different QML root.
+
+**What the display actually runs (VERIFIED (HW 2026-10-03), read-only).**
+
+* Unit `beagley_cluster.service`. Many numbered drop-ins (`90-` to `99-z-`)
+  exist and the last one wins. The effective `ExecStart` comes from
+  `/etc/systemd/system/beagley_cluster.service.d/99-z-hotspot-wifi.conf`:
+  `/data/beagley-cluster/runtime-hotspot-wifi-20260919/launch.sh`
+  (`User=root`). All `ui-dev.conf` drop-ins are renamed `*.disabled.*`.
+* `launch.sh` (not `/opt`) exports `BEAGLEY_UI_VARIANT=v3`,
+  `BEAGLEY_QML_DEV_ROOT=<runtime>/source` (same runtime dir, under `/data`),
+  `BEAGLEY_QML_DEV_FILE=<root>/src/ui/MainV3.qml` (or
+  `tools/ui/audit/start_plaza_sim.qml` while `/run/beagley-retrigger-plaza-sim`
+  exists) and `BEAGLEY_MAP_RENDERER=maplibre-native` with `file://` dark/light
+  vector styles from that source tree. `/etc/default/beagley-cluster.local`
+  sets the same root/file (do not paste that file anywhere: it holds Spotify
+  tokens).
+* So the **live QML root is `<runtime>/source` under `/data`**, a Pearl UI
+  snapshot that is a different, larger tree than this repo's `src/ui`.
+  `/opt/beagley-cluster/qml-dev` is a **stale copy** (manifest synced
+  2026-09-06, branch `ui/slice1-map-hierarchy-quiet-chrome`, commit
+  `458d02d46782`, 18 dirty files). The `ui-dev.conf` that
+  `beagley_enable_qml_dev.sh` installs would be overridden by `launch.sh`'s
+  own exports anyway.
+* Find the real root on the day, do not assume it:
+  `systemctl show beagley_cluster -p ExecStart`, then `cat` the `launch.sh`
+  it names (read-only).
+
+Prerequisite: `BEAGLEY_QML_DEV_ROOT` **is supported** by the deployed binary
+(VERIFIED (HW 2026-10-03): the live display uses it), but only with the C++
+and fonts from the same build. Fonts are registered in C++ from the Qt
+resources (`src/main.cpp`: Oxanium-Regular, Orbitron-Medium, Orbitron-Bold) and
+the `linkLost` state (REPO: `src/data/VehicleStateSource.*`, `src/render/ClusterRenderModel.*`) is also C++, so a QML-only sync cannot deliver
+new fonts or new C++-backed properties (see section 6).
 
 1. Find the IP (`dns-sd -G v4 beagley-ai.local`), then export
    `BEAGLEY_HOST=root@<ip>`.
 2. Confirm what the display really runs: `tools/ui/beagley_display_status.sh`
-   (`qml_source=compiled-binary` or `qml-dev`).
-3. One-time enable: `tools/ui/beagley_enable_qml_dev.sh`. It syncs `src/ui` to
+   (`qml_source=compiled-binary` or `qml-dev`) **and** the `ExecStart` /
+   `launch.sh` check above. The status script reports on the drop-in it knows
+   about, not on a `launch.sh` that sets its own root.
+3. One-time enable (**only on a board that really runs from
+   `/opt/beagley-cluster/qml-dev`; not the current board**):
+   `tools/ui/beagley_enable_qml_dev.sh`. It syncs `src/ui` to
    `/opt/beagley-cluster/qml-dev`, installs
    `/etc/systemd/system/beagley_cluster.service.d/ui-dev.conf`
    (`BEAGLEY_QML_DEV_ROOT=...`), runs `daemon-reload` and restarts the app.
@@ -166,8 +212,8 @@ Prerequisite: the deployed binary supports `BEAGLEY_QML_DEV_ROOT`
 
 **Wipe gotcha.** `beagley_sync_qml.sh` is a *replace*, not a merge: it runs
 `rm -rf` on the remote root (and `<root>.tmp`) and re-creates it from a tar of
-`src/ui`. **Anything else in `/opt/beagley-cluster/qml-dev` is deleted on every
-sync, including a hand-made `SkinShowOverride.qml`.** The watcher does this on
+`src/ui`. **Anything else in the remote root (default `/opt/beagley-cluster/qml-dev`)
+is deleted on every sync, including a hand-made `SkinShowOverride.qml`.** The watcher does this on
 every save. Keep such files in the repo (or a copy outside the sync root) and
 re-create them after each sync. Where the master copy of
 `SkinShowOverride.qml` lives is **TO CONFIRM**.
@@ -178,6 +224,20 @@ fewer than three components, and roots under `/bin /boot /dev /etc /lib* /proc
 /root /run /sbin /sys /usr`. Do not work around it. (`beagley_enable_qml_dev.sh`
 only checks for single quotes itself but calls the sync script, which
 validates.)
+
+**Capture-once trial / one-shot screenshot (`capture-once.env`).** On the
+current board `launch.sh` sources `$RUNTIME/capture-once.env` after its own
+exports and then **deletes it**, so the next restart reverts to the normal
+setup. It can override `BEAGLEY_QML_DEV_ROOT` / `BEAGLEY_QML_DEV_FILE` and set
+`BEAGLEY_SCREENSHOT_PATH`, `BEAGLEY_SCREENSHOT_DELAY_MS` and
+`BEAGLEY_SCREENSHOT_EXIT` (REPO: `src/main.cpp` implements the screenshot
+variables). This is the supported way to try a different QML root or take a
+screenshot (it is how the 2026-09-20 shots were taken), and it is much safer
+than a sync. Put trial QML in a **new directory under `/data`**, never in
+the live `source` directory, and write screenshots to `/data` too (root fs is
+nearly full, see section 6). Needs approval like any restart (rule 1).
+(VERIFIED (HW 2026-10-03), read-only; the hook is in the board's `launch.sh`,
+not in this repo.)
 
 ### 3.2 App restart (`beagley_cluster`)
 
@@ -239,9 +299,9 @@ sudoers rule**. The same applies to overlay and clock changes.
 4. Verify within 60 s: service `active`, no traceback in the journal, and the
    cluster on the BeagleY reconnects (`journalctl -u beagley_cluster` shows
    `VehicleStateClient connecting to ws://10.24.0.7:8765`).
-   `tools/bbb_hub/check_hub_health.py ... --require-gps` is added by PR #19.
+   `tools/bbb_hub/check_hub_health.py ... --require-gps` exists (added by PR #19, merged).
    Gauge behaviour while the hub is down or its sources are stale goes with two
-   PRs: PR #19 (stale sources publish 0.0 / fail-safe) and PR #23 (UI link-lost
+   PRs, both merged: PR #19 (stale sources publish 0.0 / fail-safe) and PR #23 (UI link-lost
    dashes and LINK LOST telltale). Read them together; the glass was not
    checked on hardware (**TO CONFIRM**, owner Cluster HMI/Engineer).
 5. A restart reloads `/etc/default/bbb-hardware-gps`. Env or unit edits also
@@ -272,11 +332,11 @@ Usage and what it synthesizes: `live_cluster_workflow.md` (REPO).
 
 Applies to the app/image (BeagleY) and the hub (BBB). Hub specifics are in the
 PR #19 docs (`bbb_deploy_rollback.md`, `bbb_deploy_plan_2026-10-03.md`,
-**not yet on the default branch**).
+now on the default branch).
 
 - [ ] **CI green** on the exact commit. Required check:
       `Configure + build (WITH_WEBENGINE=OFF)`. For hub changes also run
-      `python3 -m pytest tests -q` (Python CI arrives with PR #19/#20).
+      `python3 -m pytest tests -q` (Python CI is `contract-tests` in `diagnostic-replay-contracts.yml`, from PR #19/#20, merged).
 - [ ] **Source of truth clean**: commit is on `codex/maplibre-native-yocto-build`
       and pushed; `skills/cluster-source-truth/scripts/check.sh --strict` is
       clean.
@@ -374,7 +434,7 @@ Summary of PR #19 `bbb_deploy_rollback.md` / `bbb_deploy_plan_2026-10-03.md`
   REPO: `VehicleStateClient.cpp` auto-reconnects with backoff and has a stale
   watchdog, so the app keeps running and reconnects. What the glass shows with
   no hub is **not confirmed on hardware** (**TO CONFIRM**); owned by Cluster
-  HMI/Engineer (PR #23: link-lost dashes + LINK LOST telltale, merging).
+  HMI/Engineer (PR #23, merged: link-lost dashes + LINK LOST telltale; not in the binary currently on the board, see section 6).
 
 ### 5.3 Image / Yocto rollback (BeagleY)
 
@@ -478,7 +538,7 @@ elsewhere in this runbook. No secrets are recorded here.
 ### BeagleY (unchanged by this deploy)
 
 * Arago 2025.01; `beagley_cluster.service` active; `beagley-user-bg-upload.service` (:8787); app under
-  `/opt/beagley-cluster`. Running commit/tag: **UNKNOWN**.
+  `/opt/beagley-cluster`. Running commit: `1371e7f299fd` (2026-09-13 build, branch `development/drive-adaptive-feeds-20260913`, from the `[BUILD]` journal line), launched via `/data/beagley-cluster/runtime-hotspot-wifi-20260919/launch.sh`; see 3.1 and section 6.
 * Wi-Fi DHCP currently `192.168.1.111` on `VX220-9869`. It dropped off the network twice on 2026-10-03 (13:40-14:50
   and ~15:52 AEST); cause **UNKNOWN** (Chief of Staff owns Wi-Fi).
 
@@ -499,7 +559,7 @@ elsewhere in this runbook. No secrets are recorded here.
 * BeagleY Wi-Fi dropouts (above).
 * UNO TX is not wired, so serial inputs read 0 frames; fuel, coolant and rpm are uncalibrated; the UNO sketch pins are
   unverified on hardware.
-* No `can0` and no `can_signals.json` on the BBB (the CAN prep PR is in progress).
+* No `can0` and no `can_signals.json` on the BBB (the CAN prep work is merged in the repo, v0.2.0, but not deployed).
 
 ---
 
@@ -515,8 +575,10 @@ elsewhere in this runbook. No secrets are recorded here.
 | No CAN | No `can0`, no `can_signals.json` on the BBB. | **VERIFIED (HW 2026-10-03)** |
 | BBB deployed code is old | Not a git checkout, older than the repo. Repo behaviour and tests do not describe what runs. | **VERIFIED (HW 2026-10-03)** |
 | BeagleY unreachable from Elitebook | Likely Wi-Fi client isolation. Builds can still be done on the Elitebook, but pushing to the board goes via the Mac. | **VERIFIED (HW 2026-10-03)** |
-| BeagleY IP changes | DHCP. Hard-coded IPs in docs and skills (`192.168.0.92` etc.) are stale. | **VERIFIED (HW 2026-10-03)** |
+| BeagleY IP changes | DHCP. Drifted `192.168.1.100` (2026-09-20) -> `192.168.1.111` (2026-10-03). Hard-coded IPs in docs and skills (`192.168.0.92` etc.) are stale. | **VERIFIED (HW 2026-10-03)** |
 | Stale hub address | `192.168.0.x` hub values are hotspot-era. Canonical is `10.24.0.7`. The vehicle-hub repo `PROTOCOL.md` is legacy. | REPO (`docs/ENVIRONMENT.md`) |
+| Root fs 95% full | BeagleY `/dev/root`: 847.8 MB, 751.6 MB used, **35.5 MB free** (read 2026-10-03). `/opt` and `/etc` live there, so anything that writes to `/` (e.g. `/usr/bin` in a binary deploy) has very little headroom. `/var/volatile` is RAM. `/data` (mmcblk1p3) has 27.5 GB, 1.7 GB used, **24.4 GB free**: put runtimes, backups and screenshots on `/data`. | **VERIFIED (HW 2026-10-03)** |
+| Deployed binary is not the default branch | `$RUNTIME/bin/beagley_cluster` -> `/data/beagley-cluster/runtime-drive-adaptive-1371e7f299fd/bin/beagley_cluster`. Journal `[BUILD]`: branch `development/drive-adaptive-feeds-20260913`, commit `1371e7f299fd`, clean, built 2026-09-13T10:27:42Z. It is **not** built from `codex/maplibre-native-yocto-build`: `strings` finds no `linkLost` in it (PR #23's LINK LOST telltale and dashes cannot show with any QML) and it carries the older font set. Verifying fonts, link-lost or the dark map from the default branch needs a **new aarch64 binary** (Elitebook/CI) and a **binary deploy with a snapshot** (`skills/beagley-deploy/scripts/deploy.sh`, section 4), not a QML sync. | **VERIFIED (HW 2026-10-03)** |
 | `main` is unrelated history | Port changes by hand; do not merge across. `legacy-main-2026-10-03` branch exists. | REPO (`README.md`) |
 
 ---
@@ -544,8 +606,10 @@ elsewhere in this runbook. No secrets are recorded here.
 
 5. Image rollback: are previous release images retained, is there an A/B slot,
    what state survives a re-flash, who flashes? (5.3)
-6. Does the board's deployed binary support `BEAGLEY_QML_DEV_ROOT`? Where is
-   the master copy of `SkinShowOverride.qml`?
+6. ~~Does the board's deployed binary support `BEAGLEY_QML_DEV_ROOT`?~~
+   **Answered (VERIFIED (HW 2026-10-03)): yes**, the live display uses it, but
+   only with C++/fonts from the same build (3.1). Still open: where is the
+   master copy of `SkinShowOverride.qml`?
 7. Is `systemctl kill -s KILL beagley_cluster` the agreed way to clear a hung
    app? What caused the 2026-09-19 eglfs hang (MainV3/GirlGlass)?
 8. Current Elitebook address/name for the canonical build, and whether the
@@ -559,8 +623,7 @@ elsewhere in this runbook. No secrets are recorded here.
     BeagleY? (Only one board should be cabled at a time.)
 11. Wired `10.24.0.x` as a recovery path: it needs the BeagleY up; is there any use case when the BeagleY is the dead board?
 12. What does the glass show when the hub is down or sources are stale (PR #19 + PR #23 together)? Owner: Cluster HMI/Engineer.
-13. After PR #19 merges: update section 3.3/5.2 to point at the merged docs
-    and the hub health-check tool, and update the unit state (`Type=notify`).
+13. ~~After PR #19 merges: update 3.3/5.2~~ PR #19 is merged and the docs/tool exist; the unit is `Type=notify` on the board since the 2026-10-03 deploy. Remaining: re-read 3.3/5.2 against `docs/bbb_deploy_rollback.md` once more.
 
 ---
 

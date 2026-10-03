@@ -161,7 +161,6 @@ qt_add_resources(beagley_cluster app_font_resources
 set(BEAGLEY_QML_FILES
     src/ui/widgets/VehicleInfoCenter.qml
     src/ui/widgets/vic/VicWarningColors.qml
-    src/ui/widgets/vic/VicWarningHalo.qml
     src/ui/widgets/vic/OemTellTaleIcon.qml
     src/ui/widgets/vic/telltales/AtTempTelltale.qml
     src/ui/widgets/vic/telltales/BatteryTelltale.qml
@@ -206,9 +205,6 @@ set(BEAGLEY_QML_FILES
     src/ui/widgets/GaugeAtlasMagma.qml
     src/ui/widgets/GaugeAtlasRim.qml
     src/ui/widgets/MagmaAtlasOverlay.qml
-    src/ui/widgets/FuelPumpIcon.qml
-    src/ui/widgets/FuelGauge.qml
-    src/ui/widgets/SpeedoPearl.qml
     src/ui/widgets/TachGauge.qml
     src/ui/widgets/MatrixRain.qml
     src/ui/widgets/GaugeMatrixDepth.qml
@@ -217,10 +213,8 @@ set(BEAGLEY_QML_FILES
     src/ui/widgets/MapCenter.qml
     src/ui/widgets/MapCenterBootShell.qml
     src/ui/widgets/MapCenterMapLibreNative.qml
-    src/ui/widgets/MapLibreGaugeBackplate.qml
     src/ui/widgets/MapVehicleMarker.qml
     src/ui/widgets/WeatherCorners.qml
-    src/ui/widgets/WeatherMoodIcon.qml
     src/ui/widgets/BomCatalog.js
     src/ui/widgets/HighBeamHalo.qml
     src/ui/widgets/WiFiSetupOverlay.qml
@@ -269,7 +263,7 @@ qt_add_qml_module(beagley_cluster
 # RESOURCES land in the module resource tree at the same source-relative path as
 # the QML files (<module prefix>/src/ui/assets/skin-v2/..., whichever QTP0001
 # prefix applies), so the relative URL resolves in compiled builds as well as in qml-dev (filesystem).
-# Only referenced files are packaged: lava-strip.png is intentionally omitted.
+# Only referenced files are packaged.
 set(BEAGLEY_SKIN_V2_RESOURCES
     src/ui/assets/skin-v2/lava-annulus.png
     src/ui/assets/skin-v2/glass-rim.png

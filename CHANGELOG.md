@@ -7,6 +7,20 @@ follow [Semantic Versioning](https://semver.org/) (see [docs/RELEASING.md](docs/
 
 ## [Unreleased]
 
+### Removed
+- Cleanup (no behaviour change; every file was unreferenced by code, CMake, tests, scripts and docs): duplicate `docs/vision/atlas/*.png` (identical copies live in `src/ui/assets/skin-v2/`; `atlas-meta.txt` kept, README pointer added), `src/resources/web.qrc`, `src/ui/widgets/VehicleStateCoreAnimated.qml`, `src/ui/mock/`, the orphan old VIC icon/warning widgets (`vic/ATIcon`, `vic/VicWarningIcon`, `vic/VicWarningHalo`, `vic/icons/*` except `DriveStateIcon`, `vic/warnings/*`) and the unused `FuelGauge`, `FuelPumpIcon`, `SpeedoPearl`, `MapLibreGaugeBackplate` widgets (CMake `BEAGLEY_QML_FILES` and `widgets/qmldir` entries removed together).
+- Cleanup, second batch (approved by ThatGuy; every item re-verified unreferenced by code, CMake, tests and scripts): `docs/vision/captures/*.png`, `src/ui/assets/skin-v2/lava-strip.png`, `src/ui/skin-show-marker.png`, `src/qml.qrc`, `WeatherMoodIcon.qml`, `MainPanelTest.qml`, `tools/bom_proxy.sh`, `tools/mac_bom_proxy.py`, `tools/bbb_sim/`, `tools/beagley_gpu/package_release_bundle.sh`, `tools/perf/run_beagley_real_world_fps.sh`, `yocto/set-beagley-boot-mode-linux.sh`, skills `beagley-connect`, `beagley-gpu-diagnose`, `beagley-gpu-init`, `elitebook-connect`, `projects/fleet-atlas/` and its Pages workflow, and the Mac Docker builder scripts (`yocto/{run-mac-docker-build,check-mac-builder,watch-mac-build,mac-builder-common}.sh`). Everything remains in git history. Kept: `Main.qml`/`MainV2.qml` and the legacy gauges (still selected or used as fallback by `src/main.cpp`), the locked concept still, `assets/vic/svg/` and all licence records.
+- CI: dropped the dead `ui/slice1-map-hierarchy-quiet-chrome` push trigger from `ci.yml` and `checks.yml`.
+- Branch inventory with tip SHAs recorded in `docs/archive-branches-2026-10-03.md` before remote branch cleanup.
+
+### Fixed
+- Docs: runbook no longer lists merged PRs #19/#23 and the CAN prep work as pending; `docs/reimagined_cluster_v2.md` no longer claims `MainV2` is the default (code defaults to `MainV3`); removed `/Users/joshkomant/...` paths and example `192.168.0.x` IPs from docs and skill docs; known-debt notes updated for the removed QRC files.
+
+### Changed
+- Board runbook: section 3.1 now describes the live QML root (`<runtime>/source` under `/data`, launched by `launch.sh`), warns that `tools/ui` sync/enable scripts default to `/opt/beagley-cluster/qml-dev` and that pointing `--remote-root` at the live source deletes it, documents the `capture-once.env` one-shot method, answers open question 6, and adds known issues (root fs 95% full, deployed binary is the 2026-09-13 build, BeagleY IP drift). Docs only.
+
+## [0.2.0] - 2026-10-03
+
 ### Added
 - Hub: CAN prep without a car: OBD-II starter dictionary (`tools/bbb_hub/config/can_signals.obd2_example.json`, example only, unverified), additive optional `when` multiplexer in `can_signals.json` (needed for OBD-II PIDs sharing `0x7E8`), pure-Python fake SocketCAN (`tools/bbb_hub/fake_can.py`, `SocketCanSignalSource(socket_factory=...)`), `vcan0` test when available, `docs/can_bus_parts_and_wiring.md`. Fix: CAN log replay (`CAN_RAW_LOG`) was always treated as stale by the hub and never applied.
 - Hub: fake UNO tool (`tools/bbb_hub/fake_uno.py`), fake-UNO calibration end-to-end tests against the real hub, `docs/uno_bench_setup.md`.
@@ -25,8 +39,7 @@ follow [Semantic Versioning](https://semver.org/) (see [docs/RELEASING.md](docs/
 ## History before this changelog (reconstructed, informal)
 
 This section was reconstructed from `git log` and merged PRs #1–#10 on the default branch
-`codex/maplibre-native-yocto-build`; it is a summary, not an exact release record. No versioned release has
-been cut yet.
+`codex/maplibre-native-yocto-build`; it is a summary, not an exact release record. The first versioned release is 0.2.0 (above).
 
 ### 2026-10 (PRs #6–#10)
 - #10 Phase 1 vehicle-state port: `VehicleStateSource` base class, C++ mock, `BEAGLEY_VEHICLE_BACKEND`

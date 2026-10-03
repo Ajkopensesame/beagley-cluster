@@ -116,7 +116,7 @@ You can also override with the `BEAGLEY_TARGETS`, `BEAGLEY_HOST`, `BEAGLEY_HOST_
 ## Known debt
 
 1. **Dual assets** — both `assets/` and `src/assets/` exist; packaging/source-of-truth is unclear.
-2. **Legacy QRC** — `src/qml.qrc` is not wired into the current `qt_add_*` build path.
+2. ~~**Legacy QRC**~~ — `src/qml.qrc` and `src/resources/web.qrc` were removed (2026-10 cleanup).
 3. **web/test scratch** — `src/ui/web/test/` is gitignored for local experiments and is not part of the build.
 4. ~~**`.bak` files**~~ — untracked and gitignored (`*.bak`, `*.bak.*`).
 
@@ -124,11 +124,11 @@ Do not drive-by refactor these in unrelated PRs — see [CONTRIBUTING.md](CONTRI
 
 ## CI
 
-GitHub Actions `.github/workflows/ci.yml` runs on every pull request and on push to `main`, `ui/slice1-map-hierarchy-quiet-chrome` and `codex/maplibre-native-yocto-build`:
+GitHub Actions `.github/workflows/ci.yml` runs on every pull request and on push to `main` and `codex/maplibre-native-yocto-build`:
 
 - **Build job** (ubuntu-22.04, Qt **6.6.3** via `jurplel/install-qt-action`, module `qtwebsockets` only, **no** WebEngine): **configure** (`-DWITH_WEBENGINE=OFF`) and **build** are both required steps (hard gate, no `continue-on-error`).
 
-Other workflows cover the diagnostic replay contracts (`tools/bbb_hub`, `tests`) and the fleet-atlas Pages deploy.
+Another workflow covers the diagnostic replay contracts (`tools/bbb_hub`, `tests`).
 
 `.github/workflows/checks.yml` adds **non-required** jobs: `Lint: shellcheck (severity=error)`, `Lint: ruff (hard errors)` (config: `ruff.toml`) and an informational `Lint: qmllint (informational)`.
 

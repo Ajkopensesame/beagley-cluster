@@ -9,18 +9,13 @@ MediaCornerWidget 1.0 MediaCornerWidget.qml
 MapMenuCornerWidget 1.0 MapMenuCornerWidget.qml
 GaugeArcHead 1.0 GaugeArcHead.qml
 GaugeLensShell 1.0 GaugeLensShell.qml
-MapLibreGaugeBackplate 1.0 MapLibreGaugeBackplate.qml
 MapVehicleMarker 1.0 MapVehicleMarker.qml
 MatrixRain    1.0 MatrixRain.qml
-SpeedoPearl   1.0 SpeedoPearl.qml
-FuelGauge    1.0 FuelGauge.qml
 WeatherCorners 1.0 WeatherCorners.qml
-WeatherMoodIcon 1.0 WeatherMoodIcon.qml
 MapCenterMapLibreNative 1.0 MapCenterMapLibreNative.qml
 WiFiSetupOverlay 1.0 WiFiSetupOverlay.qml
 
 OemIcon 1.0 OemIcon.qml
-FuelPumpIcon 1.0 FuelPumpIcon.qml
 GaugeMatrixDepth 1.0 GaugeMatrixDepth.qml
 TwinMicroArcs 1.0 TwinMicroArcs.qml
 DialChrome 1.0 DialChrome.qml

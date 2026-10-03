@@ -39,11 +39,11 @@ On your dev machine:
 
 ```bash
 # Preferred when Ethernet is up:
-scp /Users/joshkomant/projects/beagley-cluster/tools/beagley_wifi/setup_wifi.sh debian@10.24.0.46:/tmp/
+scp tools/beagley_wifi/setup_wifi.sh debian@10.24.0.46:/tmp/
 ssh debian@10.24.0.46
 
 # Recovery path if Ethernet is broken:
-# scp /Users/joshkomant/projects/beagley-cluster/tools/beagley_wifi/setup_wifi.sh debian@192.168.7.2:/tmp/
+# scp tools/beagley_wifi/setup_wifi.sh debian@192.168.7.2:/tmp/
 # ssh debian@192.168.7.2
 
 sudo bash /tmp/setup_wifi.sh \
@@ -143,7 +143,7 @@ Gateway-mode contract:
 - Maintain an **ordered known list** of saved hotspots instead of one active hotspot at a time.
 - Keep the BeagleY Linux hostname stable as `beagley-ai`; use router lease labels
   `beagley-ai-eth` and `beagley-ai-wifi` for the two modem entries.
-- Reserve both modem-side identities:
+- Reserve both modem-side identities (historical Telstra-era values; the board is now plain DHCP, e.g. `192.168.1.111` on 2026-10-03, so always re-discover the IP, see `BOARD_RUNBOOK.md`):
   `c0:d6:0a:f9:55:1c -> 192.168.0.46` for Ethernet and
   `10:ca:bf:d6:34:1a -> 192.168.0.92` for Wi-Fi.
 - Local tooling should try BeagleY SSH targets in this order:

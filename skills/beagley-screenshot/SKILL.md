@@ -37,7 +37,7 @@ skills/beagley-screenshot/scripts/capture.sh --wifi-password
 Use a known target:
 
 ```bash
-skills/beagley-screenshot/scripts/capture.sh --host root@192.168.0.92 --wifi-signup
+skills/beagley-screenshot/scripts/capture.sh --host root@<beagley-ip> --wifi-signup
 ```
 
 ## Workflow
