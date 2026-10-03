@@ -23,6 +23,8 @@ Window {
     Theme.PurplePearlTheme {
         id: appTheme
         isNight: root.menuDarkChrome
+        // Skin v2: map veil + purple rails follow the (dark) underlay, not day/night chrome
+        mapUnderlayDark: root.mapUnderlayDark
     }
     Settings {
         id: clusterUiSettings
@@ -135,8 +137,9 @@ Window {
         && BEAGLEY_MAPLIBRE_NATIVE_ALLOW_UNTESTED_STYLES
     readonly property bool mapLibreNativeStyleOverrideActive: mapLibreNativeStyleOverride.length > 0
         && !clusterUiSettings.mapThemeUserSelected
-        // Slice 4: night product chrome prefers dark MapLibre theme style over bright env override
-        && !(menuDarkChrome && !mapThemeChosenThisSession)
+        // Skin v2: product map is dark nav regardless of auto day/night chrome (the board env
+        // style is bright "positron"); only a map theme picked this session overrides it
+        && mapThemeChosenThisSession
     readonly property bool mapLibreNativeStyleTrusted: mapLibreStyleTrusted(activeMapStyleUrl)
     readonly property string effectiveMapRenderer: {
         if (!mapLibreNativeRequested)
@@ -622,9 +625,10 @@ Window {
         && String(activeMapThemeOption.styleUrl || "").length > 0
     readonly property string openFreeMapDarkStyleUrl: "https://tiles.openfreemap.org/styles/dark"
     readonly property string activeMapStyleUrl: {
-        // Slice 4: night + maplibre-native → trusted dark MapLibre (readable product underlay)
-        if (mapLibreNativeRequested && menuDarkChrome && !mapThemeChosenThisSession
-                && !isBrightMapTheme(clusterUiSettings.mapTheme)) {
+        // Skin v2: maplibre-native → trusted dark MapLibre underlay (day or night) until the
+        // user picks a map theme this session. Regression at 6156465: this required
+        // menuDarkChrome, so daytime "auto" chrome fell through to the env positron (light grey).
+        if (mapLibreNativeRequested && !mapThemeChosenThisSession) {
             const darkOpt = mapThemeOption("dark")
             const darkUrl = String((darkOpt && darkOpt.styleUrl) || openFreeMapDarkStyleUrl).trim()
             if (darkUrl.length > 0)
@@ -634,13 +638,16 @@ Window {
             return mapLibreNativeStyleOverride
         if (activeMapThemeUsesMapLibre)
             return String(activeMapThemeOption.styleUrl || "")
-        if (mapLibreNativeRequested && menuDarkChrome) {
+        if (mapLibreNativeRequested) {
             const fallbackDark = String(openFreeMapDarkStyleUrl).trim()
             if (fallbackDark.length > 0)
                 return fallbackDark
         }
         return ""
     }
+    readonly property bool mapUnderlayDark: String(activeMapStyleUrl || "").indexOf("/styles/dark") >= 0
+        || (String(activeMapStyleUrl || "").length === 0
+            && String(activeMapThemeOption.id || "") === "dark")
     readonly property real activeMapMaxZoom: mapLibreNativeRequested && activeMapThemeUsesMapLibre
         ? Math.min(Number(activeMapThemeOption.maxZoom || 19), mapLibreNativeMaxZoom)
         : Number(activeMapThemeOption.maxZoom || 19)
@@ -778,8 +785,7 @@ Window {
         // Night/product chrome beats a sticky bright map from prior sessions.
         // A map chosen this session (selectMapTheme) still wins until reboot.
         // Slice 4: prefer MapLibre-backed dark theme so the center map stays a readable product.
-        if (!root.menuDarkChrome)
-            return
+        // Skin v2: applies day and night (dark nav is the product map); session choice still wins.
         if (root.mapThemeChosenThisSession)
             return
         if (!root.isBrightMapTheme(clusterUiSettings.mapTheme)
@@ -1855,7 +1861,7 @@ Window {
                 anchors.top: parent.top
                 anchors.bottom: parent.bottom
                 width: root.mapLibreSafeSideInset
-                color: root.color
+                color: appTheme.mapDarkTokens ? appTheme.deepBlackNight : root.color
             }
 
             Rectangle {
@@ -1863,7 +1869,7 @@ Window {
                 anchors.top: parent.top
                 anchors.bottom: parent.bottom
                 width: root.mapLibreSafeSideInset
-                color: root.color
+                color: appTheme.mapDarkTokens ? appTheme.deepBlackNight : root.color
             }
 
             Rectangle {
@@ -1871,7 +1877,7 @@ Window {
                 anchors.right: parent.right
                 anchors.top: parent.top
                 height: root.mapLibreSafeVerticalInset
-                color: root.color
+                color: appTheme.mapDarkTokens ? appTheme.deepBlackNight : root.color
             }
 
             Rectangle {
@@ -1879,7 +1885,7 @@ Window {
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
                 height: root.mapLibreSafeVerticalInset
-                color: root.color
+                color: appTheme.mapDarkTokens ? appTheme.deepBlackNight : root.color
             }
         }
 
@@ -2149,7 +2155,7 @@ Window {
                 onPaint: {
                     const ctx = getContext("2d")
                     ctx.clearRect(0, 0, width, height)
-                    ctx.fillStyle = root.color
+                    ctx.fillStyle = appTheme.mapDarkTokens ? appTheme.deepBlackNight : root.color
                     ctx.fillRect(0, 0, width, height)
                     ctx.globalCompositeOperation = "destination-out"
                     ctx.beginPath()
@@ -2169,7 +2175,7 @@ Window {
                 onPaint: {
                     const ctx = getContext("2d")
                     ctx.clearRect(0, 0, width, height)
-                    ctx.fillStyle = root.color
+                    ctx.fillStyle = appTheme.mapDarkTokens ? appTheme.deepBlackNight : root.color
                     ctx.fillRect(0, 0, width, height)
                     ctx.globalCompositeOperation = "destination-out"
                     ctx.beginPath()
@@ -2189,7 +2195,7 @@ Window {
                 onPaint: {
                     const ctx = getContext("2d")
                     ctx.clearRect(0, 0, width, height)
-                    ctx.fillStyle = root.color
+                    ctx.fillStyle = appTheme.mapDarkTokens ? appTheme.deepBlackNight : root.color
                     ctx.fillRect(0, 0, width, height)
                     ctx.globalCompositeOperation = "destination-out"
                     ctx.beginPath()
@@ -2209,7 +2215,7 @@ Window {
                 onPaint: {
                     const ctx = getContext("2d")
                     ctx.clearRect(0, 0, width, height)
-                    ctx.fillStyle = root.color
+                    ctx.fillStyle = appTheme.mapDarkTokens ? appTheme.deepBlackNight : root.color
                     ctx.fillRect(0, 0, width, height)
                     ctx.globalCompositeOperation = "destination-out"
                     ctx.beginPath()
