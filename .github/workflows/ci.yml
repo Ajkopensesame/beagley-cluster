@@ -13,7 +13,7 @@ jobs:
     name: Configure + build (WITH_WEBENGINE=OFF)
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Ninja
         run: sudo apt-get update && sudo apt-get install -y ninja-build
