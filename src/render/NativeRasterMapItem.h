@@ -112,7 +112,7 @@ private:
     double m_vehicleBearing = 0.0;
     bool m_vehicleVisible = true;
     QVariantList m_routePath;
-    QString m_tileUrlTemplate = QStringLiteral("https://tile.openstreetmap.org/{z}/{x}/{y}.png");
+    QString m_tileUrlTemplate; // default set in the constructor from ClusterConfig::mapTileUrl()
     bool m_darkenTiles = false;
     QString m_userAgent = QStringLiteral("BeagleyCluster/1.0");
     QString m_cacheDirectory;
