@@ -1,4 +1,4 @@
-# BBB deploy plan (DRAFT, NOT EXECUTED): hub update, UART4 overlay, clock fix
+# BBB deploy plan (DRAFT, NOT EXECUTED): hub update, UART4 overlay, GPS clock fix
 
 Written by Hardware Integration from the read-only audit of 2026-10-03. **Nothing here has been run.** Each stage
 needs separate approval from Cluster Lead / ThatGuy. Companion docs: `docs/bbb_deploy_rollback.md` (generic procedure),
@@ -61,23 +61,35 @@ Approval needed: (c). Hardware first: UNO TX -> 1k/2k divider -> **P9_11**, comm
 6. Verify with the UNO sending: `check_hub_health.py ... --require-serial`; `python3 tools/bbb_hub/sample_sensor_raw.py` shows `raw` a0/a1; frames count rises in `_health.serialVehicleInputs`.
 7. **Rollback:** restore `/boot/uEnv.txt` from the backup, restore env file, `sudo reboot`. (UART2 stays enabled in the original config so the old state returns exactly.)
 
-## Stage 3: clock fix
+## Clock fix from GPS time (this section's "Stage 3" is `bbb_stage.sh stage2`; script and doc numbering differ)
 
 Approval needed: (d). Problem: the BBB has no battery-backed RTC (RTC reads 2000-01-01) and its link to the BeagleY has no internet, so it boots with a stale
-clock and NTP cannot sync. Wrong time poisons journal and fault-recorder timestamps (and any time-based baseline logic).
+clock and NTP cannot sync. Wrong time poisons journal, fault-recorder and baseline timestamps.
 
-| Option | How | Pros | Cons |
-|---|---|---|---|
-| A. BeagleY serves time over eth0 (chrony) | BeagleY: chrony with `allow 10.24.0.0/24`, `local stratum 10` fallback; BBB: chrony/timesyncd with `server 10.24.0.46 iburst` | Simple, no code, reuses the cable | BeagleY itself only has true time when on Wi-Fi/internet or if it has its own RTC; in the car with no internet both are wrong |
-| B. GPS time on the BBB | The hub already reads NMEA on UART1; add a small step that sets/serves time from `$GPRMC/ZDA`: either gpsd + chrony SHM, or hub feeds chrony's SHM refclock (code change + PR) | Correct time anywhere with sky view, no internet | Needs code + testing; gpsd would fight the hub for `/dev/ttyS1`, so prefer the hub feeding chrony; first fix after cold start can take minutes |
-| C. Hardware RTC (DS3231 on I2C) with coin cell | Add module, overlay, `hwclock` at boot | Time survives power-off | Hardware work; I2C2 shares pins with DCAN0 |
+**Decision (ThatGuy / Cluster Lead): option B, fix the clock from GPS time. No chrony, no new service on the BeagleY.**
 
-**Recommendation:** do A first (low risk, ~30 min, makes BeagleY and BBB agree and fixes timestamps whenever the BeagleY is online), then B as a follow-up PR so
-the BBB is correct in the car without internet and can also serve time to the BeagleY. C only if power-off drift matters.
+| Option | Verdict | Why |
+|---|---|---|
+| A. BeagleY serves time over eth0 (chrony) | **Impossible** | The BeagleY image has no chrony and no ntpd, no package manager, and only `systemd-timesyncd` (a client, not a server). Even with chrony it would only have true time when online. |
+| **B. GPS time on the BBB** | **CHOSEN** | The hub already reads NMEA on `/dev/ttyS1` (gpsd cannot share that port), so the hub publishes RMC-derived UTC as `gps.utcMs`/`gps.utcValid` on its WebSocket and a small helper, `tools/bbb_hub/gps_clock.py` (service `bbb-gps-clock`), steps the clock from it. Correct time anywhere with sky view, no internet, nothing on the BeagleY. |
+| A2 / A3 (other BeagleY- or network-sourced time variants) | Not chosen | Same dependency on the BeagleY having true time, which it only has when online. |
+| C. Hardware RTC (DS3231 on I2C) with coin cell | Still a hardware add-on | Would let the time survive power-off (GPS needs a fix after every cold boot, indoors there is none). Not needed for B to work. I2C2 shares pins with DCAN0. |
 
-Option A steps (sketch, all `sudo`): BeagleY: `apt`/opkg chrony present? (**TO CONFIRM** on the BeagleY image) then `allow 10.24.0.0/24` in chrony.conf and restart chrony.
-BBB: `printf "[Time]\nNTP=10.24.0.46\n" > /etc/systemd/timesyncd.conf.d/beagley.conf; systemctl restart systemd-timesyncd; timedatectl timesync-status`.
-Verify: `timedatectl` says `System clock synchronized: yes` and `date` is correct. **Rollback:** delete the drop-in file and restart timesyncd.
+How it works: `bbb-gps-clock.service` runs as `debian` (no root) with only `CAP_SYS_TIME` (`AmbientCapabilities`/`CapabilityBoundingSet`, `NoNewPrivileges=yes`),
+connects to `ws://127.0.0.1:8765`, waits for 5 consecutive frames with `gps.utcValid` true and >= 4 satellites, and if the clock is off by more than 1 s calls
+`clock_settime` once and logs `[gps_clock] stepped clock by +X s to <ISO UTC>`. It re-checks at most every 10 minutes. GPS dates before 2026-01-01 or after 2040-01-01 are
+rejected. Held, stale or invalid fixes are never used. Until the first fix (cold start, indoors) the clock stays wrong; that is expected.
+
+Steps (all via `bbb_stage.sh stage2`, which needs stage 1 done with a release that contains `gps_clock.py`):
+
+1. Mac script checks (read-only) that `releases/current/tools/bbb_hub/gps_clock.py` exists, shows the existing units and runs `gps_clock.py --once --dry-run` on the BBB (no `sudo`, sets nothing).
+2. You type `yes`; the script runs `sudo bash bbb_apply.sh stage2` (you type the `debian` sudo password). It records state in `/home/debian/rollback/stage2-*/state.txt`,
+   renders the unit with the path `/home/debian/releases/current/tools/bbb_hub`, installs `/etc/systemd/system/bbb-gps-clock.service`, `daemon-reload`, `systemctl enable --now bbb-gps-clock`.
+3. It waits up to 120 s for a `stepped clock` line (or the helper's `no step` line when the clock was already right). **No GPS fix yet is not a failure:** it prints that the service is installed and will set the clock when a fix arrives.
+4. Check later: `date; journalctl -u bbb-gps-clock -n 20 --no-pager`.
+
+**Rollback:** `bash bbb_stage.sh rollback2` (`systemctl disable --now bbb-gps-clock; rm` the unit; `daemon-reload`). The clock keeps whatever time it has.
+The hub is not restarted by this stage; restart it (or reboot) later if you want the baseline/transition-monitor files stamped with the corrected date (see the `time.time()` audit in the PR).
 Do not change the BeagleY Wi-Fi/networkd config; Chief of Staff owns it.
 
 ## Stage 4 (later): CAN0
@@ -87,5 +99,5 @@ Do not change the BeagleY Wi-Fi/networkd config; Chief of Staff owns it.
 
 ## Suggested order and time
 
-Stage 1 (45 min incl. dry run) -> Stage 3A (30 min) -> Stage 2 (45 min, needs the UNO wired) -> later Stage 3B and 4.
+Stage 1 (45 min incl. dry run) -> clock fix (`bbb_stage.sh stage2`, ~5 min) -> UART4 (`bbb_stage.sh stage3`, 30 min) -> UNO wired (this doc's Stage 2) -> later CAN (Stage 4).
 Each stage ends with `check_hub_health.py` and a note of the new baseline.

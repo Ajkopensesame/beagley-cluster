@@ -26,6 +26,30 @@ Switching the UNO input is configuration only (no code change): enable the UART 
 Both steps are board changes and need approval (`docs/bbb_deploy_rollback.md`). Serial line format:
 `docs/serial_vehicle_input_protocol.md`.
 
+## GPS time (system clock)
+
+The BBB has no battery RTC and no internet on its only link, so after every boot its clock is wrong until
+something sets it. The GPS is the only time source, and `/dev/ttyS1` cannot be shared with gpsd, so the hub
+publishes the time and a small helper applies it:
+
+* Hub (`gps_nmea.py`): `gps.utcMs` / `gps.utcValid` in every `vehicle_state` frame. They come **only** from an
+  RMC sentence with status `A`, a valid `hhmmss` time and a valid `ddmmyy` date (year >= 2026), advanced by
+  monotonic time since receipt. `utcValid` is false for GGA-only data, status `V`, bad dates, stale or held
+  fixes and when the RMC UTC is older than 5 s. The existing `gps.timestampMs` is unchanged (for GGA it still
+  takes the date from the wall clock, so it can be wrong while the clock is wrong).
+* Helper (`tools/bbb_hub/gps_clock.py`, service `bbb-gps-clock`, runs as `debian` with only `CAP_SYS_TIME`):
+  needs 5 consecutive valid frames with >= 4 satellites, then steps the clock if it is off by more than 1 s,
+  re-checking at most every 10 minutes. Dates outside 2026-01-01..2040-01-01 are rejected. Expect accuracy
+  within roughly a second (serial and WebSocket latency), which is plenty for logs and timestamps.
+* The clock stays wrong until the first fix after power-up (cold start can take minutes; indoors there is none).
+  A coin-cell RTC module would be a hardware add-on if time must survive power-off.
+
+Check on the BBB: `date; journalctl -u bbb-gps-clock -n 20 --no-pager` (look for `stepped clock by ...`), and
+without changing anything: `python3 /home/debian/releases/current/tools/bbb_hub/gps_clock.py --once --dry-run`
+(exit 0 clock right, 10 clock off, 2 no usable GPS time, 3 hub unreachable). Overrides (optional, in
+`/etc/default/bbb-gps-clock`): `GPS_CLOCK_HUB_URL`, `GPS_CLOCK_STEP_THRESHOLD_S`, `GPS_CLOCK_RECHECK_S`,
+`GPS_CLOCK_DRY_RUN=1`. Deploy: `tools/bbb_hub/deploy/` (`bbb_stage.sh stage2`).
+
 ## UNO <-> BBB wiring safety
 
 * **Levels.** BBB GPIO is 3.3 V and **not 5 V tolerant**; the UNO drives 5 V. UNO TX -> BBB RX needs level shifting.

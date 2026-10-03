@@ -1,0 +1,31 @@
+[Unit]
+Description=BBB system clock from GPS time (reads the hub's WebSocket; no RTC, no internet on this link)
+# The hub owns the GPS serial port; this helper only talks to it over ws://127.0.0.1:8765.
+After=bbb-hardware-gps.service
+Wants=bbb-hardware-gps.service
+# Appliance: never give up restarting.
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=debian
+Group=debian
+# Least privilege: runs as debian (no root, no sudo). The ONLY capability is CAP_SYS_TIME, needed for
+# clock_settime(CLOCK_REALTIME). With a non-root User=, AmbientCapabilities is what makes it effective.
+AmbientCapabilities=CAP_SYS_TIME
+CapabilityBoundingSet=CAP_SYS_TIME
+NoNewPrivileges=yes
+Environment=PYTHONUNBUFFERED=1
+# Optional overrides: GPS_CLOCK_HUB_URL, GPS_CLOCK_STEP_THRESHOLD_S, GPS_CLOCK_RECHECK_S, GPS_CLOCK_DRY_RUN=1
+EnvironmentFile=-/etc/default/bbb-gps-clock
+# Same path convention as bbb-hardware-gps.service; the deploy script rewrites it to /home/debian/releases/current.
+ExecStart=/usr/bin/python3 /home/debian/projects/beagley-cluster/tools/bbb_hub/gps_clock.py
+Restart=always
+RestartSec=5
+LogRateLimitIntervalSec=30s
+LogRateLimitBurst=200
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

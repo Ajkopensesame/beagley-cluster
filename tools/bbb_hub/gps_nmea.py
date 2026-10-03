@@ -112,6 +112,43 @@ def _timestamp_from_fields(
     return int(calendar.timegm(dt.utctimetuple()) * 1000 + dt.microsecond / 1000)
 
 
+# RMC-derived UTC sanity floor and freshness window (see NmeaGpsState / build_hardware_gps_payload).
+RMC_UTC_MIN_YEAR = 2026
+RMC_UTC_MAX_AGE_S = 5.0
+
+
+def _rmc_utc_epoch(time_field: str, date_field: str) -> Optional[float]:
+    """UTC epoch seconds from an RMC hhmmss(.sss) + ddmmyy pair, or None if either is missing/invalid.
+
+    Unlike _timestamp_from_fields this NEVER falls back to the wall clock: the BBB has no RTC and its
+    wall clock can be months off, so a date taken from it would be meaningless for setting the clock.
+    """
+    time_field = (time_field or "").strip()
+    date_field = (date_field or "").strip()
+    if len(time_field) < 6 or len(date_field) != 6 or not date_field.isdigit():
+        return None
+    if not time_field[0:4].isdigit():
+        return None
+    try:
+        hour = int(time_field[0:2])
+        minute = int(time_field[2:4])
+        sec_float = float(time_field[4:])
+        day = int(date_field[0:2])
+        month = int(date_field[2:4])
+        year = 2000 + int(date_field[4:6])
+    except ValueError:
+        return None
+    if not (0 <= hour <= 23 and 0 <= minute <= 59 and 0.0 <= sec_float < 60.0):
+        return None
+    if year < RMC_UTC_MIN_YEAR or not (1 <= month <= 12) or not (1 <= day <= 31):
+        return None
+    try:
+        base = datetime(year, month, day, hour, minute, 0, tzinfo=timezone.utc)
+    except ValueError:  # e.g. 31 Feb
+        return None
+    return base.timestamp() + sec_float
+
+
 def _estimate_accuracy_m(hdop: Optional[float], default_accuracy_m: float) -> float:
     if hdop is None or hdop <= 0.0:
         return default_accuracy_m
@@ -133,6 +170,11 @@ class GpsSample:
     received_monotonic: float
     # True when fix_valid is only the short fix-hold (no live fix); speed is then the last known value.
     held: bool = False
+    # RMC-only UTC (status A + valid time + valid date), as epoch seconds, and the monotonic instant it was
+    # received. None when no trustworthy RMC UTC is known. Independent of timestamp_ms (which may use the
+    # wall-clock date for GGA sentences).
+    rmc_utc_epoch: Optional[float] = None
+    rmc_utc_monotonic: Optional[float] = None
 
 
 @dataclass
@@ -173,6 +215,8 @@ class NmeaGpsState:
         self._last_received_monotonic = 0.0
         self._last_valid_sample: Optional[GpsSample] = None
         self._last_valid_monotonic = 0.0
+        self._rmc_utc_epoch: Optional[float] = None
+        self._rmc_utc_monotonic: Optional[float] = None
 
     def _raw_fix_valid(self) -> bool:
         if self._lat is None or self._lng is None:
@@ -201,6 +245,8 @@ class NmeaGpsState:
             satellites=self._satellites,
             source="hardware",
             received_monotonic=received_monotonic,
+            rmc_utc_epoch=self._rmc_utc_epoch,
+            rmc_utc_monotonic=self._rmc_utc_monotonic,
         )
 
     def _build_held_sample(self, received_monotonic: float) -> Optional[GpsSample]:
@@ -223,6 +269,8 @@ class NmeaGpsState:
             source=sample.source,
             received_monotonic=received_monotonic,
             held=True,
+            rmc_utc_epoch=sample.rmc_utc_epoch,
+            rmc_utc_monotonic=sample.rmc_utc_monotonic,
         )
 
     def _build_sample(self, received_monotonic: float) -> GpsSample:
@@ -274,6 +322,14 @@ class NmeaGpsState:
             else:
                 self._course_present = False
 
+            rmc_utc = (
+                _rmc_utc_epoch(fields[1] if len(fields) > 1 else "", fields[9] if len(fields) > 9 else "")
+                if status == "A"
+                else None
+            )
+            # Any RMC that is not A + valid time + valid date withdraws the UTC (never keep an older one).
+            self._rmc_utc_epoch = rmc_utc
+            self._rmc_utc_monotonic = received_monotonic if rmc_utc is not None else None
             self._timestamp_ms = _timestamp_from_fields(
                 fields[1] if len(fields) > 1 else "",
                 fields[9] if len(fields) > 9 else "",
@@ -453,6 +509,7 @@ def build_hardware_gps_payload(
     *,
     stale: bool,
     now_ms: Optional[int] = None,
+    now_monotonic: Optional[float] = None,
 ) -> dict:
     now_ms = int(time.time() * 1000) if now_ms is None else now_ms
     payload = {
@@ -464,8 +521,37 @@ def build_hardware_gps_payload(
         "speedKph": sample.speed_kph if sample is not None else 0.0,
         "headingReliable": bool(sample is not None and sample.heading_reliable and not stale),
     }
+    # Additive: GPS UTC for the clock helper (tools/bbb_hub/gps_clock.py). Do not derive from timestampMs.
+    utc_ms, utc_valid = _utc_fields(sample, stale=stale, now_monotonic=now_monotonic)
+    payload["utcMs"] = utc_ms
+    payload["utcValid"] = utc_valid
     if sample is not None and sample.fix_valid and not stale and sample.lat is not None:
         payload["lat"] = sample.lat
     if sample is not None and sample.fix_valid and not stale and sample.lng is not None:
         payload["lng"] = sample.lng
     return payload
+
+
+def _utc_fields(
+    sample: Optional[GpsSample],
+    *,
+    stale: bool,
+    now_monotonic: Optional[float] = None,
+) -> tuple[int, bool]:
+    """(utcMs, utcValid): RMC-derived UTC advanced by monotonic time since it was received.
+
+    utcValid is true only while the fix is valid, not stale, not a held fix, and the RMC UTC is
+    at most RMC_UTC_MAX_AGE_S old. utcMs is 0 when no RMC UTC is known.
+    """
+    if sample is None or sample.rmc_utc_epoch is None or sample.rmc_utc_monotonic is None:
+        return 0, False
+    now_mono = time.monotonic() if now_monotonic is None else now_monotonic
+    age_s = max(0.0, now_mono - sample.rmc_utc_monotonic)
+    utc_ms = int(round((sample.rmc_utc_epoch + age_s) * 1000.0))
+    valid = bool(
+        sample.fix_valid
+        and not stale
+        and not sample.held
+        and age_s <= RMC_UTC_MAX_AGE_S
+    )
+    return utc_ms, valid

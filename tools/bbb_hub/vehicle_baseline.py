@@ -425,12 +425,19 @@ class VehicleBaselineMonitor:
         self.models = [VehicleBaselineModel(profile) for profile in profiles]
         self._learned_since_save = 0
         self._last_save_time = 0.0
+        # Steady time base (wall at start + monotonic elapsed): a one-off wall-clock step by bbb-gps-clock
+        # must not expire the anomaly window or stall the save-interval check.
+        self._wall_anchor = time.time()
+        self._mono_anchor = time.monotonic()
         self._writes = 0
         self._last_error: str | None = None
         self._load()
 
+    def _steady_now(self) -> float:
+        return self._wall_anchor + (time.monotonic() - self._mono_anchor)
+
     def observe(self, state: dict[str, Any], timestamp: float | None = None) -> dict[str, Any]:
-        now = time.time() if timestamp is None else timestamp
+        now = self._steady_now() if timestamp is None else timestamp
         if not self.enabled:
             return {"enabled": False, "ok": True, "findings": []}
         findings: list[dict[str, Any]] = []
@@ -478,7 +485,7 @@ class VehicleBaselineMonitor:
             tmp_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
             tmp_path.replace(self.storage_path)
             self._learned_since_save = 0
-            self._last_save_time = time.time()
+            self._last_save_time = self._steady_now()
             self._writes += 1
             self._last_error = None
         except OSError as exc:

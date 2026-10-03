@@ -8,6 +8,7 @@ follow [Semantic Versioning](https://semver.org/) (see [docs/RELEASING.md](docs/
 ## [Unreleased]
 
 ### Added
+- Hub: GPS-disciplined clock. New additive `gps.utcMs`/`gps.utcValid` (RMC-only UTC) and `tools/bbb_hub/gps_clock.py` + `bbb-gps-clock.service` (runs as `debian` with `CAP_SYS_TIME` only) that steps the BBB clock from GPS time via the hub WebSocket; staged deploy scripts under `tools/bbb_hub/deploy/` (supersedes #29). Hub bench waveform and the baseline/transition monitors no longer depend on wall-clock continuity.
 - Hub: GPS-first speed with pulse fallback (`VEHICLE_SPEED_SOURCE`, `_health.speedSource`); UNO bench-test checklist; `firmware/uno_vehicle_input` sketch.
 - Board runbook: recorded BBB access path, missing BeagleY NTP daemon, BBB clock status and GPS-first speed links (`docs/BOARD_RUNBOOK.md`).
 - `THIRD_PARTY_NOTICES.md` inventory of bundled/third-party components and open licence questions.
