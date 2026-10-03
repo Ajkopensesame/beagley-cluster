@@ -7,6 +7,9 @@ follow [Semantic Versioning](https://semver.org/) (see [docs/RELEASING.md](docs/
 
 ## [Unreleased]
 
+### Changed
+- Board runbook: section 3.1 now describes the live QML root (`<runtime>/source` under `/data`, launched by `launch.sh`), warns that `tools/ui` sync/enable scripts default to `/opt/beagley-cluster/qml-dev` and that pointing `--remote-root` at the live source deletes it, documents the `capture-once.env` one-shot method, answers open question 6, and adds known issues (root fs 95% full, deployed binary is the 2026-09-13 build, BeagleY IP drift). Docs only.
+
 ## [0.2.0] - 2026-10-03
 
 ### Added
