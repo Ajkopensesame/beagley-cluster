@@ -1,11 +1,15 @@
 SUMMARY = "Beagley production cluster application"
-LICENSE = "CLOSED"
+LICENSE = "MIT"
+# Repo-root LICENSE (MIT, (c) 2026 Ajkopensesame). If that file changes, update the md5.
+LIC_FILES_CHKSUM = "file://LICENSE;md5=22bd6a982bd4b3876ce1c90d042a0e5c"
 
 inherit cmake pkgconfig qt6-cmake systemd
 
 BEAGLEY_CLUSTER_REPO_ROOT ?= "${@os.path.abspath(os.path.join(d.getVar('THISDIR'), '../../../..'))}"
 BEAGLEY_CLUSTER_GIT_URL ?= "git://${BEAGLEY_CLUSTER_REPO_ROOT};protocol=file"
-BEAGLEY_CLUSTER_GIT_BRANCH ?= "main"
+# The default branch is codex/maplibre-native-yocto-build. `main` now points at
+# unrelated legacy history (old main is preserved as legacy-main-2026-10-03).
+BEAGLEY_CLUSTER_GIT_BRANCH ?= "codex/maplibre-native-yocto-build"
 
 SRC_URI = " \
     ${BEAGLEY_CLUSTER_GIT_URL};branch=${BEAGLEY_CLUSTER_GIT_BRANCH} \
@@ -39,7 +43,26 @@ SRC_URI = " \
     file://beagley-cluster.default \
     file://beagley-hotspot-watchdog.default \
 "
-SRCREV = "${AUTOREV}"
+
+# Source revision. Release builds must be reproducible, so a commit is pinned:
+#   BEAGLEY_CLUSTER_SRCREV = "<40-char commit sha>"   (yocto/build-appliance-image.sh
+#       writes the verified local HEAD here automatically)
+# For development only, track the branch tip explicitly with:
+#   BEAGLEY_CLUSTER_USE_AUTOREV = "1"
+# Setting neither is a parse error rather than a silent floating build.
+BEAGLEY_CLUSTER_SRCREV ?= ""
+BEAGLEY_CLUSTER_USE_AUTOREV ?= "0"
+python () {
+    srcrev = (d.getVar('BEAGLEY_CLUSTER_SRCREV') or '').strip()
+    use_autorev = (d.getVar('BEAGLEY_CLUSTER_USE_AUTOREV') or '0').strip() == '1'
+    if srcrev:
+        d.setVar('SRCREV', srcrev)
+    elif use_autorev:
+        d.setVar('SRCREV', d.getVar('AUTOREV'))
+    else:
+        bb.fatal("beagley-cluster: set BEAGLEY_CLUSTER_SRCREV to a pinned commit "
+                 "(release builds) or BEAGLEY_CLUSTER_USE_AUTOREV = \"1\" (dev only).")
+}
 S = "${WORKDIR}/git"
 
 DEPENDS += " \
