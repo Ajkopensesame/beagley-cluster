@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 
-project(beagley_cluster LANGUAGES CXX)
+project(beagley_cluster VERSION 0.2.0 LANGUAGES CXX)
 
 execute_process(
     COMMAND git -C "${CMAKE_SOURCE_DIR}" rev-parse --short=12 HEAD
