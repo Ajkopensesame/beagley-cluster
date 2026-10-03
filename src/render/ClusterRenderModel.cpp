@@ -1,6 +1,6 @@
 #include "ClusterRenderModel.h"
 
-#include "../data/VehicleStateClient.h"
+#include "../data/VehicleStateSource.h"
 #include "../navigation/NavigationService.h"
 
 #include <QDateTime>
@@ -103,7 +103,7 @@ QString formatDistanceMeters(double meters)
 }
 } // namespace
 
-ClusterRenderModel::ClusterRenderModel(VehicleStateClient *vehicleState,
+ClusterRenderModel::ClusterRenderModel(VehicleStateSource *vehicleState,
                                        NavigationService *navigation,
                                        QObject *parent)
     : QObject(parent)
@@ -116,33 +116,33 @@ ClusterRenderModel::ClusterRenderModel(VehicleStateClient *vehicleState,
     if (m_vehicleState) {
         const auto refreshStatus = [this]() { syncStatus(); };
         const auto refreshAnalogs = [this]() { syncStatus(); };
-        connect(m_vehicleState, &VehicleStateClient::connectedChanged, this, refreshStatus);
-        connect(m_vehicleState, &VehicleStateClient::linkStaleChanged, this, refreshStatus);
-        connect(m_vehicleState, &VehicleStateClient::vehicleStateSeenChanged, this, refreshStatus);
-        connect(m_vehicleState, &VehicleStateClient::bbbStaleChanged, this, refreshStatus);
-        connect(m_vehicleState, &VehicleStateClient::gpsFixValidChanged, this, refreshStatus);
-        connect(m_vehicleState, &VehicleStateClient::gpsPoseValidChanged, this, refreshStatus);
-        connect(m_vehicleState, &VehicleStateClient::speedKphChanged, this, refreshAnalogs);
-        connect(m_vehicleState, &VehicleStateClient::rpmChanged, this, refreshAnalogs);
-        connect(m_vehicleState, &VehicleStateClient::fuelPctChanged, this, refreshAnalogs);
-        connect(m_vehicleState, &VehicleStateClient::coolantCChanged, this, refreshAnalogs);
-        connect(m_vehicleState, &VehicleStateClient::gearChanged, this, refreshAnalogs);
-        connect(m_vehicleState, &VehicleStateClient::drivetrainModeChanged, this, refreshAnalogs);
-        connect(m_vehicleState, &VehicleStateClient::overdriveChanged, this, refreshAnalogs);
-        connect(m_vehicleState, &VehicleStateClient::leftIndicatorChanged, this, refreshAnalogs);
-        connect(m_vehicleState, &VehicleStateClient::rightIndicatorChanged, this, refreshAnalogs);
-        connect(m_vehicleState, &VehicleStateClient::highBeamChanged, this, refreshAnalogs);
-        connect(m_vehicleState, &VehicleStateClient::warnBrakeChanged, this, refreshStatus);
-        connect(m_vehicleState, &VehicleStateClient::warnOilChanged, this, refreshStatus);
-        connect(m_vehicleState, &VehicleStateClient::warnChargeChanged, this, refreshStatus);
-        connect(m_vehicleState, &VehicleStateClient::warnDoorChanged, this, refreshStatus);
-        connect(m_vehicleState, &VehicleStateClient::warnCheckEngineChanged, this, refreshStatus);
-        connect(m_vehicleState, &VehicleStateClient::warnATChanged, this, refreshStatus);
-        connect(m_vehicleState, &VehicleStateClient::warnFuelLowChanged, this, refreshStatus);
-        connect(m_vehicleState, &VehicleStateClient::diagnosticChanged, this, refreshStatus);
-        connect(m_vehicleState, &VehicleStateClient::gpsLatChanged, this, refreshAnalogs);
-        connect(m_vehicleState, &VehicleStateClient::gpsLngChanged, this, refreshAnalogs);
-        connect(m_vehicleState, &VehicleStateClient::gpsBearingChanged, this, refreshAnalogs);
+        connect(m_vehicleState, &VehicleStateSource::connectedChanged, this, refreshStatus);
+        connect(m_vehicleState, &VehicleStateSource::linkStaleChanged, this, refreshStatus);
+        connect(m_vehicleState, &VehicleStateSource::vehicleStateSeenChanged, this, refreshStatus);
+        connect(m_vehicleState, &VehicleStateSource::bbbStaleChanged, this, refreshStatus);
+        connect(m_vehicleState, &VehicleStateSource::gpsFixValidChanged, this, refreshStatus);
+        connect(m_vehicleState, &VehicleStateSource::gpsPoseValidChanged, this, refreshStatus);
+        connect(m_vehicleState, &VehicleStateSource::speedKphChanged, this, refreshAnalogs);
+        connect(m_vehicleState, &VehicleStateSource::rpmChanged, this, refreshAnalogs);
+        connect(m_vehicleState, &VehicleStateSource::fuelPctChanged, this, refreshAnalogs);
+        connect(m_vehicleState, &VehicleStateSource::coolantCChanged, this, refreshAnalogs);
+        connect(m_vehicleState, &VehicleStateSource::gearChanged, this, refreshAnalogs);
+        connect(m_vehicleState, &VehicleStateSource::drivetrainModeChanged, this, refreshAnalogs);
+        connect(m_vehicleState, &VehicleStateSource::overdriveChanged, this, refreshAnalogs);
+        connect(m_vehicleState, &VehicleStateSource::leftIndicatorChanged, this, refreshAnalogs);
+        connect(m_vehicleState, &VehicleStateSource::rightIndicatorChanged, this, refreshAnalogs);
+        connect(m_vehicleState, &VehicleStateSource::highBeamChanged, this, refreshAnalogs);
+        connect(m_vehicleState, &VehicleStateSource::warnBrakeChanged, this, refreshStatus);
+        connect(m_vehicleState, &VehicleStateSource::warnOilChanged, this, refreshStatus);
+        connect(m_vehicleState, &VehicleStateSource::warnChargeChanged, this, refreshStatus);
+        connect(m_vehicleState, &VehicleStateSource::warnDoorChanged, this, refreshStatus);
+        connect(m_vehicleState, &VehicleStateSource::warnCheckEngineChanged, this, refreshStatus);
+        connect(m_vehicleState, &VehicleStateSource::warnATChanged, this, refreshStatus);
+        connect(m_vehicleState, &VehicleStateSource::warnFuelLowChanged, this, refreshStatus);
+        connect(m_vehicleState, &VehicleStateSource::diagnosticChanged, this, refreshStatus);
+        connect(m_vehicleState, &VehicleStateSource::gpsLatChanged, this, refreshAnalogs);
+        connect(m_vehicleState, &VehicleStateSource::gpsLngChanged, this, refreshAnalogs);
+        connect(m_vehicleState, &VehicleStateSource::gpsBearingChanged, this, refreshAnalogs);
     }
 
     if (m_navigation) {

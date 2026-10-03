@@ -79,7 +79,9 @@ qt_standard_project_setup()
 # --------------------
 qt_add_executable(beagley_cluster
     src/main.cpp
+    src/data/MockVehicleStateClient.cpp
     src/data/VehicleStateClient.cpp
+    src/data/VehicleStateSource.cpp
     src/navigation/OpenNavigationProvider.cpp
     src/navigation/NavigationService.cpp
     src/render/ClusterRenderModel.cpp

@@ -9,7 +9,7 @@
 #include <QVariantMap>
 #include <limits>
 
-#include "../data/VehicleStateClient.h"
+#include "../data/VehicleStateSource.h"
 #include "OpenNavigationProvider.h"
 
 class WiFiSetupService;
@@ -47,7 +47,7 @@ class NavigationService : public QObject
     Q_PROPERTY(QVariantMap mapConnectivity READ mapConnectivity NOTIFY mapConnectivityChanged)
 
 public:
-    explicit NavigationService(VehicleStateClient *vehicleState, WiFiSetupService *wifiSetup = nullptr, QObject *parent = nullptr);
+    explicit NavigationService(VehicleStateSource *vehicleState, WiFiSetupService *wifiSetup = nullptr, QObject *parent = nullptr);
 
     QString state() const { return m_state; }
     QString followMode() const { return m_followMode; }
@@ -200,7 +200,7 @@ private:
     QString promptCachePath(const QString &text) const;
     QString playerExecutable() const;
 
-    QPointer<VehicleStateClient> m_vehicleState;
+    QPointer<VehicleStateSource> m_vehicleState;
     QPointer<WiFiSetupService> m_wifiSetup;
     OpenNavigationProvider m_provider;
     QNetworkAccessManager m_network;

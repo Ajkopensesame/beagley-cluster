@@ -15,13 +15,6 @@
 static const int STALE_TIMEOUT_MS = 1000;
 static const int WATCHDOG_TICK_MS = 200;
 static const int MAX_BACKOFF_MS   = 5000;
-static const double ANALOG_SPEED_EPSILON_KPH = 0.25;
-static const int ANALOG_RPM_EPSILON = 20;
-static const double ANALOG_FUEL_EPSILON_PCT = 0.2;
-static const double ANALOG_COOLANT_EPSILON_C = 0.5;
-static const double GPS_MOVE_EPSILON_M = 2.0;
-static const double GPS_BEARING_EPSILON_DEG = 3.0;
-static const double GPS_SPEED_EPSILON_KPH = 0.5;
 
 namespace {
 bool jsonBool(const QJsonValue &value, bool *okOut = nullptr)
@@ -124,30 +117,6 @@ double normalizeBearing(double degrees)
     return wrapped < 0.0 ? wrapped + 360.0 : wrapped;
 }
 
-bool changedEnough(double previous, double next, double epsilon)
-{
-    return std::fabs(previous - next) >= epsilon;
-}
-
-double coordinateDistanceMeters(double latA, double lngA, double latB, double lngB)
-{
-    if (!std::isfinite(latA) || !std::isfinite(lngA) || !std::isfinite(latB) || !std::isfinite(lngB)) {
-        return std::numeric_limits<double>::infinity();
-    }
-
-    const double latScale = 111320.0;
-    const double lngScale = std::cos(latA * M_PI / 180.0) * 111320.0;
-    const double dLat = (latB - latA) * latScale;
-    const double dLng = (lngB - lngA) * lngScale;
-    return std::sqrt(dLat * dLat + dLng * dLng);
-}
-
-double bearingDelta(double previous, double next)
-{
-    const double delta = std::fabs(normalizeBearing(next) - normalizeBearing(previous));
-    return std::min(delta, 360.0 - delta);
-}
-
 QByteArray generateHandshakeKey()
 {
     QByteArray nonce(16, Qt::Uninitialized);
@@ -182,7 +151,7 @@ QByteArray headerValue(const QByteArray &headers, const QByteArray &name)
 } // namespace
 
 VehicleStateClient::VehicleStateClient(QObject *parent)
-    : QObject(parent)
+    : VehicleStateSource(parent)
 {
     m_url = qEnvironmentVariableIsSet("VEHICLE_HUB_WS_URL")
                 ? QString::fromUtf8(qgetenv("VEHICLE_HUB_WS_URL"))
@@ -605,8 +574,22 @@ void VehicleStateClient::onTextMessageReceived(const QString &msg)
     const QJsonObject transmission = obj.value("transmission").toObject();
     setGpsSource(obj.value("gpsSource").toString());
 
-    // Consider this a "good" frame
-    m_lastGoodRxMs = QDateTime::currentMSecsSinceEpoch();
+    // Phase 1 hub contract (vehicle-hub PROTOCOL.md): a frame is "good" (refreshes
+    // lastGoodRx, so linkStale stays false) only if the four gauge keys plus the
+    // indicators / warnings / _health objects are all present. Partial frames are
+    // still applied below but do not keep the link alive. Replayed JSONL frames
+    // (BEAGLEY_REPLAY_FILE) are diagnostic fixtures that predate the contract and
+    // omit indicators/warnings, so they are always treated as good.
+    const bool goodFrame = m_replayMode
+        || (obj.contains(QStringLiteral("speedKph"))
+            && obj.contains(QStringLiteral("rpm"))
+            && obj.contains(QStringLiteral("fuelPct"))
+            && obj.contains(QStringLiteral("coolantC"))
+            && obj.value(QStringLiteral("indicators")).isObject()
+            && obj.value(QStringLiteral("warnings")).isObject()
+            && obj.value(QStringLiteral("_health")).isObject());
+    if (goodFrame)
+        m_lastGoodRxMs = QDateTime::currentMSecsSinceEpoch();
     setVehicleStateSeen(true);
 
     setLeftIndicator(readBoolAny(indicators, {"left"}, false));
@@ -645,7 +628,7 @@ void VehicleStateClient::onTextMessageReceived(const QString &msg)
     setCoolantC(obj.value("coolantC").toDouble(0.0));
     const QString gearValue = obj.value("gear").toString(
         drivetrain.value("gear").toString(
-            transmission.value("gear").toString(m_gear)
+            transmission.value("gear").toString(gear())
         )
     );
     setGear(gearValue);
@@ -653,12 +636,12 @@ void VehicleStateClient::onTextMessageReceived(const QString &msg)
         transmission,
         {"overdrive", "od"},
         readBoolAny(drivetrain, {"overdrive", "od"},
-                    readBoolAny(obj, {"overdrive", "od"}, m_overdrive))
+                    readBoolAny(obj, {"overdrive", "od"}, overdrive()))
     ));
     const QString drivetrainModeValue = obj.value("drivetrainMode").toString(
         drivetrain.value("mode").toString(
             drivetrain.value("drivetrainMode").toString(
-                drivetrain.value("drive").toString(m_drivetrainMode)
+                drivetrain.value("drive").toString(drivetrainMode())
             )
         )
     );
@@ -666,7 +649,7 @@ void VehicleStateClient::onTextMessageReceived(const QString &msg)
     setTransferLock(readBoolAny(
         drivetrain,
         {"transfer_lock", "transferLock", "lock", "locked"},
-        readBoolAny(obj, {"transfer_lock", "transferLock", "lock", "locked"}, m_transferLock)
+        readBoolAny(obj, {"transfer_lock", "transferLock", "lock", "locked"}, transferLock())
     ));
 
     // GPS supports both top-level keys and nested object:
@@ -696,38 +679,38 @@ void VehicleStateClient::onTextMessageReceived(const QString &msg)
     const double bearing = readNumberAny(
         gps,
         {"bearing", "heading", "course"},
-        readNumberAny(obj, {"gpsBearing", "bearing", "heading", "course"}, m_gpsBearing)
+        readNumberAny(obj, {"gpsBearing", "bearing", "heading", "course"}, gpsBearing())
     );
     setGpsBearing(normalizeBearing(bearing));
     setGpsAccuracyM(readNumberAny(
         gps,
         {"accuracyM", "accuracy", "hdop_m"},
-        readNumberAny(obj, {"gpsAccuracyM", "accuracyM", "accuracy"}, m_gpsAccuracyM)
+        readNumberAny(obj, {"gpsAccuracyM", "accuracyM", "accuracy"}, gpsAccuracyM())
     ));
     setGpsTimestampMs(static_cast<qint64>(readNumberAny(
         gps,
         {"timestampMs", "timestamp", "ts"},
-        readNumberAny(obj, {"gpsTimestampMs", "timestampMs", "timestamp", "ts"}, static_cast<double>(m_gpsTimestampMs))
+        readNumberAny(obj, {"gpsTimestampMs", "timestampMs", "timestamp", "ts"}, static_cast<double>(gpsTimestampMs()))
     )));
     setGpsFixValid(readBoolAny(
         gps,
         {"fixValid", "fix_valid", "valid"},
-        readBoolAny(obj, {"gpsFixValid", "fixValid", "fix_valid", "valid"}, m_gpsFixValid)
+        readBoolAny(obj, {"gpsFixValid", "fixValid", "fix_valid", "valid"}, gpsFixValid())
     ));
     setGpsSatellites(qRound(readNumberAny(
         gps,
         {"satellites", "sats"},
-        readNumberAny(obj, {"gpsSatellites", "satellites", "sats"}, static_cast<double>(m_gpsSatellites))
+        readNumberAny(obj, {"gpsSatellites", "satellites", "sats"}, static_cast<double>(gpsSatellites()))
     )));
     setGpsHeadingReliable(readBoolAny(
         gps,
         {"headingReliable", "heading_reliable"},
-        readBoolAny(obj, {"gpsHeadingReliable", "headingReliable", "heading_reliable"}, m_gpsHeadingReliable)
+        readBoolAny(obj, {"gpsHeadingReliable", "headingReliable", "heading_reliable"}, gpsHeadingReliable())
     ));
     setGpsSpeedKph(readNumberAny(
         gps,
         {"speedKph", "speed", "speed_kph"},
-        readNumberAny(obj, {"gpsSpeedKph", "speedKph", "speed", "speed_kph"}, m_gpsSpeedKph)
+        readNumberAny(obj, {"gpsSpeedKph", "speedKph", "speed", "speed_kph"}, gpsSpeedKph())
     ));
 
     // Link stale is determined by watchdog timing; watchdog will clear it
@@ -766,318 +749,4 @@ void VehicleStateClient::checkStale()
         setDiagnosticSummary(QStringLiteral("VEHICLE DATA LINK STALE"));
         setDiagnosticFindingCount(0);
     }
-}
-
-void VehicleStateClient::setConnected(bool v)
-{
-    if (m_connected == v) return;
-    m_connected = v;
-    emit connectedChanged();
-}
-
-void VehicleStateClient::setLinkStale(bool v)
-{
-    if (m_linkStale == v) return;
-    m_linkStale = v;
-    emit linkStaleChanged();
-}
-
-void VehicleStateClient::setRxAgeMs(int v)
-{
-    if (m_rxAgeMs == v) return;
-    m_rxAgeMs = v;
-    emit rxAgeMsChanged();
-}
-
-void VehicleStateClient::setVehicleStateSeen(bool v)
-{
-    if (m_vehicleStateSeen == v) return;
-    m_vehicleStateSeen = v;
-    emit vehicleStateSeenChanged();
-}
-
-void VehicleStateClient::setLeftIndicator(bool v)
-{
-    if (m_leftIndicator == v) return;
-    m_leftIndicator = v;
-    emit leftIndicatorChanged();
-}
-
-void VehicleStateClient::setRightIndicator(bool v)
-{
-    if (m_rightIndicator == v) return;
-    m_rightIndicator = v;
-    emit rightIndicatorChanged();
-}
-
-void VehicleStateClient::setHighBeam(bool v)
-{
-    if (m_highBeam == v) return;
-    m_highBeam = v;
-    emit highBeamChanged();
-}
-
-void VehicleStateClient::setWarnBrake(bool v)
-{
-    if (m_warnBrake == v) return;
-    m_warnBrake = v;
-    emit warnBrakeChanged();
-}
-
-void VehicleStateClient::setWarnOil(bool v)
-{
-    if (m_warnOil == v) return;
-    m_warnOil = v;
-    emit warnOilChanged();
-}
-
-void VehicleStateClient::setWarnCharge(bool v)
-{
-    if (m_warnCharge == v) return;
-    m_warnCharge = v;
-    emit warnChargeChanged();
-}
-
-void VehicleStateClient::setWarnDoor(bool v)
-{
-    if (m_warnDoor == v) return;
-    m_warnDoor = v;
-    emit warnDoorChanged();
-}
-
-void VehicleStateClient::setWarnCheckEngine(bool v)
-{
-    if (m_warnCheckEngine == v) return;
-    m_warnCheckEngine = v;
-    emit warnCheckEngineChanged();
-}
-
-void VehicleStateClient::setWarnAT(bool v)
-{
-    if (m_warnAT == v) return;
-    m_warnAT = v;
-    emit warnATChanged();
-}
-
-void VehicleStateClient::setWarnFuelLow(bool v)
-{
-    if (m_warnFuelLow == v) return;
-    m_warnFuelLow = v;
-    emit warnFuelLowChanged();
-}
-
-void VehicleStateClient::setBbbStale(bool v)
-{
-    if (m_bbbStale == v) return;
-    m_bbbStale = v;
-    emit bbbStaleChanged();
-}
-
-void VehicleStateClient::setDiagnosticOk(bool v)
-{
-    if (m_diagnosticOk == v) return;
-    m_diagnosticOk = v;
-    emit diagnosticChanged();
-}
-
-void VehicleStateClient::setDiagnosticSeverity(const QString &v)
-{
-    const QString normalized = v.trimmed().toLower();
-    if (m_diagnosticSeverity == normalized) return;
-    m_diagnosticSeverity = normalized;
-    emit diagnosticChanged();
-}
-
-void VehicleStateClient::setDiagnosticStatus(const QString &v)
-{
-    const QString normalized = v.trimmed().toLower();
-    if (m_diagnosticStatus == normalized) return;
-    m_diagnosticStatus = normalized;
-    emit diagnosticChanged();
-}
-
-void VehicleStateClient::setDiagnosticSummary(const QString &v)
-{
-    const QString normalized = v.trimmed();
-    if (m_diagnosticSummary == normalized) return;
-    m_diagnosticSummary = normalized;
-    emit diagnosticChanged();
-}
-
-void VehicleStateClient::setDiagnosticFindingCount(int v)
-{
-    const int normalized = qMax(0, v);
-    if (m_diagnosticFindingCount == normalized) return;
-    m_diagnosticFindingCount = normalized;
-    emit diagnosticChanged();
-}
-
-void VehicleStateClient::setSpeedKph(double v)
-{
-    if (!changedEnough(m_speedKph, v, ANALOG_SPEED_EPSILON_KPH)) return;
-    m_speedKph = v;
-    emit speedKphChanged();
-}
-
-void VehicleStateClient::setRpm(int v)
-{
-    if (std::abs(m_rpm - v) < ANALOG_RPM_EPSILON) return;
-    m_rpm = v;
-    emit rpmChanged();
-}
-
-void VehicleStateClient::setFuelPct(double v)
-{
-    if (!changedEnough(m_fuelPct, v, ANALOG_FUEL_EPSILON_PCT)) return;
-    m_fuelPct = v;
-    emit fuelPctChanged();
-}
-
-void VehicleStateClient::setCoolantC(double v)
-{
-    if (!changedEnough(m_coolantC, v, ANALOG_COOLANT_EPSILON_C)) return;
-    m_coolantC = v;
-    emit coolantCChanged();
-}
-
-void VehicleStateClient::setGear(const QString &v)
-{
-    const QString trimmed = v.trimmed().toUpper();
-    const QString normalized = trimmed.isEmpty() ? QStringLiteral("P") : trimmed;
-    if (m_gear == normalized) return;
-    m_gear = normalized;
-    emit gearChanged();
-}
-
-void VehicleStateClient::setOverdrive(bool v)
-{
-    if (m_overdrive == v) return;
-    m_overdrive = v;
-    emit overdriveChanged();
-}
-
-void VehicleStateClient::setDrivetrainMode(const QString &v)
-{
-    QString normalized = v.trimmed().toLower();
-    if (normalized.isEmpty()) {
-        normalized = QStringLiteral("2wd");
-    } else if (normalized == QLatin1String("4x4") || normalized == QLatin1String("4h")) {
-        normalized = QStringLiteral("4wd");
-    } else if (normalized == QLatin1String("2h")) {
-        normalized = QStringLiteral("2wd");
-    }
-
-    if (m_drivetrainMode == normalized) return;
-    m_drivetrainMode = normalized;
-    emit drivetrainModeChanged();
-}
-
-void VehicleStateClient::setTransferLock(bool v)
-{
-    if (m_transferLock == v) return;
-    m_transferLock = v;
-    emit transferLockChanged();
-}
-
-void VehicleStateClient::setGpsLat(double v)
-{
-    if (coordinateDistanceMeters(m_gpsLat, m_gpsLng, v, m_gpsLng) < GPS_MOVE_EPSILON_M) return;
-    m_gpsLat = v;
-    emit gpsLatChanged();
-}
-
-void VehicleStateClient::setGpsLng(double v)
-{
-    if (coordinateDistanceMeters(m_gpsLat, m_gpsLng, m_gpsLat, v) < GPS_MOVE_EPSILON_M) return;
-    m_gpsLng = v;
-    emit gpsLngChanged();
-}
-
-void VehicleStateClient::setGpsBearing(double v)
-{
-    if (bearingDelta(m_gpsBearing, v) < GPS_BEARING_EPSILON_DEG) return;
-    m_gpsBearing = v;
-    emit gpsBearingChanged();
-}
-
-void VehicleStateClient::setGpsAccuracyM(double v)
-{
-    if (qFuzzyCompare(m_gpsAccuracyM + 1.0, v + 1.0)) return;
-    m_gpsAccuracyM = v;
-    emit gpsAccuracyMChanged();
-}
-
-void VehicleStateClient::setGpsTimestampMs(qint64 v)
-{
-    if (m_gpsTimestampMs == v) return;
-    m_gpsTimestampMs = v;
-    emit gpsTimestampMsChanged();
-}
-
-void VehicleStateClient::setGpsFixValid(bool v)
-{
-    if (m_gpsFixValid == v) return;
-    const bool wasValid = m_gpsFixValid;
-    m_gpsFixValid = v;
-    if (v && !m_gpsEverValid) {
-        m_gpsEverValid = true;
-        qInfo() << "[VehicleStateClient] first valid BBB GPS fix"
-                << "lat=" << m_gpsLat
-                << "lng=" << m_gpsLng
-                << "accuracyM=" << m_gpsAccuracyM
-                << "satellites=" << m_gpsSatellites;
-        emit gpsEverValidChanged();
-    } else if (!v && wasValid) {
-        qWarning() << "[VehicleStateClient] BBB GPS fix invalid"
-                   << "accuracyM=" << m_gpsAccuracyM
-                   << "satellites=" << m_gpsSatellites
-                   << "timestampMs=" << m_gpsTimestampMs;
-    }
-    emit gpsFixValidChanged();
-}
-
-void VehicleStateClient::setGpsSource(const QString &v)
-{
-    const QString normalized = v.trimmed();
-    if (m_gpsSource == normalized) return;
-    m_gpsSource = normalized;
-    qInfo() << "[VehicleStateClient] BBB GPS source" << (m_gpsSource.isEmpty() ? QStringLiteral("<unset>") : m_gpsSource)
-            << "fixValid=" << m_gpsFixValid
-            << "poseValid=" << m_gpsPoseValid;
-    emit gpsSourceChanged();
-}
-
-void VehicleStateClient::setGpsSatellites(int v)
-{
-    if (m_gpsSatellites == v) return;
-    m_gpsSatellites = v;
-    emit gpsSatellitesChanged();
-}
-
-void VehicleStateClient::setGpsHeadingReliable(bool v)
-{
-    if (m_gpsHeadingReliable == v) return;
-    m_gpsHeadingReliable = v;
-    emit gpsHeadingReliableChanged();
-}
-
-void VehicleStateClient::setGpsSpeedKph(double v)
-{
-    if (!changedEnough(m_gpsSpeedKph, v, GPS_SPEED_EPSILON_KPH)) return;
-    m_gpsSpeedKph = v;
-    emit gpsSpeedKphChanged();
-}
-
-void VehicleStateClient::setGpsPoseValid(bool v)
-{
-    if (m_gpsPoseValid == v) return;
-    m_gpsPoseValid = v;
-    if (!v) {
-        qWarning() << "[VehicleStateClient] BBB GPS pose invalid"
-                   << "source=" << m_gpsSource
-                   << "lat=" << m_gpsLat
-                   << "lng=" << m_gpsLng
-                   << "timestampMs=" << m_gpsTimestampMs;
-    }
-    emit gpsPoseValidChanged();
 }
