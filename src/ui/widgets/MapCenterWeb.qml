@@ -1,7 +1,6 @@
 import QtQuick 2.15
 import QtWebEngine
 import QtCore
-import Qt.labs.settings
 
 Item {
     id: root
