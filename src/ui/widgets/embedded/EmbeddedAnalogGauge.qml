@@ -4,6 +4,8 @@ import QtQuick.Shapes 1.15
 Item {
     id: root
 
+    opacity: inactive ? 0.55 : 1.0
+
     property real value: 0
     property real maxValue: 100
     property real dangerStart: maxValue * 1.1
@@ -25,13 +27,15 @@ Item {
     property int unitFontSize: 22
     property int labelFontSize: 15
     property bool animate: true
+    // Link lost: no live reading. Greyed dial, needle + fill arcs hidden, readout "--".
+    property bool inactive: false
 
     readonly property real startAngle: 144
     readonly property real sweepAngle: 252
     readonly property real clampedValue: clamp(value, 0, maxValue)
     readonly property real progress: clamp(displayValue / Math.max(1e-6, maxValue), 0, 1)
     readonly property real needleAngle: -126 + (sweepAngle * progress)
-    readonly property color activeColor: displayValue >= dangerStart ? dangerColor : accentColor
+    readonly property color activeColor: inactive ? "#6B7280" : (displayValue >= dangerStart ? dangerColor : accentColor)
     property real displayValue: 0
 
     function clamp(v, lo, hi) {
@@ -47,6 +51,7 @@ Item {
     }
 
     function primaryValueText() {
+        if (inactive) return "--"
         return valueText.length > 0 ? valueText : String(Math.round(displayValue))
     }
 
@@ -170,7 +175,7 @@ Item {
 
         ShapePath {
             strokeWidth: Math.max(12, Math.min(root.width, root.height) * 0.045)
-            strokeColor: root.withAlpha(root.activeColor, 0.22)
+            strokeColor: root.inactive ? "transparent" : root.withAlpha(root.activeColor, 0.22)
             fillColor: "transparent"
             capStyle: ShapePath.RoundCap
 
@@ -186,7 +191,7 @@ Item {
 
         ShapePath {
             strokeWidth: Math.max(5, Math.min(root.width, root.height) * 0.016)
-            strokeColor: root.activeColor
+            strokeColor: root.inactive ? "transparent" : root.activeColor
             fillColor: "transparent"
             capStyle: ShapePath.RoundCap
 
@@ -203,6 +208,7 @@ Item {
 
     Item {
         id: needlePivot
+        visible: !root.inactive
         anchors.centerIn: parent
         width: 1
         height: 1

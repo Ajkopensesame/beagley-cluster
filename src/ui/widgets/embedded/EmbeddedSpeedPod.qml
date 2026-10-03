@@ -8,6 +8,7 @@ Rectangle {
     property color panelFill: "#081220"
     property color panelStroke: "#14324A"
     property color needleColor: "#FFB03B"
+    readonly property bool linkLost: !root.cluster || !!root.cluster.linkLost
     readonly property real speedValue: root.cluster ? Number(root.cluster.speedKph || 0) : 0
     readonly property real fuelValue: root.cluster ? Number(root.cluster.fuelPct || 0) : 0
     readonly property real coolantValue: root.cluster ? Number(root.cluster.coolantC || 0) : 0
@@ -24,7 +25,8 @@ Rectangle {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: parent.top
         anchors.topMargin: 18
-        value: root.speedValue
+        value: root.linkLost ? 0 : root.speedValue
+        inactive: root.linkLost
         maxValue: 140
         dangerStart: 116
         minorStep: 10
@@ -52,8 +54,8 @@ Rectangle {
 
         Repeater {
             model: [
-                { label: "FUEL", value: Math.round(root.fuelValue) + "%", fill: Math.max(0, Math.min(1, root.fuelValue / 100.0)), color: "#4CD9FF" },
-                { label: "COOLANT", value: Math.round(root.coolantValue) + " C", fill: Math.max(0, Math.min(1, (root.coolantValue - 40.0) / 70.0)), color: root.coolantValue >= 105 ? "#E34848" : "#FFB03B" }
+                { label: "FUEL", value: root.linkLost ? "--" : Math.round(root.fuelValue) + "%", fill: root.linkLost ? 0 : Math.max(0, Math.min(1, root.fuelValue / 100.0)), color: root.linkLost ? "#6B7280" : "#4CD9FF" },
+                { label: "COOLANT", value: root.linkLost ? "--" : Math.round(root.coolantValue) + " C", fill: root.linkLost ? 0 : Math.max(0, Math.min(1, (root.coolantValue - 40.0) / 70.0)), color: root.linkLost ? "#6B7280" : (root.coolantValue >= 105 ? "#E34848" : "#FFB03B") }
             ]
 
             delegate: Rectangle {

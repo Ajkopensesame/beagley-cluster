@@ -33,6 +33,7 @@ Window {
         rpm: root.stressScene ? (2400 + 1650 * (0.5 + 0.5 * Math.sin(root.stressPhase * 1.15 + 0.4))) : (root.cluster ? root.cluster.rpm : 0),
         fuelPct: root.stressScene ? (48 + 14 * Math.sin(root.stressPhase * 0.12)) : (root.cluster ? root.cluster.fuelPct : 0),
         coolantC: root.stressScene ? (81 + 7 * Math.sin(root.stressPhase * 0.18 + 1.6)) : (root.cluster ? root.cluster.coolantC : 0),
+        linkLost: root.stressScene ? false : (root.cluster ? root.cluster.linkLost : true),
         activeWarnings: root.cluster ? root.cluster.activeWarnings : 0,
         warningSummary: root.cluster ? root.cluster.warningSummary : "LINK DOWN",
         leftIndicator: root.stressScene ? Math.sin(root.stressPhase * 1.45) > 0.72 : !!(root.cluster && root.cluster.leftIndicator),
@@ -122,6 +123,19 @@ Window {
         cluster: root.cluster
         fillColor: root.warningFill
         strokeColor: root.warningStroke
+        fontFamily: root.uiFontFamily
+    }
+
+    // Persistent LINK LOST telltale: window-level child with z above every other overlay.
+    W.LinkLostTelltale {
+        id: linkLostTelltale
+        anchors.horizontalCenter: parent.horizontalCenter
+        // Status ribbon's left cluster of pills ends near x=830; keep clear of it.
+        anchors.horizontalCenterOffset: 60
+        anchors.top: parent.top
+        anchors.topMargin: 6
+        active: !!(!root.stressScene && root.cluster && root.cluster.linkLost)
+        pulse: false
         fontFamily: root.uiFontFamily
     }
 

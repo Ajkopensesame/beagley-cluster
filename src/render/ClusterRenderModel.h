@@ -13,6 +13,9 @@ class ClusterRenderModel final : public QObject
 
     Q_PROPERTY(bool linkOk READ linkOk NOTIFY statusChanged)
     Q_PROPERTY(bool truthOk READ truthOk NOTIFY statusChanged)
+    // Mirrors VehicleStateSource::linkLost (true with no vehicle source at all).
+    // QML shows "--" / inactive gauges / the LINK LOST telltale when set.
+    Q_PROPERTY(bool linkLost READ linkLost NOTIFY statusChanged)
     Q_PROPERTY(bool internetOk READ internetOk NOTIFY statusChanged)
     Q_PROPERTY(bool gpsOk READ gpsOk NOTIFY statusChanged)
     Q_PROPERTY(QString statusText READ statusText NOTIFY statusChanged)
@@ -47,6 +50,7 @@ public:
 
     bool linkOk() const { return m_linkOk; }
     bool truthOk() const { return m_truthOk; }
+    bool linkLost() const { return m_linkLost; }
     bool internetOk() const { return m_internetOk; }
     bool gpsOk() const { return m_gpsOk; }
     QString statusText() const { return m_statusText; }
@@ -92,6 +96,7 @@ private:
 
     bool m_linkOk = false;
     bool m_truthOk = false;
+    bool m_linkLost = true;
     bool m_internetOk = false;
     bool m_gpsOk = false;
     QString m_statusText = QStringLiteral("BOOT");

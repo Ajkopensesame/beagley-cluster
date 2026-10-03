@@ -192,6 +192,13 @@ Window {
     readonly property var hub: vehicleState
     readonly property bool linkOk: hub && hub.connected && !hub.linkStale
     readonly property bool truthOk: linkOk && !hub.bbbStale
+    // Link-lost fail-safe (ARCHITECTURE.md "Link-lost behaviour"). One flag, owned by
+    // C++ (VehicleStateSource::linkLost = !connected || linkStale || bbbStale || no frame yet).
+    readonly property bool hubLinkLost: !hub || !!hub.linkLost
+    // Dashes / greyed gauges / LINK LOST telltale. Not applied to the dev-only
+    // simulation / stress / gauge-review scenes, which intentionally fake the data.
+    readonly property bool linkLostActive: hubLinkLost && !clusterSimulation && !stressScene && !gaugeReviewMode
+    readonly property color gaugeInactiveColor: "#6B7280"
     readonly property bool hotspotConnected: !!((typeof wifiSetup !== "undefined") && wifiSetup && wifiSetup.connected)
     readonly property bool hotspotIpLease: !!((typeof wifiSetup !== "undefined") && wifiSetup && wifiSetup.hasIpLease)
     readonly property bool internetOk: !!((typeof wifiSetup !== "undefined") && wifiSetup && wifiSetup.internetReachable)
@@ -315,30 +322,30 @@ Window {
         : (gaugeReviewMode ? false : truthOk && !!(hub && hub.overdrive))
     readonly property bool displayHighBeamValue: clusterSimulation
         ? (Math.floor(clusterSimulationDiscretePhase / 1.4) % 2) === 0
-        : (gaugeReviewMode ? false : !!(hub && hub.highBeam))
+        : (gaugeReviewMode ? false : (!hubLinkLost && !!(hub && hub.highBeam)))
     readonly property int simulationDriveStep: Math.floor(clusterSimulationDiscretePhase / 2.2) % 3
     readonly property int simulationWarningStep: Math.floor(clusterSimulationDiscretePhase / 1.15) % 10
     readonly property bool displayWarnDoorValue: clusterSimulation
         ? (simulationWarningStep === 4 || simulationWarningStep === 8)
-        : (gaugeReviewMode ? false : truthOk && !!(hub && hub.warnDoor))
+        : (gaugeReviewMode ? false : (hubLinkLost ? !!(hub && hub.warnDoorLatched) : !!(hub && hub.warnDoor)))
     readonly property bool displayWarnChargeValue: clusterSimulation
         ? (simulationWarningStep === 3 || simulationWarningStep === 8)
-        : (gaugeReviewMode ? false : truthOk && !!(hub && hub.warnCharge))
+        : (gaugeReviewMode ? false : (hubLinkLost ? !!(hub && hub.warnChargeLatched) : !!(hub && hub.warnCharge)))
     readonly property bool displayWarnBrakeValue: clusterSimulation
         ? (simulationWarningStep === 1 || simulationWarningStep === 8)
-        : (gaugeReviewMode ? false : truthOk && !!(hub && hub.warnBrake))
+        : (gaugeReviewMode ? false : (hubLinkLost ? !!(hub && hub.warnBrakeLatched) : !!(hub && hub.warnBrake)))
     readonly property bool displayWarnOilValue: clusterSimulation
         ? (simulationWarningStep === 2 || simulationWarningStep === 8)
-        : (gaugeReviewMode ? false : truthOk && !!(hub && hub.warnOil))
+        : (gaugeReviewMode ? false : (hubLinkLost ? !!(hub && hub.warnOilLatched) : !!(hub && hub.warnOil)))
     readonly property bool displayWarnCheckEngineValue: clusterSimulation
         ? (simulationWarningStep === 5 || simulationWarningStep === 8)
-        : (gaugeReviewMode ? false : truthOk && !!(hub && hub.warnCheckEngine))
+        : (gaugeReviewMode ? false : (hubLinkLost ? !!(hub && hub.warnCheckEngineLatched) : !!(hub && hub.warnCheckEngine)))
     readonly property bool displayWarnATValue: clusterSimulation
         ? (simulationWarningStep === 6 || simulationWarningStep === 8)
-        : (gaugeReviewMode ? false : truthOk && !!(hub && hub.warnAT))
+        : (gaugeReviewMode ? false : (hubLinkLost ? !!(hub && hub.warnATLatched) : !!(hub && hub.warnAT)))
     readonly property bool displayWarnFuelLowValue: clusterSimulation
         ? (simulationWarningStep === 7 || simulationWarningStep === 8)
-        : (gaugeReviewMode ? false : truthOk && !!(hub && hub.warnFuelLow))
+        : (gaugeReviewMode ? false : (hubLinkLost ? !!(hub && hub.warnFuelLowLatched) : !!(hub && hub.warnFuelLow)))
     readonly property string displayDrivetrainModeValue: clusterSimulation
         ? (simulationDriveStep === 0 ? "2wd" : "4wd")
         : (gaugeReviewMode ? "2wd" : ((hub && hub.drivetrainMode) ? String(hub.drivetrainMode).toLowerCase() : "2wd"))
@@ -2293,7 +2300,9 @@ Window {
                 height: root.gaugeFaceSize
                 z: root.mapLibreSafeCompositor ? 120 : 20
                 kind: "speed"
-                value: root.liveGaugeSpeed
+                // Link lost: greyed/inactive dial, arc driven to empty (not a real 0 reading)
+                opacity: root.linkLostActive ? 0.35 : 1.0
+                value: root.linkLostActive ? 0 : root.liveGaugeSpeed
                 maxValue: 140
                 // Coolant moves to tach twin micro-arcs (Skin v2); keep a quiet residual track
                 auxProgress: 0.0
@@ -2494,8 +2503,8 @@ Window {
                     Text {
                         id: speedValueText
                         anchors.centerIn: parent
-                        text: root.formatSpeedValue(root.liveGaugeSpeed)
-                        color: appTheme.speedColor(root.liveGaugeSpeed)
+                        text: root.linkLostActive ? "--" : root.formatSpeedValue(root.liveGaugeSpeed)
+                        color: root.linkLostActive ? root.gaugeInactiveColor : appTheme.speedColor(root.liveGaugeSpeed)
                         font.family: "Oxanium"
                         font.pixelSize: parent.parent.width * 0.168
                         font.bold: true
@@ -2730,7 +2739,8 @@ Window {
                 height: root.gaugeFaceSize
                 z: root.mapLibreSafeCompositor ? 120 : 20
                 kind: "tach"
-                value: root.liveGaugeRpm
+                opacity: root.linkLostActive ? 0.35 : 1.0
+                value: root.linkLostActive ? 0 : root.liveGaugeRpm
                 maxValue: 8000
                 // Twin micro-arcs own fuel/temp; mute native aux to avoid double rings
                 auxProgress: 0.0
@@ -2868,14 +2878,16 @@ Window {
                     anchors.verticalCenter: parent.verticalCenter
                     anchors.verticalCenterOffset: -parent.height * 0.028
                     z: 156
+                    // Link lost: the white/pearl gradient copies below must not out-shout the grey dashes.
+                    opacity: root.linkLostActive ? 0.45 : 1.0
                     width: rpmValueText.implicitWidth
                     height: rpmValueText.implicitHeight
 
                     Text {
                         id: rpmValueText
                         anchors.centerIn: parent
-                        text: (root.liveGaugeRpm / 1000.0).toFixed(1)
-                        color: appTheme.rpmColor(root.liveGaugeRpm)
+                        text: root.linkLostActive ? "--" : (root.liveGaugeRpm / 1000.0).toFixed(1)
+                        color: root.linkLostActive ? root.gaugeInactiveColor : appTheme.rpmColor(root.liveGaugeRpm)
                         font.family: "Oxanium"
                         font.pixelSize: parent.parent.width * 0.150
                         font.bold: true
@@ -2969,6 +2981,7 @@ Window {
                     theme: appTheme
                     effectLevel: root.gaugeEffectLevel
                     lowEffectMode: root.gaugeLowEffectMode
+                    inactive: root.linkLostActive
                     fuelNorm: Math.max(0, Math.min(1, root.liveGaugeFuel / 100))
                     fuelPct: root.liveGaugeFuel
                     coolantNorm: Math.max(0.14, Math.min(1, (root.liveGaugeCoolant - 40) / 70))
@@ -4952,6 +4965,17 @@ Window {
                 }
             }
         }
+    }
+
+    // Persistent LINK LOST telltale: direct child of the window at a z above every
+    // other root-level overlay (WiFi overlay is 9500), so nothing can cover it.
+    W.LinkLostTelltale {
+        id: linkLostTelltale
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: parent.top
+        anchors.topMargin: 10
+        active: root.linkLostActive
+        pulse: !root.lowEffectMode
     }
 
     W.WiFiSetupOverlay {

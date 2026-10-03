@@ -209,6 +209,7 @@ set(BEAGLEY_QML_FILES
     src/ui/widgets/MatrixRain.qml
     src/ui/widgets/GaugeMatrixDepth.qml
     src/ui/widgets/TwinMicroArcs.qml
+    src/ui/widgets/LinkLostTelltale.qml
     src/ui/widgets/MapCenter.qml
     src/ui/widgets/MapCenterBootShell.qml
     src/ui/widgets/MapCenterMapLibreNative.qml
@@ -368,6 +369,14 @@ if(BUILD_TESTING)
     target_include_directories(navigation_search_ranking_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_link_libraries(navigation_search_ranking_test PRIVATE Qt6::Core Qt6::Network)
     add_test(NAME navigation_search_ranking_test COMMAND navigation_search_ranking_test)
+
+    add_executable(vehicle_state_link_lost_test
+        tests/vehicle_state_link_lost_test.cpp
+        src/data/VehicleStateSource.cpp
+    )
+    target_include_directories(vehicle_state_link_lost_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(vehicle_state_link_lost_test PRIVATE Qt6::Core)
+    add_test(NAME vehicle_state_link_lost_test COMMAND vehicle_state_link_lost_test)
 
     add_test(
         NAME bbb_nmea_gps_test

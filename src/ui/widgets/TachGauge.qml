@@ -192,37 +192,37 @@ Item {
         ? (root.simulationWarningStep === 4 || root.simulationWarningStep === 8)
         : (root.telltaleDemoActive
         ? true
-        : root.linkOk && !!root.vehicleState && !!root.vehicleState.warnDoor)
+        : (!!root.vehicleState && (root.vehicleState.linkLost ? !!root.vehicleState.warnDoorLatched : !!root.vehicleState.warnDoor)))
     readonly property bool displayWarnCharge: root.simulationActive
         ? (root.simulationWarningStep === 3 || root.simulationWarningStep === 8)
         : (root.telltaleDemoActive
         ? true
-        : root.linkOk && !!root.vehicleState && !!root.vehicleState.warnCharge)
+        : (!!root.vehicleState && (root.vehicleState.linkLost ? !!root.vehicleState.warnChargeLatched : !!root.vehicleState.warnCharge)))
     readonly property bool displayWarnBrake: root.simulationActive
         ? (root.simulationWarningStep === 1 || root.simulationWarningStep === 8)
         : (root.telltaleDemoActive
         ? true
-        : root.linkOk && !!root.vehicleState && !!root.vehicleState.warnBrake)
+        : (!!root.vehicleState && (root.vehicleState.linkLost ? !!root.vehicleState.warnBrakeLatched : !!root.vehicleState.warnBrake)))
     readonly property bool displayWarnOil: root.simulationActive
         ? (root.simulationWarningStep === 2 || root.simulationWarningStep === 8)
         : (root.telltaleDemoActive
         ? true
-        : root.linkOk && !!root.vehicleState && !!root.vehicleState.warnOil)
+        : (!!root.vehicleState && (root.vehicleState.linkLost ? !!root.vehicleState.warnOilLatched : !!root.vehicleState.warnOil)))
     readonly property bool displayWarnCheckEngine: root.simulationActive
         ? (root.simulationWarningStep === 5 || root.simulationWarningStep === 8)
         : (root.telltaleDemoActive
         ? true
-        : root.linkOk && !!root.vehicleState && !!root.vehicleState.warnCheckEngine)
+        : (!!root.vehicleState && (root.vehicleState.linkLost ? !!root.vehicleState.warnCheckEngineLatched : !!root.vehicleState.warnCheckEngine)))
     readonly property bool displayWarnAT: root.simulationActive
         ? (root.simulationWarningStep === 6 || root.simulationWarningStep === 8)
         : (root.telltaleDemoActive
         ? true
-        : root.linkOk && !!root.vehicleState && !!root.vehicleState.warnAT)
+        : (!!root.vehicleState && (root.vehicleState.linkLost ? !!root.vehicleState.warnATLatched : !!root.vehicleState.warnAT)))
     readonly property bool displayWarnFuelLow: root.simulationActive
         ? (root.simulationWarningStep === 7 || root.simulationWarningStep === 8)
         : (root.telltaleDemoActive
         ? true
-        : root.linkOk && !!root.vehicleState && !!root.vehicleState.warnFuelLow)
+        : (!!root.vehicleState && (root.vehicleState.linkLost ? !!root.vehicleState.warnFuelLowLatched : !!root.vehicleState.warnFuelLow)))
     readonly property string displayDrivetrainMode: root.simulationActive
         ? (root.simulationDriveStep === 0 ? "2wd" : "4wd")
         : (root.telltaleDemoActive

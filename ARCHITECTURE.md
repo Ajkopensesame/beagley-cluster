@@ -57,6 +57,39 @@ VehicleStateSource          (QML-facing properties + shared setters)
 - The hub owns fuel/coolant conversion; the client reads the top-level fields, never `analog.*`.
 - The client additionally understands extras used on this line: GPS (nested `gps` or top-level), `_diagnostic`, `drivetrain`/`transmission`, `gpsSource`. Changes to the wire format belong in [vehicle-hub](https://github.com/Ajkopensesame/vehicle-hub) first.
 
+### Link-lost behaviour
+
+Policy is owned in one place: `VehicleStateSource` (C++, shared by the live client and the mock). QML only binds to it.
+
+**`linkLost`** (new `bool` property on `vehicleState`; also mirrored as `clusterRenderModel.linkLost`) is true when **any** of:
+
+- the socket is not `connected`, or
+- `linkStale` (no *good* frame for >1 s, see client), or
+- `bbbStale` (hub says `_health.stale=true`, i.e. its serial/CAN source is silent; the hub publishes zeroed values in that state), or
+- no `vehicle_state` frame has been seen yet (boot).
+
+It is derived inside the setters of those four properties, so it needs no client changes and adds no timers or clocks of its own. The `_health.stale` flag is the only per-vehicle staleness flag the protocol defines for the gauges (`gpsStale` / per-source diagnostics are hub passthrough and are not consumed here), so there is no per-gauge "SENSOR" case: loss is all-or-nothing.
+
+**While `linkLost` (MainV3 and MainEmbedded):**
+
+| Item | Behaviour |
+|------|-----------|
+| speed, rpm | `--` (grey), arc/needle empty and greyed, never a real `0` |
+| fuel, coolant | `--` (grey), fill arcs/bars hidden, pods greyed |
+| gear | `-` (unchanged), drive-mode/overdrive/odometer placeholders unchanged |
+| turn signals, high beam | off (transient) |
+| warnings: brake, oil, charge, check engine, A/T, low fuel, door | **latched**: a warning that was active in the last healthy state stays on; warnings that were off stay off (no invented "unknown" state) |
+| LINK LOST telltale | persistent amber-on-red pill + `!` icon (`widgets/LinkLostTelltale.qml`), window-level child at `z: 20000` (above the WiFi overlay's 9500), no timeout, shown for as long as `linkLost` |
+| existing status text (`LINK DOWN` / `LINK STALE` / `BBB STALE`, embedded ribbon + warning summary) | unchanged; the embedded warning summary additionally appends `LINK LOST` and never reads `SYSTEMS NOMINAL` while lost |
+
+Dev-only simulation / stress / gauge-review scenes in MainV3 (and the stress scene in MainEmbedded) bypass the dashes and telltale because they fake the data on purpose.
+
+**Warning latch.** `VehicleStateSource` exposes `warnBrakeLatched`, `warnOilLatched`, `warnChargeLatched`, `warnDoorLatched`, `warnCheckEngineLatched`, `warnATLatched`, `warnFuelLowLatched` (existing `warn*` properties are unchanged). While the link is healthy the latched value tracks the live value; the moment `linkLost` becomes true it is frozen. QML shows `linkLost ? warnXLatched : warnX`. The sync runs one event-loop turn after a change (queued) because the client applies a frame's warnings *before* its `_health.stale` flag: a hub-stale frame carries zeroed warnings, and syncing immediately would latch those zeros. When the link recovers the latch is released and warnings follow live values again. Limits: a warning that *turns on* while the link is lost cannot be known; that is why the LINK LOST telltale is prominent. A warning that cleared in the same event-loop turn as the loss is latched at its previous (on) value. A partial (non-good) frame is still applied by the client and, while the link is otherwise healthy, can legitimately clear a warning; that is existing client behaviour and not changed here.
+
+**Not covered:** the legacy `Main.qml` / `MainV2.qml` variants (`BEAGLEY_UI_VARIANT=legacy|v1|v2`) only get the warning latch (via `TachGauge.qml`); they still show `0` and have no LINK LOST telltale.
+
+**Verifying on a vehicle/bench:** stop the hub (or unplug the UNO so it reports `_health.stale`) and expect dashes + LINK LOST within about 1 s, active warnings still lit; restart it and expect live values and no telltale. C++ coverage: `tests/vehicle_state_link_lost_test.cpp` (ctest `vehicle_state_link_lost_test`). The QML side is not covered by automated tests.
+
 ## Run / backends
 
 | Mode | How |

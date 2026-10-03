@@ -17,6 +17,11 @@ class VehicleStateSource : public QObject
     Q_PROPERTY(bool linkStale READ linkStale NOTIFY linkStaleChanged)
     Q_PROPERTY(int  rxAgeMs READ rxAgeMs NOTIFY rxAgeMsChanged)
     Q_PROPERTY(bool vehicleStateSeen READ vehicleStateSeen NOTIFY vehicleStateSeenChanged)
+    // Single fail-safe policy flag (see ARCHITECTURE.md "Link-lost behaviour"):
+    // true unless the socket is connected, the link is fresh, the hub does not
+    // report `_health.stale`, and at least one vehicle_state frame was seen.
+    // QML binds "--" / inactive gauges / the LINK LOST telltale to this.
+    Q_PROPERTY(bool linkLost READ linkLost NOTIFY linkLostChanged)
 
     // Indicators (truth from BBB)
     Q_PROPERTY(bool leftIndicator READ leftIndicator NOTIFY leftIndicatorChanged)
@@ -31,6 +36,18 @@ class VehicleStateSource : public QObject
     Q_PROPERTY(bool warnCheckEngine READ warnCheckEngine NOTIFY warnCheckEngineChanged)
     Q_PROPERTY(bool warnAT READ warnAT NOTIFY warnATChanged)
     Q_PROPERTY(bool warnFuelLow READ warnFuelLow NOTIFY warnFuelLowChanged)
+
+    // Warnings as the driver should see them while the link is lost: while the
+    // link is healthy they mirror the live warn* values; once the link is lost
+    // they stay frozen at the last value seen while healthy (a warning that was
+    // on stays on). Use `linkLost ? warnXLatched : warnX` in QML.
+    Q_PROPERTY(bool warnBrakeLatched READ warnBrakeLatched NOTIFY warnLatchedChanged)
+    Q_PROPERTY(bool warnOilLatched READ warnOilLatched NOTIFY warnLatchedChanged)
+    Q_PROPERTY(bool warnChargeLatched READ warnChargeLatched NOTIFY warnLatchedChanged)
+    Q_PROPERTY(bool warnDoorLatched READ warnDoorLatched NOTIFY warnLatchedChanged)
+    Q_PROPERTY(bool warnCheckEngineLatched READ warnCheckEngineLatched NOTIFY warnLatchedChanged)
+    Q_PROPERTY(bool warnATLatched READ warnATLatched NOTIFY warnLatchedChanged)
+    Q_PROPERTY(bool warnFuelLowLatched READ warnFuelLowLatched NOTIFY warnLatchedChanged)
 
     // BBB-declared stale (separate from linkStale)
     Q_PROPERTY(bool bbbStale READ bbbStale NOTIFY bbbStaleChanged)
@@ -72,6 +89,7 @@ public:
     bool linkStale() const { return m_linkStale; }
     int  rxAgeMs() const { return m_rxAgeMs; }
     bool vehicleStateSeen() const { return m_vehicleStateSeen; }
+    bool linkLost() const { return m_linkLost; }
 
     bool leftIndicator() const { return m_leftIndicator; }
     bool rightIndicator() const { return m_rightIndicator; }
@@ -84,6 +102,19 @@ public:
     bool warnCheckEngine() const { return m_warnCheckEngine; }
     bool warnAT() const { return m_warnAT; }
     bool warnFuelLow() const { return m_warnFuelLow; }
+
+    bool warnBrakeLatched() const { return m_latched.brake; }
+    bool warnOilLatched() const { return m_latched.oil; }
+    bool warnChargeLatched() const { return m_latched.charge; }
+    bool warnDoorLatched() const { return m_latched.door; }
+    bool warnCheckEngineLatched() const { return m_latched.checkEngine; }
+    bool warnATLatched() const { return m_latched.at; }
+    bool warnFuelLowLatched() const { return m_latched.fuelLow; }
+
+    // Copies the live warnings into the latched set if (and only if) the link
+    // is healthy. Runs automatically one event-loop turn after a warning or
+    // link-health change; public so callers/tests can flush synchronously.
+    void syncLatchedWarnings();
 
     bool bbbStale() const { return m_bbbStale; }
     bool diagnosticOk() const { return m_diagnosticOk; }
@@ -118,6 +149,8 @@ signals:
     void linkStaleChanged();
     void rxAgeMsChanged();
     void vehicleStateSeenChanged();
+    void linkLostChanged();
+    void warnLatchedChanged();
 
     void leftIndicatorChanged();
     void rightIndicatorChanged();
@@ -199,6 +232,27 @@ protected:
     void setGpsPoseValid(bool v);
 
 private:
+    void updateLinkLost();
+    void scheduleLatchedSync();
+
+    struct WarnSet {
+        bool brake = false;
+        bool oil = false;
+        bool charge = false;
+        bool door = false;
+        bool checkEngine = false;
+        bool at = false;
+        bool fuelLow = false;
+        bool operator==(const WarnSet &o) const {
+            return brake == o.brake && oil == o.oil && charge == o.charge && door == o.door
+                && checkEngine == o.checkEngine && at == o.at && fuelLow == o.fuelLow;
+        }
+    };
+
+    bool m_linkLost = true;
+    bool m_latchedSyncQueued = false;
+    WarnSet m_latched;
+
     bool m_connected = false;
     bool m_linkStale = true;
     int  m_rxAgeMs = 0;
