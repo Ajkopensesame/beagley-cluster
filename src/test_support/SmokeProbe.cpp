@@ -14,6 +14,7 @@
 #include <QVariant>
 #include <QtGlobal>
 #include <cstdio>
+#include <cstdlib>
 
 namespace {
 
@@ -24,6 +25,9 @@ struct Captured {
 
 QList<Captured> g_captured;
 bool g_capturing = false;
+// After the verdict (finish()) until the TeardownGuard destructor: engine/app teardown noise.
+QStringList g_teardown;
+bool g_verdictDone = false;
 
 // Known-benign warnings. Everything else that is a warning/critical fails the test.
 // Each entry MUST say why it is benign; add new entries only with a justification.
@@ -67,6 +71,8 @@ void handler(QtMsgType type, const QMessageLogContext &context, const QString &m
     std::fflush(stderr);
     if (g_capturing && (type == QtWarningMsg || type == QtCriticalMsg || type == QtFatalMsg))
         g_captured.append({type, message});
+    else if (g_verdictDone && (type == QtWarningMsg || type == QtCriticalMsg || type == QtFatalMsg))
+        g_teardown.append(message);
 }
 
 QStringList g_failures;
@@ -176,7 +182,7 @@ QStringList judgeState(const Probe &p)
 
 void finish()
 {
-    g_capturing = false; // teardown-time binding noise is not part of the assertions
+    g_capturing = false; // judged below; later messages are collected as teardown noise
 
     QStringList unexpected;
     for (const Captured &c : g_captured) {
@@ -198,6 +204,7 @@ void finish()
 
     std::fprintf(stderr, "[SMOKE] RESULT %s (%lld ms, %d frames)\n", g_failures.isEmpty() ? "PASS" : "FAIL",
                  static_cast<long long>(g_probe.clock.elapsed()), g_probe.frames);
+    g_verdictDone = true;
     QCoreApplication::exit(g_failures.isEmpty() ? 0 : 1);
 }
 
@@ -238,6 +245,26 @@ void installMessageHandler()
 {
     g_capturing = true;
     qInstallMessageHandler(handler);
+}
+
+TeardownGuard::~TeardownGuard()
+{
+    if (!enabled() || !g_verdictDone)
+        return;
+    QStringList bad;
+    for (const QString &m : g_teardown) {
+        if (!isAllowed(m))
+            bad << m;
+    }
+    std::fprintf(stderr, "[SMOKE] %s: no warnings/TypeErrors during engine teardown (%d unexpected)\n",
+                 bad.isEmpty() ? "ok  " : "FAIL", static_cast<int>(bad.size()));
+    for (const QString &m : bad)
+        std::fprintf(stderr, "[SMOKE]   teardown: %s\n", m.left(200).toLocal8Bit().constData());
+    if (!bad.isEmpty()) {
+        std::fprintf(stderr, "[SMOKE] TEARDOWN FAIL\n");
+        std::fflush(stderr);
+        std::_Exit(1);
+    }
 }
 
 void start(QQmlApplicationEngine &engine)

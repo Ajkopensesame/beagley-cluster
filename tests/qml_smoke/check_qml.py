@@ -22,14 +22,8 @@ from pathlib import Path
 # ---------------------------------------------------------------- file selection
 # Supported = everything under src/ui that ships in the compiled module and is reachable
 # from MainV3 / MainEmbedded / the widget qmldirs, i.e. all tracked *.qml minus:
-EXCLUDED = {
-    "src/ui/Main.qml": "legacy v1 entry (BEAGLEY_UI_VARIANT=legacy)",
-    "src/ui/MainV2.qml": "legacy v2 entry",
-    "src/ui/MainPanelTest.qml": "dev-only panel test harness",
-    "src/ui/widgets/SpeedoPearl.qml": "dead code: imports the Qt5-only QtGraphicalEffects "
-                                      "module, which does not exist in Qt 6; nothing references it",
-}
-EXCLUDED_PREFIXES = ("src/ui/mock/",)  # dev mocks
+EXCLUDED = {}  # rel-path -> reason. (Legacy Main/MainV2 and dead SpeedoPearl were deleted.)
+EXCLUDED_PREFIXES = ()
 EXCLUDED_SUFFIXES = (".bak",)
 
 
@@ -104,6 +98,22 @@ def qrc_reference_failures(root: Path):
                     failures.append(f"{rel}:{n}: '{ref}' -> {target} exists but is not listed in CMakeLists.txt "
                                     "(QML_FILES/RESOURCES), so it is missing from the compiled qrc")
     return failures
+
+
+def map_style_init_failures(root: Path):
+    """The MapLibre plugin reads its style once, at Map creation: the style must be an INITIAL
+    property of the Loader-created Impl, and the Impl must never default to the demo style."""
+    out = []
+    wrapper = (root / "src/ui/widgets/MapCenterMapLibreNative.qml").read_text(encoding="utf-8")
+    if 'setSource("MapCenterMapLibreNativeImpl.qml", { "styleUrl": root.styleUrl })' not in wrapper:
+        out.append("src/ui/widgets/MapCenterMapLibreNative.qml: the Impl Loader must pass styleUrl as an initial "
+                   "property via setSource(...) (assigning it in onLoaded is too late: the Qt Location plugin has "
+                   "already read its style and the map stays on the Impl default)")
+    impl = (root / "src/ui/widgets/MapCenterMapLibreNativeImpl.qml").read_text(encoding="utf-8")
+    if "demotiles" in impl:
+        out.append("src/ui/widgets/MapCenterMapLibreNativeImpl.qml: must not default to the MapLibre demo style "
+                   "(blank map); use ClusterConfig::defaultMapLibreNativeStyleUrl() / BEAGLEY_MAPLIBRE_NATIVE_DEFAULT_STYLE_URL")
+    return out
 
 
 def run_guards(root: Path) -> int:

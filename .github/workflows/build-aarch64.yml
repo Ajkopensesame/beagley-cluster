@@ -125,7 +125,7 @@ jobs:
         run: |
           set -uo pipefail
           sha="${{ steps.src.outputs.sha }}"; short="${{ steps.src.outputs.short }}"
-          out="$GITHUB_WORKSPACE/beagley-aarch64-$short"
+          out="$GITHUB_WORKSPACE/beagley-aarch64-$short-gles"
           mkdir -p "$out/reference" "$out/evidence"
           cp build/beagley_cluster "$out/beagley_cluster"
           [ -f build/nowplayingctl ] && cp build/nowplayingctl "$out/nowplayingctl"
@@ -133,6 +133,23 @@ jobs:
           readelf -d "$out/beagley_cluster" | grep -iE "RPATH|RUNPATH" > "$out/evidence/rpath-before-strip.txt" || true
           patchelf --remove-rpath "$out/beagley_cluster"
           [ -f "$out/nowplayingctl" ] && patchelf --remove-rpath "$out/nowplayingctl" || true
+          # GLES board: it has libEGL/libGLESv2 but NO libGLX/libOpenGL/libGL. The desktop-GL aqt Qt
+          # puts libOpenGL/libGLX into Qt6::Gui's link interface, so the linker records them as NEEDED
+          # even though this app never calls a GL function (it only uses Qt public API: QQuickWindow /
+          # QSGRendererInterface). Record, prove "no GL symbols referenced", then drop those entries.
+          readelf -d "$out/beagley_cluster" | sed -n 's/.*Shared library: \[\(.*\)\]/\1/p' | sort > "$out/evidence/needed-libs.before-gl-strip.txt"
+          nm -D --undefined-only "$out/beagley_cluster" > "$out/evidence/undefined-symbols.txt"
+          # any undefined symbol that libGL/libGLX/libOpenGL/libEGL/libGLES would provide (gl*, glX*, egl*), or any QOpenGL* class from libQt6Gui/libQt6OpenGL
+          grep -E ' (gl[A-Z0-9][A-Za-z0-9_]*|glX[A-Za-z0-9_]*|egl[A-Z][A-Za-z0-9_]*)(@.*)?$' "$out/evidence/undefined-symbols.txt" > "$out/evidence/undefined-gl-symbols.txt" || true
+          c++filt < "$out/evidence/undefined-symbols.txt" | grep -E 'QOpenGL|QSurfaceFormat|QNativeInterface::QGLX|QNativeInterface::QEGL' > "$out/evidence/undefined-qopengl-symbols.txt" || true
+          if [ -s "$out/evidence/undefined-gl-symbols.txt" ]; then
+            echo "FATAL: binary references GL symbols; refusing to strip libOpenGL/libGLX NEEDED" >&2
+            cat "$out/evidence/undefined-gl-symbols.txt" >&2
+            glfail=1
+          else
+            glfail=0
+            patchelf --remove-needed libGLX.so.0 --remove-needed libOpenGL.so.0 --remove-needed libGL.so.1 "$out/beagley_cluster"
+          fi
           # Reference copies of the MapLibre libs this binary was linked against (do NOT deploy by default).
           find "$RUNNER_TEMP/qmaplibre-prefix" -name 'libQMapLibre*.so*' -exec cp -a {} "$out/reference/" \;
           # The app does not link QMapLibre/Qt6Location directly (linker --as-needed): they are
@@ -157,7 +174,7 @@ jobs:
           grep -o 'Qt_[0-9][0-9]*' "$ev/dynamic-symbols.txt" | sort -uV > "$ev/qt-symbol-versions-needed.txt" || true
           strings -a "$bin" | grep -E "Beagley build identity|BEAGLEY_BUILD|^[0-9a-f]{12}$" | head -5 > "$ev/build-strings.txt" || true
 
-          fail=0; res="$ev/abi-checks.txt"; : > "$res"
+          fail=$glfail; res="$ev/abi-checks.txt"; : > "$res"
           chk() { if [ "$1" = ok ]; then echo "PASS  $2" >> "$res"; else echo "FAIL  $2" >> "$res"; fail=1; fi; }
           grep -q "ELF 64-bit.*ARM aarch64" "$ev/file.txt" && chk ok "ELF 64-bit aarch64" || chk bad "ELF 64-bit aarch64"
           # WITH_MAPLIBRE_NATIVE=ON proof: cache value + the Impl QML file only added to the
@@ -171,6 +188,12 @@ jobs:
             { grep -q 'libQMapLibre' "$f" && grep -q 'libQt6Location' "$f"; } && chk ok "$(basename "$pl") needs libQMapLibre + libQt6Location" || chk bad "$(basename "$pl") needs libQMapLibre + libQt6Location"
           done
           grep -q 'libQMapLibre' "$ev/needed-libs.txt" && echo "NOTE  binary links libQMapLibre directly" >> "$res" || echo "NOTE  binary does not list libQMapLibre/libQt6Location as NEEDED (expected: --as-needed, loaded at run time via the MapLibre QML plugin + geoservices plugin)" >> "$res"
+          # GLES board allow-list: Qt6 libs, EGL/GLESv2, toolchain runtime. libGLX/libOpenGL/libGL must be gone.
+          grep -E 'libGLX|libOpenGL|libGL\.so' "$ev/needed-libs.txt" > /dev/null && chk bad "no libGLX/libOpenGL/libGL in NEEDED" || chk ok "no libGLX/libOpenGL/libGL in NEEDED"
+          unk="$(grep -vE '^(libQt6[A-Za-z0-9]*\.so\.6|libEGL\.so\.1|libGLESv2\.so\.2|libstdc\+\+\.so\.6|libgcc_s\.so\.1|libc\.so\.6|libm\.so\.6|ld-linux-aarch64\.so\.1)$' "$ev/needed-libs.txt" || true)"
+          [ -z "$unk" ] && chk ok "every NEEDED lib is in the board allow-list (Qt6, libEGL.so.1, libGLESv2.so.2, libstdc++, libgcc_s, libc, libm, ld-linux)" || chk bad "NEEDED libs outside the board allow-list: $(echo $unk)"
+          [ -s "$ev/undefined-gl-symbols.txt" ] && chk bad "binary references gl*/glX*/egl* symbols (see undefined-gl-symbols.txt)" || chk ok "binary references no gl*/glX*/egl* symbols"
+          [ -s "$ev/undefined-qopengl-symbols.txt" ] && echo "NOTE  binary references QOpenGL*/QSurfaceFormat symbols: $(wc -l < "$ev/undefined-qopengl-symbols.txt") (see undefined-qopengl-symbols.txt; needs libQt6OpenGL/ GLES-Qt ABI review)" >> "$res" || echo "PASS  binary references no QOpenGL*/QSurfaceFormat symbols" >> "$res"
           grep -qi "WebEngine" "$ev/needed-libs.txt" && chk bad "no WebEngine linkage" || chk ok "no WebEngine linkage"
           maxv() { sort -V "$1" | tail -1 | sed 's/^[A-Z]*_//'; }
           g="$(maxv "$ev/glibc-versions-needed.txt")"; x="$(maxv "$ev/glibcxx-versions-needed.txt")"
@@ -188,7 +211,7 @@ jobs:
             echo "runner image:     ${ImageOS:-?} ${ImageVersion:-?} ($(uname -m))"
             echo "compiler:         $(c++ --version | head -1)"
             echo "cmake:            $(cmake --version | head -1)"
-            echo "Qt (build):       $QT_VERSION  ($QT_ROOT_DIR)  - aqtinstall linux_gcc_arm64, NOT the board's Yocto Qt"
+            echo "Qt (build):       $QT_VERSION  ($QT_ROOT_DIR)  - aqtinstall linux_gcc_arm64 (desktop-GL build), NOT the board's Yocto/GLES Qt; libOpenGL/libGLX NEEDED entries removed with patchelf after proving no GL symbols are referenced"
             echo "QMapLibre:        $MAPLIBRE_QT_VERSION  sha256 $MAPLIBRE_QT_SHA256 (+ 0001-respect-build-testing.patch)"
             echo "flags:            -DCMAKE_BUILD_TYPE=Release -DBEAGLEY_APPLIANCE_PRODUCTION=ON -DWITH_WEBENGINE=OFF -DWITH_MAPLIBRE_NATIVE=ON"
             echo "built at:         $(date -u +%FT%TZ)"
@@ -200,7 +223,7 @@ jobs:
           echo "dir=$out" >> "$GITHUB_OUTPUT"
           echo "failed=$fail" >> "$GITHUB_OUTPUT"
           {
-            echo "### beagley-aarch64-$short"
+            echo "### beagley-aarch64-$short-gles"
             echo '```'; cat "$res"; echo '```'
             echo '```'; cat "$ev/file.txt"; echo '```'
             echo "NEEDED:"; echo '```'; cat "$ev/needed-libs.txt"; echo '```'
@@ -210,7 +233,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: beagley-aarch64-${{ steps.src.outputs.short }}
+          name: beagley-aarch64-${{ steps.src.outputs.short }}-gles
           path: ${{ steps.pack.outputs.dir }}
           if-no-files-found: error
           retention-days: 30

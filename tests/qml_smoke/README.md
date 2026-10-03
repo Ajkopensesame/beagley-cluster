@@ -20,7 +20,9 @@ drifts from it. The probe is inert unless `BEAGLEY_SMOKE_TEST=1`.
 
 Environment set by CTest: `QT_QPA_PLATFORM=offscreen`, `QT_QUICK_BACKEND=software` (no GL/EGL
 needed on the runner), `BEAGLEY_WIFI_ONBOARDING=0` (otherwise the Wi-Fi dialog covers the
-screen), hermetic `XDG_*` dirs under the build tree. Works with `WITH_WEBENGINE=OFF` and
+screen), hermetic `XDG_*` dirs under the build tree, and `BEAGLEY_MAP_TILE_URL=file:///nonexistent-tiles/...` so the
+embedded map pod / radar never contact a real tile server (a live OSM response once failed CI with
+HTTP/2 "stream N finished with error" warnings). Works with `WITH_WEBENGINE=OFF` and
 `WITH_MAPLIBRE_NATIVE=OFF` (the CI configuration).
 
 Assertions: root object created and is a `QQuickWindow`; window and content item are 1920x720;
@@ -32,6 +34,11 @@ process start until the verdict - allow-list with justifications is `kAllowList`
 `rpmValueText` in MainV3; `gaugeReadout` x2 in MainEmbedded) is a number with mock data and
 exactly `--` when link is lost.
 
+Teardown: a `SmokeProbe::TeardownGuard` (first local in `main()`, so destroyed last) collects every
+warning logged after the verdict until the process is fully torn down; any non-allow-listed one (in
+practice `TypeError: Cannot read property ... of null`) prints `[SMOKE] TEARDOWN FAIL` and exits 1
+(`FAIL_REGULAR_EXPRESSION` makes ctest fail).
+
 Because a failed QML load makes `main()` return -1 before any verdict, the tests also require
 the `[SMOKE] RESULT PASS` line (`PASS_REGULAR_EXPRESSION`).
 
@@ -39,9 +46,8 @@ Run locally: `ctest --test-dir build -R qml_smoke --output-on-failure`.
 
 ## `qml_static_guards` and `qmllint_errors`
 
-Both are `check_qml.py`. File set: every tracked `src/ui/**/*.qml` except the legacy entries
-(`Main.qml`, `MainV2.qml`, `MainPanelTest.qml`), `src/ui/mock/`, `*.bak*` and the dead
-`SpeedoPearl.qml` (see `EXCLUDED` in the script).
+Both are `check_qml.py`. File set: every tracked `src/ui/**/*.qml` except `*.bak*` (see
+`EXCLUDED` in the script; the legacy `Main`/`MainV2` screens and dead `SpeedoPearl` are deleted).
 
 * `qml_static_guards`: import allow-list (unversioned `QtQuick.Shapes` only - a versioned import
   hides `Shape.preferredRendererType`/`CurveRenderer` on Qt >= 6.6 and the component fails to

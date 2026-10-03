@@ -10,16 +10,17 @@ Related: `.github/workflows/build-aarch64.yml` (the build), `docs/BOARD_RUNBOOK.
 (access, rules), `docs/ENVIRONMENT.md` (env vars), `ARCHITECTURE.md` ("Link-lost behaviour").
 
 
-## Reference build (first run of this workflow)
+## Reference build (current)
 
 | | |
 | --- | --- |
-| Built commit | `f2ac1b3c69d42b5da6ef275dc581283b33ba568b` (default-branch tip at 2026-10-03 16:31 +1000: merge of #38; includes #35 hub CAN prep, #37 changelog, #23 link-lost fail-safe, #16 fonts, #15 hub config) |
-| Run | https://github.com/Ajkopensesame/beagley-cluster/actions/runs/37103355734 (success, ~7 min on `ubuntu-24.04-arm`) |
-| `beagley_cluster` sha256 | `914368eb6eecf283d2cb1ed0cbf78f6c984e78e442aa2b5046b71da13c481bb3` (21,795,688 bytes, aarch64, not stripped) |
+| Built commit | `c8b936a1f1b63d75364743eb05e5b1882f4ed9da` (default-branch tip after #36 and #41 merged; includes #36 QML smoke tests + Shapes/Carto/OFF-build MainV3 fixes, #35, #23 link-lost, #16 fonts, #15 hub config) |
+| Run | https://github.com/Ajkopensesame/beagley-cluster/actions/runs/37104630579 (success, `ubuntu-24.04-arm`) |
+| `beagley_cluster` sha256 | `3df29f6ae3748576e71f7daf547170f6a42d26c5d0e8c3b34921dc262c1cea3b` (21,376,736 bytes, aarch64, not stripped, no RUNPATH) |
 | `nowplayingctl` sha256 | `b7eb75379d80a845f2adcf0b009d18cd24d092b26912714f132de83ff6d6218e` |
-| Max symbol versions | GLIBC_2.38, GLIBCXX 3.4.x <= 3.4.32 (board glibc must be >= 2.38; Scarthgap ships 2.39) |
-| Not included | PR #36 (QML smoke tests + qmllint + OFF-build MainV3 load fix + unversioned `QtQuick.Shapes` + dead Carto tile URLs) was still open when this was built. The binary therefore still has the Carto tile URLs and `QtQuick.Shapes 1.15` imports. The MapLibre-ON build (this one) is not affected by the OFF-build MainV3 load failure. |
+| Max symbol versions | GLIBC_2.38, GLIBCXX <= 3.4.32, `Qt_6.9` symbol version (needs Qt >= 6.9.0). Board glibc is 2.39 per the operator; > 2.39 needed would be a hard NO-GO |
+| New runtime dir | `/data/beagley-cluster/runtime-c8b936a1f1b6-linklost`, staged first in `/data/beagley-cluster/staging-c8b936a1f1b6/` |
+| Earlier build | `f2ac1b3c69d4` (before #36) is superseded |
 
 Always re-check the commit in `BUILD_INFO.txt` against what you intend to deploy.
 

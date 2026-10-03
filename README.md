@@ -23,7 +23,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for seams and data flow, and [CONTRIBUTIN
 | `src/navigation/` | `NavigationService`, `OpenNavigationProvider` |
 | `src/render/` | C++ render items and `ClusterRenderModel` |
 | `src/system/` | Wi‑Fi setup, now-playing, radar image services |
-| `src/ui/` | QML: `MainV3` (default), `MainV2`, `Main` (legacy), `MainEmbedded`, theme, widgets, `web/map` |
+| `src/ui/` | QML: `MainV3` (default), `MainEmbedded`, theme, widgets, `web/map` |
 | `tools/bbb_hub/` | Python BBB hub (prod/sim), diagnostics, replay |
 | `yocto/` | Appliance image build (`meta-beagley-cluster`) |
 | `docs/` | Design notes and workflows; board access, deploy and recovery: [docs/BOARD_RUNBOOK.md](docs/BOARD_RUNBOOK.md) |
@@ -83,7 +83,7 @@ Map rendering is chosen by `BEAGLEY_MAP_RENDERER` (`web`, `native`, `native-onli
 | `BEAGLEY_VEHICLE_BACKEND` | env | `mock` or `live` (default **`live`**) |
 | `VEHICLE_HUB_WS_URL` | env | Hub WebSocket URL (default `ws://10.24.0.7:8765`) |
 | `BEAGLEY_REPLAY_FILE` / `BEAGLEY_REPLAY_LOOP` | env | Replay JSONL frames through the live client |
-| `BEAGLEY_UI_VARIANT` | env | `v3` (default), `v2`, `legacy`/`v1`, `embedded`/`appliance` |
+| `BEAGLEY_UI_VARIANT` | env | `v3` (default), `embedded`/`appliance` (`legacy`/`v1`/`v2` were removed and now load `v3` with a warning) |
 | `BEAGLEY_RENDER_PROFILE` | env | `embedded` or desktop profile |
 | `BEAGLEY_MAP_RENDERER` | env | See Map |
 | `BEAGLEY_NO_MAP` | env | Non-zero → skip WebEngine map |

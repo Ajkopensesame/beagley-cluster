@@ -31,7 +31,7 @@ Item {
     readonly property string trustedStyleUrls: (typeof BEAGLEY_MAPLIBRE_NATIVE_TRUSTED_STYLES !== "undefined"
         && BEAGLEY_MAPLIBRE_NATIVE_TRUSTED_STYLES)
         ? String(BEAGLEY_MAPLIBRE_NATIVE_TRUSTED_STYLES)
-        : "https://demotiles.maplibre.org/style.json"
+        : ""
     readonly property string appTrustedStyleUrls: "https://tiles.openfreemap.org/styles/positron https://tiles.openfreemap.org/styles/liberty https://tiles.openfreemap.org/styles/dark https://tiles.openfreemap.org/styles/bright https://demotiles.maplibre.org/style.json"
     readonly property bool styleTrusted: mapLibreStyleTrusted(styleUrl)
     readonly property bool shouldUseMapLibre: mapLibreNativeAvailable && styleTrusted
@@ -124,16 +124,35 @@ Item {
     }
 
 
+    // The Impl's Qt Location Plugin reads its `maplibre.map.styles` parameter exactly once, when
+    // the Map is created. The style therefore has to be an INITIAL property of the Impl
+    // (Loader.setSource(url, {styleUrl: ...})): assigning `impl.styleUrl` in `onLoaded` is too
+    // late, the plugin has already been created with the Impl's own default style (that is how
+    // the board ended up on https://demotiles.maplibre.org/style.json, a blank light-blue
+    // world map, after the Loader refactor in the QML smoke-test PR). Style changes are
+    // handled by the gate toggle in reloadNativeMap(), which re-creates the Impl.
     Loader {
         id: mapLibreLoader
         anchors.fill: parent
-        active: root.shouldUseMapLibre && root.mapLibreReloadGate
+        active: false
+        readonly property bool wanted: root.shouldUseMapLibre && root.mapLibreReloadGate
+
         // Resolved by URL at runtime (not a static `MapCenterMapLibreNativeImpl {}` type):
         // the Impl file is only compiled into the module when WITH_MAPLIBRE_NATIVE=ON, and a
         // static reference made MainV3/Main unloadable ("... is not a type") in every other
         // configuration, including the CI build. A missing/broken Impl now only yields
         // Loader.Error -> raster fallback, as nativeImplFailed intends.
-        source: "MapCenterMapLibreNativeImpl.qml"
+        function sync() {
+            if (wanted) {
+                console.info("[MapCenterMapLibreNative] creating native map with style", root.styleUrl)
+                setSource("MapCenterMapLibreNativeImpl.qml", { "styleUrl": root.styleUrl })
+                active = true
+            } else {
+                active = false
+            }
+        }
+        onWantedChanged: sync()
+        Component.onCompleted: sync()
 
         onStatusChanged: {
             if (status === Loader.Error)
