@@ -23,7 +23,7 @@ jobs:
     name: "Lint: shellcheck (severity=error)"
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: "shellcheck (hard gate - errors only)"
         run: |
@@ -47,7 +47,7 @@ jobs:
     name: "Lint: ruff (hard errors)"
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v5
         with:
@@ -64,7 +64,7 @@ jobs:
     # Informational only: never fails the workflow.
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Qt 6.6.3 (no WebEngine)
         uses: jurplel/install-qt-action@v4
