@@ -430,6 +430,7 @@ int main(int argc, char *argv[])
     // Headless QML smoke test hook (BEAGLEY_SMOKE_TEST=1 only; inert otherwise).
     if (SmokeProbe::enabled())
         SmokeProbe::installMessageHandler();
+    SmokeProbe::TeardownGuard smokeTeardownGuard; // must stay the first local: destroyed last
 
     QGuiApplication app(argc, argv);
     qmlRegisterType<GaugeArcItem>("BeagleY", 1, 0, "GaugeArcItem");
@@ -741,5 +742,16 @@ int main(int argc, char *argv[])
         }
     }
 
-    return app.exec();
+    const int exitCode = app.exec();
+
+    // Tear the QML scene down while every context object (vehicleState, navigation,
+    // clusterRenderModel, nowPlaying, wifiSetup, ...) is still alive. These locals are
+    // declared after `engine`, so they are destroyed BEFORE it; with the scene still
+    // alive their disappearance re-evaluated ~30 bindings against null ("TypeError:
+    // Cannot read property ... of null") during shutdown. Deleting the root objects first
+    // means no binding can run after the objects they read are gone.
+    const auto roots = engine.rootObjects();
+    for (QObject *root : roots)
+        delete root;
+    return exitCode;
 }

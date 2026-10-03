@@ -483,6 +483,7 @@ if(BUILD_TESTING)
         set_tests_properties(qml_smoke_${_name} PROPERTIES
             ENVIRONMENT "${_env}"
             PASS_REGULAR_EXPRESSION "\\[SMOKE\\] RESULT PASS"
+            FAIL_REGULAR_EXPRESSION "\\[SMOKE\\] (TEARDOWN FAIL|FAIL:)"
             TIMEOUT 90)
     endforeach()
 endif()
