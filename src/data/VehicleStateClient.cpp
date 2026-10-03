@@ -1,6 +1,7 @@
 #include "VehicleStateClient.h"
 
 #include "../config/ClusterConfig.h"
+#include "VehicleStateFrame.h"
 
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -17,6 +18,10 @@
 static const int STALE_TIMEOUT_MS = 1000;
 static const int WATCHDOG_TICK_MS = 200;
 static const int MAX_BACKOFF_MS   = 5000;
+static const int INITIAL_BACKOFF_MS = 250;
+static const int CONNECT_TIMEOUT_MS = 5000;          // TCP connect + WebSocket upgrade
+static const int MAX_HANDSHAKE_BYTES = 16 * 1024;    // HTTP upgrade response size cap
+static const int PARSE_LOG_INTERVAL_MS = 5000;       // rate limit for parse-error logs
 
 namespace {
 bool jsonBool(const QJsonValue &value, bool *okOut = nullptr)
@@ -162,6 +167,8 @@ VehicleStateClient::VehicleStateClient(QObject *parent)
     m_replayLoop = !qEnvironmentVariableIsSet("BEAGLEY_REPLAY_LOOP")
         || qEnvironmentVariableIntValue("BEAGLEY_REPLAY_LOOP") != 0;
 
+    m_clock.start();
+
     m_socket.setProxy(QNetworkProxy::NoProxy);
     connect(&m_socket, &QTcpSocket::connected, this, &VehicleStateClient::onSocketConnected);
     connect(&m_socket, &QTcpSocket::disconnected, this, &VehicleStateClient::onDisconnected);
@@ -172,19 +179,8 @@ VehicleStateClient::VehicleStateClient(QObject *parent)
                    << "state=" << m_socket.state()
                    << "url=" << m_connectUrl;
         if (m_socket.state() == QAbstractSocket::UnconnectedState) {
-            m_handshakeComplete = false;
-            m_socketBuffer.clear();
-            m_fragmentBuffer.clear();
-            m_fragmentIsText = false;
-            setConnected(false);
-            setLinkStale(true);
-            setGpsFixValid(false);
-            setGpsPoseValid(false);
-            setDiagnosticOk(false);
-            setDiagnosticSeverity(QStringLiteral("warning"));
-            setDiagnosticStatus(QStringLiteral("link_down"));
-            setDiagnosticSummary(QStringLiteral("VEHICLE DATA LINK DOWN"));
-            setDiagnosticFindingCount(0);
+            m_connectTimeout.stop();
+            handleLinkDown();
             scheduleReconnect();
         }
     });
@@ -195,6 +191,10 @@ VehicleStateClient::VehicleStateClient(QObject *parent)
     m_watchdog.setInterval(WATCHDOG_TICK_MS);
     connect(&m_watchdog, &QTimer::timeout, this, &VehicleStateClient::checkStale);
     m_watchdog.start();
+
+    m_connectTimeout.setSingleShot(true);
+    m_connectTimeout.setInterval(CONNECT_TIMEOUT_MS);
+    connect(&m_connectTimeout, &QTimer::timeout, this, &VehicleStateClient::onConnectTimeout);
 
     m_reconnect.setSingleShot(true);
     connect(&m_reconnect, &QTimer::timeout, this, &VehicleStateClient::connectNow);
@@ -216,6 +216,19 @@ VehicleStateClient::VehicleStateClient(QObject *parent)
     }
 
     connectNow();
+}
+
+VehicleStateClient::~VehicleStateClient()
+{
+    // m_socket is declared before members its signal handlers use (e.g.
+    // m_connectUrl), so it would otherwise be destroyed after them and emit
+    // stateChanged/disconnected into freed state. Detach and close it first.
+    m_watchdog.stop();
+    m_reconnect.stop();
+    m_connectTimeout.stop();
+    m_replayTimer.stop();
+    QObject::disconnect(&m_socket, nullptr, this, nullptr);
+    m_socket.abort();
 }
 
 void VehicleStateClient::loadReplayFrames(const QString &path)
@@ -278,12 +291,32 @@ void VehicleStateClient::connectNow()
     }
     m_handshakeComplete = false;
     m_socketBuffer.clear();
-    m_fragmentBuffer.clear();
-    m_fragmentIsText = false;
+    m_decoder.reset();
     m_handshakeKey = generateHandshakeKey();
 
     qDebug() << "[VehicleStateClient] connecting to" << m_connectUrl;
+    m_connectTimeout.start();
     m_socket.connectToHost(m_connectUrl.host(), m_connectUrl.port(80));
+}
+
+void VehicleStateClient::onConnectTimeout()
+{
+    if (m_handshakeComplete || m_replayMode) {
+        return;
+    }
+    failConnection(QStringLiteral("connect/handshake timed out after %1 ms").arg(CONNECT_TIMEOUT_MS));
+}
+
+// Drop the current connection (protocol violation, timeout) and go through the
+// normal link-down + backoff path.
+void VehicleStateClient::failConnection(const QString &reason)
+{
+    qWarning().noquote() << "[VehicleStateClient] dropping connection:" << reason
+                         << "url=" << m_connectUrl.toString();
+    m_connectTimeout.stop();
+    m_socket.abort();
+    handleLinkDown();
+    scheduleReconnect();
 }
 
 void VehicleStateClient::scheduleReconnect()
@@ -308,8 +341,18 @@ void VehicleStateClient::onSocketConnected()
 
 void VehicleStateClient::onSocketReadyRead()
 {
-    m_socketBuffer += m_socket.readAll();
-    processSocketBuffer();
+    const QByteArray data = m_socket.readAll();
+    if (!m_handshakeComplete) {
+        m_socketBuffer += data;
+        processSocketBuffer();
+        return;
+    }
+    QVector<WebSocketFrameDecoder::Event> events;
+    const auto status = m_decoder.feed(data, &events);
+    processDecodedEvents(events);
+    if (status != WebSocketFrameDecoder::Status::Ok) {
+        failConnection(m_decoder.errorString());
+    }
 }
 
 void VehicleStateClient::sendHandshakeRequest()
@@ -342,12 +385,7 @@ void VehicleStateClient::sendHandshakeRequest()
 
 void VehicleStateClient::processSocketBuffer()
 {
-    if (!m_handshakeComplete) {
-        processHandshake();
-    }
-    if (m_handshakeComplete) {
-        processFrameBuffer();
-    }
+    processHandshake();
 }
 
 void VehicleStateClient::processHandshake()
@@ -355,6 +393,9 @@ void VehicleStateClient::processHandshake()
     static const QByteArray separator("\r\n\r\n");
     const int headerEnd = m_socketBuffer.indexOf(separator);
     if (headerEnd < 0) {
+        if (m_socketBuffer.size() > MAX_HANDSHAKE_BYTES) {
+            failConnection(QStringLiteral("handshake response exceeds %1 bytes").arg(MAX_HANDSHAKE_BYTES));
+        }
         return;
     }
 
@@ -380,95 +421,34 @@ void VehicleStateClient::processHandshake()
 
     m_handshakeComplete = true;
     onConnected();
+
+    // Bytes after the HTTP headers already belong to the WebSocket stream.
+    if (!m_socketBuffer.isEmpty()) {
+        const QByteArray rest = m_socketBuffer;
+        m_socketBuffer.clear();
+        QVector<WebSocketFrameDecoder::Event> events;
+        const auto status = m_decoder.feed(rest, &events);
+        processDecodedEvents(events);
+        if (status != WebSocketFrameDecoder::Status::Ok) {
+            failConnection(m_decoder.errorString());
+        }
+    }
 }
 
-void VehicleStateClient::processFrameBuffer()
+void VehicleStateClient::processDecodedEvents(const QVector<WebSocketFrameDecoder::Event> &events)
 {
-    while (true) {
-        if (m_socketBuffer.size() < 2) {
-            return;
-        }
-
-        const quint8 byte0 = quint8(m_socketBuffer.at(0));
-        const quint8 byte1 = quint8(m_socketBuffer.at(1));
-        const bool fin = (byte0 & 0x80) != 0;
-        const quint8 opcode = (byte0 & 0x0f);
-        const bool masked = (byte1 & 0x80) != 0;
-
-        quint64 payloadLength = quint64(byte1 & 0x7f);
-        int offset = 2;
-
-        if (payloadLength == 126) {
-            if (m_socketBuffer.size() < offset + 2) {
-                return;
-            }
-            payloadLength =
-                (quint64(quint8(m_socketBuffer.at(offset))) << 8) |
-                quint64(quint8(m_socketBuffer.at(offset + 1)));
-            offset += 2;
-        } else if (payloadLength == 127) {
-            if (m_socketBuffer.size() < offset + 8) {
-                return;
-            }
-            payloadLength = 0;
-            for (int i = 0; i < 8; ++i) {
-                payloadLength = (payloadLength << 8) | quint64(quint8(m_socketBuffer.at(offset + i)));
-            }
-            offset += 8;
-        }
-
-        QByteArray maskKey;
-        if (masked) {
-            if (m_socketBuffer.size() < offset + 4) {
-                return;
-            }
-            maskKey = m_socketBuffer.mid(offset, 4);
-            offset += 4;
-        }
-
-        if (m_socketBuffer.size() < offset + int(payloadLength)) {
-            return;
-        }
-
-        QByteArray payload = m_socketBuffer.mid(offset, int(payloadLength));
-        m_socketBuffer.remove(0, offset + int(payloadLength));
-
-        if (masked) {
-            for (int i = 0; i < payload.size(); ++i) {
-                payload[i] = payload.at(i) ^ maskKey.at(i % 4);
-            }
-        }
-
-        switch (opcode) {
-        case 0x0:
-            if (m_fragmentIsText) {
-                m_fragmentBuffer += payload;
-                if (fin) {
-                    onTextMessageReceived(QString::fromUtf8(m_fragmentBuffer));
-                    m_fragmentBuffer.clear();
-                    m_fragmentIsText = false;
-                }
-            }
+    for (const WebSocketFrameDecoder::Event &event : events) {
+        switch (event.type) {
+        case WebSocketFrameDecoder::EventType::Text:
+            onTextMessageReceived(QString::fromUtf8(event.payload));
             break;
-        case 0x1:
-            if (fin) {
-                onTextMessageReceived(QString::fromUtf8(payload));
-            } else {
-                m_fragmentBuffer = payload;
-                m_fragmentIsText = true;
-            }
+        case WebSocketFrameDecoder::EventType::Ping:
+            sendControlFrame(0xA, event.payload);
             break;
-        case 0x8:
-            sendControlFrame(0x8, payload.left(125));
+        case WebSocketFrameDecoder::EventType::Close:
+            sendControlFrame(0x8, event.payload.left(125));
             m_socket.disconnectFromHost();
             return;
-        case 0x9:
-            sendControlFrame(0xA, payload);
-            break;
-        case 0xA:
-            break;
-        default:
-            break;
         }
     }
 }
@@ -512,19 +492,31 @@ void VehicleStateClient::sendControlFrame(quint8 opcode, const QByteArray &paylo
 void VehicleStateClient::onConnected()
 {
     qInfo() << "[VehicleStateClient] connected" << m_connectUrl;
+    m_connectTimeout.stop();
     setConnected(true);
-    m_backoffMs = 250;
+    m_backoffMs = INITIAL_BACKOFF_MS;
 }
 
 void VehicleStateClient::onDisconnected()
 {
     qWarning() << "[VehicleStateClient] disconnected" << m_connectUrl;
+    m_connectTimeout.stop();
+    handleLinkDown();
+    scheduleReconnect();
+}
+
+// Common "link is down" state reset (disconnect, socket error, forced drop).
+// Forgetting the last good frame means a fast reconnect cannot present old data
+// as fresh: linkStale stays true until a new good frame arrives.
+void VehicleStateClient::handleLinkDown()
+{
     m_handshakeComplete = false;
     m_socketBuffer.clear();
-    m_fragmentBuffer.clear();
-    m_fragmentIsText = false;
+    m_decoder.reset();
+    m_hasGoodFrame = false;
     setConnected(false);
     setLinkStale(true);
+    setBbbStale(true);
     setGpsFixValid(false);
     setGpsPoseValid(false);
     setDiagnosticOk(false);
@@ -532,7 +524,6 @@ void VehicleStateClient::onDisconnected()
     setDiagnosticStatus(QStringLiteral("link_down"));
     setDiagnosticSummary(QStringLiteral("VEHICLE DATA LINK DOWN"));
     setDiagnosticFindingCount(0);
-    scheduleReconnect();
 }
 
 void VehicleStateClient::playNextReplayFrame()
@@ -557,9 +548,17 @@ void VehicleStateClient::playNextReplayFrame()
 
 void VehicleStateClient::onTextMessageReceived(const QString &msg)
 {
-    const QJsonDocument doc = QJsonDocument::fromJson(msg.toUtf8());
-    if (!doc.isObject())
+    QJsonParseError parseError;
+    const QJsonDocument doc = QJsonDocument::fromJson(msg.toUtf8(), &parseError);
+    if (parseError.error != QJsonParseError::NoError) {
+        logParseProblem(QStringLiteral("invalid JSON (%1 at offset %2, %3 bytes)")
+                            .arg(parseError.errorString()).arg(parseError.offset).arg(msg.size()));
         return;
+    }
+    if (!doc.isObject()) {
+        logParseProblem(QStringLiteral("JSON is not an object (%1 bytes)").arg(msg.size()));
+        return;
+    }
 
     const QJsonObject obj = doc.object();
     const QString type = obj.value("type").toString();
@@ -580,16 +579,11 @@ void VehicleStateClient::onTextMessageReceived(const QString &msg)
     // still applied below but do not keep the link alive. Replayed JSONL frames
     // (BEAGLEY_REPLAY_FILE) are diagnostic fixtures that predate the contract and
     // omit indicators/warnings, so they are always treated as good.
-    const bool goodFrame = m_replayMode
-        || (obj.contains(QStringLiteral("speedKph"))
-            && obj.contains(QStringLiteral("rpm"))
-            && obj.contains(QStringLiteral("fuelPct"))
-            && obj.contains(QStringLiteral("coolantC"))
-            && obj.value(QStringLiteral("indicators")).isObject()
-            && obj.value(QStringLiteral("warnings")).isObject()
-            && obj.value(QStringLiteral("_health")).isObject());
-    if (goodFrame)
-        m_lastGoodRxMs = QDateTime::currentMSecsSinceEpoch();
+    const bool goodFrame = m_replayMode || VehicleStateFrame::isGood(obj);
+    if (goodFrame) {
+        m_lastGoodRxMs = nowMs();
+        m_hasGoodFrame = true;
+    }
     setVehicleStateSeen(true);
 
     setLeftIndicator(readBoolAny(indicators, {"left"}, false));
@@ -717,13 +711,33 @@ void VehicleStateClient::onTextMessageReceived(const QString &msg)
     // once age is within threshold.
 }
 
+// Rate-limited: a misbehaving hub sending 10 Hz garbage must not flood the journal.
+void VehicleStateClient::logParseProblem(const QString &what)
+{
+    const qint64 now = nowMs();
+    if (m_lastParseLogMs >= 0 && now - m_lastParseLogMs < PARSE_LOG_INTERVAL_MS) {
+        ++m_suppressedParseLogs;
+        return;
+    }
+    qWarning().noquote() << "[VehicleStateClient] frame ignored:" << what
+                         << (m_suppressedParseLogs > 0
+                                 ? QStringLiteral("(+%1 similar suppressed)").arg(m_suppressedParseLogs)
+                                 : QString());
+    m_lastParseLogMs = now;
+    m_suppressedParseLogs = 0;
+}
+
 void VehicleStateClient::checkStale()
 {
-    if (m_lastGoodRxMs == 0) {
+    if (!m_hasGoodFrame) {
         setRxAgeMs(0);
         setLinkStale(true);
         setGpsFixValid(false);
         setGpsPoseValid(false);
+        if (!connected()) {
+            // Keep the more specific "link down" diagnostic set by handleLinkDown().
+            return;
+        }
         setDiagnosticOk(false);
         setDiagnosticSeverity(QStringLiteral("warning"));
         setDiagnosticStatus(QStringLiteral("link_stale"));
@@ -732,8 +746,7 @@ void VehicleStateClient::checkStale()
         return;
     }
 
-    const qint64 now = QDateTime::currentMSecsSinceEpoch();
-    const int age = int(now - m_lastGoodRxMs);
+    const int age = int(nowMs() - m_lastGoodRxMs);
     setRxAgeMs(age);
 
     const bool staleNow = (age > STALE_TIMEOUT_MS);
