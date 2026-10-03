@@ -518,20 +518,22 @@ class VehicleHub:
     def _apply_can_overlay(self, state: dict) -> None:
         decoded_signals = set()
         if self._can_replay is not None:
-            decoded = self._can_replay.snapshot()
+            health = self._can_replay.health()
+            # Fail-safe: a stale source must not keep showing its last values as live.
+            decoded = {} if health.get("stale", True) else self._can_replay.snapshot()
             merge_vehicle_overlay(state, decoded)
             decoded_signals.update(decoded)
-            health = self._can_replay.health()
             state["_health"]["canReplay"] = health
             state["_health"]["canReplayDiagnostics"] = self._can_replay.diagnostics()
             if decoded and not health.get("stale", True):
                 state["_health"]["stale"] = False
                 state["_health"]["vehicleSource"] = "can_replay"
         if self._can_live is not None:
-            decoded = self._can_live.snapshot()
+            health = self._can_live.health()
+            # Fail-safe: a stale source must not keep showing its last values as live.
+            decoded = {} if health.get("stale", True) else self._can_live.snapshot()
             merge_vehicle_overlay(state, decoded)
             decoded_signals.update(decoded)
-            health = self._can_live.health()
             state["_health"]["canLive"] = health
             state["_health"]["canLiveDiagnostics"] = self._can_live.diagnostics()
             if decoded and not health.get("stale", True):
@@ -554,9 +556,10 @@ class VehicleHub:
                     "reason": "not configured or failed to initialize",
                 }
             return
-        overlay = self._serial_inputs.snapshot()
-        merge_vehicle_overlay(state, overlay)
         health = self._serial_inputs.health()
+        # Fail-safe: a stale source (UNO unplugged/silent) must not keep showing its last values as live.
+        overlay = {} if health.get("stale", True) else self._serial_inputs.snapshot()
+        merge_vehicle_overlay(state, overlay)
         state["_health"]["serialVehicleInputs"] = health
         if overlay and not health.get("stale", True):
             state["_health"]["stale"] = False

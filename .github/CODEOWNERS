@@ -1,0 +1,13 @@
+# Default owner for everything
+*                       @Ajkopensesame
+
+# Path splits (all currently the same owner; adjust as maintainers are added)
+/.github/               @Ajkopensesame
+/src/                   @Ajkopensesame
+/tools/                 @Ajkopensesame
+/tools/bbb_hub/         @Ajkopensesame
+/yocto/                 @Ajkopensesame
+/docs/                  @Ajkopensesame
+/tests/                 @Ajkopensesame
+/skills/                @Ajkopensesame
+/CMakeLists.txt         @Ajkopensesame
