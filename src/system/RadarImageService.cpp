@@ -1,4 +1,5 @@
 #include "RadarImageService.h"
+#include "../config/ClusterConfig.h"
 
 #include <QCryptographicHash>
 #include <QDebug>
@@ -689,10 +690,12 @@ RadarImageService::CenterTile RadarImageService::centerTile() const
 QUrl RadarImageService::mapTileUrl(int row, int col) const
 {
     const int tilesPerAxis = 1 << kTileZoom;
-    const QString urlText = QStringLiteral("https://a.basemaps.cartocdn.com/rastertiles/voyager_nolabels/%1/%2/%3.png")
-        .arg(QString::number(kTileZoom),
-             QString::number(wrapTileX(col, tilesPerAxis)),
-             QString::number(row));
+    // Base layer: configurable keyless tiles (Carto voyager_nolabels now returns an
+    // "API KEY REQUIRED" watermark). See ClusterConfig::mapTileUrl().
+    QString urlText = ClusterConfig::mapTileUrl();
+    urlText.replace(QStringLiteral("{z}"), QString::number(kTileZoom));
+    urlText.replace(QStringLiteral("{x}"), QString::number(wrapTileX(col, tilesPerAxis)));
+    urlText.replace(QStringLiteral("{y}"), QString::number(row));
     return QUrl(urlText);
 }
 

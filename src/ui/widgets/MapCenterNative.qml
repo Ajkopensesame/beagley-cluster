@@ -22,6 +22,7 @@ Item {
     property var mapGuidanceBanner: ({})
     property var mapConnectivity: ({})
     property string tileUrlTemplate: ""
+    property bool tileDarken: false
     property bool interactionEnabled: true
     readonly property bool embeddedMapThrottle: (typeof BEAGLEY_RENDER_PROFILE !== "undefined"
         && String(BEAGLEY_RENDER_PROFILE) === "embedded")
@@ -365,6 +366,7 @@ Item {
                 vehicleVisible: root.nativeVehicleVisible
                 routePath: root.nativeRoutePath
                 tileUrlTemplate: root.resolvedTileUrlTemplate
+                darkenTiles: root.tileDarken
                 userAgent: "BeagleyCluster/1.0 (native-online)"
                 metrics: (typeof performanceMetrics !== "undefined") ? performanceMetrics : null
             }

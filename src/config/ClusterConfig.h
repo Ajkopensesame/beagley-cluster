@@ -21,6 +21,31 @@ inline QString hubUrl()
     return fromEnv.isEmpty() ? defaultHubUrl() : fromEnv;
 }
 
+// Raster map tile template for the keyless fallback map (and the radar base layer).
+// Default: OpenStreetMap standard tiles. NOTE: OSM's tile usage policy requires a valid
+// identifying User-Agent (the app sends one) and forbids heavy use; point this at your own
+// tile server / a licensed provider for production fleets. Carto's old keyless
+// light_all/dark_all/voyager endpoints now return an "API KEY REQUIRED" watermark and must
+// not be used. Override with BEAGLEY_MAP_TILE_URL ({z}/{x}/{y} placeholders).
+inline QString defaultMapTileUrl()
+{
+    return QStringLiteral("https://tile.openstreetmap.org/{z}/{x}/{y}.png");
+}
+
+inline QString mapTileUrl()
+{
+    const QString fromEnv = QString::fromUtf8(qgetenv("BEAGLEY_MAP_TILE_URL")).trimmed();
+    return fromEnv.isEmpty() ? defaultMapTileUrl() : fromEnv;
+}
+
+// Whether the Dark map theme darkens the (light) fallback tiles locally. Default on;
+// BEAGLEY_MAP_TILE_DARKEN=0 for a tile source that is already dark.
+inline bool mapTileDarken()
+{
+    return !qEnvironmentVariableIsSet("BEAGLEY_MAP_TILE_DARKEN")
+        || qEnvironmentVariableIntValue("BEAGLEY_MAP_TILE_DARKEN") != 0;
+}
+
 enum class VehicleBackend { Live, Mock };
 
 // Resolve BEAGLEY_VEHICLE_BACKEND. Default is live. Anything but "mock"/"live"/empty

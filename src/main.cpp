@@ -41,6 +41,7 @@
 #include "system/NowPlayingService.h"
 #include "system/RadarImageService.h"
 #include "system/WiFiSetupService.h"
+#include "test_support/SmokeProbe.h"
 
 #ifdef WITH_WEBENGINE
 #include <QtWebEngineQuick/QtWebEngineQuick>
@@ -426,6 +427,10 @@ int main(int argc, char *argv[])
     }
 #endif
 
+    // Headless QML smoke test hook (BEAGLEY_SMOKE_TEST=1 only; inert otherwise).
+    if (SmokeProbe::enabled())
+        SmokeProbe::installMessageHandler();
+
     QGuiApplication app(argc, argv);
     qmlRegisterType<GaugeArcItem>("BeagleY", 1, 0, "GaugeArcItem");
     qmlRegisterType<NativeGaugeInstrumentItem>("BeagleY", 1, 0, "NativeGaugeInstrument");
@@ -473,6 +478,8 @@ int main(int argc, char *argv[])
             ? QStringLiteral("qrc:/web/map/styles/embedded-liberty.json")
             : QStringLiteral("https://tiles.openfreemap.org/styles/liberty"));
     engine.setNetworkAccessManagerFactory(new BeagleyNetworkAccessManagerFactory(mapUserAgent));
+    engine.rootContext()->setContextProperty("BEAGLEY_MAP_TILE_URL", ClusterConfig::mapTileUrl());
+    engine.rootContext()->setContextProperty("BEAGLEY_MAP_TILE_DARKEN", ClusterConfig::mapTileDarken());
     engine.rootContext()->setContextProperty("BEAGLEY_NO_MAP", noMap);
     engine.rootContext()->setContextProperty("BEAGLEY_FORCE_SNAPSHOT_MAP", forceSnapshotMap);
     engine.rootContext()->setContextProperty("BEAGLEY_EMBEDDED_DISPLAY", embeddedDisplay);
@@ -705,6 +712,9 @@ int main(int argc, char *argv[])
 
     if (engine.rootObjects().isEmpty())
         return -1;
+
+    if (SmokeProbe::enabled())
+        SmokeProbe::start(engine);
 
     for (QObject *object : engine.rootObjects()) {
         if (auto *window = qobject_cast<QQuickWindow *>(object)) {

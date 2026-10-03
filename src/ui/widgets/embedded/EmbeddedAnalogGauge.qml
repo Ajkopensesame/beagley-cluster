@@ -1,5 +1,5 @@
 import QtQuick 2.15
-import QtQuick.Shapes 1.15
+import QtQuick.Shapes
 
 Item {
     id: root
@@ -262,6 +262,7 @@ Item {
         spacing: 0
 
         Text {
+            objectName: "gaugeReadout"
             anchors.horizontalCenter: parent.horizontalCenter
             color: root.textColor
             font.family: root.fontFamily

@@ -29,6 +29,7 @@ class NativeRasterMapItem : public QQuickItem
     Q_PROPERTY(bool vehicleVisible READ vehicleVisible WRITE setVehicleVisible NOTIFY viewChanged)
     Q_PROPERTY(QVariantList routePath READ routePath WRITE setRoutePath NOTIFY routePathChanged)
     Q_PROPERTY(QString tileUrlTemplate READ tileUrlTemplate WRITE setTileUrlTemplate NOTIFY tileUrlTemplateChanged)
+    Q_PROPERTY(bool darkenTiles READ darkenTiles WRITE setDarkenTiles NOTIFY darkenTilesChanged)
     Q_PROPERTY(QString userAgent READ userAgent WRITE setUserAgent NOTIFY userAgentChanged)
     Q_PROPERTY(QString cacheDirectory READ cacheDirectory WRITE setCacheDirectory NOTIFY cacheDirectoryChanged)
     Q_PROPERTY(QObject *metrics READ metrics WRITE setMetrics NOTIFY metricsChanged)
@@ -47,10 +48,12 @@ public:
     bool vehicleVisible() const { return m_vehicleVisible; }
     QVariantList routePath() const { return m_routePath; }
     QString tileUrlTemplate() const { return m_tileUrlTemplate; }
+    bool darkenTiles() const { return m_darkenTiles; }
     QString userAgent() const { return m_userAgent; }
     QString cacheDirectory() const { return m_cacheDirectory; }
     QObject *metrics() const { return m_metrics; }
 
+    void setDarkenTiles(bool value);
     void setCenterLat(double value);
     void setCenterLng(double value);
     void setMapBearing(double value);
@@ -69,6 +72,7 @@ signals:
     void viewChanged();
     void routePathChanged();
     void tileUrlTemplateChanged();
+    void darkenTilesChanged();
     void userAgentChanged();
     void cacheDirectoryChanged();
     void metricsChanged();
@@ -109,6 +113,7 @@ private:
     bool m_vehicleVisible = true;
     QVariantList m_routePath;
     QString m_tileUrlTemplate = QStringLiteral("https://tile.openstreetmap.org/{z}/{x}/{y}.png");
+    bool m_darkenTiles = false;
     QString m_userAgent = QStringLiteral("BeagleyCluster/1.0");
     QString m_cacheDirectory;
     QPointer<QObject> m_metrics;
