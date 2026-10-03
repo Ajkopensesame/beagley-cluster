@@ -78,7 +78,7 @@ jobs:
 
       - name: Cache QMapLibre ${{ env.MAPLIBRE_QT_VERSION }}
         id: mlcache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ runner.temp }}/qmaplibre-prefix
           key: qmaplibre-${{ env.MAPLIBRE_QT_VERSION }}-qt${{ env.QT_VERSION }}-arm64-${{ hashFiles('app/yocto/meta-beagley-cluster/recipes-graphics/maplibre-native-qt/**') }}-v1
