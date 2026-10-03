@@ -616,11 +616,14 @@ int main(int argc, char *argv[])
     QString entryPoint;
     if (uiVariant == QLatin1String("embedded") || uiVariant == QLatin1String("appliance")) {
         entryPoint = QStringLiteral("MainEmbedded");
-    } else if (uiVariant == QLatin1String("legacy") || uiVariant == QLatin1String("v1")) {
-        entryPoint = QStringLiteral("Main");
-    } else if (uiVariant == QLatin1String("v2")) {
-        entryPoint = QStringLiteral("MainV2");
     } else {
+        // The old Main.qml (legacy/v1) and MainV2.qml (v2) screens were removed. Those values
+        // are still accepted so existing launch scripts keep starting, but they get MainV3.
+        if (uiVariant == QLatin1String("legacy") || uiVariant == QLatin1String("v1")
+            || uiVariant == QLatin1String("v2")) {
+            qWarning() << "[UI] BEAGLEY_UI_VARIANT =" << uiVariant
+                       << "was removed (legacy Main/MainV2 UIs deleted); using MainV3";
+        }
         entryPoint = QStringLiteral("MainV3");
     }
 
@@ -696,20 +699,8 @@ int main(int argc, char *argv[])
     };
     loadEntryPoint(entryPoint);
 
-    // Only desktop-oriented variants should fall back to the legacy Main UI.
-    // On the embedded appliance path that fallback can reintroduce optional
-    // WebEngine dependencies that the production build intentionally excludes.
-    const bool allowLegacyMainFallback =
-        renderProfile != QLatin1String("embedded")
-        && uiVariant != QLatin1String("embedded")
-        && uiVariant != QLatin1String("appliance");
-    if (engine.rootObjects().isEmpty()
-        && allowLegacyMainFallback
-        && entryPoint != QLatin1String("Main")) {
-        qWarning() << "[UI] failed to load" << entryPoint << "- falling back to Main";
-        loadEntryPoint(QStringLiteral("Main"));
-    }
-
+    // No silent fallback to another UI: a MainV3/MainEmbedded load failure is a hard error
+    // (the old fallback to the legacy Main.qml is gone together with that screen).
     if (engine.rootObjects().isEmpty())
         return -1;
 

@@ -6,6 +6,7 @@ Only the vehicle-state link is covered here. Many more `BEAGLEY_*` switches (UI 
 | --- | --- | --- | --- |
 | `VEHICLE_HUB_WS_URL` | `ws://10.24.0.7:8765` (`ClusterConfig::defaultHubUrl()`) | `VehicleStateClient` via `ClusterConfig::hubUrl()` | Hub WebSocket endpoint. Empty/unset → default. |
 | `BEAGLEY_VEHICLE_BACKEND` | `live` | `main.cpp` via `ClusterConfig::resolveVehicleBackend()` | `live` or `mock`. Unknown values warn and use live. `mock` is **refused** (warn + live) in builds with `BEAGLEY_APPLIANCE_PRODUCTION=ON`. |
+| `BEAGLEY_UI_VARIANT` | `v3` (`embedded` on the embedded render profile) | `main.cpp` | `v3` -> MainV3, `embedded`/`appliance` -> MainEmbedded. `legacy`/`v1`/`v2` were removed with the old screens: they log a warning and load MainV3. There is no fall-back UI: if the entry QML fails to load the process exits non-zero. |
 | `BEAGLEY_REPLAY_FILE` | unset | `VehicleStateClient` | JSONL file of `vehicle_state` frames to replay instead of connecting. Replay frames always count as "good" (never stale); see ARCHITECTURE.md. |
 | `BEAGLEY_REPLAY_LOOP` | `1` | `VehicleStateClient` | `0` plays the replay once. |
 
