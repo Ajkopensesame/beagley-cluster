@@ -154,10 +154,6 @@ Window {
         && BEAGLEY_MAPLIBRE_NATIVE_FULL_UNDERLAY
     readonly property bool mapLibreSafeCompositor: mapLibreNativeActive && !mapLibreNativeFullUnderlay
     readonly property real gaugeFaceBackgroundOpacity: 1.0
-    readonly property int mapLibreSafeSideInset: mapLibreSafeCompositor
-        ? Math.round(gaugeFaceSize * 0.50)
-        : 0
-    readonly property int mapLibreSafeVerticalInset: mapLibreSafeCompositor ? 14 : 0
     readonly property bool radarFeatureEnabled: (typeof BEAGLEY_RADAR_ENABLED !== "undefined")
         && BEAGLEY_RADAR_ENABLED
     property string weatherExpandedMode: (typeof BEAGLEY_INITIAL_WEATHER_EXPANDED_MODE !== "undefined"
@@ -184,6 +180,21 @@ Window {
     readonly property int gaugePodSize: 632
     readonly property int gaugeFaceSize: 644
     readonly property int gaugeEdgeBleed: -26
+    // Centre map panel geometry. The panel lives strictly in the gap between the two gauge lens
+    // rims (GaugeLensShell diameter = gaugeFaceSize + 36, centred in a gaugeShellSize shell that is
+    // pushed gaugeEdgeBleed off each screen edge):
+    //   left rim  = gaugeEdgeBleed + gaugeShellSize/2 + (gaugeFaceSize + 36)/2 = 698 px
+    //   right rim = width - 698 = 1222 px   -> free gap 524 px; panel inset adds mapPanelGaugeClearance.
+    // (Previously the map used gaugeFaceSize * 0.5 = 322 px per side, i.e. it reached 376 px into each
+    // gauge.) A full-bleed map is only used when MapLibre full-underlay is explicitly requested.
+    readonly property int gaugeLensSize: gaugeFaceSize + 36
+    readonly property int mapPanelGaugeClearance: 8
+    readonly property bool mapPanelActive: !mapLibreNativeFullUnderlay
+    readonly property int mapPanelSideInset: mapPanelActive
+        ? Math.max(0, gaugeEdgeBleed + Math.round(gaugeShellSize / 2) + Math.round(gaugeLensSize / 2) + mapPanelGaugeClearance)
+        : 0
+    readonly property int mapPanelVerticalInset: mapPanelActive ? 14 : 0
+    readonly property int mapPanelCornerRadius: 22
     property real sharedEffectPhase: 0.0
     property real stressPhase: 0.0
     property real clusterSimulationPhase: 0.0
@@ -1798,15 +1809,30 @@ Window {
             }
         }
 
+        // Centre map panel: the map is clipped to its own rectangle strictly between the gauges
+        // (see mapPanelSideInset). Dark backing first, so a missing / light (demo-style) map never
+        // shows as a bright rectangle. Gauge shells are z 220; nothing here goes above z 9.
+        Rectangle {
+            id: mapPanelBackdrop
+            z: 0
+            anchors.fill: parent
+            anchors.leftMargin: root.mapPanelSideInset
+            anchors.rightMargin: root.mapPanelSideInset
+            anchors.topMargin: root.mapPanelVerticalInset
+            anchors.bottomMargin: root.mapPanelVerticalInset
+            color: appTheme.mapPanelBackdrop
+            visible: !root.mapMenuOpen
+        }
+
         W.MapCenter {
             id: navField
             anchors.fill: parent
             visible: !root.mapMenuOpen
-            anchors.leftMargin: root.mapLibreSafeSideInset
-            anchors.rightMargin: root.mapLibreSafeSideInset
-            anchors.topMargin: root.mapLibreSafeVerticalInset
-            anchors.bottomMargin: root.mapLibreSafeVerticalInset
-            clip: false
+            anchors.leftMargin: root.mapPanelSideInset
+            anchors.rightMargin: root.mapPanelSideInset
+            anchors.topMargin: root.mapPanelVerticalInset
+            anchors.bottomMargin: root.mapPanelVerticalInset
+            clip: true
             mode: ((typeof BEAGLEY_NO_MAP !== "undefined" && BEAGLEY_NO_MAP)
                 && !(root.effectiveMapRenderer === "native"
                     || root.effectiveMapRenderer === "native-online"
@@ -1846,7 +1872,7 @@ Window {
 
         Item {
             id: mapLegibilityVeil
-            anchors.fill: parent
+            anchors.fill: navField
             z: 4
             visible: !root.mapMenuOpen && !root.navControlsOpen
 
@@ -1863,6 +1889,14 @@ Window {
                 }
             }
 
+            // Flat dark tint over the map content: a light demo-style fallback map reads as a dim
+            // slate panel instead of a bright rectangle; a real dark map is barely affected.
+            Rectangle {
+                anchors.fill: parent
+                color: appTheme.mapPanelBackdrop
+                opacity: root.mapNavProductActive ? appTheme.mapPanelTintGuidance : appTheme.mapPanelTint
+            }
+
             Rectangle {
                 anchors.left: parent.left
                 anchors.right: parent.right
@@ -1877,43 +1911,14 @@ Window {
             }
         }
 
-        Item {
-            id: mapLibreCompositorFence
-            anchors.fill: parent
-            visible: root.mapLibreSafeCompositor
+        // Soft panel edge (feathered sides, rounded corners) over the map, below the gauges and rails.
+        W.MapPanelFrame {
+            id: mapPanelFrame
+            anchors.fill: navField
             z: 8
-
-            Rectangle {
-                anchors.left: parent.left
-                anchors.top: parent.top
-                anchors.bottom: parent.bottom
-                width: root.mapLibreSafeSideInset
-                color: appTheme.mapDarkTokens ? appTheme.deepBlackNight : root.color
-            }
-
-            Rectangle {
-                anchors.right: parent.right
-                anchors.top: parent.top
-                anchors.bottom: parent.bottom
-                width: root.mapLibreSafeSideInset
-                color: appTheme.mapDarkTokens ? appTheme.deepBlackNight : root.color
-            }
-
-            Rectangle {
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.top: parent.top
-                height: root.mapLibreSafeVerticalInset
-                color: appTheme.mapDarkTokens ? appTheme.deepBlackNight : root.color
-            }
-
-            Rectangle {
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.bottom: parent.bottom
-                height: root.mapLibreSafeVerticalInset
-                color: appTheme.mapDarkTokens ? appTheme.deepBlackNight : root.color
-            }
+            visible: root.mapPanelActive && !root.mapMenuOpen && !root.navControlsOpen
+            fenceColor: appTheme.mapPanelFence
+            cornerRadius: root.mapPanelCornerRadius
         }
 
         // Skin v2: concept purple top/bottom map frame accents
@@ -1926,9 +1931,9 @@ Window {
             Rectangle {
                 anchors.left: parent.left
                 anchors.right: parent.right
-                anchors.leftMargin: root.mapLibreSafeSideInset + 8
-                anchors.rightMargin: root.mapLibreSafeSideInset + 8
-                y: root.mapLibreSafeVerticalInset
+                anchors.leftMargin: root.mapPanelSideInset + root.mapPanelCornerRadius
+                anchors.rightMargin: root.mapPanelSideInset + root.mapPanelCornerRadius
+                y: root.mapPanelVerticalInset
                 height: 2
                 radius: 1
                 color: appTheme.mapFramePurple
@@ -1937,9 +1942,9 @@ Window {
             Rectangle {
                 anchors.left: parent.left
                 anchors.right: parent.right
-                anchors.leftMargin: root.mapLibreSafeSideInset + 28
-                anchors.rightMargin: root.mapLibreSafeSideInset + 28
-                y: root.mapLibreSafeVerticalInset + 2
+                anchors.leftMargin: root.mapPanelSideInset + root.mapPanelCornerRadius + 20
+                anchors.rightMargin: root.mapPanelSideInset + root.mapPanelCornerRadius + 20
+                y: root.mapPanelVerticalInset + 2
                 height: 1
                 color: appTheme.mapFramePurple
                 opacity: 0.48
@@ -1947,10 +1952,10 @@ Window {
             Rectangle {
                 anchors.left: parent.left
                 anchors.right: parent.right
-                anchors.leftMargin: root.mapLibreSafeSideInset + 8
-                anchors.rightMargin: root.mapLibreSafeSideInset + 8
+                anchors.leftMargin: root.mapPanelSideInset + root.mapPanelCornerRadius
+                anchors.rightMargin: root.mapPanelSideInset + root.mapPanelCornerRadius
                 anchors.bottom: parent.bottom
-                anchors.bottomMargin: root.mapLibreSafeVerticalInset
+                anchors.bottomMargin: root.mapPanelVerticalInset
                 height: 2
                 radius: 1
                 color: appTheme.mapFramePurple
@@ -1959,10 +1964,10 @@ Window {
             Rectangle {
                 anchors.left: parent.left
                 anchors.right: parent.right
-                anchors.leftMargin: root.mapLibreSafeSideInset + 28
-                anchors.rightMargin: root.mapLibreSafeSideInset + 28
+                anchors.leftMargin: root.mapPanelSideInset + root.mapPanelCornerRadius + 20
+                anchors.rightMargin: root.mapPanelSideInset + root.mapPanelCornerRadius + 20
                 anchors.bottom: parent.bottom
-                anchors.bottomMargin: root.mapLibreSafeVerticalInset + 2
+                anchors.bottomMargin: root.mapPanelVerticalInset + 2
                 height: 1
                 color: appTheme.mapFramePurple
                 opacity: 0.42
