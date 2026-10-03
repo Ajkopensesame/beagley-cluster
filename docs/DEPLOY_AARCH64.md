@@ -76,7 +76,8 @@ The artifact `beagley-aarch64-<sha12>` contains:
 | `SHA256SUMS` | checksums of every file |
 | `evidence/file.txt`, `readelf-header.txt`, `readelf-dynamic.txt`, `needed-libs.txt` | architecture and the exact shared libraries it needs |
 | `evidence/readelf-version-info.txt`, `glibc-versions-needed.txt`, `glibcxx-versions-needed.txt`, `qt-symbol-versions-needed.txt`, `qt-private-api-symbols.txt` | symbol-version requirements |
-| `evidence/abi-checks.txt` | PASS/FAIL list (aarch64, links QMapLibre + Qt6Location, no WebEngine, glibc/glibcxx ceilings) |
+| `evidence/abi-checks.txt` | PASS/FAIL list (aarch64, `WITH_MAPLIBRE_NATIVE=ON`/`WITH_WEBENGINE=OFF` in the CMake cache, MapLibre-native QML compiled in, MapLibre plugins need libQMapLibre + libQt6Location, no WebEngine, glibc/glibcxx ceilings). Note: `beagley_cluster` itself does **not** list libQMapLibre/libQt6Location as NEEDED (linker `--as-needed`); MapLibre is loaded at run time through the `MapLibre` QML module and the `geoservices` plugin, exactly as in the Yocto image. |
+| `reference/plugins/geoservices/libqtgeoservices_maplibre.so`, `reference/qml/MapLibre/*` | the MapLibre plugins built from the same QMapLibre 3.0.0 source; compare `readelf -d` (SONAME/NEEDED) with the board's copies. **Reference only.** |
 | `reference/libQMapLibre*.so*` | the QMapLibre this binary was linked against. **Reference only; do not deploy unless section 4 shows the board's copy is missing/wrong.** |
 | `reference/beagley-cluster-launch.sh.from-repo`, `beagley-cluster.default.from-repo` | the repo's launcher and env defaults, for comparison with the board's |
 
@@ -144,7 +145,7 @@ EOF
    # use the exact LD_LIBRARY_PATH / QT_PLUGIN_PATH values the old launch.sh exports (if any)
    LD_TRACE_LOADED_OBJECTS=1 /data/beagley-cluster/runtime-<sha12>-linklost/beagley_cluster | grep -E 'not found|=>'
    ```
-   must show **no `not found`**, and `libQt6*.so.6` / `libQMapLibre.so.3` must resolve to the same paths the old binary resolves to (run the same command on the old binary and diff). This does not start the app; it only runs the dynamic loader in trace mode.
+   must show **no `not found`** (the QMapLibre/Qt Location plugins are not in this list because they are `dlopen`ed by Qt; check them separately: `for f in /usr/lib/plugins/geoservices/libqtgeoservices_maplibre.so /usr/lib/qml/MapLibre/libdeclarative_locationplugin_maplibre.so; do /lib/ld-linux-aarch64.so.1 --list $f 2>&1 | grep -c 'not found'; done` must print 0 0, and their `readelf -d` NEEDED must list `libQMapLibre.so.3` and `libQt6Location.so.6`; compare with `reference/` in the artifact), and `libQt6*.so.6` / `libQMapLibre.so.3` must resolve to the same paths the old binary resolves to (run the same command on the old binary and diff). This does not start the app; it only runs the dynamic loader in trace mode.
 
 ---
 
