@@ -1,6 +1,6 @@
 import QtQuick 2.15
 import QtQuick.Window 2.15
-import Qt.labs.settings
+import QtCore
 import BeagleY 1.0
 
 import "./theme" as Theme

@@ -51,7 +51,8 @@ ALLOWED_IMPORTS = {
     # Shape.CurveRenderer (Qt >= 6.6): "is not available in QtQuick.Shapes 1.15" and the
     # whole component fails to load. Must stay unversioned.
     "QtQuick.Shapes": {""},
-    "Qt.labs.settings": {"", "1.0"},
+    # QtCore.Settings (Qt >= 6.5) replaces the deprecated Qt.labs.settings: importing the labs
+    # module again prints "The Settings type from Qt.labs.settings is deprecated" at startup.
     "QtCore": {""},
     "BeagleY": {"1.0"},
     # Optional-feature modules, only for files that are compiled in when the feature is on.

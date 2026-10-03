@@ -37,11 +37,6 @@ const AllowEntry kAllowList[] = {
     // MainV3.qml); Qt reports the miss as a warning.
     {R"(SkinShowOverride\.qml: No such file or directory)",
      "optional qml-dev-only override, absent by design in compiled builds"},
-    // MainV3 uses Qt.labs.settings (deprecated since Qt 6.5 in favour of QtCore.Settings).
-    // Works on every supported Qt; migrating is a behaviour-affecting change outside this
-    // test's scope.
-    {R"(The Settings type from Qt\.labs\.settings is deprecated)",
-     "known deprecation notice, tracked as follow-up"},
     // Emitted by the offscreen QPA plugin when the window asks to be raised; the
     // offscreen platform has no window stacking.
     {R"(This plugin does not support (raise|propagateSizeHints|setParent)\(\))",
