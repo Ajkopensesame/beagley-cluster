@@ -296,6 +296,10 @@ Window {
     readonly property real gaugeRpmMaxStep: gaugeLowEffectMode ? 280.0 : 420.0
     readonly property real liveGaugeSpeed: smoothedSpeedValue
     readonly property real liveGaugeRpm: smoothedRpmValue
+    // Tach magma: engine-running floor so low-RPM atlas band stays visibly hot (p02-class frame)
+    readonly property real tachMagmaProgress: liveGaugeRpm > 150
+        ? Math.max(0.10, Math.min(1, liveGaugeRpm / 8000))
+        : 0.0
     readonly property real liveGaugeCoolant: smoothedCoolantValue
     readonly property real liveGaugeFuel: smoothedFuelValue
     readonly property bool gaugePearlBreatheActive: !gaugeEffectsOff && !gaugeLavaAccentEnabled
@@ -2776,7 +2780,7 @@ Window {
                 accentOverlayMode: true
                 gaugeColor: appTheme.lavaOrange
                 chromeColor: appTheme.lavaTrack
-                progress: Math.max(0, Math.min(1, root.liveGaugeRpm / 8000))
+                progress: root.tachMagmaProgress
                 showArcHead: false
                 maxValue: 8000
                 startAngleDeg: 225
@@ -2789,10 +2793,10 @@ Window {
             }
 
             W.MagmaAtlasOverlay {
-                anchors.fill: speedGauge
+                anchors.fill: tachGauge
                 z: root.mapLibreSafeCompositor ? 126 : 26
                 visible: root.gaugeLavaAccentEnabled
-                progress: Math.max(0, Math.min(1, root.liveGaugeSpeed / 140))
+                progress: root.tachMagmaProgress
             }
 
             Item {
