@@ -59,6 +59,22 @@ IMPORT_RE = re.compile(r'^\s*import\s+([A-Za-z_][\w.]*)(?:\s+([\d.]+))?(?:\s+as\
 CARTO_RE = re.compile(r"basemaps\.cartocdn\.com/rastertiles|cartocdn\.com/.*(dark_all|light_all|voyager)")
 
 
+def map_style_init_failures(root: Path):
+    """The MapLibre plugin reads its style once, at Map creation: the style must be an INITIAL
+    property of the Loader-created Impl, and the Impl must never default to the demo style."""
+    out = []
+    wrapper = (root / "src/ui/widgets/MapCenterMapLibreNative.qml").read_text(encoding="utf-8")
+    if 'setSource("MapCenterMapLibreNativeImpl.qml", { "styleUrl": root.styleUrl })' not in wrapper:
+        out.append("src/ui/widgets/MapCenterMapLibreNative.qml: the Impl Loader must pass styleUrl as an initial "
+                   "property via setSource(...) (assigning it in onLoaded is too late: the Qt Location plugin has "
+                   "already read its style and the map stays on the Impl default)")
+    impl = (root / "src/ui/widgets/MapCenterMapLibreNativeImpl.qml").read_text(encoding="utf-8")
+    if "demotiles" in impl:
+        out.append("src/ui/widgets/MapCenterMapLibreNativeImpl.qml: must not default to the MapLibre demo style "
+                   "(blank map); use ClusterConfig::defaultMapLibreNativeStyleUrl() / BEAGLEY_MAPLIBRE_NATIVE_DEFAULT_STYLE_URL")
+    return out
+
+
 def run_guards(root: Path) -> int:
     failures = []
     for rel in supported_files(root):

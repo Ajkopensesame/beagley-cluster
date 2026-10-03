@@ -85,9 +85,16 @@ Item {
     readonly property bool vehicleVisibleResolved: vehiclePoseValid
         && !fixedOriginEnabled
         && (vehicleBucketHasPose || externalVehiclePoseValid)
+    // Never fall back to the MapLibre demo style (blank light-blue world map): the plugin reads
+    // the style once at creation, so an empty styleUrl here would pin the wrong map until
+    // restart. The parent passes styleUrl as an initial property (see MapCenterMapLibreNative).
+    readonly property string defaultStyleUrl: (typeof BEAGLEY_MAPLIBRE_NATIVE_DEFAULT_STYLE_URL !== "undefined"
+        && BEAGLEY_MAPLIBRE_NATIVE_DEFAULT_STYLE_URL)
+        ? String(BEAGLEY_MAPLIBRE_NATIVE_DEFAULT_STYLE_URL)
+        : "https://tiles.openfreemap.org/styles/dark"
     readonly property string resolvedStyleUrl: styleUrl.length > 0
         ? styleUrl
-        : "https://demotiles.maplibre.org/style.json"
+        : defaultStyleUrl
 
     property real nativeCenterLat: resolvedCameraLat
     property real nativeCenterLng: resolvedCameraLng

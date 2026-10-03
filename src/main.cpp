@@ -494,6 +494,8 @@ int main(int argc, char *argv[])
                                              mapLibreNativeAllowUntestedStyles);
     engine.rootContext()->setContextProperty("BEAGLEY_MAPLIBRE_NATIVE_STYLE_URL",
                                              mapLibreNativeStyleUrl);
+    engine.rootContext()->setContextProperty("BEAGLEY_MAPLIBRE_NATIVE_DEFAULT_STYLE_URL",
+                                             ClusterConfig::defaultMapLibreNativeStyleUrl());
     engine.rootContext()->setContextProperty("BEAGLEY_MAPLIBRE_NATIVE_TRUSTED_STYLES",
                                              mapLibreNativeTrustedStyles);
     engine.rootContext()->setContextProperty("BEAGLEY_MAPLIBRE_NATIVE_MAX_ZOOM",
@@ -539,6 +541,12 @@ int main(int argc, char *argv[])
                                   QString::fromLatin1(BEAGLEY_BUILD_GIT_COMMIT),
                                   QString::fromLatin1(BEAGLEY_BUILD_GIT_DIRTY),
                                   QString::fromLatin1(BEAGLEY_BUILD_TIMESTAMP_UTC));
+    qInfo().noquote() << "[MAP] MapLibre native: requested =" << (mapRenderer == QLatin1String("maplibre-native"))
+                      << "builtIn =" << mapLibreNativeAvailable
+                      << "startupStyle =" << ClusterConfig::defaultMapLibreNativeStyleUrl()
+                      << "envStyleOverride =" << (mapLibreNativeStyleUrl.isEmpty() ? QStringLiteral("(none)") : mapLibreNativeStyleUrl)
+                      << "(an env style only applies after a map theme is picked; unset it to use the default)"
+                      << "envTrustedStyles =" << (mapLibreNativeTrustedStyles.isEmpty() ? QStringLiteral("(default)") : mapLibreNativeTrustedStyles);
     qInfo() << "[BOOT] uiVariant env =" << qgetenv("BEAGLEY_UI_VARIANT")
             << "hubUrl =" << ClusterConfig::hubUrl()
             << "mapStyle =" << mapStyleUrl
@@ -554,6 +562,7 @@ int main(int argc, char *argv[])
             << "mapLibreNativeAvailable =" << mapLibreNativeAvailable
             << "mapLibreNativeAllowUntestedStyles =" << mapLibreNativeAllowUntestedStyles
             << "mapLibreNativeStyleUrl =" << mapLibreNativeStyleUrl
+            << "mapLibreNativeDefaultStyleUrl =" << ClusterConfig::defaultMapLibreNativeStyleUrl()
             << "mapLibreNativeMaxZoom =" << mapLibreNativeMaxZoom
             << "mapBootMode =" << mapBootMode
             << "mapStyleMode =" << mapStyleMode

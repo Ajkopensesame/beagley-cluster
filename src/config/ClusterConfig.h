@@ -46,6 +46,19 @@ inline bool mapTileDarken()
         || qEnvironmentVariableIntValue("BEAGLEY_MAP_TILE_DARKEN") != 0;
 }
 
+// MapLibre Native (embedded/appliance map) style used when nothing else selects one: the dark
+// OpenFreeMap style, online. Verified 2026-10-03: the style JSON, its vector tiles
+// (https://tiles.openfreemap.org/planet), sprite (sprites/ofm_f384/ofm) and glyphs
+// (fonts/{fontstack}/{range}.pbf) all resolve. MainV3 prefers this style at start-up until a map
+// theme is picked (an env BEAGLEY_MAPLIBRE_NATIVE_STYLE_URL only applies after that, see
+// MainV3.qml activeMapStyleUrl). Offline, MapLibre Native cannot fetch it and the app falls
+// back to the raster map. There is no env override for this constant on purpose; the
+// per-theme URLs live in MainV3.qml mapThemeOptions.
+inline QString defaultMapLibreNativeStyleUrl()
+{
+    return QStringLiteral("https://tiles.openfreemap.org/styles/dark");
+}
+
 enum class VehicleBackend { Live, Mock };
 
 // Resolve BEAGLEY_VEHICLE_BACKEND. Default is live. Anything but "mock"/"live"/empty
