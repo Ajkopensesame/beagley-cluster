@@ -35,6 +35,7 @@ Item {
     property var mapGuidanceBanner: ({})
     property var mapConnectivity: ({})
     property string tileUrlTemplate: ""
+    property bool tileDarken: false
     property string styleUrl: ""
     property bool interactionEnabled: true
 
@@ -172,6 +173,7 @@ Item {
             mapGuidanceBanner: root.mapGuidanceBanner
             mapConnectivity: root.mapConnectivity
             tileUrlTemplate: root.tileUrlTemplate
+            tileDarken: root.tileDarken
             interactionEnabled: root.interactionEnabled
         }
     }

@@ -79,6 +79,7 @@ qt_standard_project_setup()
 # --------------------
 qt_add_executable(beagley_cluster
     src/main.cpp
+    src/test_support/SmokeProbe.cpp
     src/data/MockVehicleStateClient.cpp
     src/data/VehicleStateClient.cpp
     src/data/VehicleStateSource.cpp
@@ -387,7 +388,7 @@ if(BUILD_TESTING)
     )
 
     # ---- QtTest suite (vehicle-state layer) ----
-    find_package(Qt6 REQUIRED COMPONENTS Test)
+    find_package(Qt6 REQUIRED COMPONENTS Test Gui)
 
     # Vehicle-state sources without the QML/render stack, shared by the tests.
     add_library(beagley_vehicle_state STATIC
@@ -412,5 +413,76 @@ if(BUILD_TESTING)
         set_tests_properties(${_qt_test} PROPERTIES
             ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
             TIMEOUT 120)
+    endforeach()
+
+    # GUI-module QtTest (QImage only, no window): tile darkening + tile-URL config.
+    add_executable(tst_tile_tint tests/qt/tst_tile_tint.cpp)
+    target_include_directories(tst_tile_tint PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(tst_tile_tint PRIVATE Qt6::Gui Qt6::Test)
+    add_test(NAME tst_tile_tint COMMAND tst_tile_tint)
+    set_tests_properties(tst_tile_tint PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 120)
+
+    # ---- Static QML checks (tests/qml_smoke/check_qml.py) ----
+    # Source guards (unversioned QtQuick.Shapes, no Qt5-only imports, no dead Carto tiles) and
+    # qmllint from the same Qt install that built the app, failing on error-level problems only.
+    # Baseline and rationale: tests/qml_smoke/README.md.
+    add_test(NAME qml_static_guards
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/qml_smoke/check_qml.py guards ${CMAKE_CURRENT_SOURCE_DIR})
+    find_program(BEAGLEY_QMLLINT qmllint
+        HINTS "${QT6_INSTALL_PREFIX}/${QT6_INSTALL_BINS}" "${Qt6_DIR}/../../../bin"
+              "${Qt6_DIR}/../../../libexec")
+    if(NOT BEAGLEY_QMLLINT)
+        message(WARNING "qmllint not found: the qmllint_errors test will FAIL until it is available")
+        set(BEAGLEY_QMLLINT "qmllint-NOTFOUND")
+    endif()
+    add_test(NAME qmllint_errors
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/qml_smoke/check_qml.py qmllint
+                ${CMAKE_CURRENT_SOURCE_DIR} --qmllint ${BEAGLEY_QMLLINT} --import-path ${CMAKE_CURRENT_BINARY_DIR})
+
+    # ---- QML offscreen smoke tests (real binary, real QML, see tests/qml_smoke/README.md) ----
+    # Runs beagley_cluster itself with BEAGLEY_SMOKE_TEST=1 so main.cpp's genuine bootstrap
+    # (registered types, context properties, backend + entry-point selection) is what gets
+    # exercised. QT_QUICK_BACKEND=software pins the scene graph to the software renderer so
+    # the result does not depend on a GL/EGL stack being present on the CI runner.
+    # Works with WITH_WEBENGINE=OFF (the CI configuration): the map is forced off there.
+    set(_smoke_env
+        QT_QPA_PLATFORM=offscreen
+        QT_QUICK_BACKEND=software
+        BEAGLEY_SMOKE_TEST=1
+        # Without this the Wi-Fi onboarding dialog covers the whole screen (see docs/ENVIRONMENT.md).
+        BEAGLEY_WIFI_ONBOARDING=0
+        # Hermetic: no persisted settings/caches from the developer's or runner's profile.
+        XDG_CONFIG_HOME=${CMAKE_CURRENT_BINARY_DIR}/smoke-home/config
+        XDG_CACHE_HOME=${CMAKE_CURRENT_BINARY_DIR}/smoke-home/cache
+        XDG_DATA_HOME=${CMAKE_CURRENT_BINARY_DIR}/smoke-home/data)
+    # name | UI variant | backend | expectation | hub url
+    foreach(_case
+        "v3_mock|v3|mock|live|"
+        "embedded_mock|embedded|mock|live|"
+        # live backend pointed at a closed port: it never connects -> linkLost stays true
+        "v3_linklost|v3|live|linklost|ws://127.0.0.1:1"
+        "embedded_linklost|embedded|live|linklost|ws://127.0.0.1:1"
+    )
+        string(REPLACE "|" ";" _f "${_case}")
+        list(GET _f 0 _name)
+        list(GET _f 1 _variant)
+        list(GET _f 2 _backend)
+        list(GET _f 3 _expect)
+        list(LENGTH _f _nf)
+        set(_env ${_smoke_env}
+            BEAGLEY_UI_VARIANT=${_variant}
+            BEAGLEY_VEHICLE_BACKEND=${_backend}
+            BEAGLEY_SMOKE_EXPECT=${_expect})
+        if(_nf GREATER 4)
+            list(GET _f 4 _hub)
+            if(NOT "${_hub}" STREQUAL "")
+                list(APPEND _env VEHICLE_HUB_WS_URL=${_hub})
+            endif()
+        endif()
+        add_test(NAME qml_smoke_${_name} COMMAND beagley_cluster)
+        set_tests_properties(qml_smoke_${_name} PROPERTIES
+            ENVIRONMENT "${_env}"
+            PASS_REGULAR_EXPRESSION "\\[SMOKE\\] RESULT PASS"
+            TIMEOUT 90)
     endforeach()
 endif()

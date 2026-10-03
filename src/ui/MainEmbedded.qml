@@ -129,6 +129,7 @@ Window {
     // Persistent LINK LOST telltale: window-level child with z above every other overlay.
     W.LinkLostTelltale {
         id: linkLostTelltale
+        objectName: "linkLostTelltale"
         anchors.horizontalCenter: parent.horizontalCenter
         // Status ribbon's left cluster of pills ends near x=830; keep clear of it.
         anchors.horizontalCenterOffset: 60

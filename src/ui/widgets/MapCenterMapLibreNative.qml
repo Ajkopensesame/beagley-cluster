@@ -20,6 +20,7 @@ Item {
     property var mapGuidanceBanner: ({})
     property var mapConnectivity: ({})
     property string tileUrlTemplate: ""
+    property bool tileDarken: false
     property string styleUrl: ""
     property bool interactionEnabled: true
 
@@ -102,41 +103,43 @@ Item {
     onNativeImplFailedChanged: root.logFallbackReason()
     onStyleUrlChanged: root.reloadNativeMap()
 
+    function bindNativeImpl(impl) {
+        impl.lat = Qt.binding(function() { return root.lat })
+        impl.lng = Qt.binding(function() { return root.lng })
+        impl.bearing = Qt.binding(function() { return root.bearing })
+        impl.zoom = Qt.binding(function() { return root.zoom })
+        impl.speedKph = Qt.binding(function() { return root.speedKph })
+        impl.fixedOriginEnabled = Qt.binding(function() { return root.fixedOriginEnabled })
+        impl.fixedOriginLat = Qt.binding(function() { return root.fixedOriginLat })
+        impl.fixedOriginLng = Qt.binding(function() { return root.fixedOriginLng })
+        impl.fixedOriginLabel = Qt.binding(function() { return root.fixedOriginLabel })
+        impl.navigationState = Qt.binding(function() { return root.navigationState })
+        impl.mapVehiclePose = Qt.binding(function() { return root.mapVehiclePose })
+        impl.mapCameraHints = Qt.binding(function() { return root.mapCameraHints })
+        impl.mapRouteOverlay = Qt.binding(function() { return root.mapRouteOverlay })
+        impl.mapGuidanceBanner = Qt.binding(function() { return root.mapGuidanceBanner })
+        impl.mapConnectivity = Qt.binding(function() { return root.mapConnectivity })
+        impl.styleUrl = Qt.binding(function() { return root.styleUrl })
+        impl.interactionEnabled = Qt.binding(function() { return root.interactionEnabled })
+    }
+
+
     Loader {
         id: mapLibreLoader
         anchors.fill: parent
         active: root.shouldUseMapLibre && root.mapLibreReloadGate
-        sourceComponent: mapLibreNativeComponent
+        // Resolved by URL at runtime (not a static `MapCenterMapLibreNativeImpl {}` type):
+        // the Impl file is only compiled into the module when WITH_MAPLIBRE_NATIVE=ON, and a
+        // static reference made MainV3/Main unloadable ("... is not a type") in every other
+        // configuration, including the CI build. A missing/broken Impl now only yields
+        // Loader.Error -> raster fallback, as nativeImplFailed intends.
+        source: "MapCenterMapLibreNativeImpl.qml"
 
         onStatusChanged: {
             if (status === Loader.Error)
                 root.logFallbackReason()
         }
-    }
-
-    Component {
-        id: mapLibreNativeComponent
-
-        MapCenterMapLibreNativeImpl {
-            anchors.fill: parent
-            lat: root.lat
-            lng: root.lng
-            bearing: root.bearing
-            zoom: root.zoom
-            speedKph: root.speedKph
-            fixedOriginEnabled: root.fixedOriginEnabled
-            fixedOriginLat: root.fixedOriginLat
-            fixedOriginLng: root.fixedOriginLng
-            fixedOriginLabel: root.fixedOriginLabel
-            navigationState: root.navigationState
-            mapVehiclePose: root.mapVehiclePose
-            mapCameraHints: root.mapCameraHints
-            mapRouteOverlay: root.mapRouteOverlay
-            mapGuidanceBanner: root.mapGuidanceBanner
-            mapConnectivity: root.mapConnectivity
-            styleUrl: root.styleUrl
-            interactionEnabled: root.interactionEnabled
-        }
+        onLoaded: root.bindNativeImpl(item)
     }
 
     Loader {
@@ -167,6 +170,7 @@ Item {
             mapGuidanceBanner: root.mapGuidanceBanner
             mapConnectivity: root.mapConnectivity
             tileUrlTemplate: root.tileUrlTemplate
+            tileDarken: root.tileDarken
             interactionEnabled: root.interactionEnabled
         }
     }

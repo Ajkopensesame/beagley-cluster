@@ -11,11 +11,14 @@
 #include <QSGGeometry>
 #include <QSGGeometryNode>
 #include <QSGNode>
+#include <QSGRendererInterface>
+#include <QQuickWindow>
 #include <QSGSimpleTextureNode>
 #include <QSGTexture>
 #include <QSGTransformNode>
 #include <QStandardPaths>
 #include <QUrl>
+#include "TileTint.h"
 #include <QPainter>
 #include <QVector>
 
@@ -247,6 +250,17 @@ void NativeRasterMapItem::setTileUrlTemplate(const QString &value)
     update();
 }
 
+void NativeRasterMapItem::setDarkenTiles(bool value)
+{
+    if (m_darkenTiles == value) {
+        return;
+    }
+    m_darkenTiles = value;
+    invalidateTileState();
+    emit darkenTilesChanged();
+    update();
+}
+
 void NativeRasterMapItem::setUserAgent(const QString &value)
 {
     if (m_userAgent == value) {
@@ -433,6 +447,9 @@ void NativeRasterMapItem::requestTile(int z, int x, int y)
         QImage image;
         if (reply->error() == QNetworkReply::NoError) {
             image.loadFromData(reply->readAll());
+            if (m_darkenTiles && !image.isNull()) {
+                image = TileTint::darken(image);
+            }
         }
 
         {
@@ -518,6 +535,17 @@ void NativeRasterMapItem::recordCounter(const QString &bucket, int amount)
 
 QSGNode *NativeRasterMapItem::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *)
 {
+    // The Qt software scene-graph backend (QT_QUICK_BACKEND=software, used by the headless
+    // offscreen smoke tests and as a last-resort renderer) cannot draw custom
+    // QSGGeometryNode / QSGSimpleTextureNode trees: QSGSoftwareRenderableNode::update()
+    // dereferences a null renderable and the whole process segfaults on the first frame.
+    // Render nothing instead of crashing; the surrounding pod chrome stays visible.
+    if (window() && window()->rendererInterface()
+        && window()->rendererInterface()->graphicsApi() == QSGRendererInterface::Software) {
+        delete oldNode;
+        return nullptr;
+    }
+
     auto *root = oldNode ? static_cast<MapSceneRoot *>(oldNode) : new MapSceneRoot;
 
     const QList<VisibleTile> tiles = m_visibleTiles;

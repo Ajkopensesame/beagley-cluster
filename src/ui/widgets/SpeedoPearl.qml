@@ -1,5 +1,5 @@
 import QtQuick 2.15
-import QtQuick.Shapes 1.15
+import QtQuick.Shapes
 import QtGraphicalEffects 1.15
 
 Item {

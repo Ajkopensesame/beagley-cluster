@@ -584,12 +584,20 @@ Window {
     property bool awaitingRoutePreview: false
     property bool departureCameraCloseInActive: false
     readonly property var effectiveMapCameraHints: buildEffectiveMapCameraHints()
+    // Keyless raster fallback tiles. Carto light_all/dark_all now answer every tile with an
+    // "API KEY REQUIRED" watermark, so both themes use BEAGLEY_MAP_TILE_URL (default: OSM
+    // standard tiles, see ClusterConfig::mapTileUrl) and the dark theme darkens them locally.
+    readonly property string fallbackMapTileUrl: (typeof BEAGLEY_MAP_TILE_URL !== "undefined" && String(BEAGLEY_MAP_TILE_URL).length > 0)
+        ? String(BEAGLEY_MAP_TILE_URL)
+        : "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+    readonly property bool fallbackMapTileDarken: (typeof BEAGLEY_MAP_TILE_DARKEN !== "undefined") ? !!BEAGLEY_MAP_TILE_DARKEN : true
     readonly property var mapThemeOptions: [
         {
             id: "light",
             label: "Minimal",
             detail: "Clean",
-            tileUrlTemplate: "https://a.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}.png",
+            tileUrlTemplate: root.fallbackMapTileUrl,
+            tileDarken: false,
             styleUrl: "https://tiles.openfreemap.org/styles/positron",
             mapLibre: true,
             maxZoom: 19,
@@ -611,7 +619,8 @@ Window {
             id: "dark",
             label: "Dark",
             detail: "Night",
-            tileUrlTemplate: "https://a.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png",
+            tileUrlTemplate: root.fallbackMapTileUrl,
+            tileDarken: root.fallbackMapTileDarken,
             styleUrl: "https://tiles.openfreemap.org/styles/dark",
             mapLibre: true,
             maxZoom: 19,
@@ -632,6 +641,7 @@ Window {
     ]
     readonly property var activeMapThemeOption: mapThemeOption(clusterUiSettings.mapTheme)
     readonly property string activeMapTileUrlTemplate: String(activeMapThemeOption.tileUrlTemplate || "")
+    readonly property bool activeMapTileDarken: !!activeMapThemeOption.tileDarken
     readonly property bool activeMapThemeUsesMapLibre: activeMapThemeOption.mapLibre !== false
         && String(activeMapThemeOption.styleUrl || "").length > 0
     readonly property string openFreeMapDarkStyleUrl: "https://tiles.openfreemap.org/styles/dark"
@@ -1822,6 +1832,7 @@ Window {
             mapGuidanceBanner: navigation.mapGuidanceBanner
             mapConnectivity: navigation.mapConnectivity
             tileUrlTemplate: root.activeMapTileUrlTemplate
+            tileDarken: root.activeMapTileDarken
             styleUrl: root.activeMapStyleUrl
             snapshotRefreshMs: 0
             videoEnabled: false
@@ -2502,6 +2513,7 @@ Window {
 
                     Text {
                         id: speedValueText
+                        objectName: "speedValueText"
                         anchors.centerIn: parent
                         text: root.linkLostActive ? "--" : root.formatSpeedValue(root.liveGaugeSpeed)
                         color: root.linkLostActive ? root.gaugeInactiveColor : appTheme.speedColor(root.liveGaugeSpeed)
@@ -2885,6 +2897,7 @@ Window {
 
                     Text {
                         id: rpmValueText
+                        objectName: "rpmValueText"
                         anchors.centerIn: parent
                         text: root.linkLostActive ? "--" : (root.liveGaugeRpm / 1000.0).toFixed(1)
                         color: root.linkLostActive ? root.gaugeInactiveColor : appTheme.rpmColor(root.liveGaugeRpm)
@@ -4971,6 +4984,7 @@ Window {
     // other root-level overlay (WiFi overlay is 9500), so nothing can cover it.
     W.LinkLostTelltale {
         id: linkLostTelltale
+        objectName: "linkLostTelltale"
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: parent.top
         anchors.topMargin: 10
