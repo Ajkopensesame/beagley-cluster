@@ -102,6 +102,12 @@ still undecided and keeps the previous behaviour (serial/CAN only).
 * `sensorFaults`: from the most recent line, `fuel_sender_fault` / `coolant_sender_fault` for an open/shorted sender.
 * `lastError` reports a missing/unusable calibration file (the hub keeps running with no calibration).
 
+## Testing without a UNO
+
+`tools/bbb_hub/fake_uno.py` writes lines in this format to a new pty (`--link /tmp/fake_uno`), a file/FIFO/tty (`--out`)
+or stdout, with `--sweep fixed|ramp|steps|fault` (`--help`). `tests/test_fake_uno_calibration_e2e.py` runs the real hub
+against it and checks raw -> calibrated values, sender faults, no-calibration and stale behaviour. Local only.
+
 ## Rollback / safety
 
 Setting `VEHICLE_SENSOR_CALIBRATION=/nonexistent.json` (or emptying the tables) returns to pre-calibration

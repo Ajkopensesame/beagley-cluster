@@ -102,4 +102,6 @@ until the signal dictionary is verified.
    When both feed the same signal, CAN overlay is applied first and the serial overlay merges after it,
    so for any key the serial line provides, the serial value overwrites the CAN value; decide per signal which source is authoritative before enabling both.
 9. **Test without hardware:** `vcan0` (`sudo modprobe vcan; sudo ip link add vcan0 type vcan; sudo ip link set vcan0 up`)
-   with `cansend`/`canplayer` exercises the live path on a laptop. (A pytest for this is a follow-up.)
+   with `cansend`/`canplayer` exercises the live path on a laptop. `tests/test_can_prep.py` does this automatically when a `vcan0`
+   already exists (skipped otherwise) and always runs the same checks through a pure-Python fake CAN socket
+   (`tools/bbb_hub/fake_can.py`). Parts and wiring list: `docs/can_bus_parts_and_wiring.md`.
