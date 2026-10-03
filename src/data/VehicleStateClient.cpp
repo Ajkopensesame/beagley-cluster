@@ -628,7 +628,7 @@ void VehicleStateClient::onTextMessageReceived(const QString &msg)
     setCoolantC(obj.value("coolantC").toDouble(0.0));
     const QString gearValue = obj.value("gear").toString(
         drivetrain.value("gear").toString(
-            transmission.value("gear").toString(m_gear)
+            transmission.value("gear").toString(gear())
         )
     );
     setGear(gearValue);
@@ -636,12 +636,12 @@ void VehicleStateClient::onTextMessageReceived(const QString &msg)
         transmission,
         {"overdrive", "od"},
         readBoolAny(drivetrain, {"overdrive", "od"},
-                    readBoolAny(obj, {"overdrive", "od"}, m_overdrive))
+                    readBoolAny(obj, {"overdrive", "od"}, overdrive()))
     ));
     const QString drivetrainModeValue = obj.value("drivetrainMode").toString(
         drivetrain.value("mode").toString(
             drivetrain.value("drivetrainMode").toString(
-                drivetrain.value("drive").toString(m_drivetrainMode)
+                drivetrain.value("drive").toString(drivetrainMode())
             )
         )
     );
@@ -649,7 +649,7 @@ void VehicleStateClient::onTextMessageReceived(const QString &msg)
     setTransferLock(readBoolAny(
         drivetrain,
         {"transfer_lock", "transferLock", "lock", "locked"},
-        readBoolAny(obj, {"transfer_lock", "transferLock", "lock", "locked"}, m_transferLock)
+        readBoolAny(obj, {"transfer_lock", "transferLock", "lock", "locked"}, transferLock())
     ));
 
     // GPS supports both top-level keys and nested object:
@@ -679,38 +679,38 @@ void VehicleStateClient::onTextMessageReceived(const QString &msg)
     const double bearing = readNumberAny(
         gps,
         {"bearing", "heading", "course"},
-        readNumberAny(obj, {"gpsBearing", "bearing", "heading", "course"}, m_gpsBearing)
+        readNumberAny(obj, {"gpsBearing", "bearing", "heading", "course"}, gpsBearing())
     );
     setGpsBearing(normalizeBearing(bearing));
     setGpsAccuracyM(readNumberAny(
         gps,
         {"accuracyM", "accuracy", "hdop_m"},
-        readNumberAny(obj, {"gpsAccuracyM", "accuracyM", "accuracy"}, m_gpsAccuracyM)
+        readNumberAny(obj, {"gpsAccuracyM", "accuracyM", "accuracy"}, gpsAccuracyM())
     ));
     setGpsTimestampMs(static_cast<qint64>(readNumberAny(
         gps,
         {"timestampMs", "timestamp", "ts"},
-        readNumberAny(obj, {"gpsTimestampMs", "timestampMs", "timestamp", "ts"}, static_cast<double>(m_gpsTimestampMs))
+        readNumberAny(obj, {"gpsTimestampMs", "timestampMs", "timestamp", "ts"}, static_cast<double>(gpsTimestampMs()))
     )));
     setGpsFixValid(readBoolAny(
         gps,
         {"fixValid", "fix_valid", "valid"},
-        readBoolAny(obj, {"gpsFixValid", "fixValid", "fix_valid", "valid"}, m_gpsFixValid)
+        readBoolAny(obj, {"gpsFixValid", "fixValid", "fix_valid", "valid"}, gpsFixValid())
     ));
     setGpsSatellites(qRound(readNumberAny(
         gps,
         {"satellites", "sats"},
-        readNumberAny(obj, {"gpsSatellites", "satellites", "sats"}, static_cast<double>(m_gpsSatellites))
+        readNumberAny(obj, {"gpsSatellites", "satellites", "sats"}, static_cast<double>(gpsSatellites()))
     )));
     setGpsHeadingReliable(readBoolAny(
         gps,
         {"headingReliable", "heading_reliable"},
-        readBoolAny(obj, {"gpsHeadingReliable", "headingReliable", "heading_reliable"}, m_gpsHeadingReliable)
+        readBoolAny(obj, {"gpsHeadingReliable", "headingReliable", "heading_reliable"}, gpsHeadingReliable())
     ));
     setGpsSpeedKph(readNumberAny(
         gps,
         {"speedKph", "speed", "speed_kph"},
-        readNumberAny(obj, {"gpsSpeedKph", "speedKph", "speed", "speed_kph"}, m_gpsSpeedKph)
+        readNumberAny(obj, {"gpsSpeedKph", "speedKph", "speed", "speed_kph"}, gpsSpeedKph())
     ));
 
     // Link stale is determined by watchdog timing; watchdog will clear it
