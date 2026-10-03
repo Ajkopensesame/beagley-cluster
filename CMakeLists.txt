@@ -173,7 +173,6 @@ set(BEAGLEY_QML_FILES
     src/ui/widgets/vic/telltales/OilTelltale.qml
     src/ui/widgets/vic/telltales/WarningTelltale.qml
     src/ui/widgets/vic/icons/DriveStateIcon.qml
-    src/ui/widgets/TurnChevronFlow.qml
     src/ui/widgets/GaugeChevronOrbit.qml
     src/ui/theme/PurplePearlTheme.qml
     src/ui/widgets/embedded/EmbeddedBottomRail.qml
@@ -184,9 +183,7 @@ set(BEAGLEY_QML_FILES
     src/ui/widgets/embedded/EmbeddedTachPod.qml
 
     # Entry point
-    src/ui/Main.qml
     src/ui/MainEmbedded.qml
-    src/ui/MainV2.qml
     src/ui/MainV3.qml
 
     # Widgets
@@ -198,14 +195,12 @@ set(BEAGLEY_QML_FILES
     src/ui/widgets/RadarGlyph.qml
     src/ui/widgets/MediaCornerWidget.qml
     src/ui/widgets/MapMenuCornerWidget.qml
-    src/ui/widgets/SpeedGauge.qml
     src/ui/widgets/DialChrome.qml
     src/ui/widgets/GaugeLensShell.qml
     src/ui/widgets/GaugeArcHead.qml
     src/ui/widgets/GaugeAtlasMagma.qml
     src/ui/widgets/GaugeAtlasRim.qml
     src/ui/widgets/MagmaAtlasOverlay.qml
-    src/ui/widgets/TachGauge.qml
     src/ui/widgets/MatrixRain.qml
     src/ui/widgets/GaugeMatrixDepth.qml
     src/ui/widgets/TwinMicroArcs.qml

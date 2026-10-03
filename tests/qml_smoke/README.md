@@ -41,9 +41,8 @@ Run locally: `ctest --test-dir build -R qml_smoke --output-on-failure`.
 
 ## `qml_static_guards` and `qmllint_errors`
 
-Both are `check_qml.py`. File set: every tracked `src/ui/**/*.qml` except the legacy entries
-(`Main.qml`, `MainV2.qml`, `MainPanelTest.qml`), `src/ui/mock/`, `*.bak*` and the dead
-`SpeedoPearl.qml` (see `EXCLUDED` in the script).
+Both are `check_qml.py`. File set: every tracked `src/ui/**/*.qml` except `*.bak*` (see
+`EXCLUDED` in the script; the legacy `Main`/`MainV2` screens and dead `SpeedoPearl` are deleted).
 
 * `qml_static_guards`: import allow-list (unversioned `QtQuick.Shapes` only - a versioned import
   hides `Shape.preferredRendererType`/`CurveRenderer` on Qt >= 6.6 and the component fails to

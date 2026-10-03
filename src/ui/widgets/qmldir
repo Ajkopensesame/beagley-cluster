@@ -1,5 +1,3 @@
-SpeedGauge    1.0 SpeedGauge.qml
-TachGauge     1.0 TachGauge.qml
 CornerCircleShell 1.0 CornerCircleShell.qml
 CornerPodFrame 1.0 CornerPodFrame.qml
 WeatherCornerWidget 1.0 WeatherCornerWidget.qml

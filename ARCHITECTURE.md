@@ -26,7 +26,7 @@ src/
   navigation/       # NavigationService (consumes vehicle GPS), OpenNavigationProvider
   render/           # ClusterRenderModel and native render items
   system/           # Wi-Fi setup, now playing, radar image
-  ui/               # QML: MainV3 (default), MainV2, Main, MainEmbedded, theme, widgets, web/map
+  ui/               # QML: MainV3 (default), MainEmbedded, theme, widgets, web/map
 tools/bbb_hub/      # Python BBB hub + diagnostics (producer side)
 yocto/              # appliance image build
 ```
@@ -89,7 +89,7 @@ Dev-only simulation / stress / gauge-review scenes in MainV3 (and the stress sce
 
 **Warning latch.** `VehicleStateSource` exposes `warnBrakeLatched`, `warnOilLatched`, `warnChargeLatched`, `warnDoorLatched`, `warnCheckEngineLatched`, `warnATLatched`, `warnFuelLowLatched` (existing `warn*` properties are unchanged). While the link is healthy the latched value tracks the live value; the moment `linkLost` becomes true it is frozen. QML shows `linkLost ? warnXLatched : warnX`. The sync runs one event-loop turn after a change (queued) because the client applies a frame's warnings *before* its `_health.stale` flag: a hub-stale frame carries zeroed warnings, and syncing immediately would latch those zeros. When the link recovers the latch is released and warnings follow live values again. Limits: a warning that *turns on* while the link is lost cannot be known; that is why the LINK LOST telltale is prominent. A warning that cleared in the same event-loop turn as the loss is latched at its previous (on) value. A partial (non-good) frame is still applied by the client and, while the link is otherwise healthy, can legitimately clear a warning; that is existing client behaviour and not changed here.
 
-**Not covered:** the legacy `Main.qml` / `MainV2.qml` variants (`BEAGLEY_UI_VARIANT=legacy|v1|v2`) only get the warning latch (via `TachGauge.qml`); they still show `0` and have no LINK LOST telltale.
+**Legacy screens:** the old `Main.qml` / `MainV2.qml` (and their `SpeedGauge` / `TachGauge` / `TurnChevronFlow` widgets) were deleted; `BEAGLEY_UI_VARIANT=legacy|v1|v2` now loads `MainV3` with a warning.
 
 **Verifying on a vehicle/bench:** stop the hub (or unplug the UNO so it reports `_health.stale`) and expect dashes + LINK LOST within about 1 s, active warnings still lit; restart it and expect live values and no telltale. C++ coverage: `tests/vehicle_state_link_lost_test.cpp` (ctest `vehicle_state_link_lost_test`). The QML side is not covered by automated tests.
 
