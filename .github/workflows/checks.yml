@@ -78,7 +78,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: ruff check (config in ruff.toml: E9, F63, F7, F82)
+      - name: "ruff check (config in ruff.toml - E9, F63, F7, F82)"
         run: |
           python -m pip install --upgrade pip ruff
           ruff check .
