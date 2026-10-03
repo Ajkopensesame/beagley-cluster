@@ -1,0 +1,222 @@
+name: Build aarch64 (BeagleY appliance binary)
+
+# MANUAL build of the BeagleY-AI (TI AM67A, aarch64) appliance binary.
+# Nothing here deploys anything. It produces an artifact + checksums + ABI
+# evidence so a human can review and approve a later binary deploy.
+# See docs/DEPLOY_AARCH64.md.
+#
+# How: native build on a GitHub-hosted Linux ARM64 runner (free for public
+# repos) against Qt 6.9.1 (the Qt of the TI SDK 11.00 / Scarthgap image, see the
+# doc) from aqtinstall, plus QMapLibre 3.0.0 built from source with the same
+# flags as yocto/.../maplibre-native-qt_3.0.0.bb. This is NOT the Yocto-built
+# binary and is NOT verified against the board's sysroot: the artifact contains
+# the checks to run read-only on the board before swapping.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref (branch/tag/sha) of beagley-cluster to build"
+        required: false
+        default: "codex/maplibre-native-yocto-build"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-aarch64-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  QT_VERSION: "6.9.1"
+  MAPLIBRE_QT_VERSION: "3.0.0"
+  MAPLIBRE_QT_SHA256: "9689fb0630adc33a34ea476bdf53a3ef7dc76cb3c95da9de056081f9330a9355"
+  # Scarthgap (Yocto 5.0) toolchain ceilings the binary must stay under to run on the board.
+  MAX_GLIBC: "2.39"
+  MAX_GLIBCXX: "3.4.32"
+
+jobs:
+  build:
+    name: Build aarch64 binary (Qt 6.9.1, MapLibre native ON, WebEngine OFF)
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 240
+    steps:
+      - name: Checkout app source
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || 'codex/maplibre-native-yocto-build' }}
+          path: app
+
+      - name: Source identity
+        id: src
+        run: |
+          cd app
+          sha="$(git rev-parse HEAD)"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "short=${sha:0:12}" >> "$GITHUB_OUTPUT"
+          echo "Building $sha ($(git log -1 --format=%s))"
+          git status --porcelain | grep . && { echo "dirty tree"; exit 1; } || true
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ninja-build cmake pkg-config patchelf file binutils curl ca-certificates bzip2 \
+            build-essential libgl1-mesa-dev libegl1-mesa-dev libgles-dev libxkbcommon-dev \
+            libfontconfig1-dev libfreetype-dev libdbus-1-dev libglib2.0-dev libicu-dev \
+            libcurl4-openssl-dev libssl-dev libuv1-dev libjpeg-dev libpng-dev libwebp-dev zlib1g-dev
+
+      - name: Install Qt ${{ env.QT_VERSION }} (linux_gcc_arm64)
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          host: linux_arm64
+          target: desktop
+          arch: linux_gcc_arm64
+          modules: "qtwebsockets qtlocation qtpositioning qtshadertools"
+          cache: true
+
+      - name: Cache QMapLibre ${{ env.MAPLIBRE_QT_VERSION }}
+        id: mlcache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/qmaplibre-prefix
+          key: qmaplibre-${{ env.MAPLIBRE_QT_VERSION }}-qt${{ env.QT_VERSION }}-arm64-${{ hashFiles('app/yocto/meta-beagley-cluster/recipes-graphics/maplibre-native-qt/**') }}-v1
+
+      - name: Build QMapLibre ${{ env.MAPLIBRE_QT_VERSION }} (same flags as the Yocto recipe)
+        if: steps.mlcache.outputs.cache-hit != 'true'
+        run: |
+          set -euxo pipefail
+          cd "$RUNNER_TEMP"
+          curl -fsSL -o ml.tar.bz2 "https://github.com/maplibre/maplibre-native-qt/releases/download/v${MAPLIBRE_QT_VERSION}/maplibre-native-qt_v${MAPLIBRE_QT_VERSION}_Source.tar.bz2"
+          echo "${MAPLIBRE_QT_SHA256}  ml.tar.bz2" | sha256sum -c -
+          tar xjf ml.tar.bz2
+          cd "maplibre-native-qt_v${MAPLIBRE_QT_VERSION}_Source"
+          patch -p1 < "$GITHUB_WORKSPACE/app/yocto/meta-beagley-cluster/recipes-graphics/maplibre-native-qt/files/0001-respect-build-testing.patch"
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/qmaplibre-prefix" \
+            -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR" \
+            -DMLN_WITH_OPENGL=ON \
+            -DMLN_QT_WITH_LOCATION=ON \
+            -DMLN_QT_WITH_WIDGETS=OFF \
+            -DMLN_QT_STATIC=OFF \
+            -DMLN_WITH_WERROR=OFF \
+            -DBUILD_TESTING=OFF
+          cmake --build build -j"$(nproc)"
+          cmake --install build
+
+      - name: Configure app (WITH_MAPLIBRE_NATIVE=ON, WITH_WEBENGINE=OFF, appliance profile)
+        run: |
+          set -euxo pipefail
+          cmake -S app -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBEAGLEY_APPLIANCE_PRODUCTION=ON \
+            -DWITH_WEBENGINE=OFF \
+            -DWITH_MAPLIBRE_NATIVE=ON \
+            -DBUILD_TESTING=OFF \
+            -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR;$RUNNER_TEMP/qmaplibre-prefix"
+
+      - name: Build app
+        run: cmake --build build -j"$(nproc)"
+
+      - name: Collect artifact + ABI evidence
+        id: pack
+        run: |
+          set -uo pipefail
+          sha="${{ steps.src.outputs.sha }}"; short="${{ steps.src.outputs.short }}"
+          out="$GITHUB_WORKSPACE/beagley-aarch64-$short"
+          mkdir -p "$out/reference" "$out/evidence"
+          cp build/beagley_cluster "$out/beagley_cluster"
+          [ -f build/nowplayingctl ] && cp build/nowplayingctl "$out/nowplayingctl"
+          # Drop the CI build-tree RUNPATH so the board's normal loader path is used.
+          readelf -d "$out/beagley_cluster" | grep -iE "RPATH|RUNPATH" > "$out/evidence/rpath-before-strip.txt" || true
+          patchelf --remove-rpath "$out/beagley_cluster"
+          [ -f "$out/nowplayingctl" ] && patchelf --remove-rpath "$out/nowplayingctl" || true
+          # Reference copies of the MapLibre libs this binary was linked against (do NOT deploy by default).
+          find "$RUNNER_TEMP/qmaplibre-prefix" -name 'libQMapLibre*.so*' -exec cp -a {} "$out/reference/" \;
+          # The app does not link QMapLibre/Qt6Location directly (linker --as-needed): they are
+          # loaded at run time through the MapLibre QML module + geoservices plugin, so ship those
+          # for reference too (same layout the Yocto recipe installs).
+          mkdir -p "$out/reference/plugins/geoservices" "$out/reference/qml/MapLibre"
+          find "$RUNNER_TEMP/qmaplibre-prefix" -name 'libqtgeoservices_maplibre.so' -exec cp -a {} "$out/reference/plugins/geoservices/" \;
+          find "$RUNNER_TEMP/qmaplibre-prefix" -path '*qml/MapLibre/*' -type f -exec cp -a {} "$out/reference/qml/MapLibre/" \;
+          cp app/yocto/meta-beagley-cluster/recipes-apps/beagley-cluster/files/beagley-cluster-launch.sh "$out/reference/beagley-cluster-launch.sh.from-repo"
+          cp app/yocto/meta-beagley-cluster/recipes-apps/beagley-cluster/files/beagley-cluster.default "$out/reference/beagley-cluster.default.from-repo"
+
+          bin="$out/beagley_cluster"; ev="$out/evidence"
+          file "$bin" > "$ev/file.txt"
+          readelf -h "$bin" > "$ev/readelf-header.txt"
+          readelf -d "$bin" > "$ev/readelf-dynamic.txt"
+          readelf -d "$bin" | sed -n 's/.*Shared library: \[\(.*\)\]/\1/p' | sort > "$ev/needed-libs.txt"
+          readelf --version-info "$bin" > "$ev/readelf-version-info.txt"
+          objdump -T "$bin" > "$ev/dynamic-symbols.txt" 2>&1 || true
+          grep -o 'GLIBC_[0-9.]*' "$ev/dynamic-symbols.txt" | sort -uV > "$ev/glibc-versions-needed.txt"
+          grep -o 'GLIBCXX_[0-9.]*' "$ev/dynamic-symbols.txt" | sort -uV > "$ev/glibcxx-versions-needed.txt"
+          grep -o 'Qt_[0-9]*\(\.[0-9]*\)*_PRIVATE_API' "$ev/dynamic-symbols.txt" | sort -u > "$ev/qt-private-api-symbols.txt" || true
+          grep -o 'Qt_[0-9][0-9]*' "$ev/dynamic-symbols.txt" | sort -uV > "$ev/qt-symbol-versions-needed.txt" || true
+          strings -a "$bin" | grep -E "Beagley build identity|BEAGLEY_BUILD|^[0-9a-f]{12}$" | head -5 > "$ev/build-strings.txt" || true
+
+          fail=0; res="$ev/abi-checks.txt"; : > "$res"
+          chk() { if [ "$1" = ok ]; then echo "PASS  $2" >> "$res"; else echo "FAIL  $2" >> "$res"; fail=1; fi; }
+          grep -q "ELF 64-bit.*ARM aarch64" "$ev/file.txt" && chk ok "ELF 64-bit aarch64" || chk bad "ELF 64-bit aarch64"
+          # WITH_MAPLIBRE_NATIVE=ON proof: cache value + the Impl QML file only added to the
+          # resource set when ON + the geoservices/QML plugins depend on QMapLibre + Qt6Location.
+          grep -q '^WITH_MAPLIBRE_NATIVE:BOOL=ON' build/CMakeCache.txt && chk ok "CMakeCache WITH_MAPLIBRE_NATIVE=ON" || chk bad "CMakeCache WITH_MAPLIBRE_NATIVE=ON"
+          grep -q '^WITH_WEBENGINE:BOOL=OFF' build/CMakeCache.txt && chk ok "CMakeCache WITH_WEBENGINE=OFF" || chk bad "CMakeCache WITH_WEBENGINE=OFF"
+          grep -qs 'MapCenterMapLibreNativeImpl' build/build.ninja && chk ok "MapCenterMapLibreNativeImpl.qml compiled into resources" || chk bad "MapCenterMapLibreNativeImpl.qml compiled into resources"
+          for pl in reference/plugins/geoservices/libqtgeoservices_maplibre.so reference/qml/MapLibre/libdeclarative_locationplugin_maplibre.so; do
+            readelf -d "$out/$pl" > "$ev/$(basename "$pl").readelf-dynamic.txt" 2>&1 || true
+            f="$ev/$(basename "$pl").readelf-dynamic.txt"
+            { grep -q 'libQMapLibre' "$f" && grep -q 'libQt6Location' "$f"; } && chk ok "$(basename "$pl") needs libQMapLibre + libQt6Location" || chk bad "$(basename "$pl") needs libQMapLibre + libQt6Location"
+          done
+          grep -q 'libQMapLibre' "$ev/needed-libs.txt" && echo "NOTE  binary links libQMapLibre directly" >> "$res" || echo "NOTE  binary does not list libQMapLibre/libQt6Location as NEEDED (expected: --as-needed, loaded at run time via the MapLibre QML plugin + geoservices plugin)" >> "$res"
+          grep -qi "WebEngine" "$ev/needed-libs.txt" && chk bad "no WebEngine linkage" || chk ok "no WebEngine linkage"
+          maxv() { sort -V "$1" | tail -1 | sed 's/^[A-Z]*_//'; }
+          g="$(maxv "$ev/glibc-versions-needed.txt")"; x="$(maxv "$ev/glibcxx-versions-needed.txt")"
+          [ -z "$g" ] || [ "$(printf '%s\n%s\n' "$g" "$MAX_GLIBC" | sort -V | tail -1)" = "$MAX_GLIBC" ] && chk ok "max GLIBC needed $g <= $MAX_GLIBC" || chk bad "max GLIBC needed $g > $MAX_GLIBC"
+          [ -z "$x" ] || [ "$(printf '%s\n%s\n' "$x" "$MAX_GLIBCXX" | sort -V | tail -1)" = "$MAX_GLIBCXX" ] && chk ok "max GLIBCXX needed $x <= $MAX_GLIBCXX" || chk bad "max GLIBCXX needed $x > $MAX_GLIBCXX"
+          [ -s "$ev/qt-private-api-symbols.txt" ] && echo "NOTE  binary imports Qt PRIVATE_API symbols (exact Qt patch match needed): $(tr '\n' ' ' < "$ev/qt-private-api-symbols.txt")" >> "$res" || echo "PASS  no Qt private-API symbol imports" >> "$res"
+
+          {
+            echo "commit:           $sha"
+            echo "branch/ref:       ${{ inputs.ref || 'codex/maplibre-native-yocto-build' }}"
+            echo "commit subject:   $(git -C app log -1 --format=%s)"
+            echo "commit date:      $(git -C app log -1 --format=%cI)"
+            echo "workflow run:     ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo "workflow commit:  ${{ github.sha }}"
+            echo "runner image:     ${ImageOS:-?} ${ImageVersion:-?} ($(uname -m))"
+            echo "compiler:         $(c++ --version | head -1)"
+            echo "cmake:            $(cmake --version | head -1)"
+            echo "Qt (build):       $QT_VERSION  ($QT_ROOT_DIR)  - aqtinstall linux_gcc_arm64, NOT the board's Yocto Qt"
+            echo "QMapLibre:        $MAPLIBRE_QT_VERSION  sha256 $MAPLIBRE_QT_SHA256 (+ 0001-respect-build-testing.patch)"
+            echo "flags:            -DCMAKE_BUILD_TYPE=Release -DBEAGLEY_APPLIANCE_PRODUCTION=ON -DWITH_WEBENGINE=OFF -DWITH_MAPLIBRE_NATIVE=ON"
+            echo "built at:         $(date -u +%FT%TZ)"
+          } > "$out/BUILD_INFO.txt"
+          ( cd "$out" && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS )
+          echo "---- abi-checks ----"; cat "$res"
+          echo "---- needed ----"; cat "$ev/needed-libs.txt"
+          echo "---- SHA256SUMS ----"; cat "$out/SHA256SUMS"
+          echo "dir=$out" >> "$GITHUB_OUTPUT"
+          echo "failed=$fail" >> "$GITHUB_OUTPUT"
+          {
+            echo "### beagley-aarch64-$short"
+            echo '```'; cat "$res"; echo '```'
+            echo '```'; cat "$ev/file.txt"; echo '```'
+            echo "NEEDED:"; echo '```'; cat "$ev/needed-libs.txt"; echo '```'
+            echo "sha256:"; echo '```'; grep -E ' \./(beagley_cluster|nowplayingctl)$' "$out/SHA256SUMS"; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: beagley-aarch64-${{ steps.src.outputs.short }}
+          path: ${{ steps.pack.outputs.dir }}
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Fail if an ABI sanity check failed
+        if: steps.pack.outputs.failed != '0'
+        run: |
+          echo "One or more ABI sanity checks failed; see abi-checks.txt in the artifact." >&2
+          exit 1
