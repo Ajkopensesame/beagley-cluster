@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/Ajkopensesame/beagley-cluster/security/advisories/new
+    about: Please report security issues privately via GitHub security advisories, not as a public issue.
+  - name: Hub protocol changes
+    url: https://github.com/Ajkopensesame/vehicle-hub
+    about: Cluster <-> hub vehicle_state protocol changes are proposed in the vehicle-hub repo first.
