@@ -13,6 +13,7 @@ qmllint job that Platform DevOps owns in .github/workflows/checks.yml. Keeping t
 levels here (documented, CTest-only) leaves that job's output untouched.
 """
 import argparse
+import os
 import re
 import subprocess
 import sys
@@ -65,6 +66,46 @@ IMPORT_RE = re.compile(r'^\s*import\s+([A-Za-z_][\w.]*)(?:\s+([\d.]+))?(?:\s+as\
 CARTO_RE = re.compile(r"basemaps\.cartocdn\.com/rastertiles|cartocdn\.com/.*(dark_all|light_all|voyager)")
 
 
+# ---------------------------------------------------------------- qrc references
+# Every literal relative resource path in a QML file ("Foo.qml", "../assets/x.png", ...) must
+# exist in the source tree AND be listed in CMakeLists.txt (QML_FILES / RESOURCES), otherwise it
+# is missing from the compiled binary's qrc and fails at run time with
+# "qrc:/BeagleY/...: No such file or directory" (this is how SkinShowOverride.qml slipped by).
+RESOURCE_LITERAL_RE = re.compile(r'"([A-Za-z0-9_./-]+\.(?:qml|png|svg|jpe?g|ttf|otf|json|js|frag|vert|qsb|webp|gif))"')
+# Intentionally absent from the compiled module. Each entry needs a justification and a check
+# that the reference is guarded so it is never probed in a compiled (qrc:) build.
+OPTIONAL_QRC_REFS = {
+    ("src/ui/MainV3.qml", "SkinShowOverride.qml"):
+        ("qml-dev-only show-profile marker (shipping it would force the show profile)",
+         'Qt.resolvedUrl("SkinShowOverride.qml").toString().indexOf("file:") === 0'),
+}
+
+
+def qrc_reference_failures(root: Path):
+    cmake = (root / "CMakeLists.txt").read_text(encoding="utf-8")
+    failures = []
+    for rel in supported_files(root):
+        text = (root / rel).read_text(encoding="utf-8")
+        for n, line in enumerate(text.splitlines(), 1):
+            code = line.split("//")[0]
+            for m in RESOURCE_LITERAL_RE.finditer(code):
+                ref = m.group(1)
+                if ref.startswith(("http", "/")):
+                    continue
+                optional = OPTIONAL_QRC_REFS.get((rel, ref))
+                if optional:
+                    if optional[1] not in text:
+                        failures.append(f"{rel}:{n}: optional reference '{ref}' ({optional[0]}) must be guarded by: {optional[1]}")
+                    continue
+                target = os.path.normpath(os.path.join(os.path.dirname(rel), ref)).replace(os.sep, "/")
+                if not (root / target).is_file():
+                    failures.append(f"{rel}:{n}: '{ref}' -> {target} does not exist")
+                elif target not in cmake:
+                    failures.append(f"{rel}:{n}: '{ref}' -> {target} exists but is not listed in CMakeLists.txt "
+                                    "(QML_FILES/RESOURCES), so it is missing from the compiled qrc")
+    return failures
+
+
 def run_guards(root: Path) -> int:
     failures = []
     for rel in supported_files(root):
@@ -92,6 +133,7 @@ def run_guards(root: Path) -> int:
                     if CARTO_RE.search(line):
                         failures.append(f"{p.relative_to(root)}:{n}: Carto keyless raster tiles are dead "
                                         "(API KEY REQUIRED watermark); use BEAGLEY_MAP_TILE_URL")
+    failures += qrc_reference_failures(root)
     for f in failures:
         print("GUARD FAIL:", f)
     print(f"qml_static_guards: {len(supported_files(root))} files checked, {len(failures)} problem(s)")
