@@ -13,6 +13,7 @@ follow [Semantic Versioning](https://semver.org/) (see [docs/RELEASING.md](docs/
 - Board runbook: recorded BBB access path, missing BeagleY NTP daemon, BBB clock status and GPS-first speed links (`docs/BOARD_RUNBOOK.md`).
 - `THIRD_PARTY_NOTICES.md` inventory of bundled/third-party components and open licence questions.
 - `CHANGELOG.md`, `docs/RELEASING.md` and a CMake project version (`0.2.0`).
+- Third-party provenance review: verified MapLibre GL JS 4.7.1 / Orbitron / Oxanium sources, added `licenses/` (MapLibre BSD-3, Oxanium OFL), per-icon SVG Repo licence table, OpenFreeMap/OSM attribution requirements and gaps in `THIRD_PARTY_NOTICES.md`.
 - Docs: deployed BBB state (release `305b982`, verified 2026-10-03 15:55 AEST) added to `docs/BOARD_RUNBOOK.md`; UART4 (`/dev/ttyS4`) is now the enabled UNO serial input and the GPS is on `/dev/ttyS1`; corrected stale `ttyS4`-as-GPS values in `tools/bbb_hub/bbb-hardware-gps.env.example` (comments/example values only) and in the wiring, bench-checklist, Wi-Fi architecture, serial-protocol, deploy-plan (now marked executed) and UNO README docs.
 
 ### Notes
