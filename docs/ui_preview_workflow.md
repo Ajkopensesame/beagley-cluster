@@ -6,7 +6,7 @@ the display layout is changing.
 ## Start The Local Display
 
 ```bash
-cd /Users/joshkomant/projects/beagley-cluster
+cd /path/to/beagley-cluster
 ./tools/ui/mac_preview.sh
 ```
 
@@ -18,21 +18,21 @@ To keep the preview running in the background while editing, use the managed
 starter:
 
 ```bash
-cd /Users/joshkomant/projects/beagley-cluster
+cd /path/to/beagley-cluster
 ./tools/ui/start_mac_preview.sh
 ```
 
 Stop it with:
 
 ```bash
-cd /Users/joshkomant/projects/beagley-cluster
+cd /path/to/beagley-cluster
 ./tools/ui/stop_mac_preview.sh
 ```
 
 ## Watch While Editing
 
 ```bash
-cd /Users/joshkomant/projects/beagley-cluster
+cd /path/to/beagley-cluster
 ./tools/ui/mac_preview.sh --watch
 ```
 
@@ -44,7 +44,7 @@ while watch mode is active, the watcher relaunches it.
 ## Use Live Vehicle Data
 
 ```bash
-cd /Users/joshkomant/projects/beagley-cluster
+cd /path/to/beagley-cluster
 ./tools/ui/mac_preview.sh --watch --live --hub ws://10.24.0.7:8765
 ```
 

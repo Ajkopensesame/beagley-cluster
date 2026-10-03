@@ -34,24 +34,11 @@ desktop workflow.
 
 ## Repo entrypoints
 
-- Yocto layer: [yocto/meta-beagley-cluster](/Users/joshkomant/projects/beagley-cluster/yocto/meta-beagley-cluster)
-- Yocto helper: [yocto/build-appliance-image.sh](/Users/joshkomant/projects/beagley-cluster/yocto/build-appliance-image.sh)
-- Mac preflight: [yocto/check-mac-builder.sh](/Users/joshkomant/projects/beagley-cluster/yocto/check-mac-builder.sh)
-- Mac watchdog: [yocto/watch-mac-build.sh](/Users/joshkomant/projects/beagley-cluster/yocto/watch-mac-build.sh)
-- Mac launcher: [yocto/run-mac-docker-build.sh](/Users/joshkomant/projects/beagley-cluster/yocto/run-mac-docker-build.sh)
-- Embedded launcher: [tools/beagley_gpu/run_embedded_with_gate.sh](/Users/joshkomant/projects/beagley-cluster/tools/beagley_gpu/run_embedded_with_gate.sh)
-- Perf replay docs: [tools/perf/README.md](/Users/joshkomant/projects/beagley-cluster/tools/perf/README.md)
-- Release packager: [yocto/package-appliance-release.sh](/Users/joshkomant/projects/beagley-cluster/yocto/package-appliance-release.sh)
-
-## Mac builder contract
-
-- Dedicated external APFS SSD mounted as `BeagleyBuilder`
-- Preflight requires at least `900 GiB` total SSD capacity and `500 GiB` free
-- Docker Desktop `DataFolder` on that SSD
-- Yocto `downloads` and `sstate-cache` on that SSD
-- TI workspace inside Docker volume `beagley-ti-sdk-11-workspace`
-- Mac build profile uses `YOCTO_RESOURCE_PROFILE=moderate-memory`
-- `watch-mac-build.sh` stops the build on Docker storage I/O errors
+- Yocto layer: [yocto/meta-beagley-cluster](../yocto/meta-beagley-cluster)
+- Yocto helper: [yocto/build-appliance-image.sh](../yocto/build-appliance-image.sh)
+- Embedded launcher: [tools/beagley_gpu/run_embedded_with_gate.sh](../tools/beagley_gpu/run_embedded_with_gate.sh)
+- Perf replay docs: [tools/perf/README.md](../tools/perf/README.md)
+- Release packager: [yocto/package-appliance-release.sh](../yocto/package-appliance-release.sh)
 
 ## Validation targets
 

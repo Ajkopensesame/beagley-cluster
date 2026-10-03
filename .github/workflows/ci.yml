@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - ui/slice1-map-hierarchy-quiet-chrome
       - codex/maplibre-native-yocto-build
   pull_request:
 

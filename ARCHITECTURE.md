@@ -111,7 +111,7 @@ Dev-only simulation / stress / gauge-review scenes in MainV3 (and the stress sce
 ## Known debt
 
 1. **Dual assets** — `assets/` vs `src/assets/`; unclear single source of truth.
-2. **Legacy QRC** — `src/qml.qrc` is not used by the current `qt_add_*` path.
+2. ~~**Legacy QRC**~~ — `src/qml.qrc` was removed (2026-10 cleanup); resources come from the `qt_add_*` calls in `CMakeLists.txt`.
 3. **web/test scratch** — `src/ui/web/test/` is gitignored and not referenced by CMake.
 4. **Committed `.bak` files** under `src/ui`.
 

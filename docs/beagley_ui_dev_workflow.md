@@ -4,13 +4,17 @@ Use this workflow when the Mac preview does not match the real display closely
 enough. The BeagleY stays the renderer, and local QML edits are copied to the
 device.
 
+> **Board note (VERIFIED 2026-10-03):** the live display does **not** run from `/opt/beagley-cluster/qml-dev`. It runs a
+> `/data/beagley-cluster/runtime-*/launch.sh` with its own QML root, and pointing these scripts' `--remote-root` at that
+> root deletes it. Read `docs/BOARD_RUNBOOK.md` section 3.1 before syncing anything.
+
 ## One-Time Setup
 
 The installed BeagleY binary must support filesystem QML loading. After that
 binary is deployed, enable QML dev mode:
 
 ```bash
-cd /Users/joshkomant/projects/beagley-cluster
+cd /path/to/beagley-cluster
 ./tools/ui/beagley_enable_qml_dev.sh
 ```
 
@@ -31,7 +35,7 @@ BEAGLEY_QML_DEV_ROOT=/opt/beagley-cluster/qml-dev
 Run the watcher from a Mac terminal:
 
 ```bash
-cd /Users/joshkomant/projects/beagley-cluster
+cd /path/to/beagley-cluster
 ./tools/ui/beagley_watch_qml.sh
 ```
 
@@ -42,7 +46,7 @@ fails, it collects debug output.
 For a single manual sync:
 
 ```bash
-cd /Users/joshkomant/projects/beagley-cluster
+cd /path/to/beagley-cluster
 ./tools/ui/beagley_sync_qml.sh
 ```
 
@@ -69,7 +73,7 @@ binary.
 ## Return To Production Mode
 
 ```bash
-cd /Users/joshkomant/projects/beagley-cluster
+cd /path/to/beagley-cluster
 ./tools/ui/beagley_disable_qml_dev.sh
 ```
 

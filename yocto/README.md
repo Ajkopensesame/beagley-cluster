@@ -51,34 +51,11 @@ The TI workspace and build tree are kept on a Docker volume, not the macOS
 filesystem, because BitBake's Unix socket handling is not reliable on a bind
 mount backed by Docker Desktop's host file sharing.
 
-## macOS builder path
+## macOS builder path (removed)
 
-For the supported Mac-specific path, keep the repo on the internal SSD but move
-Docker Desktop's disk image plus Yocto caches onto a dedicated external APFS
-SSD. The expected layout is:
-
-- Docker Desktop `DataFolder`: `/Volumes/BeagleyBuilder/DockerDesktop`
-- downloads cache: `/Volumes/BeagleyBuilder/beagley-cache/downloads`
-- sstate cache: `/Volumes/BeagleyBuilder/beagley-cache/sstate-cache`
-- TI workspace: Docker volume `beagley-ti-sdk-11-workspace`
-
-Use the Mac-specific helper instead of `run-builder-container.sh`:
-
-```bash
-./yocto/run-mac-docker-build.sh
-```
-
-This path:
-
-- validates the external APFS volume with `diskutil verifyVolume`
-- requires a dedicated SSD with at least `900 GiB` total capacity
-- checks free space and Docker Desktop settings
-- requires at least `500 GiB` free before launching the build
-- can run a write/read SSD smoke test before the build
-- locks Docker Desktop to the repo's Mac build defaults
-- launches the Yocto build with `YOCTO_RESOURCE_PROFILE=moderate-memory`
-- starts a watchdog that stops the build on Docker storage I/O errors
-- keeps the Mac awake with `caffeinate` while the build runs
+The Mac Docker helpers (`run-mac-docker-build.sh`, `check-mac-builder.sh`, `watch-mac-build.sh`,
+`mac-builder-common.sh`) were removed in the 2026-10 cleanup (see git history). Builds run on CI or the Elitebook
+(`run-builder-container.sh` / `build-appliance-image.sh`), never on the Mac or the boards (see `docs/BOARD_RUNBOOK.md`).
 
 Environment overrides:
 
@@ -136,16 +113,6 @@ Resource profiles:
 - `moderate-memory`: 2-way build parallelism for constrained builders that
   cannot safely sustain full balanced mode
 - `low-memory`: 1-way build parallelism for the most constrained fallback path
-
-For a final Mac-based attempt on an 8 GB machine, prefer `moderate-memory`
-instead of `low-memory`. It is still conservative, but materially faster than
-serial compilation without jumping straight to the 4-way `balanced` profile.
-
-Mac-specific entrypoints:
-
-- `yocto/check-mac-builder.sh`
-- `yocto/watch-mac-build.sh`
-- `yocto/run-mac-docker-build.sh`
 
 When the BeagleY BSP is present, `MACHINE_POLICY=board-bsp` and
 `MACHINE=beagley-ai` are the supported production defaults. The helper only
