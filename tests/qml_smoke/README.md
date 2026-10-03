@@ -58,6 +58,8 @@ Both are `check_qml.py`. File set: every tracked `src/ui/**/*.qml` except `*.bak
   `OPTIONAL_QRC_REFS` with a justification and a required guard expression (currently only the qml-dev-only
   `SkinShowOverride.qml`, probed only when MainV3 was loaded from a `file:` URL). The runtime counterpart is the
   smoke probe: a missing Loader/Image source is a `qWarning`, which fails every `qml_smoke_*` test.
+  Also the MapLibre-native style init guard (`map_style_init_failures`): the wrapper must pass `styleUrl` to the
+  Impl as an initial property via `setSource(...)`, and the Impl must never default to `demotiles` or an empty style.
 * `qmllint_errors`: qmllint from the same Qt install, `-I <build dir>` so `import BeagleY` resolves.
   Fails on syntax errors and on every category except those listed below. Levels are passed
   as flags (not a `.qmllint.ini`) because qmllint applies a repo-level `.qmllint.ini` to *every*

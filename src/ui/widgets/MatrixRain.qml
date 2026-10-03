@@ -4,7 +4,7 @@ Item {
     id: root
     anchors.fill: parent
 
-    // ===== Public API (Main.qml expects THESE) =====
+    // ===== Public API (consumed by MainV3.qml) =====
     property color rainColor: "#C7B7FF"
     property color glowColor: "#EAD7FF"
     property bool effectEnabled: true
