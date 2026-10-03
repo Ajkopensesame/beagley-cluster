@@ -82,6 +82,7 @@ qt_add_executable(beagley_cluster
     src/data/MockVehicleStateClient.cpp
     src/data/VehicleStateClient.cpp
     src/data/VehicleStateSource.cpp
+    src/data/WebSocketFrameDecoder.cpp
     src/navigation/OpenNavigationProvider.cpp
     src/navigation/NavigationService.cpp
     src/render/ClusterRenderModel.cpp
