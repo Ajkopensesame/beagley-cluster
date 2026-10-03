@@ -112,6 +112,10 @@ Top-level required fields:
   - `_health.serialVehicleInputs.enabled` (bool)
   - `_health.serialVehicleInputs.device` (string)
   - `_health.serialVehicleInputs.baud` (int)
+  - `_health.serialVehicleInputs.calibration` (object of bools: fuel, coolant, speed, rpm)
+  - `_health.serialVehicleInputs.raw` (object: last raw a0, a1, speed_hz, rpm_hz)
+  - `_health.serialVehicleInputs.sensorFaults` (list of `fuel_sender_fault` / `coolant_sender_fault`)
+  - See `docs/serial_vehicle_input_protocol.md` for the serial line format and calibration file.
   - `_health.serialVehicleInputs.stale` (bool)
 - Optional deterministic signal monitor diagnostics:
   - `_health.signalMonitor.enabled` (bool)

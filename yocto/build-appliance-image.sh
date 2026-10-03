@@ -19,7 +19,16 @@ YOCTO_BITBAKE_RETRIES="${YOCTO_BITBAKE_RETRIES:-3}"
 YOCTO_GIT_FETCH_RETRIES="${YOCTO_GIT_FETCH_RETRIES:-6}"
 YOCTO_BITBAKE_REPLY_WAIT_SEC="${YOCTO_BITBAKE_REPLY_WAIT_SEC:-300}"
 DEFAULT_GIT_BRANCH="$(git -C "$REPO_ROOT" branch --show-current 2>/dev/null || true)"
-BEAGLEY_CLUSTER_GIT_BRANCH="${BEAGLEY_CLUSTER_GIT_BRANCH:-${DEFAULT_GIT_BRANCH:-main}}"
+BEAGLEY_CLUSTER_GIT_BRANCH="${BEAGLEY_CLUSTER_GIT_BRANCH:-${DEFAULT_GIT_BRANCH:-codex/maplibre-native-yocto-build}}"
+# Release builds pin the app source to an exact commit. Default: the local HEAD
+# (the provenance guard below already requires it to match the remote branch tip).
+# BEAGLEY_CLUSTER_SRCREV=<sha> overrides; BEAGLEY_CLUSTER_USE_AUTOREV=1 tracks the
+# branch tip instead (development only, not reproducible).
+BEAGLEY_CLUSTER_USE_AUTOREV="${BEAGLEY_CLUSTER_USE_AUTOREV:-0}"
+BEAGLEY_CLUSTER_SRCREV="${BEAGLEY_CLUSTER_SRCREV:-}"
+if [[ "$BEAGLEY_CLUSTER_USE_AUTOREV" != 1 && -z "$BEAGLEY_CLUSTER_SRCREV" ]]; then
+  BEAGLEY_CLUSTER_SRCREV="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || true)"
+fi
 BEAGLEY_CLUSTER_PACKAGECONFIG_APPEND="${BEAGLEY_CLUSTER_PACKAGECONFIG_APPEND:-}"
 BEAGLEY_SOURCE_REMOTE="${BEAGLEY_SOURCE_REMOTE:-https://github.com/Ajkopensesame/beagley-cluster.git}"
 BEAGLEY_REQUIRE_REMOTE_REF="${BEAGLEY_REQUIRE_REMOTE_REF:-1}"
@@ -736,6 +745,18 @@ IMAGE_FSTYPES += "wic wic.bmap"
 BEAGLEY_MACHINE_POLICY ?= "${MACHINE_POLICY}"
 BEAGLEY_CLUSTER_GIT_BRANCH ?= "${BEAGLEY_CLUSTER_GIT_BRANCH}"
 EOF
+
+if [[ "$BEAGLEY_CLUSTER_USE_AUTOREV" == 1 ]]; then
+  replace_managed_block conf/local.conf "beagley-cluster source revision" <<EOF
+BEAGLEY_CLUSTER_USE_AUTOREV = "1"
+EOF
+elif [[ -n "$BEAGLEY_CLUSTER_SRCREV" ]]; then
+  replace_managed_block conf/local.conf "beagley-cluster source revision" <<EOF
+BEAGLEY_CLUSTER_SRCREV = "${BEAGLEY_CLUSTER_SRCREV}"
+EOF
+else
+  fail "cannot determine BEAGLEY_CLUSTER_SRCREV (git rev-parse HEAD failed); set BEAGLEY_CLUSTER_SRCREV or BEAGLEY_CLUSTER_USE_AUTOREV=1"
+fi
 
 if [[ -n "$BEAGLEY_CLUSTER_PACKAGECONFIG_APPEND" ]]; then
   replace_managed_block conf/local.conf "beagley-cluster packageconfig overrides" <<EOF
