@@ -257,8 +257,8 @@ qt_add_qml_module(beagley_cluster
 # Skin v2 atlas PNGs referenced via Qt.resolvedUrl("../assets/skin-v2/...") from
 # src/ui/widgets/*.qml (GaugeAtlasMagma, GaugeAtlasRim, MagmaAtlasOverlay).
 # RESOURCES land in the module resource tree at the same source-relative path as
-# the QML files (qrc:/qt/qml/BeagleY/src/ui/assets/skin-v2/...), so the relative
-# URL resolves in compiled builds as well as in qml-dev (filesystem).
+# the QML files (<module prefix>/src/ui/assets/skin-v2/..., whichever QTP0001
+# prefix applies), so the relative URL resolves in compiled builds as well as in qml-dev (filesystem).
 # Only referenced files are packaged: lava-strip.png is intentionally omitted.
 set(BEAGLEY_SKIN_V2_RESOURCES
     src/ui/assets/skin-v2/lava-annulus.png
