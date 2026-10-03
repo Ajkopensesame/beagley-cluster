@@ -1,7 +1,7 @@
 # Serial vehicle input protocol (UNO / Arduino module -> BBB hub)
 
 The BBB hub (`tools/bbb_hub/vehicle_hub_prod.py`) reads one text line per sample from the serial device
-set by `VEHICLE_INPUT_SERIAL_DEVICE` (production board: `/dev/ttyS2`, BBB UART2) at
+set by `VEHICLE_INPUT_SERIAL_DEVICE` (production board: `/dev/ttyS4`, BBB UART4 on P9_11 since 2026-10-03; the earlier `/dev/ttyS2` UART2 RX pin P9_22 is damaged) at
 `VEHICLE_INPUT_SERIAL_BAUD` (default **115200**, 8N1, no flow control). Parsing lives in
 `tools/bbb_hub/input_adapters.py`; calibration in `tools/bbb_hub/sensor_calibration.py`.
 The `vehicle_state` wire format is **unchanged**.
@@ -101,6 +101,12 @@ still undecided and keeps the previous behaviour (serial/CAN only).
 * `raw`: last raw `a0`, `a1`, `speed_hz`, `rpm_hz` seen (for calibration and debugging).
 * `sensorFaults`: from the most recent line, `fuel_sender_fault` / `coolant_sender_fault` for an open/shorted sender.
 * `lastError` reports a missing/unusable calibration file (the hub keeps running with no calibration).
+
+## Testing without a UNO
+
+`tools/bbb_hub/fake_uno.py` writes lines in this format to a new pty (`--link /tmp/fake_uno`), a file/FIFO/tty (`--out`)
+or stdout, with `--sweep fixed|ramp|steps|fault` (`--help`). `tests/test_fake_uno_calibration_e2e.py` runs the real hub
+against it and checks raw -> calibrated values, sender faults, no-calibration and stale behaviour. Local only.
 
 ## Rollback / safety
 

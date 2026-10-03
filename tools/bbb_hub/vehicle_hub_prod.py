@@ -52,7 +52,7 @@ except Exception as exc:
 
 WS_HOST = os.getenv("BBB_HUB_HOST", "0.0.0.0")
 WS_PORT = int(os.getenv("BBB_HUB_PORT", "8765"))
-GPS_DEVICE = os.getenv("BBB_GPS_DEVICE", "/dev/ttyS4")
+GPS_DEVICE = os.getenv("BBB_GPS_DEVICE", "/dev/ttyS1")
 GPS_BAUD = int(os.getenv("BBB_GPS_BAUD", "9600"))
 GPS_READ_TIMEOUT_MS = int(os.getenv("BBB_GPS_READ_TIMEOUT_MS", "200"))
 GPS_STALE_MS = int(os.getenv("BBB_GPS_STALE_MS", "2000"))

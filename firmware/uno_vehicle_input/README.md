@@ -40,7 +40,7 @@ The hub turns counts / Hz into fuel %, coolant C, km/h and rpm with `tools/bbb_h
 ## Wiring (bench)
 
 ```
-UNO D1 (TX) --[1 kOhm]--+--> BBB P9_11 (UART4 RX, /dev/ttyS4: TO CONFIRM)
+UNO D1 (TX) --[1 kOhm]--+--> BBB P9_11 (UART4 RX; `/dev/ttyS4` confirmed present on the BBB, wiring not yet verified)
                         |
                       [2 kOhm]
                         |

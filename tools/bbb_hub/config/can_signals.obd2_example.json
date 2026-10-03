@@ -1,0 +1,89 @@
+{
+  "version": 1,
+  "generatedAt": "2026-10-03T00:00:00+00:00",
+  "source": {
+    "log": null,
+    "labels": null,
+    "note": "STARTER / EXAMPLE ONLY. Generic ISO 15765-4 (11-bit, 500 kbit/s) OBD-II Mode 01 responses from ECU #1 (0x7E8) with the public SAE J1979 formulas. NOT verified on any real vehicle: the IDs, which PIDs the ECU answers, and the bus bitrate must be confirmed. Replace with a dictionary generated from a real capture (tools/bbb_hub/config/README.md)."
+  },
+  "exportPolicy": {
+    "minConfidence": 0.0,
+    "requiresVerified": false,
+    "unknownPolicy": "example file: nothing here is a verified vehicle mapping"
+  },
+  "signals": {
+    "speedKph": {
+      "canId": "0x7E8",
+      "startBit": 24,
+      "length": 8,
+      "endian": "big",
+      "signed": false,
+      "scale": 1.0,
+      "offset": 0.0,
+      "unit": "kph",
+      "when": [
+        {"startBit": 8, "length": 8, "value": 65},
+        {"startBit": 16, "length": 8, "value": 13}
+      ],
+      "confidence": 0.0,
+      "verified": false,
+      "pipeline": {},
+      "evidence": {"formula": "OBD-II PID 0x0D: A km/h", "status": "unverified public-standard example"}
+    },
+    "rpm": {
+      "canId": "0x7E8",
+      "startBit": 24,
+      "length": 16,
+      "endian": "big",
+      "signed": false,
+      "scale": 0.25,
+      "offset": 0.0,
+      "unit": "rpm",
+      "when": [
+        {"startBit": 8, "length": 8, "value": 65},
+        {"startBit": 16, "length": 8, "value": 12}
+      ],
+      "confidence": 0.0,
+      "verified": false,
+      "pipeline": {},
+      "evidence": {"formula": "OBD-II PID 0x0C: (256*A + B) / 4 rpm", "status": "unverified public-standard example"}
+    },
+    "coolantC": {
+      "canId": "0x7E8",
+      "startBit": 24,
+      "length": 8,
+      "endian": "big",
+      "signed": false,
+      "scale": 1.0,
+      "offset": -40.0,
+      "unit": "C",
+      "when": [
+        {"startBit": 8, "length": 8, "value": 65},
+        {"startBit": 16, "length": 8, "value": 5}
+      ],
+      "confidence": 0.0,
+      "verified": false,
+      "pipeline": {},
+      "evidence": {"formula": "OBD-II PID 0x05: A - 40 degC", "status": "unverified public-standard example"}
+    },
+    "fuelPct": {
+      "canId": "0x7E8",
+      "startBit": 24,
+      "length": 8,
+      "endian": "big",
+      "signed": false,
+      "scale": 0.39215686274509803,
+      "offset": 0.0,
+      "unit": "pct",
+      "when": [
+        {"startBit": 8, "length": 8, "value": 65},
+        {"startBit": 16, "length": 8, "value": 47}
+      ],
+      "confidence": 0.0,
+      "verified": false,
+      "pipeline": {},
+      "evidence": {"formula": "OBD-II PID 0x2F: A * 100 / 255 %", "status": "unverified public-standard example"}
+    }
+  },
+  "rejectedSignals": {}
+}

@@ -8,11 +8,15 @@ follow [Semantic Versioning](https://semver.org/) (see [docs/RELEASING.md](docs/
 ## [Unreleased]
 
 ### Added
+- Hub: CAN prep without a car: OBD-II starter dictionary (`tools/bbb_hub/config/can_signals.obd2_example.json`, example only, unverified), additive optional `when` multiplexer in `can_signals.json` (needed for OBD-II PIDs sharing `0x7E8`), pure-Python fake SocketCAN (`tools/bbb_hub/fake_can.py`, `SocketCanSignalSource(socket_factory=...)`), `vcan0` test when available, `docs/can_bus_parts_and_wiring.md`. Fix: CAN log replay (`CAN_RAW_LOG`) was always treated as stale by the hub and never applied.
+- Hub: fake UNO tool (`tools/bbb_hub/fake_uno.py`), fake-UNO calibration end-to-end tests against the real hub, `docs/uno_bench_setup.md`.
 - Hub: GPS-disciplined clock. New additive `gps.utcMs`/`gps.utcValid` (RMC-only UTC) and `tools/bbb_hub/gps_clock.py` + `bbb-gps-clock.service` (runs as `debian` with `CAP_SYS_TIME` only) that steps the BBB clock from GPS time via the hub WebSocket; staged deploy scripts under `tools/bbb_hub/deploy/` (supersedes #29). Hub bench waveform and the baseline/transition monitors no longer depend on wall-clock continuity.
 - Hub: GPS-first speed with pulse fallback (`VEHICLE_SPEED_SOURCE`, `_health.speedSource`); UNO bench-test checklist; `firmware/uno_vehicle_input` sketch.
 - Board runbook: recorded BBB access path, missing BeagleY NTP daemon, BBB clock status and GPS-first speed links (`docs/BOARD_RUNBOOK.md`).
 - `THIRD_PARTY_NOTICES.md` inventory of bundled/third-party components and open licence questions.
 - `CHANGELOG.md`, `docs/RELEASING.md` and a CMake project version (`0.2.0`).
+- Third-party provenance review: verified MapLibre GL JS 4.7.1 / Orbitron / Oxanium sources, added `licenses/` (MapLibre BSD-3, Oxanium OFL), per-icon SVG Repo licence table, OpenFreeMap/OSM attribution requirements and gaps in `THIRD_PARTY_NOTICES.md`.
+- Docs: deployed BBB state (release `305b982`, verified 2026-10-03 15:55 AEST) added to `docs/BOARD_RUNBOOK.md`; UART4 (`/dev/ttyS4`) is now the enabled UNO serial input and the GPS is on `/dev/ttyS1`; corrected stale `ttyS4`-as-GPS values in `tools/bbb_hub/bbb-hardware-gps.env.example` (comments/example values only) and in the wiring, bench-checklist, Wi-Fi architecture, serial-protocol, deploy-plan (now marked executed) and UNO README docs.
 
 ### Notes
 - Repository hygiene, CI checks and community files are tracked in their own PRs and will be listed here
