@@ -119,7 +119,7 @@ GitHub Actions `.github/workflows/ci.yml` runs on every pull request and on push
 
 Other workflows cover the diagnostic replay contracts (`tools/bbb_hub`, `tests`) and the fleet-atlas Pages deploy.
 
-`.github/workflows/checks.yml` adds **non-required** jobs: `Python tests (pytest, 3.12)`, `Lint: shellcheck (severity=error)`, `Lint: ruff (hard errors)` (config: `ruff.toml`) and an informational `Lint: qmllint (informational)`.
+`.github/workflows/checks.yml` adds **non-required** jobs: `Lint: shellcheck (severity=error)`, `Lint: ruff (hard errors)` (config: `ruff.toml`) and an informational `Lint: qmllint (informational)`.
 
 ## License
 

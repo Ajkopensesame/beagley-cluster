@@ -2,7 +2,8 @@ name: Checks
 
 # Additional, NON-REQUIRED checks. The required gate remains the "Configure + build
 # (WITH_WEBENGINE=OFF)" job in ci.yml. Kept in a separate workflow so ci.yml is untouched.
-# Job names (for a later ruleset): "Python tests (pytest, 3.12)", "Lint: shellcheck (severity=error)",
+# Python tests are NOT here: they run in diagnostic-replay-contracts.yml (PR #19).
+# Job names (for a later ruleset): "Lint: shellcheck (severity=error)",
 # "Lint: ruff (hard errors)", "Lint: qmllint (informational)".
 
 on:
@@ -18,32 +19,6 @@ permissions:
   contents: read
 
 jobs:
-  python-tests:
-    name: Python tests (pytest, 3.12)
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install test dependencies
-        run: python -m pip install --upgrade pip pytest
-
-      - name: Run pytest (tests/ and tools/bbb_hub tests, if any)
-        # All tests/test_*.py currently pass without hardware. If one starts needing hardware or extra
-        # dependencies, exclude exactly that file with --deselect/--ignore here and list it in the PR,
-        # rather than hiding the failure.
-        # tests/bbb_nmea_gps_test.py is not collected by pytest (name does not match test_*.py); it runs
-        # via ctest in the C++ test suite.
-        run: |
-          paths="tests"
-          if find tools/bbb_hub -name 'test_*.py' -o -name '*_test.py' | grep -q .; then
-            paths="$paths tools/bbb_hub"
-          fi
-          python -m pytest $paths -q
-
   shellcheck:
     name: "Lint: shellcheck (severity=error)"
     runs-on: ubuntu-22.04
