@@ -41,3 +41,16 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .venv/
+
+# Hygiene (added): backups, Python caches, machine-local target config, build dirs
+*.bak
+*.bak.*
+*.bak[0-9]
+*.orig
+*.rej
+__pycache__/
+*.pyc
+config/beagley-target.env
+build*/
+/build/
+/build-*/

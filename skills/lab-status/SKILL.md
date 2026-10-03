@@ -43,7 +43,8 @@ GitHub guidance:
 - Use `--source-guard` before production Yocto/app builds; it delegates to the
   existing build-source guard and may fail dirty or unsynced source by design.
 
-Default targets can be overridden with:
+Default targets can be overridden with (or set persistently in `config/beagley-target.env`,
+created by copying `config/beagley-target.env.example`; the real file is gitignored):
 
 - `BEAGLEY_TARGETS`, `BEAGLEY_HOST`, `BEAGLEY_HOST_NAME`
 - `ELITEBOOK_TARGETS`, `ELITEBOOK_HOST`, `ELITEBOOK_SSH_KEY`
