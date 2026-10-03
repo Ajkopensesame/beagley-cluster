@@ -70,13 +70,13 @@ Hard rules:
 | Device | Address | How to reach | Owner | Status |
 | --- | --- | --- | --- | --- |
 | BeagleY (`beagley-ai`) Wi-Fi | DHCP. Was `192.168.1.111`, earlier `192.168.1.100`. **Changes.** | From the **Mac only**: find the IP with `dns-sd -G v4 beagley-ai.local`, then `ssh -o BatchMode=yes -o ConnectTimeout=8 -i ~/.ssh/beagley_bbb root@<ip>` | Cluster Lead (app); Chief of Staff (Wi-Fi) | **VERIFIED (HW 2026-10-03)** |
-| BeagleY from the Elitebook | none | Cannot reach it (Wi-Fi client isolation likely). Use the Mac. | n/a | **VERIFIED (HW 2026-10-03)** (cause **TO CONFIRM**) |
+| BeagleY from the Elitebook | none | Cannot reach it. Cause **TO CONFIRM** (Wi-Fi client isolation or a different network). Use the Mac. | n/a | Unreachable: **VERIFIED (HW 2026-10-03)**; cause **TO CONFIRM** |
 | BeagleY `eth0` | `10.24.0.46/24` | Direct hub LAN to the BBB only; not a general uplink | Cluster Lead | **VERIFIED (HW 2026-10-03)**; REPO `05-beagley-eth-debug.network` |
 | BBB hub | `10.24.0.7:8765` (WebSocket) | From the Mac, jump through the BeagleY: `ssh -o BatchMode=yes -i ~/.ssh/beagley_bbb -J root@<beagley-ip> debian@10.24.0.7`. User `debian`; root login refused. | Hardware Integration | **VERIFIED (HW 2026-10-03)** |
-| BBB `sudo` | n/a | `debian` has **no passwordless sudo**. Every `sudo` step needs ThatGuy to run or approve it. | ThatGuy | **VERIFIED (HW 2026-10-03)** |
-| BBB USB gadget (fallback) | `192.168.7.2` | Over the USB cable to the BBB | n/a | Documented, **untested** (TO CONFIRM) |
-| BeagleY USB recovery `usb0` (fallback) | `192.168.7.2/24` | REPO: `55-beagley-usb-recovery.network`, `beagley_wifi_architecture.md` recovery path. Same address as the BBB gadget, so only one board at a time on the cable. | Cluster Lead | REPO; untested on hardware (TO CONFIRM) |
-| BeagleY wired fallback | `10.24.0.x` | Via the hub LAN from the BBB side | n/a | **VERIFIED (HW 2026-10-03)** as a link; use as recovery path **TO CONFIRM** |
+| BBB `sudo` | n/a | `debian` has `sudo` with a password (`(ALL:ALL) ALL`). The only passwordless (NOPASSWD) rule is for exactly `/usr/local/sbin/bbb-bench-sim enable\|disable\|status\|parked\|cruise`. So in general there is no passwordless sudo: hub restart, overlay, clock and any other change need ThatGuy's password. | ThatGuy | **VERIFIED (HW 2026-10-03)** |
+| BBB USB gadget (fallback) | `192.168.7.2` | Over the USB cable to the BBB. BBB `/etc/systemd/network/usb0.network` is static `192.168.7.2/24` with `DHCPServer=on`, so a laptop on that cable gets a lease. `usb0`/`usb1` were down (no cable) on 2026-10-03. | n/a | Config **VERIFIED (HW 2026-10-03)**; path itself **untested** (TO CONFIRM) |
+| BeagleY USB recovery `usb0` (fallback) | `192.168.7.2/24` | REPO: `55-beagley-usb-recovery.network`, `beagley_wifi_architecture.md` recovery path. Same address as the BBB gadget; that is fine as long as only one board is cabled at a time. | Cluster Lead | REPO; untested on hardware (TO CONFIRM) |
+| BeagleY wired path | `10.24.0.x` | Hub LAN between the boards; the BBB jump hop uses it | n/a | Working path **VERIFIED (HW 2026-10-03)**. As a *recovery* path it needs the BeagleY up, so it does not help when the BeagleY is the dead one: recovery use **TO CONFIRM** |
 | Elitebook (Yocto builder) | see `tools/source_truth/build_canonical_yocto_app.sh` | Builds the Yocto aarch64 app/image | Platform DevOps | REPO; current address **TO CONFIRM** |
 | Mac | n/a | Only machine that can reach the BeagleY; hosts the SSH key and snapshots | ThatGuy | **VERIFIED (HW 2026-10-03)** |
 
@@ -91,7 +91,7 @@ Other facts
   running `tools/bbb_hub/run_prod.sh` -> `vehicle_hub_prod.py`, env
   `/etc/default/bbb-hardware-gps`. Legacy `vehicle-hub.service` is disabled.
   **VERIFIED (HW 2026-10-03)**. The repo unit (`tools/bbb_hub/bbb-hardware-gps.service`)
-  matches that shape (REPO) and adds `Restart=always`, `RestartSec=2`.
+  matches that shape (REPO) and adds `Restart=always`, `RestartSec=2`. The repo unit after PR #19 also adds `Type=notify`, `WatchdogSec=15` and log rate limits; the unit on the board is the pre-#19 version.
 * BBB deployed dir `/home/debian/projects/beagley-cluster` is **not a git
   checkout** and is **older than the repo**. **VERIFIED (HW 2026-10-03)**.
   Do not assume repo behaviour equals deployed behaviour.
@@ -199,26 +199,46 @@ a broad `pkill -f`.
 
 ### 3.3 Hub restart (BBB)
 
-The only hub restart path needs `sudo` on the BBB, so **ThatGuy must run it or
-approve a sudoers rule**.
+Restarting the hub needs `sudo` with a password on the BBB (the only NOPASSWD
+rule is for `bbb-bench-sim`), so **ThatGuy must run it or approve a narrow
+sudoers rule**. The same applies to overlay and clock changes.
 
 1. Reach the BBB through the BeagleY jump (section 2). Read-only first:
    `systemctl is-active bbb-hardware-gps`,
    `journalctl -u bbb-hardware-gps -n 50 --no-pager`,
    `cat /etc/default/bbb-hardware-gps`. Log timestamps are unreliable
    (section 6).
-2. A restart blanks the gauges for roughly 5-10 s (from the PR #19 plan).
+2. A restart blanks the gauges for roughly 5-10 s (**estimated** in the PR #19 plan, not measured).
 3. ThatGuy runs: `sudo systemctl restart bbb-hardware-gps`.
 4. Verify within 60 s: service `active`, no traceback in the journal, and the
    cluster on the BeagleY reconnects (`journalctl -u beagley_cluster` shows
    `VehicleStateClient connecting to ws://10.24.0.7:8765`).
    `tools/bbb_hub/check_hub_health.py ... --require-gps` is added by PR #19.
+   Gauge behaviour while the hub is down or its sources are stale goes with two
+   PRs: PR #19 (stale sources publish 0.0 / fail-safe) and PR #23 (UI link-lost
+   dashes and LINK LOST telltale). Read them together; the glass was not
+   checked on hardware (**TO CONFIRM**, owner Cluster HMI/Engineer).
 5. A restart reloads `/etc/default/bbb-hardware-gps`. Env or unit edits also
    need `sudo systemctl daemon-reload`. Keep a dated backup of anything you
    edit.
 
-Bench vehicle simulation toggle (`bbb-bench-sim`, REPO
-`live_cluster_workflow.md`): whether it is installed on the BBB is **TO CONFIRM**.
+**Bench vehicle simulation toggle (`bbb-bench-sim`)**
+
+> **WARNING: `sudo bbb-bench-sim enable` makes the hub send FAKE vehicle data**
+> (speed, rpm, fuel, coolant, gear, indicators, warnings, drivetrain). Run
+> `sudo bbb-bench-sim status` and make sure the state is `disable` before any
+> real-vehicle test or any test whose results depend on real inputs.
+
+Installed on the BBB (**VERIFIED (HW 2026-10-03)**):
+
+* binary `/usr/local/sbin/bbb-bench-sim` (not `/usr/local/bin`)
+* sudoers rule `/etc/sudoers.d/bbb-bench-sim`: NOPASSWD for exactly
+  `enable|disable|status|parked|cruise`
+* scripts `/home/debian/projects/beagley-cluster/tools/bbb_hub/bbb_bench_vehicle_sim.sh`
+  and `install_bbb_bench_sim_toggle.sh`
+* env `BBB_VEHICLE_BENCH_SIM=0`, profile `busy-demo` (read 2026-10-03)
+
+Usage and what it synthesizes: `live_cluster_workflow.md` (REPO).
 
 ---
 
@@ -312,14 +332,20 @@ Summary of PR #19 `bbb_deploy_rollback.md` / `bbb_deploy_plan_2026-10-03.md`
   `~/bbb-snapshots/2026-10-03-pre-deploy/` (checksums in `MANIFEST.sha256`);
   extraction as root, ThatGuy only.
 * Config-only fallbacks (no code change): unset `VEHICLE_INPUT_SERIAL_DEVICE`,
-  unset `CAN_LIVE_INTERFACE`, point `VEHICLE_SENSOR_CALIBRATION` at a missing
-  file, restart the hub.
+  unset `CAN_LIVE_INTERFACE`, restart the hub. Both variables exist in the
+  hub deployed on the BBB today (**VERIFIED (HW 2026-10-03)**).
+  `VEHICLE_SENSOR_CALIBRATION` exists only in repo code from PR #11 (merged);
+  the deployed BBB hub is older code and does not read it at all, so changing
+  it does nothing until the hub is updated.
 * Overlay/UART changes need a BBB reboot: back up `/boot/uEnv.txt`, change one
   overlay at a time, roll back by restoring the copy and rebooting.
 * Ordering trap: a unit with `Type=notify`/`WatchdogSec` installed before
   `sd_notify`-capable code makes systemd kill the hub.
 * The app launcher only waits up to 20 s for the hub and then starts anyway.
-  How the UI behaves without a hub is **TO CONFIRM**.
+  REPO: `VehicleStateClient.cpp` auto-reconnects with backoff and has a stale
+  watchdog, so the app keeps running and reconnects. What the glass shows with
+  no hub is **not confirmed on hardware** (**TO CONFIRM**); owned by Cluster
+  HMI/Engineer (PR #23: link-lost dashes + LINK LOST telltale, merging).
 
 ### 5.3 Image / Yocto rollback (BeagleY)
 
@@ -355,11 +381,14 @@ Order of least to most invasive. Wi-Fi config is **not** yours to edit.
    nothing is in range, the fix belongs to Chief of Staff.
 3. **Wired hub LAN**: the BeagleY `eth0` is `10.24.0.46` and the BBB `10.24.0.7`.
    If the BBB is reachable by another path, the BeagleY can be reached from it
-   at `10.24.0.46`. Not tested as a recovery path (**TO CONFIRM**).
+   at `10.24.0.46`. This is a working path, but it needs the BeagleY up, so it
+   does not help if the BeagleY is the dead board. Recovery use **TO CONFIRM**.
 4. **USB gadget** `192.168.7.2`. The BBB gadget address is documented but
-   untested (**TO CONFIRM**). The BeagleY image also defines `usb0` as
-   `192.168.7.2/24` (REPO), also untested (**TO CONFIRM**). Connect one board
-   at a time and confirm which one answers before doing anything.
+   untested (**TO CONFIRM**). The BBB side is a static `192.168.7.2/24` with a
+   DHCP server, so a laptop on the cable gets a lease. The BeagleY image also
+   defines `usb0` as `192.168.7.2/24` (REPO), also untested (**TO CONFIRM**);
+   that is fine as long as only one board is cabled. Confirm which one
+   answers before doing anything.
 5. **Wi-Fi watchdog**: the BeagleY has a hotspot watchdog that handles
    CC33xx driver stuck states (REPO `beagley_wifi_architecture.md`). Do not
    disable or tune it without Chief of Staff.
@@ -391,11 +420,12 @@ Order of least to most invasive. Wi-Fi config is **not** yours to edit.
 **ThatGuy**
 
 1. Standing rule for approvals: is a PR comment enough, or do you want chat
-   sign-off per deploy? Who may type `sudo` on the BBB, or will you approve a
-   narrow sudoers rule for `systemctl restart bbb-hardware-gps`?
+   sign-off per deploy? `sudo` on the BBB needs your password (except
+   `bbb-bench-sim`): will you run hub restarts yourself, or approve a narrow
+   sudoers rule for `systemctl restart bbb-hardware-gps`?
 2. Should the BBB clock fix (PR #19 plan Stage 3, option A first) go ahead, and
    when?
-3. Is the BBB `bbb-bench-sim` toggle installed and in use?
+3. `bbb-bench-sim` is installed (state `disable`). Who is allowed to enable it, and how is the state checked before a real-vehicle test?
 
 **Chief of Staff (Wi-Fi)**
 
@@ -419,9 +449,10 @@ Order of least to most invasive. Wi-Fi config is **not** yours to edit.
 **Hardware Integration**
 
 10. Is the USB gadget fallback (`192.168.7.2`) tested on the BBB and on the
-    BeagleY? Which one answers when both are on the cable?
-11. Wired `10.24.0.x` recovery to the BeagleY: tested?
-12. After PR #19 merges: update section 3.3/5.2 to point at the merged docs
+    BeagleY? (Only one board should be cabled at a time.)
+11. Wired `10.24.0.x` as a recovery path: it needs the BeagleY up; is there any use case when the BeagleY is the dead board?
+12. What does the glass show when the hub is down or sources are stale (PR #19 + PR #23 together)? Owner: Cluster HMI/Engineer.
+13. After PR #19 merges: update section 3.3/5.2 to point at the merged docs
     and the hub health-check tool, and update the unit state (`Type=notify`).
 
 ---
