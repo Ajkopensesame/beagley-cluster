@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Runs on the MAC. Usage:  bash bbb_stage.sh <stage1|stage2|stage3|rollback1|rollback2|rollback3> [beagley-ip]
+# stage2 = GPS-disciplined clock (bbb-gps-clock.service on the BBB only; no BeagleY steps).
 # Does every read-only check and dry run itself, then asks you to type "yes" and runs the one
 # privileged step with ssh -t, so YOU type the BBB `debian` sudo password. Nothing bypasses sudo.
 # Keep this script, bbb_apply.sh and release-<sha>.tgz in the same folder.
@@ -19,7 +20,6 @@ find_ip() {
 SSHO=(-o BatchMode=yes -o ConnectTimeout=8 -i "$KEY")
 bssh()  { ssh "${SSHO[@]}" -J "root@$IP" debian@10.24.0.7 "$@"; }          # no password needed
 bsshT() { ssh -t "${SSHO[@]}" -J "root@$IP" debian@10.24.0.7 "$@"; }        # interactive: sudo asks YOU
-ysh()   { ssh "${SSHO[@]}" "root@$IP" "$@"; }                               # BeagleY
 confirm() { read -r -p "$1 Type yes to continue: " a; [ "$a" = yes ] || { echo "Stopped. Nothing changed."; exit 0; }; }
 
 [ -n "$STAGE" ] || { sed -n 2,5p "$0"; exit 1; }
@@ -31,7 +31,7 @@ upload_release() {
   [ -f "$TGZ" ] || { echo "release-*.tgz not found next to this script"; exit 1; }
   bssh "mkdir -p $REL" && scp "${SSHO[@]}" -J "root@$IP" "$TGZ" "$HERE/bbb_apply.sh" "debian@10.24.0.7:$REL/" >/dev/null || { echo "upload failed"; exit 1; }
   LOCAL_SUM="$(shasum -a 256 "$TGZ" | cut -d' ' -f1)"
-  bssh "cd $REL && echo '$LOCAL_SUM  release-$SHA.tgz' | sha256sum -c - && { [ -d $SHA ] || tar xzf release-$SHA.tgz; } && ls $SHA/tools/bbb_hub | wc -l" || { echo "checksum/extract failed"; exit 1; }
+  bssh "cd $REL && echo '$LOCAL_SUM  release-$SHA.tgz' | sha256sum -c - && { [ -d $SHA ] || tar xzmf release-$SHA.tgz; } && ls $SHA/tools/bbb_hub | wc -l" || { echo "checksum/extract failed"; exit 1; }
 }
 
 case "$STAGE" in
@@ -51,19 +51,18 @@ stage1)
   echo "-- post check"; bssh "python3 $REL/current/tools/bbb_hub/check_hub_health.py ws://127.0.0.1:8765 --require-gps"
   ;;
 stage2)
-  echo "== Stage 2: clock fix, option A (BeagleY serves time over eth0) =="
-  echo "-- checking the BeagleY for chrony (read-only)"
-  ysh 'command -v chronyd chronyc; ls /etc/chrony.conf /etc/chrony/chrony.conf 2>&1; date; timedatectl 2>&1 | grep -i "synchronized\|NTP"; ss -lun 2>/dev/null | grep ":123 " || echo "nothing listening on UDP 123"'
-  if ! ysh 'command -v chronyd >/dev/null'; then
-    echo "chrony is NOT installed on the BeagleY, so option A cannot proceed as planned. Nothing changed. Tell Cluster Lead."; exit 2
-  fi
-  echo "-- BBB side (read-only)"; bssh 'date; timedatectl 2>&1 | head -6; systemctl list-unit-files | grep -i "timesyncd\|chrony"'
-  confirm "Next: (1) on the BeagleY allow NTP for 10.24.0.0/24 in chrony and restart chronyd (backup kept), (2) on the BBB point timesyncd at 10.24.0.46 and restart the hub."
-  CF="$(ysh 'ls /etc/chrony.conf /etc/chrony/chrony.conf 2>/dev/null | head -1')"
-  ysh "cp -a $CF $CF.bak-hwint-\$(date +%s) && grep -q '^allow 10.24.0.0/24' $CF || echo 'allow 10.24.0.0/24' >> $CF; systemctl restart chronyd 2>/dev/null || systemctl restart chrony; sleep 2; chronyc tracking | head -5; chronyc sources 2>&1 | head -6"
-  echo "NOTE: if 'Leap status' above is not Normal the BeagleY itself has no good time (offline); the BBB will then not sync."
+  echo "== Stage 2: GPS-disciplined clock (bbb-gps-clock.service on the BBB; nothing on the BeagleY) =="
+  bssh "[ -f $REL/current/tools/bbb_hub/gps_clock.py ] && [ -f $REL/current/tools/bbb_hub/bbb-gps-clock.service ]" \
+    || { echo "Stage 1 has not been applied with a release that contains gps_clock.py (releases/current/tools/bbb_hub/gps_clock.py missing). Run stage1 with the new release-<sha>.tgz first. Nothing changed."; exit 1; }
+  echo "-- BBB side (read-only): clock, existing units, GPS time as the hub reports it"
+  bssh 'date -u; timedatectl 2>&1 | head -6; echo "--- bbb-hardware-gps.service:"; systemctl status bbb-hardware-gps --no-pager 2>&1 | head -4; echo "--- bbb-gps-clock.service:"; systemctl cat bbb-gps-clock 2>&1 | head -30; systemctl is-enabled bbb-gps-clock 2>&1; systemctl is-active bbb-gps-clock 2>&1; python3 -c "import websockets; print(\"websockets\", websockets.__version__)" 2>&1'
+  echo "-- dry run on the BBB (does not set the clock; exit 0=already right, 10=would step, 2=no GPS time yet, 3=hub unreachable)"
+  bssh "python3 $REL/current/tools/bbb_hub/gps_clock.py --once --dry-run --timeout 20"; echo "dry-run exit code: $?"
+  confirm "Next: install and enable bbb-gps-clock.service on the BBB (runs as debian with CAP_SYS_TIME only, reads GPS time from the hub, steps the clock when it is off by more than 1 s). No BeagleY changes. No GPS fix yet is fine: it will set the clock when a fix arrives."
   scp "${SSHO[@]}" -J "root@$IP" "$HERE/bbb_apply.sh" "debian@10.24.0.7:$REL/" >/dev/null
-  bsshT "sudo bash $REL/bbb_apply.sh stage2"
+  bsshT "sudo bash $REL/bbb_apply.sh stage2 $(date -u +%s)"
+  echo "-- post check (read-only)"; bssh 'date -u; journalctl -u bbb-gps-clock -n 5 --no-pager -o cat 2>&1; systemctl is-active bbb-gps-clock'
+  echo "Later check:  ssh to the BBB and run:  date; journalctl -u bbb-gps-clock -n 20 --no-pager"
   ;;
 stage3)
   echo "== Stage 3: UART4 overlay + BBB reboot + /dev/ttyS4 =="

@@ -3,7 +3,8 @@
 # Written by Hardware Integration. Read it before you type the sudo password.
 # Every step: backs up what it changes, verifies, and rolls itself back on failure.
 #   stage1   switch hub to the release dir, install repo unit (Type=notify), restart hub, health check
-#   stage2   point systemd-timesyncd at the BeagleY (10.24.0.46), wait for sync, restart hub, health check
+#   stage2   install + enable bbb-gps-clock.service (GPS-disciplined clock, runs as debian with CAP_SYS_TIME only)
+#            optional 2nd arg: the Mac's UTC epoch, printed as a sanity comparison
 #   stage3a  add BB-UART4 overlay to /boot/uEnv.txt and reboot
 #   stage3b  after reboot: check /dev/ttyS4, set VEHICLE_INPUT_SERIAL_DEVICE=/dev/ttyS4, restart hub, health check
 #   rollback1|rollback2|rollback3   undo that stage from the newest backup (3 reboots the board)
@@ -14,8 +15,7 @@ ENVF=/etc/default/bbb-hardware-gps
 UENV=/boot/uEnv.txt
 REL=/home/debian/releases
 CUR=$REL/current
-TIMESYNCD_DROPIN=/etc/systemd/timesyncd.conf.d/beagley.conf
-BEAGLEY_NTP=10.24.0.46
+CLK_UNIT=/etc/systemd/system/bbb-gps-clock.service
 WS=ws://127.0.0.1:8765
 TS="$(date +%Y%m%d-%H%M%S)"   # board clock is wrong; only used to make names unique
 
@@ -75,36 +75,57 @@ rollback1)
   restore_unit_env "$B"; wait_active && say "old unit restored, hub active" || die "hub not active after rollback"
   ;;
 stage2)
-  command -v timedatectl >/dev/null && systemctl list-unit-files | grep -q '^systemd-timesyncd' || die "systemd-timesyncd not available on the BBB"
+  MAC_EPOCH="${SHA:-}"   # for stage2 the 2nd argument is the Mac's UTC epoch (optional, sanity print only)
+  case "$MAC_EPOCH" in ''|*[!0-9]*) MAC_EPOCH="" ;; esac
+  [ -f "$CUR/tools/bbb_hub/gps_clock.py" ] && [ -f "$CUR/tools/bbb_hub/bbb-gps-clock.service" ] \
+    || die "$CUR does not contain gps_clock.py / bbb-gps-clock.service: apply stage1 with a release that includes them first"
   B=/home/debian/rollback/stage2-$TS; mkdir -p "$B"
-  [ -f "$TIMESYNCD_DROPIN" ] && cp -a "$TIMESYNCD_DROPIN" "$B"/
-  date > "$B/clock_before.txt"
-  mkdir -p "$(dirname "$TIMESYNCD_DROPIN")"
-  printf '[Time]\nNTP=%s\nFallbackNTP=\n' "$BEAGLEY_NTP" > "$TIMESYNCD_DROPIN"
-  systemctl enable --now systemd-timesyncd >/dev/null 2>&1
-  systemctl restart systemd-timesyncd
-  say "waiting up to 90 s for time from $BEAGLEY_NTP"
-  OK=0
-  for _ in $(seq 1 90); do
-    [ "$(timedatectl show -p NTPSynchronized --value)" = yes ] && { OK=1; break; }
+  { echo "clock_before: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+    echo "unit_file_present: $([ -f "$CLK_UNIT" ] && echo yes || echo no)"
+    echo "enabled_before: $(systemctl is-enabled bbb-gps-clock 2>&1)"
+    echo "active_before: $(systemctl is-active bbb-gps-clock 2>&1)"
+    echo "timesyncd: $(systemctl is-enabled systemd-timesyncd 2>&1) / $(systemctl is-active systemd-timesyncd 2>&1)"
+  } > "$B/state.txt"
+  [ -f "$CLK_UNIT" ] && cp -a "$CLK_UNIT" "$B/bbb-gps-clock.service"
+  say "state recorded in $B/state.txt"
+  [ -n "$MAC_EPOCH" ] && say "Mac UTC epoch at launch: $MAC_EPOCH; BBB now: $(date -u +%s) (difference includes the time you took to type the password)"
+  sed "s#/home/debian/projects/beagley-cluster/tools/bbb_hub#$CUR/tools/bbb_hub#g" \
+      "$CUR/tools/bbb_hub/bbb-gps-clock.service" > "$CLK_UNIT.new" || die "unit render failed"
+  mv "$CLK_UNIT.new" "$CLK_UNIT"
+  systemctl daemon-reload
+  STEPS_BEFORE="$(journalctl -u bbb-gps-clock -b --no-pager -o cat 2>/dev/null | grep -c 'stepped clock')"
+  OKS_BEFORE="$(journalctl -u bbb-gps-clock -b --no-pager -o cat 2>/dev/null | grep -c 'no step')"
+  systemctl enable --now bbb-gps-clock || { systemctl disable --now bbb-gps-clock >/dev/null 2>&1; rm -f "$CLK_UNIT"; systemctl daemon-reload; die "could not enable bbb-gps-clock; unit removed again"; }
+  say "bbb-gps-clock enabled and started; waiting up to 120 s for a GPS time fix (journalctl -u bbb-gps-clock)"
+  RESULT=""
+  for _ in $(seq 1 120); do
+    if [ "$(systemctl is-active bbb-gps-clock)" = failed ]; then RESULT=failed; break; fi
+    LOG="$(journalctl -u bbb-gps-clock -b --no-pager -o cat 2>/dev/null)"
+    if [ "$(printf '%s\n' "$LOG" | grep -c 'stepped clock')" -gt "$STEPS_BEFORE" ]; then RESULT=stepped; break; fi
+    if [ "$(printf '%s\n' "$LOG" | grep -c 'no step')" -gt "$OKS_BEFORE" ]; then RESULT=correct; break; fi
     sleep 1
   done
-  timedatectl timesync-status 2>&1 | head -12
-  if [ "$OK" = 1 ]; then
-    say "clock synchronized: $(date). Restarting hub so it starts from the corrected clock."
-    systemctl restart bbb-hardware-gps
-    if wait_active && sleep 5 && health --require-gps; then say "STAGE 2 OK"; else die "hub unhealthy after clock step; run: sudo bash $REL/bbb_apply.sh rollback2 (and check the hub)"; fi
-  else
-    say "no sync from $BEAGLEY_NTP (BeagleY NTP server not running, or the BeagleY has no good time). Rolling back the drop-in."
-    rm -f "$TIMESYNCD_DROPIN"; [ -f "$B/beagley.conf" ] && cp -a "$B/beagley.conf" "$TIMESYNCD_DROPIN"
-    systemctl restart systemd-timesyncd
-    exit 1
-  fi
+  say "recent bbb-gps-clock log:"; journalctl -u bbb-gps-clock -n 8 --no-pager -o cat 2>&1 | sed 's/^/    /'
+  say "BBB clock now: $(date -u '+%Y-%m-%d %H:%M:%S') UTC"
+  [ -n "$MAC_EPOCH" ] && say "Mac UTC epoch at launch was $MAC_EPOCH; BBB epoch now $(date -u +%s)"
+  case "$RESULT" in
+  stepped) say "STAGE 2 OK: the clock was set from GPS time. The hub keeps running; restart it (or reboot) later if you want its baseline files stamped with the corrected date." ;;
+  correct) say "STAGE 2 OK: the clock already matches GPS time (no step needed)." ;;
+  failed)
+    systemctl disable --now bbb-gps-clock >/dev/null 2>&1; rm -f "$CLK_UNIT"; systemctl daemon-reload
+    die "bbb-gps-clock entered the failed state; unit removed again (see journalctl -u bbb-gps-clock -n 30 --no-pager)" ;;
+  *)
+    say "STAGE 2 INSTALLED. No GPS time yet (no fix, e.g. indoors, or the hub is not up). This is not an error:"
+    say "the service keeps running and sets the clock as soon as a fix arrives. Check later with:"
+    say "    date; journalctl -u bbb-gps-clock -n 20 --no-pager"
+    systemctl is-active bbb-gps-clock >/dev/null || die "bbb-gps-clock is not active; see journalctl -u bbb-gps-clock -n 30 --no-pager" ;;
+  esac
   ;;
 rollback2)
-  B="$(latest_backup stage2)"; rm -f "$TIMESYNCD_DROPIN"
-  [ -n "$B" ] && [ -f "$B/beagley.conf" ] && cp -a "$B/beagley.conf" "$TIMESYNCD_DROPIN"
-  systemctl restart systemd-timesyncd; say "timesyncd drop-in removed"
+  systemctl disable --now bbb-gps-clock 2>&1 | sed 's/^/    /'
+  rm -f "$CLK_UNIT"
+  systemctl daemon-reload
+  say "bbb-gps-clock disabled and removed (the clock keeps whatever time it has; it is not reverted)"
   ;;
 stage3a)
   [ -f /lib/firmware/BB-UART4-00A0.dtbo ] || ls /boot/dtbs/*/overlays/BB-UART4-00A0.dtbo >/dev/null 2>&1 || die "BB-UART4-00A0.dtbo not found"

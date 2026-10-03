@@ -149,7 +149,7 @@ FRAME_PERIOD_SEC = 0.1
 class VehicleHub:
     def __init__(self) -> None:
         self.clients: set[websockets.WebSocketServerProtocol] = set()
-        self._started_at = time.time()
+        self._started_at = time.monotonic()  # monotonic: bench waveform must not jump when bbb-gps-clock steps the wall clock
         self.last_loop_monotonic = time.monotonic()
         self._gps = NmeaSerialGpsSource(
             device=GPS_DEVICE,
@@ -414,6 +414,9 @@ class VehicleHub:
             "satellites": int(max(8, hardware_gps.get("satellites", 10) or 10)),
             "speedKph": float(max(0.0, BENCH_CRUISE_SPEED_KPH)),
             "headingReliable": True,
+            # Simulated position must never discipline the system clock (see gps_clock.py).
+            "utcMs": 0,
+            "utcValid": False,
         }
 
     def _build_can_replay(self):
@@ -698,7 +701,7 @@ class VehicleHub:
         return evidence
 
     async def next_state(self) -> dict:
-        t = time.time() - self._started_at
+        t = time.monotonic() - self._started_at
         state = (
             self._build_bench_vehicle_state(t)
             if VEHICLE_BENCH_SIM_ENABLED

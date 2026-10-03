@@ -288,12 +288,16 @@ class VehicleTransitionMonitor:
         self._last_event: dict[str, Any] | None = None
         self._last_error: str | None = None
         self._last_save_at = 0.0
+        # Steady time base: wall time at start advanced by monotonic time, so a one-off wall-clock step
+        # (bbb-gps-clock) cannot flush the history / finalize pending windows early.
+        self._wall_anchor = time.time()
+        self._mono_anchor = time.monotonic()
         self._learned_since_save = 0
         self._lineage = dict(lineage or {})
         self._load()
 
     def observe(self, state: dict[str, Any], *, timestamp: float | None = None, learn_allowed: bool | None = None) -> dict[str, Any]:
-        now = time.time() if timestamp is None else timestamp
+        now = self._steady_now() if timestamp is None else timestamp
         if not self.enabled:
             return self._summary(findings=[])
 
@@ -388,6 +392,9 @@ class VehicleTransitionMonitor:
             "findings": findings,
             "lastError": self._last_error,
         }
+
+    def _steady_now(self) -> float:
+        return self._wall_anchor + (time.monotonic() - self._mono_anchor)
 
     def _prune_history(self, now: float) -> None:
         max_before = max((profile.before_seconds for profile in self.profiles), default=2.0)

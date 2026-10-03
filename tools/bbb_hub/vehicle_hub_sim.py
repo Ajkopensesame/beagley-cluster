@@ -141,7 +141,7 @@ class VehicleHub:
     def __init__(self) -> None:
         self.clients: set[websockets.WebSocketServerProtocol] = set()
         self.phone_gps = PhoneGpsStore()
-        self._started_at = time.time()
+        self._started_at = time.monotonic()
 
     async def add_client(self, ws: websockets.WebSocketServerProtocol) -> None:
         self.clients.add(ws)
@@ -253,7 +253,7 @@ class VehicleHub:
         return not fix_valid
 
     async def next_state(self) -> dict:
-        t = time.time() - self._started_at
+        t = time.monotonic() - self._started_at
         state = self._build_simulated_state(t)
         phone_sample = await self.phone_gps.snapshot()
 
