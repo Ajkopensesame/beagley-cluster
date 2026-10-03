@@ -11,7 +11,6 @@ Pixel-close visual match to this still beats incremental Pearl polish.
 Baked from the concept still (bake parameters in [`atlas/atlas-meta.txt`](./atlas/atlas-meta.txt)); the PNGs themselves live only in [`src/ui/assets/skin-v2/`](../../src/ui/assets/skin-v2/):
 
 - `lava-annulus.png` — annular magma (OpacityMask progress on DialChrome)
-- `lava-strip.png` — polar unwrap (reference / future shader map)
 - `glass-rim.png` — specular glass ring overlay
 - `gauge-face-matrix.png` — show-profile face plate
 
@@ -36,7 +35,7 @@ Drive composites the annulus via `GaugeAtlasMagma` (GPU OpacityMask). Show can e
 
 Score captures against the concept PNG with the profile named in the filename.
 
-Latest appliance stills live in [`captures/`](./captures/) (`skin-v2-drive-*.png` / `skin-v2-show-*.png`). `beagley_sync_qml.sh` does not use rsync: it tars the `src/ui` files over ssh into `${REMOTE_ROOT}.tmp` (default `/opt/beagley-cluster/qml-dev.tmp`), then, as the ssh user (root by default), runs `rm -rf ${REMOTE_ROOT}` and `mv`s the new tree into place. That replaces the whole remote directory and wipes anything else in it, including a hand-made `SkinShowOverride.qml` — re-create it after every sync.
+(Older appliance stills under `captures/` were removed in the 2026-10 cleanup; they remain in git history.) `beagley_sync_qml.sh` does not use rsync: it tars the `src/ui` files over ssh into `${REMOTE_ROOT}.tmp` (default `/opt/beagley-cluster/qml-dev.tmp`), then, as the ssh user (root by default), runs `rm -rf ${REMOTE_ROOT}` and `mv`s the new tree into place. That replaces the whole remote directory and wipes anything else in it, including a hand-made `SkinShowOverride.qml` — re-create it after every sync.
 
 ## Related env
 

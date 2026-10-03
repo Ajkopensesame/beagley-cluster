@@ -21,7 +21,7 @@ Related docs: [live_cluster_workflow.md](live_cluster_workflow.md),
 hub protocol [../tools/schema/vehicle_state_v1.md](../tools/schema/vehicle_state_v1.md),
 UNO bench checklist [bench_test_checklist.md](bench_test_checklist.md),
 UNO firmware [../firmware/uno_vehicle_input/](../firmware/uno_vehicle_input/README.md).
-Added by PR #19 (not on this branch until it merges; links resolve after that):
+Added by PR #19 (merged):
 `docs/bbb_deploy_rollback.md`, `docs/bbb_deploy_plan_2026-10-03.md`,
 `docs/bbb_hardware_wiring.md`.
 
@@ -93,7 +93,7 @@ Other facts
   running `tools/bbb_hub/run_prod.sh` -> `vehicle_hub_prod.py`, env
   `/etc/default/bbb-hardware-gps`. Legacy `vehicle-hub.service` is disabled.
   **VERIFIED (HW 2026-10-03)**. The repo unit (`tools/bbb_hub/bbb-hardware-gps.service`)
-  matches that shape (REPO) and adds `Restart=always`, `RestartSec=2`. The repo unit after PR #19 also adds `Type=notify`, `WatchdogSec=15` and log rate limits; the unit on the board is the pre-#19 version.
+  matches that shape (REPO) and adds `Restart=always`, `RestartSec=2`. The repo unit (since PR #19, merged) also has `Type=notify`, `WatchdogSec=15` and log rate limits; the board's unit state is under "Deployed board state" (`Type=notify` since the 2026-10-03 deploy).
 * BBB deployed dir `/home/debian/projects/beagley-cluster` is **not a git
   checkout** and is **older than the repo**. **VERIFIED (HW 2026-10-03)**.
   Do not assume repo behaviour equals deployed behaviour.
@@ -299,9 +299,9 @@ sudoers rule**. The same applies to overlay and clock changes.
 4. Verify within 60 s: service `active`, no traceback in the journal, and the
    cluster on the BeagleY reconnects (`journalctl -u beagley_cluster` shows
    `VehicleStateClient connecting to ws://10.24.0.7:8765`).
-   `tools/bbb_hub/check_hub_health.py ... --require-gps` is added by PR #19.
+   `tools/bbb_hub/check_hub_health.py ... --require-gps` exists (added by PR #19, merged).
    Gauge behaviour while the hub is down or its sources are stale goes with two
-   PRs: PR #19 (stale sources publish 0.0 / fail-safe) and PR #23 (UI link-lost
+   PRs, both merged: PR #19 (stale sources publish 0.0 / fail-safe) and PR #23 (UI link-lost
    dashes and LINK LOST telltale). Read them together; the glass was not
    checked on hardware (**TO CONFIRM**, owner Cluster HMI/Engineer).
 5. A restart reloads `/etc/default/bbb-hardware-gps`. Env or unit edits also
@@ -332,11 +332,11 @@ Usage and what it synthesizes: `live_cluster_workflow.md` (REPO).
 
 Applies to the app/image (BeagleY) and the hub (BBB). Hub specifics are in the
 PR #19 docs (`bbb_deploy_rollback.md`, `bbb_deploy_plan_2026-10-03.md`,
-**not yet on the default branch**).
+now on the default branch).
 
 - [ ] **CI green** on the exact commit. Required check:
       `Configure + build (WITH_WEBENGINE=OFF)`. For hub changes also run
-      `python3 -m pytest tests -q` (Python CI arrives with PR #19/#20).
+      `python3 -m pytest tests -q` (Python CI is `contract-tests` in `diagnostic-replay-contracts.yml`, from PR #19/#20, merged).
 - [ ] **Source of truth clean**: commit is on `codex/maplibre-native-yocto-build`
       and pushed; `skills/cluster-source-truth/scripts/check.sh --strict` is
       clean.
@@ -434,7 +434,7 @@ Summary of PR #19 `bbb_deploy_rollback.md` / `bbb_deploy_plan_2026-10-03.md`
   REPO: `VehicleStateClient.cpp` auto-reconnects with backoff and has a stale
   watchdog, so the app keeps running and reconnects. What the glass shows with
   no hub is **not confirmed on hardware** (**TO CONFIRM**); owned by Cluster
-  HMI/Engineer (PR #23: link-lost dashes + LINK LOST telltale, merging).
+  HMI/Engineer (PR #23, merged: link-lost dashes + LINK LOST telltale; not in the binary currently on the board, see section 6).
 
 ### 5.3 Image / Yocto rollback (BeagleY)
 
@@ -559,7 +559,7 @@ elsewhere in this runbook. No secrets are recorded here.
 * BeagleY Wi-Fi dropouts (above).
 * UNO TX is not wired, so serial inputs read 0 frames; fuel, coolant and rpm are uncalibrated; the UNO sketch pins are
   unverified on hardware.
-* No `can0` and no `can_signals.json` on the BBB (the CAN prep PR is in progress).
+* No `can0` and no `can_signals.json` on the BBB (the CAN prep work is merged in the repo, v0.2.0, but not deployed).
 
 ---
 
@@ -623,8 +623,7 @@ elsewhere in this runbook. No secrets are recorded here.
     BeagleY? (Only one board should be cabled at a time.)
 11. Wired `10.24.0.x` as a recovery path: it needs the BeagleY up; is there any use case when the BeagleY is the dead board?
 12. What does the glass show when the hub is down or sources are stale (PR #19 + PR #23 together)? Owner: Cluster HMI/Engineer.
-13. After PR #19 merges: update section 3.3/5.2 to point at the merged docs
-    and the hub health-check tool, and update the unit state (`Type=notify`).
+13. ~~After PR #19 merges: update 3.3/5.2~~ PR #19 is merged and the docs/tool exist; the unit is `Type=notify` on the board since the 2026-10-03 deploy. Remaining: re-read 3.3/5.2 against `docs/bbb_deploy_rollback.md` once more.
 
 ---
 

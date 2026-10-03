@@ -214,7 +214,6 @@ set(BEAGLEY_QML_FILES
     src/ui/widgets/MapCenterMapLibreNative.qml
     src/ui/widgets/MapVehicleMarker.qml
     src/ui/widgets/WeatherCorners.qml
-    src/ui/widgets/WeatherMoodIcon.qml
     src/ui/widgets/BomCatalog.js
     src/ui/widgets/HighBeamHalo.qml
     src/ui/widgets/WiFiSetupOverlay.qml
@@ -263,7 +262,7 @@ qt_add_qml_module(beagley_cluster
 # RESOURCES land in the module resource tree at the same source-relative path as
 # the QML files (<module prefix>/src/ui/assets/skin-v2/..., whichever QTP0001
 # prefix applies), so the relative URL resolves in compiled builds as well as in qml-dev (filesystem).
-# Only referenced files are packaged: lava-strip.png is intentionally omitted.
+# Only referenced files are packaged.
 set(BEAGLEY_SKIN_V2_RESOURCES
     src/ui/assets/skin-v2/lava-annulus.png
     src/ui/assets/skin-v2/glass-rim.png

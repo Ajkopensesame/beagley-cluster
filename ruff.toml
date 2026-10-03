@@ -1,7 +1,7 @@
 # Minimal Ruff config: hard-error rules only, so CI is green and catches real breakage.
 # Widen gradually (e.g. add F401/F841, then E/W) in follow-up PRs.
 line-length = 120
-extend-exclude = ["src/ui/web", "yocto", "projects/fleet-atlas/runtime"]
+extend-exclude = ["src/ui/web", "yocto"]
 
 [lint]
 # E9: syntax/IO errors; F63: invalid comparisons/asserts; F7: syntax-ish errors in statements;

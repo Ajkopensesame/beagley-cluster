@@ -79,7 +79,7 @@ production data path.
 ## BeagleY: Enter Live Cluster Profile
 
 ```bash
-cd /Users/joshkomant/projects/beagley-cluster
+cd /path/to/beagley-cluster
 tools/ui/beagley_live_cluster_profile.sh
 ```
 

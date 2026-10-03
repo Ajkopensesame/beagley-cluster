@@ -12,7 +12,6 @@ GaugeLensShell 1.0 GaugeLensShell.qml
 MapVehicleMarker 1.0 MapVehicleMarker.qml
 MatrixRain    1.0 MatrixRain.qml
 WeatherCorners 1.0 WeatherCorners.qml
-WeatherMoodIcon 1.0 WeatherMoodIcon.qml
 MapCenterMapLibreNative 1.0 MapCenterMapLibreNative.qml
 WiFiSetupOverlay 1.0 WiFiSetupOverlay.qml
 

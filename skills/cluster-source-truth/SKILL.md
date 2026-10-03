@@ -52,13 +52,13 @@ New-conversation checklist:
    `codex/maplibre-native-yocto-build`.
 2. Run `skills/cluster-source-truth/scripts/check.sh --strict` before changing
    or judging the live display.
-3. If the check shows a dirty `/Users/joshkomant/projects/beagley-cluster`
+3. If the check shows a dirty local Mac checkout
    worktree, treat it as a development queue only. Do not deploy from it.
 4. If the check shows `qml_source=qml-dev`, run the live profile from the
    canonical checkout to return the board to compiled-binary mode:
 
 ```bash
-tools/ui/beagley_live_cluster_profile.sh --host root@192.168.0.92 --simulation --effect-level off --gauge-detail rich
+tools/ui/beagley_live_cluster_profile.sh --host root@<beagley-ip> --simulation --effect-level off --gauge-detail rich
 ```
 
 That live profile defaults to full-map-under-gauges mode. If a menu/window is

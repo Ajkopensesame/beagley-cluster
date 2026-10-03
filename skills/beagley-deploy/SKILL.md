@@ -21,13 +21,13 @@ tools/source_truth/build_canonical_yocto_app.sh
 4. Deploy with `BEAGLEY_DEPLOY_BIN` set:
 
 ```bash
-BEAGLEY_HOST=192.168.0.92 \
+BEAGLEY_HOST=root@<beagley-ip> \
 BEAGLEY_DEPLOY_BIN=/path/to/beagley_cluster-aarch64 \
 skills/beagley-deploy/scripts/deploy.sh
 ```
 
 Do not run a production deploy directly from
-`/Users/joshkomant/projects/beagley-cluster` when it is dirty or on an older
+a local Mac checkout when it is dirty or on an older
 branch. That worktree is a development queue unless it is clean and on the
 canonical branch.
 

@@ -49,9 +49,9 @@ Design goals:
 
 ## Runtime model
 
-- Default entrypoint is now `MainV2`.
-- Legacy screen remains available with `BEAGLEY_UI_VARIANT=legacy`.
-- The run script defaults to V2 unless you override it.
+- *Historical (2026-04):* this design shipped as `MainV2`. The current default entrypoint is `MainV3` (`src/main.cpp`; the embedded render profile uses `MainEmbedded`).
+- `MainV2` is still selectable with `BEAGLEY_UI_VARIANT=v2`, and the legacy screen with `BEAGLEY_UI_VARIANT=legacy`.
+- `run_1920x720.sh` defaults `BEAGLEY_UI_VARIANT` to `v3` unless you override it.
 
 ## Next architectural cleanup I would do
 

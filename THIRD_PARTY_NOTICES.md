@@ -17,8 +17,8 @@ The project's own code is MIT-licensed, see [LICENSE](LICENSE).
 | Oxanium Regular | `src/assets/fonts/Oxanium-Regular.ttf` | SIL OFL 1.1 | **VERIFIED.** Name table: "Copyright 2019 The Oxanium Project Authors (https://github.com/sevmeyer/oxanium)", licence URL `scripts.sil.org/OFL`, version 2.000 (designer: Severin Meyer). 369 of 374 glyph outlines are identical to upstream `fonts/ttf/Oxanium-Regular.ttf` (upstream commit `a8f39e0`), but the file is **not byte-identical** (different build: has a `STAT` table, no `DSIG`), so the exact download source (likely a Google Fonts-derived static instance) is not known. No Reserved Font Name is declared in the upstream OFL. Upstream `OFL.txt` copied to [`licenses/OFL-Oxanium.txt`](licenses/OFL-Oxanium.txt). |
 | Orbitron Medium / Bold | `src/assets/fonts/Orbitron-Medium.ttf`, `Orbitron-Bold.ttf` | SIL OFL 1.1, Reserved Font Name "Orbitron" | **VERIFIED.** PR #16 replaced the previous fake (saved-HTML) files. Both TTFs are **byte-identical** (sha256) to `Orbitron Medium.ttf` / `Orbitron Bold.ttf` at <https://github.com/theleagueof/orbitron> commit `13e6a5222aa6818d81c9acd27edd701a2d744152` (Matt McInerney, (c) 2009). Name table: designer "Matt McInerney", vendor URL theleagueofmoveabletype.com (the upstream files carry no copyright/licence strings of their own). Licence text is in [`src/assets/fonts/OFL-Orbitron.txt`](src/assets/fonts/OFL-Orbitron.txt) (sha256 identical to upstream `Open Font License.markdown`) with provenance in `src/assets/fonts/README-Orbitron.md`. Files are unmodified, so the Reserved Font Name clause is respected. |
 | svgrepo icons (+ `door-open.svg`) | `assets/vic/svg/` | **Per-icon**, see table below | **PARTLY VERIFIED** – see "SVG Repo icons" below |
-| Skin art ("skin v2": atlas, lava, glass rim, concept/captures) | `src/ui/assets/skin-v2/**`, `src/ui/skin-show-marker.png`, `docs/vision/**` | Unknown / owner's own work | **TO CONFIRM with ThatGuy.** Repo evidence is summarised under "Skin art provenance" below; it cannot establish authorship or licence. Do not redistribute outside this repo until confirmed. |
-| Fleet Atlas demo (`projects/fleet-atlas/`) | loads Leaflet 1.9.4 (BSD-2-Clause, TO VERIFY) from unpkg, and Space Grotesk / IBM Plex Mono (OFL, TO VERIFY) from Google Fonts at run time | see left | TO VERIFY; nothing vendored |
+| Skin art ("skin v2": atlas, lava, glass rim, concept still) | `src/ui/assets/skin-v2/**`, `docs/vision/**` | Unknown / owner's own work | **TO CONFIRM with ThatGuy.** Repo evidence is summarised under "Skin art provenance" below; it cannot establish authorship or licence. Do not redistribute outside this repo until confirmed. |
+| ~~Fleet Atlas demo (`projects/fleet-atlas/`)~~ | removed from the repo in the 2026-10 cleanup (it loaded Leaflet 1.9.4 from unpkg and Space Grotesk / IBM Plex Mono from Google Fonts at run time; nothing was vendored). Still in git history. | n/a | n/a |
 
 ### SVG Repo icons
 
@@ -48,18 +48,18 @@ confirmed) attribution-free. To close them the owner can open each icon in a bro
 
 - Git history: `docs/vision/skin-v2-concept-1920x720.png` was first committed in `f80241d` ("Skin v2 Slice A ...
   Vision PNG locked under docs/vision/", 2026-09-06, author `joshkomant`). Every later change to `skin-v2/`,
-  `docs/vision/` and `skin-show-marker.png` is by the same author (commits `92c6511`, `6156465`, `2a21364`, `458d02d`
+  `docs/vision/` and the since-removed `skin-show-marker.png` is by the same author (commits `92c6511`, `6156465`, `2a21364`, `458d02d`
   and the "Skin v2" series). No commit message or doc says where the concept still came from.
 - Embedded metadata: the concept PNG has only `IHDR`, `pHYs` (aspect ratio) and `IDAT` chunks: **no** tEXt/iTXt/eXIf/C2PA
   generator, software, prompt or author fields. No file under these paths contains such metadata, so tool/AI use can
   neither be proved nor excluded from the files.
-- The atlas PNGs (`lava-annulus`, `lava-strip`, `glass-rim`, `gauge-face-matrix`, `progress/lava-p00..20`) are derived from the
+- The atlas PNGs (`lava-annulus`, `glass-rim`, `gauge-face-matrix`, `progress/lava-p00..20`; the unused `lava-strip.png` was removed in the
+  2026-10 cleanup and stays in git history) are derived from the
   concept still: `docs/vision/README.md` ("Atlas assets (from concept PNG)") and `docs/vision/atlas/atlas-meta.txt`
-  (the PNGs are kept only in `src/ui/assets/skin-v2/`; the former byte-identical copies under `docs/vision/atlas/` were removed)
-  (`source=skin-v2-concept-1920x720.png`, `bake=extract_skin_atlas4`). The bake script `extract_skin_atlas4` is not in the
+  (`source=skin-v2-concept-1920x720.png`, `bake=extract_skin_atlas4`). The PNGs are kept only in `src/ui/assets/skin-v2/`. The bake script `extract_skin_atlas4` is not in the
   repository. Ownership of the atlases therefore follows the ownership of the concept still.
-- `docs/vision/captures/*.png` are screenshots of the app itself (1920x720, 100 dpi); they are not third-party art.
-  `skin-show-marker.png` is a 1x1 marker pixel.
+- The former `docs/vision/captures/*.png` were screenshots of the app itself (1920x720, 100 dpi), and `skin-show-marker.png`
+  a 1x1 marker pixel; both were removed in the 2026-10 cleanup (still in git history).
 - The concept still shows a map with place names and no map attribution; that is a mock-up and not evidence either way.
 - Conclusion: no evidence of third-party sourcing, none of AI generation, none of hand-made origin. The owner has to say.
 
