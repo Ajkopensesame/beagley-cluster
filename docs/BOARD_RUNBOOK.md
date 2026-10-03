@@ -221,7 +221,7 @@ re-create them after each sync. Where the master copy of
 PR #8 added `validate_remote_root`: the sync refuses an empty or relative path,
 characters outside `A-Za-z0-9._/-`, `//`, a trailing `/`, `.`/`..` segments,
 fewer than three components, and roots under `/bin /boot /dev /etc /lib* /proc
-/root /run /sbin /sys /usr`. Do not work around it. (`beagley_enable_qml_dev.sh`
+/root /run /sbin /sys /usr`. Do not work around it. A follow-up guard (`fix/sync-qml-live-runtime-guard`) also refuses anything at or under `/data/beagley-cluster`, any `runtime-*` path segment, and - checked over ssh *before* anything is deleted - any root that is, or sits below, a directory holding `launch.sh`, `beagley-cluster-launch.sh`, `capture-once.env`, `bin/beagley_cluster`, `beagley_cluster`, `.live` or `.beagley-live-runtime`. A failing probe also aborts. There is no override; test: `tests/sync_qml_guard_test.sh` (ctest `sync_qml_guard_test`). (`beagley_enable_qml_dev.sh`
 only checks for single quotes itself but calls the sync script, which
 validates.)
 

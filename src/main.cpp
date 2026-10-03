@@ -430,6 +430,7 @@ int main(int argc, char *argv[])
     // Headless QML smoke test hook (BEAGLEY_SMOKE_TEST=1 only; inert otherwise).
     if (SmokeProbe::enabled())
         SmokeProbe::installMessageHandler();
+    SmokeProbe::TeardownGuard smokeTeardownGuard; // must stay the first local: destroyed last
 
     QGuiApplication app(argc, argv);
     qmlRegisterType<GaugeArcItem>("BeagleY", 1, 0, "GaugeArcItem");
@@ -493,6 +494,8 @@ int main(int argc, char *argv[])
                                              mapLibreNativeAllowUntestedStyles);
     engine.rootContext()->setContextProperty("BEAGLEY_MAPLIBRE_NATIVE_STYLE_URL",
                                              mapLibreNativeStyleUrl);
+    engine.rootContext()->setContextProperty("BEAGLEY_MAPLIBRE_NATIVE_DEFAULT_STYLE_URL",
+                                             ClusterConfig::defaultMapLibreNativeStyleUrl());
     engine.rootContext()->setContextProperty("BEAGLEY_MAPLIBRE_NATIVE_TRUSTED_STYLES",
                                              mapLibreNativeTrustedStyles);
     engine.rootContext()->setContextProperty("BEAGLEY_MAPLIBRE_NATIVE_MAX_ZOOM",
@@ -538,6 +541,12 @@ int main(int argc, char *argv[])
                                   QString::fromLatin1(BEAGLEY_BUILD_GIT_COMMIT),
                                   QString::fromLatin1(BEAGLEY_BUILD_GIT_DIRTY),
                                   QString::fromLatin1(BEAGLEY_BUILD_TIMESTAMP_UTC));
+    qInfo().noquote() << "[MAP] MapLibre native: requested =" << (mapRenderer == QLatin1String("maplibre-native"))
+                      << "builtIn =" << mapLibreNativeAvailable
+                      << "startupStyle =" << ClusterConfig::defaultMapLibreNativeStyleUrl()
+                      << "envStyleOverride =" << (mapLibreNativeStyleUrl.isEmpty() ? QStringLiteral("(none)") : mapLibreNativeStyleUrl)
+                      << "(an env style only applies after a map theme is picked; unset it to use the default)"
+                      << "envTrustedStyles =" << (mapLibreNativeTrustedStyles.isEmpty() ? QStringLiteral("(default)") : mapLibreNativeTrustedStyles);
     qInfo() << "[BOOT] uiVariant env =" << qgetenv("BEAGLEY_UI_VARIANT")
             << "hubUrl =" << ClusterConfig::hubUrl()
             << "mapStyle =" << mapStyleUrl
@@ -553,6 +562,7 @@ int main(int argc, char *argv[])
             << "mapLibreNativeAvailable =" << mapLibreNativeAvailable
             << "mapLibreNativeAllowUntestedStyles =" << mapLibreNativeAllowUntestedStyles
             << "mapLibreNativeStyleUrl =" << mapLibreNativeStyleUrl
+            << "mapLibreNativeDefaultStyleUrl =" << ClusterConfig::defaultMapLibreNativeStyleUrl()
             << "mapLibreNativeMaxZoom =" << mapLibreNativeMaxZoom
             << "mapBootMode =" << mapBootMode
             << "mapStyleMode =" << mapStyleMode
@@ -616,11 +626,14 @@ int main(int argc, char *argv[])
     QString entryPoint;
     if (uiVariant == QLatin1String("embedded") || uiVariant == QLatin1String("appliance")) {
         entryPoint = QStringLiteral("MainEmbedded");
-    } else if (uiVariant == QLatin1String("legacy") || uiVariant == QLatin1String("v1")) {
-        entryPoint = QStringLiteral("Main");
-    } else if (uiVariant == QLatin1String("v2")) {
-        entryPoint = QStringLiteral("MainV2");
     } else {
+        // The old Main.qml (legacy/v1) and MainV2.qml (v2) screens were removed. Those values
+        // are still accepted so existing launch scripts keep starting, but they get MainV3.
+        if (uiVariant == QLatin1String("legacy") || uiVariant == QLatin1String("v1")
+            || uiVariant == QLatin1String("v2")) {
+            qWarning() << "[UI] BEAGLEY_UI_VARIANT =" << uiVariant
+                       << "was removed (legacy Main/MainV2 UIs deleted); using MainV3";
+        }
         entryPoint = QStringLiteral("MainV3");
     }
 
@@ -696,20 +709,8 @@ int main(int argc, char *argv[])
     };
     loadEntryPoint(entryPoint);
 
-    // Only desktop-oriented variants should fall back to the legacy Main UI.
-    // On the embedded appliance path that fallback can reintroduce optional
-    // WebEngine dependencies that the production build intentionally excludes.
-    const bool allowLegacyMainFallback =
-        renderProfile != QLatin1String("embedded")
-        && uiVariant != QLatin1String("embedded")
-        && uiVariant != QLatin1String("appliance");
-    if (engine.rootObjects().isEmpty()
-        && allowLegacyMainFallback
-        && entryPoint != QLatin1String("Main")) {
-        qWarning() << "[UI] failed to load" << entryPoint << "- falling back to Main";
-        loadEntryPoint(QStringLiteral("Main"));
-    }
-
+    // No silent fallback to another UI: a MainV3/MainEmbedded load failure is a hard error
+    // (the old fallback to the legacy Main.qml is gone together with that screen).
     if (engine.rootObjects().isEmpty())
         return -1;
 
@@ -750,5 +751,16 @@ int main(int argc, char *argv[])
         }
     }
 
-    return app.exec();
+    const int exitCode = app.exec();
+
+    // Tear the QML scene down while every context object (vehicleState, navigation,
+    // clusterRenderModel, nowPlaying, wifiSetup, ...) is still alive. These locals are
+    // declared after `engine`, so they are destroyed BEFORE it; with the scene still
+    // alive their disappearance re-evaluated ~30 bindings against null ("TypeError:
+    // Cannot read property ... of null") during shutdown. Deleting the root objects first
+    // means no binding can run after the objects they read are gone.
+    const auto roots = engine.rootObjects();
+    for (QObject *root : roots)
+        delete root;
+    return exitCode;
 }

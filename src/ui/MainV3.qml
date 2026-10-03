@@ -644,7 +644,12 @@ Window {
     readonly property bool activeMapTileDarken: !!activeMapThemeOption.tileDarken
     readonly property bool activeMapThemeUsesMapLibre: activeMapThemeOption.mapLibre !== false
         && String(activeMapThemeOption.styleUrl || "").length > 0
-    readonly property string openFreeMapDarkStyleUrl: "https://tiles.openfreemap.org/styles/dark"
+    // Compiled-in default (ClusterConfig::defaultMapLibreNativeStyleUrl) with a literal fallback so
+    // the QML also loads in harnesses that do not inject the context property.
+    readonly property string openFreeMapDarkStyleUrl: (typeof BEAGLEY_MAPLIBRE_NATIVE_DEFAULT_STYLE_URL !== "undefined"
+        && BEAGLEY_MAPLIBRE_NATIVE_DEFAULT_STYLE_URL)
+        ? String(BEAGLEY_MAPLIBRE_NATIVE_DEFAULT_STYLE_URL)
+        : "https://tiles.openfreemap.org/styles/dark"
     readonly property string activeMapStyleUrl: {
         // Skin v2: maplibre-native → trusted dark MapLibre underlay (day or night) until the
         // user picks a map theme this session. Regression at 6156465: this required
@@ -2137,14 +2142,19 @@ Window {
 
         // Probe show-profile without BEAGLEY_SKIN_PROFILE in the running binary.
         // Loader.Ready only when SkinShowOverride.qml exists beside MainV3 (qml-dev).
+        // The file is a qml-dev-only marker and is intentionally NOT in the compiled module
+        // (shipping it would force the show profile permanently). The Loader therefore only
+        // probes when MainV3 itself was loaded from the filesystem (file: URL, i.e.
+        // BEAGLEY_QML_DEV_ROOT); in a compiled build (qrc:) it stays inactive and nothing is
+        // logged ("qrc:/BeagleY/src/ui/SkinShowOverride.qml: No such file or directory").
         // SHOW:  printf '%s\n' 'import QtQuick 2.15; QtObject { objectName: "skinShow" }' \
         //          > /opt/beagley-cluster/qml-dev/src/ui/SkinShowOverride.qml && systemctl restart beagley_cluster
         // DRIVE: rm -f /opt/beagley-cluster/qml-dev/src/ui/SkinShowOverride.qml && systemctl restart beagley_cluster
         Loader {
             id: skinShowLoader
-            active: true
+            active: Qt.resolvedUrl("SkinShowOverride.qml").toString().indexOf("file:") === 0
             asynchronous: false
-            source: Qt.resolvedUrl("SkinShowOverride.qml")
+            source: active ? Qt.resolvedUrl("SkinShowOverride.qml") : ""
         }
 
         Item {

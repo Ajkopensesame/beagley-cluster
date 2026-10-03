@@ -19,6 +19,7 @@
 #include <QStandardPaths>
 #include <QUrl>
 #include "TileTint.h"
+#include "../config/ClusterConfig.h"
 #include <QPainter>
 #include <QVector>
 
@@ -125,6 +126,9 @@ NativeRasterMapItem::NativeRasterMapItem(QQuickItem *parent)
     : QQuickItem(parent)
 {
     setFlag(ItemHasContents, true);
+    // Default tile source honours BEAGLEY_MAP_TILE_URL (also for the embedded map pod, which
+    // never sets tileUrlTemplate); QML can still override the property.
+    m_tileUrlTemplate = ClusterConfig::mapTileUrl();
     m_cacheDirectory = QStandardPaths::writableLocation(QStandardPaths::CacheLocation)
         + QStringLiteral("/native-online-map");
 }
