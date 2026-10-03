@@ -46,7 +46,7 @@ Item {
     readonly property real sweepAngleDeg: 210
 
     // ---- BBB vehicle truth source ----
-    // NOTE: `vehicleState` is expected to be a context property provided by C++ (VehicleStateClient).
+    // NOTE: `vehicleState` is expected to be a context property provided by C++ (VehicleStateClient live, or MockVehicleStateClient when BEAGLEY_VEHICLE_BACKEND=mock).
     // If it is missing, QML should fail loudly rather than invent data.
     property var vehicleState
     property bool stressScene: false

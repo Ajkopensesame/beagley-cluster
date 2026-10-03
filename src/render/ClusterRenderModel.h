@@ -5,7 +5,7 @@
 #include <QVariantList>
 
 class NavigationService;
-class VehicleStateClient;
+class VehicleStateSource;
 
 class ClusterRenderModel final : public QObject
 {
@@ -41,7 +41,7 @@ class ClusterRenderModel final : public QObject
     Q_PROPERTY(QString etaText READ etaText NOTIFY guidanceChanged)
 
 public:
-    explicit ClusterRenderModel(VehicleStateClient *vehicleState,
+    explicit ClusterRenderModel(VehicleStateSource *vehicleState,
                                 NavigationService *navigation,
                                 QObject *parent = nullptr);
 
@@ -86,7 +86,7 @@ private:
     void syncRoutePath();
     void tick();
 
-    VehicleStateClient *m_vehicleState = nullptr;
+    VehicleStateSource *m_vehicleState = nullptr;
     NavigationService *m_navigation = nullptr;
     QTimer m_tickTimer;
 

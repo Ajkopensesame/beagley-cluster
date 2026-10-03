@@ -25,7 +25,9 @@
 
 #include <memory>
 
+#include "data/MockVehicleStateClient.h"
 #include "data/VehicleStateClient.h"
+#include "data/VehicleStateSource.h"
 #include "navigation/NavigationService.h"
 #include "render/ClusterRenderModel.h"
 #include "render/GaugeArcItem.h"
@@ -544,8 +546,23 @@ int main(int argc, char *argv[])
             << "stressScene =" << stressScene
             << "perfMetrics =" << perfMetricsEnabled;
 
-    // Live vehicle_state from BBB (WebSocket) exposed to QML as `vehicleState`
-    VehicleStateClient vehicleState;
+    // vehicle_state backend: BEAGLEY_VEHICLE_BACKEND=mock|live (default live).
+    // Either way it is exposed to QML as `vehicleState` with the same properties.
+    const QString vehicleBackend =
+        QString::fromUtf8(qgetenv("BEAGLEY_VEHICLE_BACKEND")).trimmed().toLower();
+    std::unique_ptr<VehicleStateSource> vehicleStateOwner;
+    if (vehicleBackend == QLatin1String("mock")) {
+        vehicleStateOwner = std::make_unique<MockVehicleStateClient>();
+    } else {
+        if (!vehicleBackend.isEmpty() && vehicleBackend != QLatin1String("live")) {
+            qWarning() << "[main] unknown BEAGLEY_VEHICLE_BACKEND" << vehicleBackend
+                       << "- using live";
+        }
+        vehicleStateOwner = std::make_unique<VehicleStateClient>();
+    }
+    VehicleStateSource &vehicleState = *vehicleStateOwner;
+    qInfo() << "[main] BEAGLEY_VEHICLE_BACKEND ="
+            << (vehicleBackend == QLatin1String("mock") ? "mock" : "live");
     engine.rootContext()->setContextProperty("vehicleState", &vehicleState);
     WiFiSetupService wifiSetup;
     engine.rootContext()->setContextProperty("wifiSetup", &wifiSetup);

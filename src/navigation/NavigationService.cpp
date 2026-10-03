@@ -121,7 +121,7 @@ QVariantList searchResultsToVariantList(const QList<SearchResultData> &parsed)
 }
 } // namespace
 
-NavigationService::NavigationService(VehicleStateClient *vehicleState, WiFiSetupService *wifiSetup, QObject *parent)
+NavigationService::NavigationService(VehicleStateSource *vehicleState, WiFiSetupService *wifiSetup, QObject *parent)
     : QObject(parent)
     , m_vehicleState(vehicleState)
     , m_wifiSetup(wifiSetup)
@@ -164,21 +164,21 @@ NavigationService::NavigationService(VehicleStateClient *vehicleState, WiFiSetup
 
     if (m_vehicleState) {
         const auto updateSlot = [this]() { updateFromVehicle(); };
-        connect(m_vehicleState, &VehicleStateClient::speedKphChanged, this, updateSlot);
-        connect(m_vehicleState, &VehicleStateClient::gpsLatChanged, this, updateSlot);
-        connect(m_vehicleState, &VehicleStateClient::gpsLngChanged, this, updateSlot);
-        connect(m_vehicleState, &VehicleStateClient::gpsBearingChanged, this, updateSlot);
-        connect(m_vehicleState, &VehicleStateClient::gpsAccuracyMChanged, this, updateSlot);
-        connect(m_vehicleState, &VehicleStateClient::gpsTimestampMsChanged, this, updateSlot);
-        connect(m_vehicleState, &VehicleStateClient::gpsFixValidChanged, this, updateSlot);
-        connect(m_vehicleState, &VehicleStateClient::gpsPoseValidChanged, this, updateSlot);
-        connect(m_vehicleState, &VehicleStateClient::gpsSourceChanged, this, updateSlot);
-        connect(m_vehicleState, &VehicleStateClient::gpsSatellitesChanged, this, updateSlot);
-        connect(m_vehicleState, &VehicleStateClient::gpsHeadingReliableChanged, this, updateSlot);
-        connect(m_vehicleState, &VehicleStateClient::linkStaleChanged, this, updateSlot);
-        connect(m_vehicleState, &VehicleStateClient::bbbStaleChanged, this, updateSlot);
-        connect(m_vehicleState, &VehicleStateClient::connectedChanged, this, &NavigationService::updateConnectivityStatus);
-        connect(m_vehicleState, &VehicleStateClient::vehicleStateSeenChanged, this, updateSlot);
+        connect(m_vehicleState, &VehicleStateSource::speedKphChanged, this, updateSlot);
+        connect(m_vehicleState, &VehicleStateSource::gpsLatChanged, this, updateSlot);
+        connect(m_vehicleState, &VehicleStateSource::gpsLngChanged, this, updateSlot);
+        connect(m_vehicleState, &VehicleStateSource::gpsBearingChanged, this, updateSlot);
+        connect(m_vehicleState, &VehicleStateSource::gpsAccuracyMChanged, this, updateSlot);
+        connect(m_vehicleState, &VehicleStateSource::gpsTimestampMsChanged, this, updateSlot);
+        connect(m_vehicleState, &VehicleStateSource::gpsFixValidChanged, this, updateSlot);
+        connect(m_vehicleState, &VehicleStateSource::gpsPoseValidChanged, this, updateSlot);
+        connect(m_vehicleState, &VehicleStateSource::gpsSourceChanged, this, updateSlot);
+        connect(m_vehicleState, &VehicleStateSource::gpsSatellitesChanged, this, updateSlot);
+        connect(m_vehicleState, &VehicleStateSource::gpsHeadingReliableChanged, this, updateSlot);
+        connect(m_vehicleState, &VehicleStateSource::linkStaleChanged, this, updateSlot);
+        connect(m_vehicleState, &VehicleStateSource::bbbStaleChanged, this, updateSlot);
+        connect(m_vehicleState, &VehicleStateSource::connectedChanged, this, &NavigationService::updateConnectivityStatus);
+        connect(m_vehicleState, &VehicleStateSource::vehicleStateSeenChanged, this, updateSlot);
     }
 
     if (m_wifiSetup) {
