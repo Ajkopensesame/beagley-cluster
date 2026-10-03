@@ -7,6 +7,8 @@ follow [Semantic Versioning](https://semver.org/) (see [docs/RELEASING.md](docs/
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-03
+
 ### Added
 - Hub: CAN prep without a car: OBD-II starter dictionary (`tools/bbb_hub/config/can_signals.obd2_example.json`, example only, unverified), additive optional `when` multiplexer in `can_signals.json` (needed for OBD-II PIDs sharing `0x7E8`), pure-Python fake SocketCAN (`tools/bbb_hub/fake_can.py`, `SocketCanSignalSource(socket_factory=...)`), `vcan0` test when available, `docs/can_bus_parts_and_wiring.md`. Fix: CAN log replay (`CAN_RAW_LOG`) was always treated as stale by the hub and never applied.
 - Hub: fake UNO tool (`tools/bbb_hub/fake_uno.py`), fake-UNO calibration end-to-end tests against the real hub, `docs/uno_bench_setup.md`.
@@ -25,8 +27,7 @@ follow [Semantic Versioning](https://semver.org/) (see [docs/RELEASING.md](docs/
 ## History before this changelog (reconstructed, informal)
 
 This section was reconstructed from `git log` and merged PRs #1–#10 on the default branch
-`codex/maplibre-native-yocto-build`; it is a summary, not an exact release record. No versioned release has
-been cut yet.
+`codex/maplibre-native-yocto-build`; it is a summary, not an exact release record. The first versioned release is 0.2.0 (above).
 
 ### 2026-10 (PRs #6–#10)
 - #10 Phase 1 vehicle-state port: `VehicleStateSource` base class, C++ mock, `BEAGLEY_VEHICLE_BACKEND`
