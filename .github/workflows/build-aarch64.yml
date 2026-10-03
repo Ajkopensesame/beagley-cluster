@@ -13,6 +13,9 @@ name: Build aarch64 (BeagleY appliance binary)
 # the checks to run read-only on the board before swapping.
 
 on:
+  push:
+    branches: [build/aarch64-gles-run]
+    paths: ['.github/workflows/build-aarch64.yml']
   workflow_dispatch:
     inputs:
       ref:
